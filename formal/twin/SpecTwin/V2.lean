@@ -2,6 +2,7 @@ import SpecTwin.V2.Types
 import SpecTwin.V2.Basic
 import SpecTwin.V2.Codecs
 import SpecTwin.V2.Relations
+import SpecTwin.V2.Announce
 
 /-! # The twin of protocol-v2.md: its modules
 
