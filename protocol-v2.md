@@ -3039,8 +3039,8 @@ window stretches in proportion as the node's own uplink falls below `ASK_UPLINK`
   window from it, card 17 its push degree). The asked peer's link is not known; a home node asking a
   datacenter peer waits longer than it needs to before moving on, which costs time only when that
   peer does not answer.
-- **The floor** is `protocol.md`'s value: at 50 Mbps and above the protocol is
-  `protocol.md`'s, event for event.
+- **The floor** is `protocol.md`'s value: at 50 Mbps and above the ask window is
+  `protocol.md`'s.
 - **The promise stays at 400 ms**, so a peer that does not answer is still parked as soon as in
   `protocol.md`, and the asker moves on from it later only by the window.
   A slow honest peer can now be
