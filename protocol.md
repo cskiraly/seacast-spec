@@ -2020,6 +2020,7 @@ This document decides at the moment of sending, so it needs the backlog to be in
 | deferred chunks | block root | until the block installs | when their slot leaves the live window or their group expires, at the next heartbeat (`drop_stale_waits`); reservations are released |
 | `tied`, with `tie_slot` (the slot a connection's first copy named, per root and connection) | block root, connection and group | until the root installs | released at its installation; dropped when that slot leaves the live window or its group expires, at the next heartbeat (`drop_stale_waits`), or where the root's bid commits another group (`drop_tie`); an index the group's count, once known, has not (`drop_beyond`); when the connection closes |
 | window slots | node | until a covering HAVE | `WINDOW_TIMEOUT`, or when the peer's queue closes |
+| the window's line (`waiters`) | node, a place per peer's writer | while the writer waits for a slot | when the writer takes a slot (`acquire_slot`) or finds no chunk to send (`release_unused_slot`), or when the peer's queue closes; the first writer in line that can write then tries again, if a slot is free (`wake_front`) |
 
 - **Per-connection state** is reset when the connection closes. A restarted peer usually keeps its
   peer id, so this state must not be keyed by peer id alone.
