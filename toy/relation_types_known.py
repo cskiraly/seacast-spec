@@ -12,18 +12,20 @@ handler as if p had sent it, and S's sends to p are recorded:
 - (a) a JOIN for an object type S does not run: nothing stored in `join_recv`, no JOIN sent back;
 - (b) with p's JOIN for rows taken back (the link has not joined rows), a GRAFT for a row family: no relation, no
   GRAFT pending, nothing sent;
-- (c) the same link, a PRUNE for that family: no backoff set;
+- (c) the same link, with backoffs of five seconds, a PRUNE for that family: no backoff set; the control, a PRUNE
+  for a column family the link has joined: its backoff set;
 - (d) the control: a GRAFT for a column family the link has joined is handled: S answers it;
 - (e) with S's own JOIN for columns owed to a second peer (not yet queued), that peer's GRAFT for a column family:
   ignored, as the link is not yet one of `links(T)`;
 - (f) a WANT for a cell of the row S serves, on the link of (b), which has not joined rows: ignored, no standing
   request, no error;
 - (g) the control: with only S's JOIN for rows owed to the second peer, its GRAFT for a column family: answered;
-- (h) a cell that names its column group, from a third peer whose JOIN for columns is taken back (the link has joined
-  rows only), given to S's `on_frame`: taken (`on_chunk`), since the cell is in a row group too, as an answer to a
-  row WANT is; the control, a fourth peer with both JOINs taken back: ignored.
-On the document before the rule, (a), (b), (c), (e) and (f) fail; on the document before chunks were read through
-every group they belong to, (h) fails.
+- (h) a cell that names its column group, and a holding of that column group, from a third peer whose JOIN for
+  columns is taken back (the link has joined rows only), given to S's `on_frame`: both taken (`on_chunk`,
+  `on_holding`), since chunks and holdings are taken on any link (an answer to a row WANT, and its acknowledgement,
+  can name the cell's column); the same from a fourth peer with both JOINs taken back: taken too.
+On the document before the rule, (a), (b), (c), (e) and (f) fail; on the documents that tested chunks and holdings
+for the link's types, (h) fails.
 """
 import sys
 from pathlib import Path
@@ -89,9 +91,16 @@ def main():
            0 in ns["grafted_out"][p][ROW][fam], 0 in ns["grafted_in"][p][ROW][fam])
     line(f"(b) the link has not joined rows: a GRAFT for row family {fam}: relation or pending GRAFT, sent",
          (any(rel), [m for q, m in sent]), (False, []))
+    spec_bo = (ROW.params.PRUNE_BACKOFF, COL.params.PRUNE_BACKOFF)
+    ROW.params.PRUNE_BACKOFF = COL.params.PRUNE_BACKOFF = 5.0   # a backoff a PRUNE would store
     ns["on_prune"](p, ns["Prune"](object_type="row", family=fam, colour=0, direction="IN"))
-    line(f"(c) the same link, a PRUNE for row family {fam}: backoff set",
-         bool(ns["backoff"][p][ROW][fam]), False)
+    cf = sim.gcol[next(g for g in sim.canonical if sim.gtype.get(g) == "column")]
+    ns["on_prune"](p, ns["Prune"](object_type="column", family=cf, colour=0, direction="IN"))
+    ROW.params.PRUNE_BACKOFF, COL.params.PRUNE_BACKOFF = spec_bo
+    line(f"(c) the same link, backoffs of 5 s: a PRUNE for row family {fam}: backoff set; the control, column "
+         f"family {cf}, joined: backoff set", (bool(ns["backoff"][p][ROW][fam]),
+                                               ns["backoff"][p][COL][cf].get((0, "OUT"), 0.0) > ns["now"]),
+         (False, True))
 
     cfam = sim.gcol[next(g for g in sim.canonical if sim.gtype.get(g) == "column")]
     sent.clear()
@@ -139,13 +148,17 @@ def main():
         del ns["join_recv"][p3][COL]
         del ns["join_recv"][p4][COL]
         del ns["join_recv"][p4][ROW]
-        took, spec_chunk = [], ns["on_chunk"]
+        took, held, spec_chunk, spec_hold = [], [], ns["on_chunk"], ns["on_holding"]
         ns["on_chunk"] = lambda q, ch: took.append(q)
-        ns["on_frame"](p3, Wm.Frame(Wm.Entry(chunk=f)))
-        ns["on_frame"](p4, Wm.Frame(Wm.Entry(chunk=f)))
-        ns["on_chunk"] = spec_chunk
-        line(f"(h) a cell naming column {sim.gcol[cg]}: from node {p3} (rows only joined), from node {p4} (neither): "
-             f"taken", (p3 in took, p4 in took), (True, False))
+        ns["on_holding"] = lambda q, h: held.append(q)
+        hv = Wm.IDONTWANT(Wm.HaveBitmap(group=cg, bits=ns["bitmap"]({f.index})))
+        for q in (p3, p4):
+            ns["on_frame"](q, Wm.Frame(Wm.Entry(chunk=f)))
+            ns["on_frame"](q, Wm.Frame(Wm.Entry(control=hv)))
+        ns["on_chunk"], ns["on_holding"] = spec_chunk, spec_hold
+        line(f"(h) a cell naming column {sim.gcol[cg]}, and a holding of it: from node {p3} (rows only joined), from "
+             f"node {p4} (neither): chunk taken, holding taken", ((p3 in took, p3 in held), (p4 in took, p4 in held)),
+             ((True, True), (True, True)))
     line("penalties", pen, [])
 
 

@@ -159,28 +159,31 @@ where one has a control that must come out the other way, it is named:
 - `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the pairs of family and colour a link
   may have (`MAX_RELATIONS`). With the limit set to what the link has, a GRAFT for a new column
   family is ignored without an answer, the node's own GRAFT for one is not sent, and a PRUNE for one
-  sets no backoff; a GRAFT for a family the link carries is answered yes again; with no limit, the
-  first is answered yes. A backoff not yet run out counts toward the limit, one run out does not,
-  and a PRUNE of the node's still owed counts. The peer's next PRUNE drops a backoff that has run
-  out, and a backoff of zero stores none. The node's upkeep, offered the peer for every family,
-  grafts no pair new to the link at the limit. No penalty. It fails on the document before the
-  limit.
+  sets no backoff, against a control PRUNE for a carried pair that does; a GRAFT for a family the
+  link carries is answered yes again; with no limit, the first is answered yes. A backoff not yet
+  run out counts toward the limit, one run out does not, and a PRUNE of the node's still owed
+  counts. The peer's next PRUNE drops a backoff that has run out, with the entry it empties, and a
+  backoff of zero stores none. The node's upkeep, offered the peer for every family, grafts no pair
+  new to the link at the limit. No penalty. It fails on the document before the limit.
 - `relation_types_known.py`: `protocol-v2.md` §2 and §4.1, object types a link has not joined, under
   `--upkeep on`. A JOIN for a type the node does not run stores nothing and draws no JOIN back; with
   the link's rows JOIN taken back, a GRAFT for a row family makes no relation and draws no answer, a
-  PRUNE sets no backoff, and a WANT for a row cell keeps no standing request; with the node's own
-  JOIN owed to a second peer, that peer's GRAFT is ignored. The controls: a GRAFT for a joined column
-  family is answered, and so is one when only the other type's JOIN is owed. A cell that names its
-  column group is taken on a link that joined only rows, since it is in a row group too, and ignored
-  on one that joined neither. No penalty. It fails on the document before the rule.
+  PRUNE sets no backoff even with a backoff of five seconds, and a WANT for a row cell keeps no
+  standing request; with the node's own JOIN owed to a second peer, that peer's GRAFT is ignored.
+  The controls: a PRUNE for a joined column family sets its backoff, a GRAFT for one is answered,
+  and so is one when only the other type's JOIN is owed. A cell that names its column group, and a
+  holding of that group, are taken on a link that joined only rows and on one that joined neither,
+  since chunks and holdings are taken on any link. No penalty. It fails on the document before the
+  rule.
 - `serve_budget_known.py`: `protocol-v2.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
   budget set to two, of three asks for cells of distinct columns the node holds, not on its offers,
   two are answered and the third refused; an ask on an offer the writer wrote, sent or owed, is
   answered over the budget; a standing request's answer is dropped, and a kept probe answered; after
   the heartbeat, asks are answered again. An id asked twice in a frame is answered and charged once;
   with one unit left, one at the stock limit of three answers is refused without spending it, and
-  the next is answered with it; a plain ask and a probe of the same id in one frame, in either
-  order, give one answer with the probe's exemption. No penalty. It fails on the document before the
+  the next is answered with it; with one unit of the group's limit left, a plain ask and a probe of
+  the same id in one frame, in either order, give one answer with the probe's exemption, and spend
+  no budget. No penalty. It fails on the document before the
   budget.
 - `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
   beyond the group's count keeps no standing request, nor one past the type's most before the count
@@ -188,7 +191,8 @@ where one has a control that must come out the other way, it is named:
   in the run (`fill`, `drop_wants_beyond`); and with the asker's limit of unknown groups set to one
   (`MAX_PENDING_GROUPS`), a second unknown group is ignored while a known one is kept, a place frees
   when its group resolves, its lifetime passes (and the asker's standing request goes with it, at
-  the next heartbeat at the latest), or the connection closes. A standing WANT kept at the source
+  the next heartbeat or the group's opening, whichever comes first), or the connection closes,
+  which leaves no empty entry. A standing WANT kept at the source
   before its publish is answered by the publish. No penalty. It fails on the document before the
   bounds.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an

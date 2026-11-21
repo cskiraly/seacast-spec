@@ -1982,10 +1982,19 @@ class Node:
         ns["claims_close"](q)
         if getattr(self, "alarm_close", None):      # --alarm-wait: the alarm's asks to q not yet written are settled
             self.alarm_close(q)
-        for name in ("holders", "standing", "routed_standing"):
-            for idx in ns[name].values():
-                for s in idx.values():
-                    s.discard(q)
+        for idx in ns["holders"].values():
+            for s in idx.values():
+                s.discard(q)
+        for name in ("standing", "routed_standing"):   # protocol-v2.md §4.5: and the entries that empties
+            tab = ns[name]
+            for g in list(tab):
+                idx = tab[g]
+                for i in list(idx):
+                    idx[i].discard(q)
+                    if not idx[i]:
+                        del idx[i]
+                if not idx:
+                    del tab[g]
         if isinstance(ns.get("mesh"), set):
             ns["mesh"].discard(q)
         ns["leave_line"](q)                         # its place in the window's line, per connection (§8.1)

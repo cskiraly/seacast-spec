@@ -15,8 +15,10 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
 - the limit of unknown groups' places, with the limit one: (e) once (b)'s first column resolves (its header known),
   its place frees and another unknown column is kept; (f) when a place's lifetime passes (`GROUP_TTL`, made short
   here), the next admission frees it and drops the asker's standing request for that column; (g) at the close
-  (`drop_peer`), the asker's places go; (h) a second peer's place past its lifetime, with no WANT after it: the
-  heartbeat (`release_wanted_groups`) frees it and drops its standing request, leaving no empty entry;
+  (`drop_peer`), the asker's places go, with its standing requests and no empty entry left; (h) a second peer's place past its lifetime, with no WANT after it: the
+  heartbeat (`release_wanted_groups`) frees it and drops its standing request, leaving no empty entry; (j) the same
+  peer's place for another column past its lifetime, the group's first cell arriving before the next heartbeat
+  (`fill`): the opening frees the place first, so the request is not answered;
 - (d) with the type's most raised past the count, a routed standing WANT for a column S knows nothing of, at an index
   past its count: kept, with its route mark; then the block runs until S stores the column's cells, and the group's
   opening (`fill`, `drop_wants_beyond`) drops both;
@@ -25,7 +27,8 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
 - penalties: none.
 On the document before the bounds, (a) to (d) and (f) fail. (e) and (g) read the limit's places, which that document
 does not have, so they pass there; they fail on a version of the limit that never freed a place. (h) fails on the
-document before the heartbeat freed places, and (i) on the document before the publish answered standing requests.
+document before the heartbeat freed places, (j) on the document before a group's opening freed them, and (i) on
+the document before the publish answered standing requests.
 """
 import sys
 from pathlib import Path
@@ -103,7 +106,11 @@ def main():
     line(f"(f) column {sim.gcol[gc]}'s place past its lifetime: its standing request kept; column {sim.gcol[gh]} kept",
          (kept(ns, gc, 0, p), kept(ns, gh, 0, p)), (False, True))
     S.drop_peer(p)
-    line("(g) at the close: p's places kept", p in getattr(S, "want_unknown", {}), False)
+    tabs = [ns[t] for t in ("standing", "routed_standing")]
+    empty = any(not idx or any(not s for s in idx.values()) for tab in tabs for idx in tab.values())
+    left = any(p in s for tab in tabs for idx in tab.values() for s in idx.values())
+    line("(g) at the close: p's places kept, empty entries left, p's requests left",
+         (p in getattr(S, "want_unknown", {}), empty, left), (False, False, False))
     q = next(x for x in sorted(S.peers) if x not in (1, p))
     gx = cols[7]
     ns["on_want"](q, [Wm.FlaggedWant(gx, 0, True, 0)])
@@ -116,6 +123,20 @@ def main():
          f"entry left, the place held", (before, (kept(ns, gx, 0, q), gx in ns["standing"],
                                                   gx in getattr(S, "want_unknown", {}).get(q, {}))),
          (True, (False, False, False)))
+    gy = next(g for g in sorted(sim.canonical) if sim.gtype.get(g) == "column" and g not in ns["hdr"]
+              and g not in ns["T_of"] and g not in cols)
+    spec_auth = ns["authenticable"]
+    ns["authenticable"] = lambda g: False if g == gy else spec_auth(g)   # its gate closed, as before its header
+    ns["on_want"](q, [Wm.FlaggedWant(gy, 0, True, 0)])
+    ns["authenticable"] = spec_auth
+    before = kept(ns, gy, 0, q)
+    ns["GROUP_TTL"] = 0.001
+    ns["now"] += 0.01                               # past the place's lifetime, before the next heartbeat
+    r = next(x for x in sorted(S.peers) if x not in (1, p, q))
+    ns["fill"](gy, 0, sim.nodes[1].ns["chunks"][gy][0], r)   # the group's first cell arrives: the group opens
+    del ns["GROUP_TTL"]
+    line(f"(j) node {q}'s place for column {sim.gcol[gy]}: kept; past its lifetime, the group opening before the "
+         f"heartbeat: answers to node {q}", (before, ns["served"][q][gy]), (True, 0))
     ns["MAX_PENDING_GROUPS"] = float("inf")
     if "drop_wants_beyond" not in ns:
         line("(d) the sweep as the group opens (drop_wants_beyond)", "not in the document", "present")

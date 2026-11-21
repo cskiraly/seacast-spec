@@ -13,7 +13,8 @@ and S's answers to p are recorded:
 - (a) with S's limit set to the pairs the link has now, a GRAFT for a family it does not have: no answer, no relation;
 - (b) the control: the same limit, a GRAFT for a family and colour the link carries: answered yes again;
 - (d) the same limit, S's own GRAFT for a new family (`graft`, as its upkeep calls it): nothing sent, nothing pending;
-- (e) the same limit, a PRUNE for a new family: no backoff;
+- (e) the same limit, with backoffs of five seconds, a PRUNE for a new family: no backoff; the control, a PRUNE for
+  a pair the link carries: its backoff set;
 - (c) the control: with no limit, the GRAFT of (a): answered yes, and the relation made;
 - (f) what counts toward the limit, read from `relation_room` with the limit one above what the link has: a backoff
   not yet run out counts, one run out does not, and a PRUNE of S's still owed to p counts;
@@ -93,9 +94,16 @@ def main():
     ns["graft"](p, COL, new[1], 0, "IN")
     line(f"(d) the same limit: S's own GRAFT for column family {new[1]}: sent, pending",
          (list(sent), 0 in ns["grafted_in"][p][COL][new[1]]), ([], False))
+    spec_bo, COL.params.PRUNE_BACKOFF = COL.params.PRUNE_BACKOFF, 5.0   # a backoff a PRUNE would store
     ns["on_prune"](p, ns["Prune"](object_type="column", family=new[2], colour=0, direction="IN"))
-    line(f"(e) the same limit: a PRUNE for column family {new[2]}: backoff set", bool(ns["backoff"][p][COL][new[2]]),
-         False)
+    ctl = None
+    if carried:
+        f0, k0 = sorted(carried)[0]
+        ns["on_prune"](p, ns["Prune"](object_type="column", family=f0, colour=k0, direction="IN"))
+        ctl = any(t > ns["now"] for t in ns["backoff"][p][COL][f0].values())
+    COL.params.PRUNE_BACKOFF = spec_bo
+    line(f"(e) the same limit, backoffs of 5 s: a PRUNE for column family {new[2]}: backoff set; the control, a "
+         f"PRUNE for a pair the link carries: backoff set", (bool(ns["backoff"][p][COL][new[2]]), ctl), (False, True))
     COL.params.MAX_RELATIONS = math.inf
     line(f"(c) no limit: a GRAFT for column family {new[0]}: answers, relation", graft(new[0]), (["Graft"], True))
     if "relation_room" in ns:
@@ -117,13 +125,14 @@ def main():
              (r0, r1, r2, r3), (True, False, True, False))
         z, w = new[5], new[6]
         ns["on_prune"](p, ns["Prune"](object_type="column", family=z, colour=0, direction="IN"))
-        gone = (0, "IN") not in ns["backoff"][p][COL][x]
+        gone = x not in ns["backoff"][p][COL]           # the run-out backoff, and the entry it emptied
         none = not any(ns["backoff"][p][COL][z].values())
         spec_bo, COL.params.PRUNE_BACKOFF = COL.params.PRUNE_BACKOFF, 5.0
         ns["on_prune"](p, ns["Prune"](object_type="column", family=w, colour=0, direction="IN"))
         COL.params.PRUNE_BACKOFF = spec_bo
         stored = ns["backoff"][p][COL][w].get((0, "OUT"), 0.0) > ns["now"]
-        line(f"(g) p's PRUNE for family {z}: family {x}'s run-out backoff gone, none stored at a backoff of 0; at 5 s, "
+        line(f"(g) p's PRUNE for family {z}: family {x}'s run-out backoff and its entry gone, none stored at a "
+             f"backoff of 0; at 5 s, "
              f"family {w}'s stored", (gone, none, stored), (True, True, True))
         spec_cand = ns["candidates"]
         ns["candidates"] = lambda T, fam, c, d: [p]     # p, for every family and colour the upkeep looks at

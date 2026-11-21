@@ -20,8 +20,9 @@ does not, each of a different column:
 - (g) one frame asking an id twice: one answer, the budget, the stock count and `served` charged once;
 - (h) with one unit of the budget left, an id not on an offer at the stock limit of three answers: refused without
   spending the budget; the next ask, for another id not on an offer, is answered with that unit;
-- (i) after the heartbeat, one frame with a plain ask and then p's probe of S's claim, for the same id, and one with
-  the two the other way round: one answer each, and the probe's exemption taken (`probe_answers`) in both;
+- (i) after the heartbeat, with one unit of the group's limit (`SERVE_LIMIT`) left, one frame with a plain ask and
+  then p's probe of S's claim, for the same id, and one with the two the other way round: one answer each, the
+  probe's exemption taken (`probe_answers`), and no budget spent, in both;
 - penalties: none.
 On the document before the budget, (a), (d) and (g) fail, and (b) and (c) have no record of S's offers; (h) fails if
 the budget is charged before the stock limit is read; (i) fails, in its first order, on the document before an id
@@ -128,11 +129,15 @@ def main():
     got = []
     for c, first_probe in ((cells[2], False), (cells[5], True)):   # no probe of these groups yet
         g, i = c
+        T = ns["type_of_group"](g)
+        spec_lim, T.params.SERVE_LIMIT = T.params.SERVE_LIMIT, ns["served"][p][g] + 1   # one unit left
+        hb0 = ns["served_hb"][p]
         plain, probe = Wm.WantIndex(g, i), Wm.FlaggedWant(g, i, False, 0, True)
         n = len(ns["on_want"](p, [probe, plain] if first_probe else [plain, probe]))
-        got.append((n, ns["probe_answers"][p][g].has(i)))
-    line("(i) a plain ask and a probe of the same id in one frame, then the other order: answers, probe's exemption "
-         "taken", got, [(1, True), (1, True)])
+        T.params.SERVE_LIMIT = spec_lim
+        got.append((n, ns["probe_answers"][p][g].has(i), ns["served_hb"][p] - hb0))
+    line("(i) one unit of the group's limit left: a plain ask and a probe of the same id in one frame, then the other "
+         "order: answers, probe's exemption taken, budget spent", got, [(1, True, 0), (1, True, 0)])
     line("penalties", pen, [])
 
 
