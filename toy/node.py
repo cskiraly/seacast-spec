@@ -1401,6 +1401,20 @@ class Node:
         def own_id():                                   # protocol-v2.md §3's helper: the node's own id
             return node.sim.peer_id(node.id)
 
+        want_unknown = {}                               # per peer: the unknown groups its WANTs named
+
+        def admitted_group(p, g):                       # protocol-v2.md §3's helper: a WANT's group within p's limit
+            if g in ns["hdr"] or g in ns["T_of"]:       #   of unknown groups (protocol.md §8.2); the toy sets no
+                return True                             #   limit unless MAX_PENDING_GROUPS is given
+            seen = want_unknown.setdefault(p, set())
+            seen -= {h for h in seen if h in ns["hdr"]}  # one that resolved frees its place
+            if g in seen:
+                return True
+            if len(seen) >= ns["MAX_PENDING_GROUPS"]:
+                return False
+            seen.add(g)
+            return True
+
         def in_pushers(T, fam, col):
             return [q for q in node.peers if col in ns["push_in"][q][T][fam]]
 

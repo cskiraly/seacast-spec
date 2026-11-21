@@ -568,8 +568,10 @@ holds), `open_link(r, T)` (§4.1: connect and JOIN with `our_join(T)`, through `
 neighbours' distance between their computed custody and `fam`; all of them where the rendezvous
 keeps no such rule), `block_of(g)` (the block a cell group belongs to; `g` itself for a type without
 blocks), `wire_size(p, entry)` (§4.11: the bytes the entry's chunk takes on the wire to `p`, the
-binding's: with a header where its write carries one), and `cell_groups(root)` (the column and row
-groups of a block, from their ids alone).
+binding's: with a header where its write carries one), `cell_groups(root)` (the column and row
+groups of a block, from their ids alone), and `admitted_group(p, g)` (§4.5: a group named in `p`'s
+WANT is within `p`'s limit of unknown groups, `protocol.md` §8.2's `MAX_PENDING_GROUPS`, as its
+HAVEs and offers are; a group the node holds state for always is).
 
 ## 4. Events
 
@@ -1343,6 +1345,9 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
     for a in asks:
         gi = group_index(a)
         if gi and expired(gi.group): continue          # past its active lifetime: ignored, no penalty
+        if gi and gi.group in hdr and gi.index >= type_of_group(gi.group).index_count(hdr[gi.group]):
+            continue                                   # §4.5: an index the group has not: ignored, no penalty
+        if gi and not admitted_group(p, gi.group): continue   # §4.5: beyond p's unknown groups (protocol.md §8.2)
         if (gi and outside(p, gi.group, gi.index, gi.hops > 0)   # §4.5: not ours to serve p: ignored, with no
                 and not peer_has[p][gi.group].has(gi.index)): continue   #   penalty and no state (p's claim: below)
         declared = gi and join_recv[p][type_of_group(gi.group)].interest == DECLARED
@@ -1455,6 +1460,14 @@ node that claimed the group whole and is still decoding holds every index in `mi
 comes before the gate is kept as any ask is, and tested when the gate opens (`drop_outside`, from
 `on_header_validated`); a routed one is kept apart (`routed_standing`), so that the test still
 exempts it. An ask for an index the asker itself claimed is penalised as before.
+
+**A WANT is held to two bounds** before it can leave any state, as `protocol.md` §8.2 holds HAVEs
+and offers. An index the group does not have, once the node knows the group's count (`hdr`), is
+ignored. A group the node holds no state for counts against the asker's limit of unknown groups
+(`admitted_group`, `MAX_PENDING_GROUPS`), and an ask beyond it is ignored. Neither is penalised, and
+neither keeps a standing request or a bit of a `DECLARED` peer's interest. Without them, a WANT for
+an index that does not exist kept a standing request that nothing could answer, and WANTs for groups
+that never come kept entries that `expired` never reaches, since such a group has no lifetime.
 - *Why no penalty.* The asker's view can lag the node's honestly: a header the asker holds first, a
   JOIN or an offer in flight. In the toy's custody runs with samplers, the asks a strict test would
   call outside were all such races: a sampler's standing WANT reaching a custodian before the

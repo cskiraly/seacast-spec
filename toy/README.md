@@ -151,6 +151,10 @@ where one has a control that must come out the other way, it is named:
   claimed whole, and an ask that came while the gate was closed, kept and then dropped by
   `drop_outside` when it opens. Two honest runs, custody with samplers and the rows, ignore no ask.
   It fails on the document before the rule.
+- `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
+  beyond the group's count keeps no standing request, and with the asker's limit of unknown groups
+  set to one (`MAX_PENDING_GROUPS`), a second unknown group is ignored while a known one is kept.
+  No penalty. It fails on the document before the bounds.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an
   index it has already received, is acknowledged and neither forwarded nor put in the gossip
   history; a copy of an index held only as rebuilt is still forwarded, and the publisher's first
