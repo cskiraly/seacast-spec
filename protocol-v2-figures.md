@@ -149,7 +149,7 @@ drop the closed peer's offers, tries, promises and ties and to keep its park (§
 **Conditions.** The cells ran `toy/run.py --doc v2 --ihave-limits 4096,5000`, whose limits are the
 reference values of `protocol.md` §8.3, at 60 nodes and degree 30, with three messages and the
 default transport (`--send-buffer 1`). The baseline is the same cell with no limit: each run gave
-that cell's digest. The cells are these:
+the same digest as that cell, so the limits changed no event. The cells are these:
 - At seed 7, they are the tier 4 setting's fifteen recorded cells, variant C (`c`,
   `protocol-v2.md` §6.2), and custody, with and without a fifth of the nodes sampling. They ran on
   2026-11-18 on the draft carrying `protocol.md` v0.10.3.
@@ -219,7 +219,7 @@ typical is not stated.
 with three blocks (`--msgs 3`), seeds 7, 8 and 9, `--send-buffer 0` and the toy's default net
 (home), in five cells. C0 is honest (`--seed S`, 32 row subnets). In C1, a fifth of the nodes lie
 (`--fault claim20`). C2 is the same with 16 subnets and half the columns withheld
-(`--row-subnets 16 --withhold 64 --fault claim20`). C3 is the same with a fifth hoarding
+(`--row-subnets 16 --withhold 64 --fault claim20`). C3 is C2 with a fifth hoarding
 (`--fault hoard20`) in place of the liars. C4 is C2 with 5 % supernodes (`--supernodes 5`, three
 of 60). The runs before 2026-11-16 called `run.py` itself, with the variant's text loaded through
 `TOY_DOC2`; those of 2026-11-16 and 2026-11-18 went through a counting wrapper of the toy's run,
@@ -615,8 +615,8 @@ mechanism, not a measurement.
 
 ### v0.7's single offer
 
-**Conditions.** The cells are the toy's recorded cells (`toy/check.py --doc v2`: 60 nodes, degree
-30, three payloads, seed 7), thirteen of them on 2026-11-04. The cell `loss-thin` refuses a tenth of
+**Conditions.** The cells are the thirteen that `toy/check.py --doc v2` recorded on 2026-11-04
+(60 nodes, degree 30, three payloads, seed 7). The cell `loss-thin` refuses a tenth of
 the data chunks at admission (`--loss-data 10`) on 20 Mbps uplinks (`--up 20`). It ran at one seed.
 It was re-recorded on 2026-11-04, when the draft carried v0.7's single offer; the baseline is the
 cell's recording just before it (digest `bbee3759f47bd944`, after it `2839de460f2704e5`). The
@@ -1252,7 +1252,8 @@ not hurt in the toy gives no figure.
 **Conditions.** The cells run `--setting custody --samplers 20 --net bld --msgs 2`: 500 nodes, a
 fifth of them samplers of eight cells, the 1 Gbps proposer, two blocks, degree 70 or 16, honest and
 with 30 % withholding custodians (`--fault wh30`). Routed requests are on (`ROUTE_HOPS` 1), with a
-floor of one cover or of two. The cells ran at seeds 7 to 16, 2 000 sampler-blocks per row. A time
+floor of one cover or of two. The cells ran at seeds 7 to 16: 2 000 sampler-blocks for each
+configuration (100 samplers, two blocks, ten seeds). A time
 is the median over the 20 blocks. They ran on 2026-10-26 on the draft of 2026-10-23, and were
 recorded in the toy's README ("A sampler's reach"). The figures were first written into the text on
 the main line in spec `0d968d8` (2026-11-14). The transport took every write at once
@@ -1271,7 +1272,7 @@ runs predate ties (2026-10-26), the IHAVE limits (2026-10-27), v0.9's source at 
 **Conditions.** The figures come from the toy's graphs of §1.3's entry, with 500 nodes and seeds 7
 to 16, graph only.
 - The floor of the fewest links comes from `toy/sampler_graph.py a`, a greedy cover, with high
-  custody counted in full. Its figures are medians over samplers, with the range in brackets.
+  custody counted in full. Its figures are medians over samplers, with the range in parentheses.
 - The diversity floor comes from `toy/sampler_match.py`, with covers counted by distinct links and
   400 draws per sampler. A share is that of eight-sample draws that find eight distinct serving
   links, the mean over the seeds. It is given over three populations: 8-column custodians, 5 %
