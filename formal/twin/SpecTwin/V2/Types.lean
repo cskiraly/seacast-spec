@@ -7,8 +7,9 @@ GRAFT or PRUNE queued by `send`), and below the generated `State.lean`, whose v2
 the `String` that `Basic.lean`'s `Group` is. (A WANT's asks with their flags, `AskV2`, hold a `Key`, so they are
 `Basic.lean`'s.)
 
-A bitmap of a message is a natural number: a message's bitmap is never negative in a record (the domain of
-notes/spec-lean/v2-layer/design.md §2). -/
+A bitmap of a message is a natural number: a bitmap that arrives from outside the node (a HAVE's, a WANT's,
+`sample`'s argument) is never negative in a record, and the tracer refuses one that is. The toy would take a
+negative HAVE in places, but no run makes one. -/
 
 namespace SpecTwin.V2
 

@@ -227,7 +227,7 @@ def intOf (j : Json) : Except String Int := do
     return -(n : Int)
   | j => return ((← nat j) : Int)
 
-/-! ### protocol-v2.md's keys and values (design §4.4; the tracer writes them so) -/
+/-! ### protocol-v2.md's keys and values, in the forms the tracer writes -/
 
 /-- An object type's id: its string, as the toy names it (`"payload"`, `"column"`, `"row"`), not empty. -/
 def typeId (j : Json) : Except String V2.TypeId := do

@@ -3,18 +3,18 @@ import SpecTwin.Readers
 
 /-! # protocol-v2.md §1.4 and §4.1: colours, links and the relations' messages
 
-The twin of `colour_of` (§1.4) and of §4.1's functions that the cycle covers (notes/spec-lean/v2-layer/design.md
-§8): `send_join`, `interest_of_peer`, `wants_from_me`, `prune`, `yes`, `no`, `send_relation`,
-`queue_owed_relations`, `serves`, `counted`, `keep_coverage` and `keep_floor`. `join_push`, §4.1's too, calls
-§4.4's `announce`, so it is in `V2/Announce.lean`. `graft` comes with part G (design §8).
+The twin of `colour_of` (§1.4) and of §4.1's functions that the cycle covers: `send_join`, `interest_of_peer`,
+`wants_from_me`, `prune`, `yes`, `no`, `send_relation`, `queue_owed_relations`, `serves`, `counted`,
+`keep_coverage` and `keep_floor`. `join_push`, §4.1's too, calls §4.4's `announce`, so it is in
+`V2/Announce.lean`. `graft` comes with v0.10.12's text.
 
 v2's files follow the calls, not the sections: each function comes after every function it calls, and §4's
 sections call each other both ways (`protocol.md`'s twin does the same, README.md's Scope).
 
-- **A type is its id** (design §1.2): `T.params.X` is `param`, read from the context, and `T.id` is `T`.
+- **A type is its id:** `T.params.X` is `param`, read from the context, and `T.id` is `T`.
 - **A missing key of a dict that raises** is a crash named `KeyError`, with the key: `join_recv[p][T]` raises on
   the type, and `need[fam]` in `counted` on the family.
-- **Two loops with a bound** (design §7): `queue_owed_relations`' fuel is the list's length at the first guard,
+- **Two loops with a bound:** `queue_owed_relations`' fuel is the list's length at the first guard,
   plus one; `keep_coverage`'s is the sum of the positive needs at the first guard, plus one. Running out of fuel
   is a crash of the twin's own name.
 - **`or` and `and` short-circuit** as the Python's do: `send_relation` asks `send` only where nothing is owed,
@@ -28,7 +28,7 @@ sections call each other both ways (`protocol.md`'s twin does the same, README.m
   subscript, augmented ones included (`interest[g] |= bits` is `interest[g] = interest[g] | bits`, a write even
   where nothing changes; `served[q][g] += 1`), and a set that is a table of its own (`probe_asks`, `probe_sent`),
   whose `add` and `discard` the tracer's view logs as a write with no read, so the twin reads nothing there.
-- **A function a node can replace** (design §1.4: `forward`, `push_rebuilt`, `send_have`, `serve_standing`,
+- **A function a node can replace** (`forward`, `push_rebuilt`, `send_have`, `serve_standing`,
   `owed_missing`, `repair_verdict`, `note_claim`, `known_in_scope`) is called through its `…Call`, which asks the
   node's own where the node's line names it as replaced. -/
 
@@ -96,7 +96,7 @@ def no (p : Peer) (T : TypeId) (fam : Fam) (c : Nat) (d : Direction) : M2 m Unit
 /-- `queue_owed_relations(p)` (§4.1): the writer, before anything else (§4.11) -/
 def queueOwedRelations (p : Peer) : M2 m Unit := do
   enter "queue_owed_relations"
-  let fuel := (← owedRelationsOf p).length + 1                -- read at the first guard (design §7)
+  let fuel := (← owedRelationsOf p).length + 1                -- read at the first guard: each turn pops one
   for _ in List.range fuel do
     -- `while owed_relations[p] and has_room(p):`
     let owed ← owedRelationsOf p
@@ -112,7 +112,7 @@ def queueOwedRelations (p : Peer) : M2 m Unit := do
       let _ ← NodeV2.send p (.relation r) (match r with | .join _ => true | _ => false)
       branch "queue_owed_relations: one sent"
     | [] => pure ()
-  crash "twin: queue_owed_relations ran out of fuel (notes/spec-lean/v2-layer/design.md §7)"
+  crash "twin: queue_owed_relations ran out of fuel (the owed list's length at the first guard, plus one)"
 
 /-- `interest_of_peer(p, g)` (§4.1): what p is to receive of g, as far as we know -/
 def interestOfPeer (p : Peer) (g : Group) : M2 m IBits := do
@@ -185,7 +185,7 @@ def keepCoverage (T : TypeId) : M2 m Unit := do
   for q in ← NodeV2.links T do                                -- every link counts, whatever it was opened for
     for fam in ← counted need (← NodeV2.linkCover q T) T do
       need := lower need fam
-  -- the loop's fuel: each turn takes one at least from a positive need (design §7)
+  -- the loop's fuel: each turn takes one at least from a positive need
   let fuel := (need.foldl (fun s (_, n) => if n > 0 then s + n.toNat else s) 0) + 1
   for _ in List.range fuel do
     if !need.any (·.2 > 0) then                               -- `while any(n > 0 for n in need.values()):`
@@ -206,7 +206,7 @@ def keepCoverage (T : TypeId) : M2 m Unit := do
     for fam in ← counted need r T do
       need := lower need fam
     branch "keep_coverage: a sampling link opened"
-  crash "twin: keep_coverage ran out of fuel (notes/spec-lean/v2-layer/design.md §7)"
+  crash "twin: keep_coverage ran out of fuel (the positive needs' sum at the first guard, plus one)"
 
 /-- `keep_floor(T)` (§1.4): at the heartbeat, the links the floor forms on -/
 def keepFloor (T : TypeId) : M2 m Unit := do

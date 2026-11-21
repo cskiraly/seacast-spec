@@ -9,7 +9,7 @@ bitmap that interest reaches is an `IBits`, an `Int` read in two's complement, a
 `Int`: `ofNat a`, whose set bits are `a`'s, and `negSucc m`, which is `~m`, whose set bits are every bit `m` lacks.
 The `#guard` cases below are Python's own values (`python3 -c`), over both signs.
 
-The typing rule (notes/spec-lean/v2-layer/design.md §2): `Bits & IBits` is a `Bits` (`Bits.andI`), since one side
+The typing rule: `Bits & IBits` is a `Bits` (`Bits.andI`), since one side
 is not negative; `IBits & ~Bits` and `IBits | Bits` are `IBits`. -/
 
 namespace SpecTwin.V2
@@ -97,12 +97,12 @@ structure TypeParams where
 
 /-! ## What v2's code asks of the rest of the node
 
-notes/spec-lean/v2-layer/design.md §1.2, §5 and §5.1. A type is its id; its methods and its three parameters that
+A type is its id; its methods and its three parameters that
 are functions are questions with the id first. The helpers the document does not write out are questions too,
 and what they read and write of the twin's tables are their `cr` and `cw` notes on the tape. -/
 
 /-- A record of a node that could be linked, or of a link: `cover_candidates`' and `floor_candidates`' records
-and `link_cover`'s answer (design §5.1). Each has the fields its helper gives it, and a read of one it lacks
+and `link_cover`'s answer. Each has the fields its helper gives it, and a read of one it lacks
 crashes as the toy's `AttributeError`: `link_cover`'s has no id, `floor_candidates`' no flag. -/
 structure Cover where
   id : Option Peer := none
@@ -196,7 +196,7 @@ class NodeV2 (m : Type → Type) where
   openSamplingLink : Cover → TypeId → m Unit
   /-- `choice(xs)` of peers: a draw, answered with a member -/
   choicePeer : List Peer → m Peer
-  /-- `choice(list(s))` of a set of peers: the replay compares the argument as a set (design §3.1) -/
+  /-- `choice(list(s))` of a set of peers: the replay compares the argument as a set -/
   choiceOfSet : List Peer → m Peer
   /-- `choice(xs)` of indices -/
   choiceNat : List Nat → m Nat
@@ -208,21 +208,21 @@ class NodeV2 (m : Type → Type) where
   shuffledPairs : List (Nat × ChunkF) → m (List (Nat × ChunkF))
   /-- `sample_without_replacement(xs, k)` of records -/
   sampleCovers : List Cover → Nat → m (List Cover)
-  /-- the order in which a proxied set of peers iterates at a place of v2's code (design §3.1): a permutation of
+  /-- the order in which a proxied set of peers iterates at a place of v2's code, an `order` entry on the tape: a permutation of
   the members the twin computed -/
   order : String → List Peer → m (List Peer)
   /-- the order in which `probe_waiting[g]`'s keys iterate (`probe_waiting[g].items()` in `serve_waiting_probe`,
-  design §3.2's `keys` entry): a permutation of the keys the twin holds -/
+  a `keys` entry on the tape): a permutation of the keys the twin holds -/
   probeWaitingOrder : Group → List Peer → m (List Peer)
-  /-- the order in which `claims`' keys iterate (`claims.items()` in `claims_close`, design §3.2's `keys`
-  entry): a permutation of the keys the twin holds -/
+  /-- the order in which `claims`' keys iterate (`claims.items()` in `claims_close`, a `keys` entry on
+  the tape): a permutation of the keys the twin holds -/
   claimsOrder : List Group → m (List Group)
-  /-- `own_interest(g)`: `interest[g]`'s default, read where the table has no entry for g, which stores nothing
-  (design §1's fourth point, §4.4) -/
+  /-- `own_interest(g)`: `interest[g]`'s default, read where the table has no entry for g, which stores nothing -/
   ownInterest : Group → m IBits
-  -- The eight names of the 71 that a node can replace and that have a call site inside the replayed closure
-  -- (design §1.4: the second and fourth kinds): where the node's line names one as replaced, the Python asks the
-  -- node, and the twin asks this question in place of the document's body, as `protocol.md`'s `forwardNode` is.
+  -- The eight names of the 71 that a node can replace, by a binding of its own that changes what the function
+  -- does, and that have a call site inside the replayed closure: where the node's line names one as replaced, the
+  -- Python asks the node, and the twin asks this question in place of the document's body, as `protocol.md`'s
+  -- `forwardNode` is.
   /-- `forward(f, from_peer, axes)` as the node binds it -/
   forwardNode : ChunkF → Peer → Option (List GI) → m Unit
   /-- `push_rebuilt(g, new)` as the node binds it -/
@@ -240,7 +240,7 @@ class NodeV2 (m : Type → Type) where
   /-- `known_in_scope(g)` as the node binds it -/
   knownInScopeNode : Group → m Bits
 
-/-- The functions of the 89 left out of this cycle that the 71 call (design §8). Until each is transcribed, its
+/-- The functions of the 89 left out of this cycle that the 71 call. Until each is transcribed, its
 instance is a question on the tape. -/
 class V2Later (m : Type → Type) where
   /-- `window_release(p, g, i)` (§4.11) -/
@@ -319,7 +319,7 @@ instance {m : Type → Type} {σ : Type} [Monad m] [V2Later m] : V2Later (StateT
 instance {m : Type → Type} {ρ : Type} [Monad m] [V2Later m] : V2Later (ReaderT ρ m) where
   windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
 
-/-- v2's node-wide constants this cycle reads (design §5) that `protocol.md`'s `Consts` lacks. Two of v2's
+/-- v2's node-wide constants this cycle reads that `protocol.md`'s `Consts` lacks. Two of v2's
 constants are `Consts`' own fields, read there, so that v2 and the kept functions it calls read one value:
 `SOURCE_OFFERS` is `SOURCE_OFFERS_PUBLISH` (whether it is `PUBLISH`), and `IWANT_WINDOW` is the effective window,
 already scaled by `ask_scale()` at load time, which `may_ask`, `retry_offer` and `ask_parked` read. -/
@@ -499,11 +499,11 @@ def param {m : Type → Type} [Monad m] [Node61 m] {α : Type} [Inhabited α] (T
 #guard Bits.andI 255 (-13) == 243
 #guard Bits.andI 255 (-256) == 0
 
-/-! ## The new constructors in `protocol.md`'s pure case analyses (D1)
+/-! ## The new constructors in `protocol.md`'s pure case analyses
 
 `QEntry.asks` reads every IWANT, marked or not, as the toy's `entry.iwants()` does, and drops the flags; a
 relation and a holding hold no ask. `Ctl.isEmpty` is the toy's `_Msg.empty`: an IWANT with no asks is empty, a
-relation never is (notes/spec-lean/v2-layer/design.md §4.3). -/
+relation never is. -/
 
 private def k1 : Key := .want "g" 1
 private def k2 : Key := .want "g" 2

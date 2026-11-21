@@ -5,7 +5,7 @@ import SpecTwin.Sec72
 
 /-! # protocol-v2.md's filling, completion, decoding and claims: §4.2's `fill`, §4.6, §4.11's `filter_entry`
 
-The twin of `fill` (§4.2, main's text: part G changes it, and it is transcribed again from v0.10.12, design §8);
+The twin of `fill` (§4.2, v0.10.11's text: v0.10.12 changes it, and it is transcribed again from that text);
 §4.6's `push_rebuilt_as_source`, `push_rebuilt`, `arm`, `check_completion`, `defer_on_claim`, `reconsider`,
 `decode_group`, `claims_close` and `note_claim`; and `filter_entry`, `protocol.md` §7.2's with the probe's
 lines. Each comes after every function it calls (`V2/Relations.lean`'s rule).
@@ -15,15 +15,15 @@ lines. Each comes after every function it calls (`V2/Relations.lean`'s rule).
   `protocol.md`'s Lean does. So no block here is `mutual`.
 - **`protocol.md`'s functions that v2 calls unchanged** run through `v1`: `drop_beyond`, `close_promises`,
   `drop_group`, `add_offer`, `owe`, `held` and `tied_to_root`. The node's helpers are `Node61`'s questions:
-  `open_group` (v2's binding writes more, design §5.1, but the question is the same), `store`, `start`,
+  `open_group` (v2's binding writes more, but the question is the same), `store`, `start`,
   `penalise`, `close_promises_of_group`, `deliver` and `payload_of`.
-- **`chunks[g][i]`** is a read of another section's table, asked each time the Python reads it (design §7):
+- **`chunks[g][i]`** is a read of another section's table, asked each time the Python reads it:
   `push_rebuilt` reads it once for `T.project` and once more per place the chunk fills.
 - **The order of a proxied set** is asked in `fill` (on the claim branch: `suppression_scope(g) | ack`),
   `check_completion` and `reconsider`; `claims.items()` is a table's level, whose keys' order is asked with
-  `claimsOrder` (design §3.2).
-- **`max(a, b)`** is `if b > a then b else a` (design §7).
-- **An ask with its flags** (design §4.3): `filter_entry` filters a plain IWANT's keys and a v2 IWANT's asks
+  `claimsOrder`, a `keys` entry on the tape.
+- **`max(a, b)`** is `if b > a then b else a`: Python's `max` keeps the first of two equal arguments.
+- **An ask with its flags**: `filter_entry` filters a plain IWANT's keys and a v2 IWANT's asks
   alike; `held`, `gated` (v2's), `tied_to_root` and the promises take the ask's key, `probe_waits` and
   `probe_settled` the ask with its flags. A plain IWANT's `want` is false, as the toy's `_IWant`'s. -/
 
@@ -33,7 +33,7 @@ open SpecTwin Node61 Tables
 
 variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeV2 m]
 
-/-- `max(a, b)` on floats: the first unless the second is greater (design §7) -/
+/-- `max(a, b)` on floats: the first unless the second is greater, as Python's `max` -/
 private def pyMax (a b : Float) : Float := if b > a then b else a
 
 /-- `push_rebuilt_as_source(g2, items)` (§4.6, [D4]): with `REPAIR_BUDGET`, a rebuilt chunk is pushed as its
@@ -106,7 +106,7 @@ def pushRebuilt (g : Group) (new : List Nat) : M2 m Unit := do
       branch "push_rebuilt: a peer short"
 
 /-- A call `push_rebuilt(g, new)` as the node binds the name: the node's own where its line names it as
-replaced, a question (design §1.4), else the document's -/
+replaced, a question, else the document's -/
 def pushRebuiltCall (g : Group) (new : List Nat) : M2 m Unit := do
   if (← read).base.replaced.contains "push_rebuilt" then NodeV2.pushRebuiltNode g new else pushRebuilt g new
 
@@ -367,7 +367,7 @@ def noteClaim (p : Peer) (g : Group) : M2 m Unit := do
     branch "note_claim: deferred"
 
 /-- A call `note_claim(p, g)` as the node binds the name: the node's own where its line names it as replaced, a
-question (design §1.4), else the document's -/
+question, else the document's -/
 def noteClaimCall (p : Peer) (g : Group) : M2 m Unit := do
   if (← read).base.replaced.contains "note_claim" then NodeV2.noteClaimNode p g else noteClaim p g
 

@@ -10,17 +10,17 @@ import SpecTwin.Sec61
 The twin of `forward` (§4.4), `on_validated`, `defer` and `on_chunk` (§4.2), and `on_holding` and `on_offer`
 (§4.3). Each comes after every function it calls (`V2/Relations.lean`'s rule).
 
-- **No recursion through `defer`** (design §7, R8). `on_validated` calls `defer` on a `DEFER` verdict, and v2's
+- **No recursion through `defer`.** `on_validated` calls `defer` on a `DEFER` verdict, and v2's
   `defer` calls `on_validated` only on another verdict, which never calls `defer` again. So `on_validated` is
   written in two parts: its head (`enter`, and the test of the group's lifetime and the slot's window), and its
   body past the `DEFER` test. `defer` runs the head and the body, as the Python's call does with a verdict that
   is not `DEFER`; `on_validated` runs the head, then `defer` or the body. Nothing is `mutual`.
-- **`protocol.md`'s functions that v2 calls unchanged** run through `v1`: `message_id` (the toy's `chunk_id`,
-  design §5), `tie`, `choose_push`, `add_offer`, `tied_to_root`, `parked`, `last_resort`, `outstanding`,
+- **`protocol.md`'s functions that v2 calls unchanged** run through `v1`: `message_id` (the toy's `chunk_id`),
+  `tie`, `choose_push`, `add_offer`, `tied_to_root`, `parked`, `last_resort`, `outstanding`,
   `over_ihave_limits` and `may_ask`. The node's helpers are `Node61`'s questions: `seen`, `accepted`,
   `mark_seen`, `live`, `admitted`, `reserve`, `penalise`, `authenticable`, `shuffled`, and
   `gossip_history.put`; `valid_have(h)` and `deferred_offers(p, h)` are `NodeV2`'s, with the whole holding.
-- **`window_release`** is cut at every node this cycle (design §8): `on_holding` calls it through `V2Later`.
+- **`window_release`** is cut at every node this cycle: `on_holding` calls it through `V2Later`.
 - **`T.project(f)`** is asked each time the Python calls it: three times in `on_validated`.
 - **`forward`'s axes** are an `Option`: none projects the chunk's own, and an empty list forwards on none (design
   §7). -/
@@ -79,7 +79,7 @@ def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit
   if (← state? f.g) != some .invalid then gossipPut f         -- heartbeat gossip (§4.8); never a dropped group's
 
 /-- A call `forward(f, from_peer, axes)` as the node binds the name: the node's own where its line names it as
-replaced, a question with `axes` (design §1.4), else the document's -/
+replaced, a question with `axes`, else the document's -/
 def forwardCall (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit := do
   if (← read).base.replaced.contains "forward" then NodeV2.forwardNode f fromPeer axes else forward f fromPeer axes
 

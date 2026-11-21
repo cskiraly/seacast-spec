@@ -12,7 +12,7 @@ and `sample`. Each comes after every function it calls (`V2/Relations.lean`'s ru
   §7); running out is a crash of the twin's own name.
 - **`ask_sample`'s `order`** is built whole before `next` tests it, as the Python builds the list: `via`'s
   route and `ROUTE_HOPS` are asked, and `high` computed, whichever list is the first that is not empty.
-- **A queue as an argument** (design §7): `choose` and `pick` take the peer and read its normal lane, as
+- **A queue as an argument:** `choose` and `pick` take the peer and read its normal lane, as
   `protocol.md`'s `rarest` does. Their raises are the Python's: `IndexError` at `q.normal[0]` and at `ks[0]`,
   `ValueError` from `min` on no places, and an entry with no chunk at a place `pick` ranks is outside the domain,
   a crash here.
@@ -162,7 +162,7 @@ def resample (g : Group) (i : Nat) (q : Peer) (first : Bool) : M2 m Unit := do
     setPark q g ((← read).base.now + (← read).base.c.PARK_TTL)   -- `park[q][g] = now + PARK_TTL`
     askSample g i false                                       -- the second phase: another peer, a short wait
   -- `while held_samples[b] and samples_in_flight[b] < T.params.SAMPLE_OUTSTANDING:`
-  let n := (← heldSamplesOf b).length                         -- read at the first guard (design §7)
+  let n := (← heldSamplesOf b).length                         -- read at the first guard
   for _ in List.range (n * (n + 1) + 1) do
     let held ← heldSamplesOf b
     if held.isEmpty then
@@ -176,7 +176,7 @@ def resample (g : Group) (i : Nat) (q : Peer) (first : Bool) : M2 m Unit := do
       setHeldSamples b rest                                   -- `held_samples[b].pop(0)`
       askSample g2 i2 false
     | [] => pure ()
-  crash "twin: resample ran out of fuel (notes/spec-lean/v2-layer/design.md §7)"
+  crash "twin: resample ran out of fuel (n·(n+1)+1 turns for the n samples held at the first guard)"
 
 /-- `sample(g, bits)` (§4.10): at block arrival, the application's draw, never narrowed to what our links serve;
 ours from now on (§1.5) -/

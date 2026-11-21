@@ -5,8 +5,7 @@ import SpecTwin.ReplayTables
 Each case reads an entry of one of v2's tables as a record writes it (its table, its path and its value, in the
 forms of `tools/gen/schema_v2.py`), puts it into an empty state, and reads the state back (`cell`, `val`, `put`,
 `valueAt`, all generated). The refusals are the record forms the reader must not take: an empty value where the
-codec writes it as missing, an unsorted set, a non-finite time, a direction or a family in another form.
-notes/spec-lean/v2-layer/design.md §4.4. -/
+codec writes it as missing, an unsorted set, a non-finite time, a direction or a family in another form. -/
 
 namespace SpecTwin.V2.Codecs
 

@@ -24,8 +24,9 @@
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
-#             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders, and
-#             keptcopy.py's)
+#             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders,
+#             keptcopy.py's and labcites.py's); and no line of the twin's sources (the build's copy) or of its
+#             tools cites the notes beside which they were developed (labcites.py)
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
 #             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
 #             (footprint_test.py)
@@ -260,10 +261,15 @@ matrixdiff.py --self-test ^ok: every case as it must be$
 trace3.py --self-test-v2 ^ok:
 gen/schema_v2.py --self-test ^ok: every case as it must be$
 keptcopy.py --self-test ^ok: every case as it must be$
+labcites.py --self-test ^labcites self-test, planted: (.*), must be \1$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 10 ] || no "not 10 tools' self-tests passed"
-  echo "  $n of 10 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 11 ] || no "not 11 tools' self-tests passed"
+  echo "  $n of 11 tools' own cases as they must be (selftests.txt)"
+  # the twin's sources, as the build copied them, and its tools: none cites the notes beside which it was developed
+  { $PY "$T/labcites.py" "$OUT/twin" && $PY "$T/labcites.py" "$T"; } > "$OUT/labcites.txt" 2>&1 \
+    || no "a file of the twin or of its tools cites the notes beside which it was developed (labcites.txt)"
+  tail -n 1 "$OUT/labcites.txt" | sed 's/^/  /'
 }
 s_tables() {
   { $PY "$T/gen/gen.py" --check "$OUT/twin" && $PY "$T/gen/makers.py" --check "$OUT/twin"; } > "$OUT/tables.txt" 2>&1 \

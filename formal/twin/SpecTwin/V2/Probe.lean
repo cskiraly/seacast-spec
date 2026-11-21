@@ -6,23 +6,22 @@ The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`,
 `probe_waits`, `probe_settled`, `probe_of_claim` and `serve_probe`; §4.5's `serve_standing` and
 `serve_waiting_probe`; and §4.6's `known_in_scope`, `known_across`, `ask_custodian`, `repair_verdict` and
 `owed_missing`. Each comes after every function it calls (`V2/Relations.lean`'s rule). `serve_standing` is
-main's, v0.10.11's; part G changes it, and it is transcribed again from v0.10.12 (design §8).
+v0.10.11's text: v0.10.12 changes it, and it is transcribed again from that text.
 
-- **An ask with its flags** is an `AskV2` (design §4.3). `group_index(a)` is the twin's own (design §5): an ask by
+- **An ask with its flags** is an `AskV2`. `group_index(a)` is the twin's own: an ask by
   index is itself, with its flags; a structured id gives its group and index with none, as the toy's
   `GroupIndex` carries none. Every `Key` has a group and an index, so it is never none here; `probe_waits`,
   `probe_settled` and `probe_of_claim` test it all the same, as the Python does, with no read where it is none.
-- **The plain dicts raise** (design §4.4): `probe[g]` and `probed[g]` crash as `KeyError` on the group where the
+- **The plain dicts raise:** `probe[g]` and `probed[g]` crash as `KeyError` on the group where the
   Python loads them; `.get` reads none; `g in probe_ok` is the entry's presence, whose value can be a present
   `None` (`some none`).
-- **The order of a proxied set** is asked at each iteration (design §3.1): `serve_standing`'s popped set, empty
+- **The order of a proxied set** is asked at each iteration: `serve_standing`'s popped set, empty
   or not, and `suppression_scope`'s in `known_in_scope` and `known_across`. `probe_waiting[g].items()` is a
-  table's level, whose keys' order is asked with `probeWaitingOrder` (design §3.2's `keys` entry).
-- **`interest[g2]`** reads the table, and asks `own_interest(g2)` where it has no entry, storing nothing
-  (design §1's fourth point).
+  table's level, whose keys' order is asked with `probeWaitingOrder`, a `keys` entry on the tape.
+- **`interest[g2]`** reads the table, and asks `own_interest(g2)` where it has no entry, storing nothing.
 - **Writes** follow `V2/Relations.lean`'s rule: `probe_asks.discard`, a set's member, is a write with no read,
   as the tracer's view of a set logs it (`tools/footprint.py`, `add` and `discard`).
-- **`repair_verdict`'s steps** (design §7): a `None` list crashes as `TypeError` at its first subscript, a step
+- **`repair_verdict`'s steps:** a `None` list crashes as `TypeError` at its first subscript, a step
   past the list as `IndexError`; `want` is an `Int`, and the loop stops at `want == 0` alone. -/
 
 namespace SpecTwin.V2
@@ -31,7 +30,7 @@ open SpecTwin Node61 Tables
 
 variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeV2 m]
 
-/-- `group_index(a)` (design §5): the ask itself where it is by index, with its flags; a structured id's group
+/-- `group_index(a)`: the ask itself where it is by index, with its flags; a structured id's group
 and index, with none -/
 def groupIndex (a : AskV2) : Option AskV2 :=
   match a.key with
@@ -331,7 +330,7 @@ def owedMissing (g : Group) : M2 m Bool := do
 
 /-! ### The calls as the node binds the names
 
-A node can replace four of this file's functions (design §1.4). A call of one is the node's own where its line
+A node can replace four of this file's functions. A call of one is the node's own where its line
 names it as replaced, a question, and the document's otherwise. -/
 
 /-- A call `serve_standing(g, i)` as the node binds the name -/

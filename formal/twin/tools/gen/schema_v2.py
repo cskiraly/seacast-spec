@@ -1,11 +1,11 @@
 """protocol-v2.md's tables (§3): the twin's v2 layer, one entry per table, beside schema.py's.
 
 gen.py appends TABLES_V2 to schema.py's TABLES, so that State.lean, Tables.lean and ReplayTables.lean stay one
-each, with one `Cell` (notes/spec-lean/v2-layer/design.md §4.1). A trace under protocol.md has none of these
+each, with one `Cell`. A trace under protocol.md has none of these
 entries, and they read as missing there. The list a protocol.md trace's header is checked against, `ownTables`,
 stays schema.py's; these tables' names are `v2Tables`.
 
-A table's codec follows from two things (design §4.4): what a read of a missing key does in the toy's container
+A table's codec follows from two things: what a read of a missing key does in the toy's container
 (toy/node.py, `_v2`), and what the code observes of a stored value.
 - **Written as missing.** The tracer writes no empty leaf, and the twin's state holds none, where the container
   reads a missing key as the empty value (`LazySet`, `LazyList`, `LazyBits`, `zero`, `false`, `DefaultMap`) and
@@ -15,7 +15,7 @@ A table's codec follows from two things (design §4.4): what a read of a missing
   plain dict; the inner level of `lazy_dict`) or the code observes the key itself (`setdefault`, `.items()`, a
   pop that deletes a stored leaf). The kinds: `time`, `slot`, `typeid`, `ibits`, `join`, `opeerset`, `verdict`.
 
-How a record writes them (design §4.4, agreed with the tracer):
+How a record writes them, as the tracer writes them:
 - keys: a type id as its string (`"payload"`, `"column"`, `"row"`); a family as an integer, a natural number or
   `["-", n]`; a block id as 64 hex digits; `backoff`'s inner key as `[colour, direction]`, the direction `"OUT"`,
   `"IN"` or `"BOTH"`; a member of `probe_asks` as an ask key, as protocol.md's tables write one: an ask by index
@@ -26,7 +26,7 @@ How a record writes them (design §4.4, agreed with the tracer):
 - an `IBits` as an integer in the same signed form; a time as its 64 bits; `probe_ok`'s verdict as `true`, `false`
   or `["none"]`;
 - a set as a sorted list. That is a form for comparing states, not an order: where the code iterates a set, the
-  order the Python took is on the tape (design §3.1's `order`), and the twin takes it from there.
+  order the Python took is on the tape (an `order` entry), and the twin takes it from there.
 """
 import math
 import sys
@@ -129,7 +129,7 @@ TABLES_V2 = [
     Table("claims", "claims", "claims", [G], "opeerset",
           read=("claims?", "`claims[g]`: the peers whose claim_all arrived, or none where the group has no entry"),
           write=("setClaims", "`claims[g].add(q)`, `claims[g].discard(q)`: the entry stays, empty or not"),
-          # claims_close's `claims.items()`: the groups' order is asked (design §3.2, `keys` of `claims`)
+          # claims_close's `claims.items()`: the groups' order is asked (a `keys` entry of `claims` on the tape)
           ordered=True,
           scans=[whole("claims", "every `claims`: `claims.items()`", used=True)]),
     Table("reconsider_at", "reconsiderAt", "reconsiderAt", [G], "time",
@@ -196,7 +196,7 @@ TABLES_V2 = [
     Table("probe_waiting", "probeWaiting", "probeWaiting", [G, P], "slot",
           read=("probeWaiting?", "`probe_waiting[g][p]`: p's first marked ask of the group, or none"),
           write=("setProbeWaiting", "`probe_waiting[g][p] = i`"), erase=("eraseProbeWaiting", "`del probe_waiting[g][p]`"),
-          # serve_waiting_probe's `probe_waiting[g].items()`: a group's peers' order is asked (design §3.2)
+          # serve_waiting_probe's `probe_waiting[g].items()`: a group's peers' order is asked (a `keys` entry)
           ordered_levels=[1],
           scans=[Scan("allProbeWaiting", "probeWaiting", "every `probe_waiting[g]`: `probe_waiting[g].items()`",
                       row=True, used=True),
@@ -223,7 +223,7 @@ TABLES_V2 = [
 
 
 def signed(n):
-    """An integer as a record writes one: a natural number, or `["-", n]` below zero (design §4.4)."""
+    """An integer as a record writes one: a natural number, or `["-", n]` below zero."""
     if isinstance(n, bool) or not isinstance(n, int):
         raise TypeError(f"not an integer of a record: {n!r}")
     return n if n >= 0 else ["-", -n]
@@ -358,7 +358,7 @@ def self_test():
     case("a member of probe_asks, a structured id", by["probe_asks"].keys[0](sid), sid.hex())
     case("the two forms of one chunk's ask, apart",
          by["probe_asks"].keys[0](WantIndex(group=g, index=3)) != by["probe_asks"].keys[0](sid), True)
-    # the levels whose iteration order the tracer puts on the tape (design §3.2's `keys` entries)
+    # the levels whose iteration order the tracer puts on the tape (its `keys` entries)
     case("claims' groups, ordered", (by["claims"].kw["ordered"], tuple(by["claims"].kw["ordered_levels"])), (True, ()))
     case("probe_waiting[g]'s peers, ordered",
          (by["probe_waiting"].kw["ordered"], tuple(by["probe_waiting"].kw["ordered_levels"])), (False, (1,)))
