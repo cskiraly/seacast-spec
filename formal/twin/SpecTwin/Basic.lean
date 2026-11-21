@@ -193,6 +193,10 @@ still lives. -/
 structure HaveEntry where
   bits : Bits := 0
   ttl : Nat := 0
+  /-- protocol-v2.md §1.5's two claims of a holding (§3's `peer_has`: "bits, ttl; and claim_all, complete").
+  `protocol.md`'s code builds and reads the entry through its first two fields, so they stay false there. -/
+  claimAll : Bool := false
+  complete : Bool := false
   deriving BEq, Repr, Inhabited
 
 /-- `pushed[p][g]` (§5.2): the chunks the node chose to push p of g, the time of the first push as
