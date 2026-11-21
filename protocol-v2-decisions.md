@@ -86,12 +86,12 @@ Nothing measured argues against them.
 too before the asker has moved on. The option is a promise per peer that follows the times its
 answers took: `max(PROMISE, srtt + 4 · rttvar)`, smoothed as TCP's retransmission timer (RFC 6298),
 a peer that never answered keeping the floor. In the toy, in the research harness's setting at
-12.5 Mbps (seeds 7 to 9): with the same completion times and bytes as §4.13's form, it parked 283
-to 360 honest (peer, group) pairs per run instead of 503 to 642 (v0.3: 584 to 702), and parked the
-withholders of a 30 % withholding network as before. What it buys is the honest peers' standing
-(and whatever scoring reads from broken promises), not time; it needs per-peer state and a sample
-on every answered ask. Not measured in the harness. A promise stretched with the window, the
-other form, is rejected (§4.13).
+12.5 Mbps, it gave the same completion times and bytes as §4.13's form, parked fewer honest (peer,
+group) pairs than that form and than v0.3, and parked the withholders of a 30 % withholding network
+as before (protocol-v2-figures.md, §4.13). What it buys is the honest peers' standing (and whatever
+scoring reads from broken promises), not time; it needs per-peer state and a sample on every
+answered ask. Not measured in the harness. A promise stretched with the window, the other form, is
+rejected (§4.13).
 - **Decided on 2026-11-13:** 400 ms stays the default, and the per-peer promise is permitted as
   local policy, as `MERGE_HOLDINGS` is. The promise is the asker's own timer: it changes whom the
   asker parks, and so whom it asks next, not what either end means.
@@ -111,9 +111,8 @@ push, an offer at the chunk's acknowledgement, which, when every copy was refuse
 holding that names the chunk or a later copy's timeout.
 
 **The window's unit** (X3, decided 2026-11-13): bytes, as §4.11 runs it, a chunk taking its own
-length of the window. The column cells gain in the toy (one seed, §4.11): at 500 nodes the custody
-block completes in 531 ms at the median and 680 at the tail, against 1 011 and 1 207 with slots.
-Tier 4 moves within 15 ms (§4.11). Not taken: v0.3's slots of `CHUNK_BYTES`, and slots per object
+length of the window. The column cells gain in the toy, at 500 nodes too, and tier 4 moves little
+(protocol-v2-figures.md, §4.11). Not taken: v0.3's slots of `CHUNK_BYTES`, and slots per object
 type, which leave the same capacity question at every boundary between types (§4.11).
 
 **Decided on 2026-11-14.** Two decisions after their runs, and §4.12's rule. The runs are toy
@@ -124,42 +123,43 @@ the custodians' median and 99th percentile, and in the row settings a row member
 at most +20 ms at the median over the seeds.
 - **`[D5]` the announce relation's width.** `ALL_JOINED` for columns and rows, as every measurement
   ran it. `NONE`, offers to the relations only, is permitted for columns, never for rows.
-  - *At 60 nodes* (seeds 7 to 16), the columns' `NONE` is close in custody at 50 Mbps and with a
-    1 Gbps proposer, in custody and in rows with half the columns withheld, and in the honest rows.
-    It sends 19 to 30 % fewer offers, and 0.00 to 0.06 fewer copies. With a fifth of the nodes
-    lying about their row holdings (`claim20`) it is not close: on one seed a custodian is short in
-    two blocks, where with `ALL_JOINED` one was short in one, and on another a row member is short
-    where none was.
-  - *At 500 nodes* (seeds 7 to 9, two blocks): close in custody, with 7 % fewer offers and 0.03
-    fewer copies of 1.81; close in rows with half the columns withheld and a 1 Gbps proposer, with
-    28 % fewer offers and 0.15 fewer copies of 2.3. With liars it is close only by the letter
-    without withheld columns (the custodians' median +19 ms on the middle seed, +31 on another),
-    and not close with half withheld (+40 ms); no node short in either. Three seeds show a pass or
-    a fail, not a comparison, and do not show the 60-node shortfall gone.
+  - *At 60 nodes*, the columns' `NONE` is close in custody at 50 Mbps and with a 1 Gbps proposer,
+    in custody and in rows with half the columns withheld, and in the honest rows. It sends fewer
+    offers, and slightly fewer copies. With a fifth of the nodes lying about their row holdings
+    (`claim20`) it is not close: on one seed a custodian is short in more blocks than with
+    `ALL_JOINED`, and on another a row member is short where none was (protocol-v2-figures.md,
+    [D5]).
+  - *At 500 nodes*: close in custody, with fewer offers and slightly fewer copies; close in rows
+    with half the columns withheld and a 1 Gbps proposer, with fewer offers and fewer copies. With
+    liars it is close only by the letter without withheld columns: the custodians' median is inside
+    the bound on the middle seed and outside it on another. It is not close with half withheld. No
+    node is short in either (protocol-v2-figures.md, [D5]). Three seeds show a pass or a fail, not a
+    comparison, and do not show the 60-node shortfall gone.
   - *The rows' `NONE`* left row members short on every seed in every row setting: the rows need
     the offers to every joined peer.
   - *The columns' `SAMPLE`* (the heartbeat's paced gossip) was close where `NONE` was but in the
-    500-node rows with half withheld (the custodians' 99th percentile +26 ms on the middle seed).
-    The rows' `SAMPLE` runs as `NONE`, since a cell is published under its column and the
-    heartbeat offers it there.
+    500-node rows with half withheld, where the custodians' 99th percentile on the middle seed is
+    over the bound (protocol-v2-figures.md, [D5]). The rows' `SAMPLE` runs as `NONE`, since a cell
+    is published under its column and the heartbeat offers it there.
   - Not taken: `NONE` as the columns' default. Its saving is mostly control; its failures are under
     liars, where the offers beyond the relation are the fallback; and its passes at 500 nodes rest
     on three seeds.
 - **`[D8]` the row pull delay.** 1 s, as every measurement of the toy and the research harness ran
-  it: a secondary axis waits for the column path (R7). In the toy at 60 nodes (seeds 7 to 16; honest
-  rows, rows with a fifth of the nodes lying about their row holdings, rows with half the columns
-  withheld), 2 s costs the column path: the custodians complete 147 to 386 ms later at the median.
-  - *It can be shorter, at a cost.* 0.5 s and 0 s keep the custodians within 10 ms at the median.
-    0.5 s brings a row member's 64th cell 24 to 80 ms sooner at the median. But with liars both
-    leave row members short on every seed: 154 at 0.5 s and 219 at 0 s over the ten seeds, counted
-    once per block they are short in, against one at 1 s; 0 s also leaves a custodian short in one block more.
-    Without liars neither leaves any short. Why was not traced.
+  it: a secondary axis waits for the column path (R7). In the toy at 60 nodes (honest rows, rows
+  with a fifth of the nodes lying about their row holdings, rows with half the columns withheld),
+  2 s costs the column path: the custodians complete later at the median, in all three settings
+  (protocol-v2-figures.md, [D8]).
+  - *It can be shorter, at a cost.* 0.5 s and 0 s move the custodians little at the median. 0.5 s
+    brings a row member's 64th cell sooner at the median. But with liars both leave row members
+    short on every seed, far more than 1 s does, counted once per block they are short in, and 0 s
+    also leaves more custodians short (protocol-v2-figures.md, [D8]). Without liars neither leaves
+    any short. Why was not traced.
   - Not taken: 2 s, which fails R7; and a delay under 1 s as the default.
-- **A source's own chunks go first** (§4.12), under X3's window in bytes. In the toy, with a 50 Mbps
-  proposer, at 60 nodes over three seeds, the custody block completes 247 ms sooner at the median
-  and 430 ms sooner at the tail; single-group cells run as under v0.3's order. Not taken: v0.3's
-  order, and dropping the source's offers or queueing them after the block's pushes, which cost a
-  fast proposer 7 to 355 ms at the median.
+- **A source's own chunks go first** (§4.12), under X3's window in bytes. In the toy its clearest
+  gain was in custody with a 50 Mbps proposer, and single-group cells run as under v0.3's order
+  (protocol-v2-figures.md, §4.12). Not taken: v0.3's order, and dropping the source's offers or
+  queueing them after the block's pushes, which delay a fast proposer's completion at the median
+  (protocol-v2-figures.md, §4.12).
 
 **The probe of a claim** (R5, decided 2026-11-15, §4.6). The probe judges the claimant by its own
 copy of the probed cell only, an answer or a push. Three rules make that fair to an honest claimant

@@ -2337,10 +2337,10 @@ fewer of the scope's peers, which v0.4 does not provide for, is for later study.
 
 #### Rationale
 
-**v0.7's single offer** (since 2026-11-04). Of the toy's thirteen recorded cells then (2026-11-04,
-with the earlier transport) only the thin lossy one (`loss-thin`), whose queues refuse a tenth of
-the chunks at admission, met the second offer: it now sends 91 fewer offers of 82 938 over its three
-payloads, and its warm medians, of completion and of copies, stay as they were.
+**v0.7's single offer** (since 2026-11-04). Among the toy's recorded cells then, only the thin lossy
+one (`loss-thin`), whose queues refuse some chunks at admission, met the second offer. There the
+single offer sends fewer offers, and the warm medians, of completion and of copies, stay as they
+were (protocol-v2-figures.md, §4.7).
 
 **A refused push to a fallback link is owed** (decided 2026-11-14). Without it, a fallback target
 whose push was refused would be neither pushed the chunk nor offered it at the acknowledgement,
@@ -2359,12 +2359,12 @@ chunks whose pushes are still queued, and the source answers on top of its pushe
 is the one event the source sees whatever the transport holds (§4.11).
 
 **Offering at publish, the source's choice** (decided 2026-11-18). Two things decide it:
-- *Its uplink.* The offers draw asks on top of its pushes. In the toy's custody cell (seeds 7 to 9,
-  writes completing at once and one write at a time), a 1 Gbps proposer that offers at publish
-  completes its block 30 to 114 ms sooner at the median on the toy's 60-node graph, and 13 to 92 ms
-  sooner on the research harness's 100-node one, and answers 4.7 to 12 times as many asks.
-  A 50 Mbps proposer completes it 24 ms later at 60 nodes and 26 ms later at 500 (below, against
-  the acknowledgement).
+- *Its uplink.* The offers draw asks on top of its pushes. In the toy's custody cell, a 1 Gbps
+  proposer that offers at publish completes its block sooner at the median than one that offers at
+  the acknowledgement, on the toy's 60-node graph and on the research harness's 100-node one, with
+  writes completing at once and with one write at a time. It also answers several times as many
+  asks. A 50 Mbps proposer that offers at publish completes its block later, at 60 nodes and at 500
+  (below; protocol-v2-figures.md, §4.7).
 - *Its privacy.* Every chunk offered at once, by the one node that holds them all, names the source
   to those peers, and the paced holding [P4] then hides nothing from them. Toward the peers outside
   its pool (the relation for the chunk's colour, or with none the fallback links, `source_pool`) the
@@ -2373,10 +2373,10 @@ is the one event the source sees whatever the transport holds (§4.11).
   at `ALL_JOINED` or `NONE` there is none. A source that wants P4's cover toward its pool offers at
   the acknowledgement.
 
-Copies do not decide it: offering at publish adds 0.06 to 0.14 copies of the block received per
-node, data and control, on the toy's 60-node graph, and saves 0.10 to 0.19 on the research
-harness's 100-node one. A client may key the choice on its uplink, as striping is (`STRIPE_UPLINK`);
-this document does not, since a fast source may still want P4.
+Copies do not decide it: offering at publish adds a little to the copies of the block received per
+node, data and control, on the toy's 60-node graph, and saves a little on the research harness's
+100-node one (protocol-v2-figures.md, §4.7). A client may key the choice on its uplink, as striping
+is (`STRIPE_UPLINK`); this document does not, since a fast source may still want P4.
 
 **A pull-only type's source** (decided 2026-11-18).
 
@@ -2384,47 +2384,43 @@ this document does not, since a fast source may still want P4.
 bounds it only where every copy of one chunk is lost with its connection; no toy knob closes a
 source's links in the middle of a message.
 
-**The acknowledgement against the document before, in the toy.** At 60 nodes (seeds 7 to 16; the
-median of the seeds, and its range):
-- **The payload** completes 0 to 8 ms sooner, and its source saves bytes where the transport takes
-  the batch at once (below, "The source's offers, card 3 at the source").
-- **A 50 Mbps proposer's custody block** completes 24 ms sooner (−46 to +10, sooner on eight
-  seeds).
-- **A column's source** uploads 5 to 28 % less and is asked 88 to 99 % less (with §4.11's rule, 5
-  to 29 % and 87 to 96 % less than with that rule alone). The rows' proposer uploads 1.49 copies of
-  its block instead of 2.07.
-- **The cost.** The rows complete 178 ms later (69 to 304, later on every seed), more than with no
-  source offers at all (128 ms), and the rows with liars 214 ms later. A 1 Gbps proposer's custody
-  block completes 38 ms later (24 to 114).
-- **Why the rows pay at 60 nodes.** At seed 7 the proposer's relation peers pulled from it, while it
-  pushed, the cells it did not push them. Offered each cell only at its acknowledgement, they
-  completed 410 to 470 ms later. The other nodes moved by 56 ms.
+**The acknowledgement against the document before, in the toy.** At 60 nodes
+(protocol-v2-figures.md, §4.7):
+- **The payload** completes as soon or a little sooner, and its source saves bytes where the
+  transport takes the batch at once (below, "The source's offers, card 3 at the source").
+- **A 50 Mbps proposer's custody block** completes sooner at the median, on most seeds.
+- **A column's source** uploads less and is asked far less. With §4.11's rule it saves about as
+  much, against that rule alone. The rows' proposer uploads fewer copies of its block.
+- **The cost.** The rows complete later, on every seed, and later than with no source offers at
+  all; the rows with liars complete later too. A 1 Gbps proposer's custody block completes later.
+- **Why the rows pay at 60 nodes.** At one seed the proposer's relation peers pulled from it, while
+  it pushed, the cells it did not push them. Offered each cell only at its acknowledgement, they
+  completed much later. The other nodes moved little.
 
-At 500 nodes (degree 70):
-- **Against the document before** (seed 7, one run each; the median): the payload completes 4 ms
-  sooner (tier 4 in the all-home network), the rows 8 ms sooner, a 50 Mbps proposer's custody block
-  48 ms sooner, and a 1 Gbps proposer's 5 ms later (a fifth of the nodes sampling).
-- **Against offers per type** (below; seeds 7 to 9, paired by seed; the median of the seeds, and
-  its range):
-  - the rows complete 7 ms later (−15 to +17), and with §4.11's rule 28 ms later (18 to 54, later
-    on every seed);
-  - a 1 Gbps proposer's block 9 ms later (6 to 15);
-  - a 50 Mbps proposer's 26 ms sooner (18 to 38), and 41 ms sooner at the tail;
-  - a column's source uploads 8 to 33 % less, and is asked 57 to 98 % less.
-- **The relation peers at 500 nodes.** At seed 7, 12 of the 499 nodes pull more than 20 cells from
-  the rows' proposer with offers per type (at 60 nodes, 26 of 59, in the document before). With the
-  offers at the acknowledgement they complete 18 ms later at the median (−140 to +292). The two of
-  them that completed first, at 1.79 and 2.05 s, are 292 and 253 ms later. The 449 that pull
-  nothing from the proposer move by 5 ms.
+At 500 nodes (protocol-v2-figures.md, §4.7):
+- **Against the document before,** at one seed: the payload (tier 4 in the all-home network), the
+  rows and a 50 Mbps proposer's custody block complete sooner at the median, and a 1 Gbps
+  proposer's a little later (a fifth of the nodes sampling).
+- **Against offers per type** (below):
+  - the rows complete a little later at the median, and with §4.11's rule later on every seed;
+  - a 1 Gbps proposer's block completes a little later;
+  - a 50 Mbps proposer's completes sooner, at the median and at the tail;
+  - a column's source uploads less, and is asked far less.
+- **The relation peers at 500 nodes.** At one seed, a far smaller share of the nodes pulls many
+  cells from the rows' proposer with offers per type than at 60 nodes in the document before. With
+  the offers at the acknowledgement they complete a little later at the median. The two of them
+  that completed first complete much later. The nodes that pull nothing from the proposer move
+  little.
 - **So the rows' cost is a 60-node finding.**
 
 **The alternative: offers per type** (decided 2026-11-10, replaced 2026-11-11). A field per object
 type had the payload's source offer at the acknowledgement and a column's at publish.
-- **What it kept:** the rows' early completion at 60 nodes, 175 ms sooner than with offers at the
-  acknowledgement for every type (seeds 7 to 16), and 300 ms sooner with §4.11's rule; and a
-  1 Gbps proposer's block, 44 ms sooner at 60 nodes and 9 ms at 500.
-- **What it gave up:** at 500 nodes, a column's source's saving (8 to 33 % of its upload) and a
-  50 Mbps proposer's 26 ms, for the rows' 7 ms (28 with §4.11's rule).
+- **What it kept:** the rows' early completion at 60 nodes, against offers at the acknowledgement
+  for every type, with and without §4.11's rule; and a 1 Gbps proposer's earlier block, at 60 nodes
+  and at 500 (protocol-v2-figures.md, §4.7).
+- **What it gave up:** at 500 nodes, a column's source's saving in upload and a 50 Mbps proposer's
+  earlier block, for the rows' small gain there, with and without §4.11's rule
+  (protocol-v2-figures.md, §4.7).
 
 One rule for every type, as v0.9 has it, was taken instead; since 2026-11-18 any source may offer at
 publish (`SOURCE_OFFERS`, above).
@@ -2433,11 +2429,12 @@ publish (`SOURCE_OFFERS`, above).
 `candidates`' interest rule, §4.1).
 - *In the toy.* Its setup gives the proposer a relation with every custodian it links to, which are
   the fallback's peers. Its custody and row settings use a `SOURCE_FLOOR` of 2, at setup
-  (`--source-floor`). The hunt is not measured. At 500 nodes (one seed, §4.11), with half the columns
-  withheld, every custodian completed through the rows in 2.4 s at the median.
+  (`--source-floor`). The hunt is not measured. At 500 nodes, with half the columns withheld, every
+  custodian completed through the rows (protocol-v2-figures.md, §4.7).
 - *Not taken:* holding the publish until the links are there, which would delay every family for one
-  that the code can recover. No layer reaches a column that no node but the source custodies (seven
-  of 128 in the toy's 60-node cells); routed sample requests do (§4.10).
+  that the code can recover. No layer reaches a column that no node but the source custodies, and
+  the toy's 60-node cells have such columns (protocol-v2-figures.md, §4.7); routed sample requests
+  do (§4.10).
 
 **The source's holding is paced** [P4].
 - **Why not at the write.** Until v0.9 a chunk joined at its first write, as it still does at
@@ -2457,76 +2454,67 @@ publish (`SOURCE_OFFERS`, above).
     `protocol.md` §5.4, to the work on the source's privacy.
 - **The cost of the later holding.** It names a chunk about a round trip later than at the write.
   A relation peer that got the chunk from a forwarder may push it back to the source until the
-  holding arrives; cancel drops what is still queued. In the toy at 60 nodes (seeds 7 to 16):
-  - with writes that complete at once, 2 to 6 of a payload's chunks come back a message at the
-    median of the seeds, and up to 59 at one seed;
-  - with §4.11's rule, 0 to 2, and up to 17;
-  - no column's cells come back.
+  holding arrives; cancel drops what is still queued. In the toy at 60 nodes, with writes that
+  complete at once, a few of a payload's chunks come back a message at the median of the seeds, and
+  many more at one seed. With §4.11's rule fewer come back, and no column's cells come back
+  (protocol-v2-figures.md, §4.7).
 
 What P4 costs here depends on how many groups a source publishes. For the payload, one group, it
 costs nothing (§6.1). A proposer of 128 column groups sends a holding per cell to each peer in that
-column's scope: in the toy at seed 7, about 38 800 holdings of 52 bytes over three blocks, 0.68 MB
-a block, which is about 108 ms of a 50 Mbps uplink. In the toy at 60 nodes (seeds 7 to 16) the
-custody block completes 116 ms later at the median of the seeds (53 to 164 ms) and 106 ms later at
-the tail, and the row cells 98 ms later at the median and 132 ms at the tail. With a 1 Gbps
-proposer the cost is 6 ms at the median. Its peers, no longer told that it holds every cell, also
-offer it cells. Under the liar fault P4 leaves more row members short (108 (member, row) pairs over
-ten seeds against 80; not traced). With v0.5 merged (2026-10-21) 2 pairs stay short over the same
-seeds, none on eight of them. It is v0.5's last resort (its §6.1): when every announcer of a cell
-is parked, each is asked once more, at waits that double. In a toy check at three seeds, without
-it the members stay short as before v0.5 (12, 24 and 18 pairs against 12, 22 and 20), while asking
-announcers beyond the first sixteen changes nothing; the doubling waits are why those rows complete
-late. The other cells move by a few ms (`toy/README.md`).
+column's scope, and on a 50 Mbps uplink those bytes take time of their own. In the toy at 60 nodes,
+with a 50 Mbps proposer, the custody block completes later, at the median and at the tail, and so
+do the row cells. With a 1 Gbps proposer the cost is small. Its peers, no longer told that it holds
+every cell, also offer it cells. Under the liar fault P4 leaves more row members short (not
+traced). With v0.5 merged (2026-10-21) few pairs stay short, and on most seeds none. It is v0.5's
+last resort (its §6.1): when every announcer of a cell is parked, each is asked once more, at waits
+that double. In a toy check at three seeds, without it the members stay short as before v0.5, while
+asking announcers beyond the first sixteen changes nothing; the doubling waits are why those rows
+complete late. The other cells move little (protocol-v2-figures.md, §4.7).
 
-These figures were measured with the holding at the write. At the acknowledgement P4 sends as many
-holdings (38 808 at seed 7), a round trip later. Moved there alone, with a column's offers still at
-publish, the holding moves the toy's column cells at the median, over seeds 7 to 16 (the median of
-the seeds, and its range):
-- the rows by 0 ms (−20 to +34), and the rows with liars by −1 ms;
-- the custody block by −5 ms (−34 to 0) with a 50 Mbps proposer, and by −6 ms (−9 to +4) with a
-  1 Gbps one.
+The costs above were measured with the holding at the write. At the acknowledgement P4 sends as many
+holdings, a round trip later. Moved there alone, with a column's offers still at publish, the
+holding moves the toy's column cells little at the median: the rows, the rows with liars, and the
+custody block with a 50 Mbps and with a 1 Gbps proposer (protocol-v2-figures.md, §4.7).
 
 The offers at the acknowledgement then move them as above.
 
 **Merging the source's holdings** (measured with the holding at the write) takes back little of P4's
 cost. With writes that complete at once, only holdings made in the same instant are in the queue
-together: 7 % of the slow proposer's holdings merge, and the custody block gains 10 ms of P4's 116
-at the median and 12 ms at the tail, the rows 4 ms at the median and 20 ms at the tail. With a
-transport that takes one write per connection at a time (the toy's `--send-buffer 1`), a holding
-also waits while another entry to the same peer goes out: 18 % merge, and the custody block gains
-16 ms of P4's 80 ms there, the rows again 4 ms at the median. Copies and completion do not change,
-and under the liar fault 100 pairs stay short against P4's 108 (both before v0.5). Most holdings
-would leave alone anyway: at seed 7, 59 % find no earlier holding of their group still waiting, in
-the queue or in the transport. Taking back more needs fewer holdings, which v0.4 does not provide
-for: holding them back for a set time, or sending them to fewer of the scope's peers; both are for
-later study. The figures are in `toy/README.md`.
+together: a small share of the slow proposer's holdings merge, and the custody block and the rows
+gain a little, at the median and at the tail. With a transport that takes one write per connection
+at a time (the toy's `--send-buffer 1`), a holding also waits while another entry to the same peer
+goes out: more holdings merge, and the custody block gains a larger share of P4's cost, which is
+smaller there; the rows gain as little at the median. Copies and completion do not change, and
+under the liar fault merging leaves slightly fewer pairs short than P4 alone (both before v0.5).
+Most holdings would leave alone anyway: at one seed, most find no earlier holding of their group
+still waiting, in the queue or in the transport. Taking back more needs fewer holdings, which v0.4
+does not provide for: holding them back for a set time, or sending them to fewer of the scope's
+peers; both are for later study (protocol-v2-figures.md, §4.7).
 
 **The source's offers, card 3 at the source,** cost a home builder bytes.
-- **At publish**, in the toy's tier 4 cells:
-  - they drew asks that the builder answered after its first copies, 0.34 to 1.35 copies of the
-    message over three seeds, with 81 to 94 % of those answers arriving as duplicates;
-  - without the offers a 50 Mbps builder uploads 1.6 to 1.8 copies of the message instead of 2.1
-    to 2.9, and its cells' medians move by less than 10 ms;
-  - a 1 Gbps builder uploads 2.0 copies instead of 10 to 12, but completes 10 ms later;
-  - a 1 Gbps proposer of columns completes 75 ms later, since its offers let peers pull from it
-    while its uplink has room.
-- **At the acknowledgement**, with writes that complete at once (60 nodes, seeds 7 to 16, the
-  median of the seeds):
-  - the payload's offers draw 61 % fewer asks (222 ids over three payloads against 572);
-  - a 50 Mbps builder uploads 2.07 copies of the message instead of 2.50, and a 1 Gbps builder
-    5.9 instead of 10.0;
-  - the medians move by −8 to 0 ms.
+- **At publish**, in the toy's tier 4 cells (protocol-v2-figures.md, §4.7):
+  - they drew asks that the builder answered after its first copies, and most of those answers
+    arrived as duplicates;
+  - without the offers a 50 Mbps builder uploads fewer copies of the message, and its cells' medians
+    move little;
+  - a 1 Gbps builder uploads far fewer copies, but completes a little later;
+  - a 1 Gbps proposer of columns completes later, since its offers let peers pull from it while its
+    uplink has room.
+- **At the acknowledgement**, with writes that complete at once (protocol-v2-figures.md, §4.7):
+  - the payload's offers draw fewer asks;
+  - a 50 Mbps builder uploads fewer copies of the message, and so does a 1 Gbps builder;
+  - the medians move little, and none is later.
 
   So most of those bytes are saved where the transport takes the batch at once, and none need saving
-  where it keeps §4.11's rule: there the offers wait behind the pushes either way (40 asks against
-  45).
+  where it keeps §4.11's rule: there the offers wait behind the pushes either way, and they draw
+  about as many asks (protocol-v2-figures.md, §4.7).
 - **A column's offers wait for the acknowledgement too** (above). A fast proposer pays for it: its
-  block completes 44 ms later at 60 nodes (seeds 7 to 16) and 9 ms later at 500 (seeds 7 to 9) than
-  with its offers at publish.
+  block completes later at 60 nodes, and a little later at 500, than with its offers at publish
+  (protocol-v2-figures.md, §4.7).
   - A fast proposer can take it back by offering at publish (`SOURCE_OFFERS`, above). With the
-    offers keyed on the configured uplink, as striping is, its block completed 6 ms sooner at 60
-    nodes than in the document before (−9 to +4); at 500 nodes the cost is 9 ms. The order of a
-    source's queue is §4.12's.
+    offers keyed on the configured uplink, as striping is, its block completed a little sooner at
+    60 nodes than in the document before; at 500 nodes the cost is the small one above
+    (protocol-v2-figures.md, §4.7). The order of a source's queue is §4.12's.
 
 ### 4.8 The heartbeat
 
@@ -2852,53 +2840,48 @@ cancel, projection and §4.12's order act on it.
 **The window's unit (X3, decided 2026-11-13, §8).** v0.3 §7.1 counts the window in slots of
 `CHUNK_BYTES` (12 000 bytes, the payload's chunk),
 `W = ceil(uplink_bytes_per_s · (RTT_REF + TARGET) / CHUNK_BYTES)`. A cell is 2 096 bytes, so the
-same slot count carries a sixth of the bytes per round trip: in the toy a 50 Mbps proposer of 128
-column groups was held to about 10 Mbps by its own window (a 9 MB block took 9.2 s where its uplink
-allows 2 s), a 1 Gbps one to about a fifth of its uplink, and a reconstructor's answer to a probe
-left 450 ms late behind its burst of rebuilt cells. One window over every object type (X3) is
-therefore counted in bytes here, a chunk taking its own length of it; slots per object type would be
-the alternative, with the same capacity question at every boundary between types.
+same slot count carries a sixth of the bytes per round trip. In the toy, a proposer of 128 column
+groups was held by its own window to a small share of its uplink, at 50 Mbps and at 1 Gbps, and a
+reconstructor's answer to a probe left late behind its burst of rebuilt cells
+(protocol-v2-figures.md, §4.11). One window over every object type (X3) is therefore counted in
+bytes here, a chunk taking its own length of it; slots per object type would be the alternative,
+with the same capacity question at every boundary between types.
 
 **The entry before the room.** v0.3 took a slot first and chose after, which also made a
 control-only entry at the head of the queue wait for a chunk's slot.
 
-**What the unit changes, in the toy** (60 nodes, one seed, `toy/README.md` for the tables): the
-custody setting's block completes in 347 ms at the median and 456 ms at the tail with a 1 Gbps
-proposer where the slot window gave 777 and 963, and in 2.4 s with a 50 Mbps proposer where it gave
-9.2 s, which is the uplink's own bound (2.2 s with §4.12's source rule); the sampling cell's samples
-arrive in 264 ms at the median where they took 750; under half the columns withheld every custodian
-completes through the rows in 2.4 s where it took 2.7, with every claim verified and none re-armed,
-since a reconstructor's answers no longer queue behind its rebuilt cells; and in the honest row cell
-no member decodes at the third phase at all, where 37 did, because the column path is done before
-the phase and the subnet's view is whole. At 500 nodes the custody block completes in 531 ms at the
-median and 680 at the tail where the slot window gave 1 011 and 1 207, and the withheld block
-through the rows in 2.4 and 2.5 s where it gave 2.5 and 3.0. Tier 4 moves within 15 ms and 0.04
-copies (§6.1).
+**What the unit changes, in the toy** (protocol-v2-figures.md, §4.11). At 60 nodes, the custody
+setting's block completes sooner, at the median and at the tail, with a 1 Gbps proposer. With a
+50 Mbps proposer it completes at about the uplink's own bound, where the slot window took several
+times as long, and a little sooner with §4.12's source rule. The sampling cell's samples arrive
+sooner. Under half the columns withheld every custodian completes through the rows sooner, with
+every claim verified and none re-armed, since a reconstructor's answers no longer queue behind its
+rebuilt cells. In the honest row cell no member decodes at the third phase at all, where several
+did under the slot window, because the column path is done before the phase and the subnet's view
+is whole. At 500 nodes the custody block and the withheld block complete sooner too, at the median
+and at the tail. Tier 4 moves little (§6.1).
 
 **Below the writer, in the toy.** The toy runs the rule as one write per connection at a time
 (`--send-buffer 1`). Read in bytes instead, as less than one payload chunk unsent, it moves the
-column cells by at most 36 ms at the median (seed 7).
-- **Its effect,** with §4.7's rules, in the toy at 60 nodes over seeds 7 to 16 (the median of the
-  seeds, and its range):
-  - the 50 Mbps payload cells complete 38 to 46 ms sooner, on 29 of their 30 seeds, with 0.10 to
-    0.36 fewer copies;
-  - the rows complete 14 ms sooner (−93 to +164, sooner on six seeds), and the rows with liars
-    47 ms sooner (sooner on six seeds). With a column's offers at publish (§4.7's alternative) the
-    rule brought them 110 and 90 ms sooner;
-  - a 50 Mbps proposer's custody block completes 48 ms later (−36 to +63, later on eight seeds), and
-    34 ms later at the tail;
-  - the 1 Gbps cells move by at most 4 ms;
-  - at 500 nodes, the payload completes 18 ms sooner with 0.31 fewer copies (seed 7), and the rows
-    2 ms sooner (1 to 21, seeds 7 to 9, sooner on every seed).
+column cells little at the median, at one seed (protocol-v2-figures.md, §4.11).
+- **Its effect,** with §4.7's rules, in the toy at 60 nodes (protocol-v2-figures.md, §4.11):
+  - the 50 Mbps payload cells complete sooner, on nearly every seed, with fewer copies;
+  - the rows complete a little sooner at the median, on more than half the seeds, and the rows with
+    liars sooner, on more than half the seeds. With a column's offers at publish (§4.7's
+    alternative) the rule brought them sooner by more;
+  - a 50 Mbps proposer's custody block completes later, on most seeds, and later at the tail;
+  - the 1 Gbps cells move little;
+  - at 500 nodes, the payload completes sooner with fewer copies, at one seed, and the rows a little
+    sooner, on every seed.
 
 **The line skips a writer mid-write** (2026-11-20, from `protocol.md` v0.10.7's §7.1).
 - *The case.* The line admitted only its first writer, and every freed room woke only it. A writer
   whose write has not completed cannot take room, so a peer that stops reading while its writer
   heads the line held every free byte. On 2026-11-20 `toy/line_stall_known.py --doc v2` showed it on
-  the `push` cell's network: with the source's line head stalled, nine other peers' chunks waited in
-  an empty window and none was sent for two seconds. With the rule none was held up. The check now
-  counts the sends from 600 ms after the stall on (past `WINDOW_TIMEOUT`), or accepts queues left
-  empty.
+  the `push` cell's network: with the source's line head stalled, the other peers' chunks waited in
+  an empty window and none was sent during the check (protocol-v2-figures.md, §4.11). With the rule
+  none was held up. The check now counts the sends from 600 ms after the stall on (past
+  `WINDOW_TIMEOUT`), or accepts queues left empty.
 - *The wake when a control write waits* (since `protocol.md` v0.10.9's §7.1). A burst of urgent
   entries woke writers in line that each blocked on its write, and free room went to nobody.
   `protocol.md`'s monitor (its W2) found this in `loss-thin`. So a writer in line whose control
@@ -2926,13 +2909,13 @@ column cells by at most 36 ms at the median (seed 7).
   node's writers where nothing else changes.
 - *The recorded cells* (`golden-v2.txt`, against v0.10.6's). Twelve move in their digest only:
   `push`, `hold`, `announce`, `none`, `withholders`, `silent`, `cap-wait`, `dcb20`, `rr-stripe`,
-  `without-a`, `ihave-limits` and `push-deep`. Two move in their numbers too: `loss-thin` (p50 807
-  to 814 ms, p99 922 to 894 ms, copies 1.64 to 1.65) and `late-block` (p99 727 to 718 ms).
-  `without-b` is the same. The figures in this document measured before 2026-11-20 ran without the
-  rule. With the wake at the wait (v0.10.9), `rr-stripe` and `push-deep` move in their digest only,
-  back to their values before v0.10.7. Every other cell kept its recorded digest, `loss-thin` and
-  `late-block` among them: there the wake moved within the same writer event. The wake before the
-  write could reorder writers' runs that fell at the same time, and their frames to different peers.
+  `without-a`, `ihave-limits` and `push-deep`. Two move in their numbers too: `loss-thin` and
+  `late-block` (protocol-v2-figures.md, §4.11). `without-b` is the same. The figures in this
+  document measured before 2026-11-20 ran without the rule. With the wake at the wait (v0.10.9),
+  `rr-stripe` and `push-deep` move in their digest only, back to their values before v0.10.7. Every
+  other cell kept its recorded digest, `loss-thin` and `late-block` among them: there the wake moved
+  within the same writer event. The wake before the write could reorder writers' runs that fell at
+  the same time, and their frames to different peers.
 
 ### 4.12 Which entry goes next
 
@@ -2956,59 +2939,53 @@ def pick(q, ks) -> int:               # [c9] the rarest of these entries, the ea
     return min(ks, key=lambda k: (len(holders[q.normal[k].chunk.group][q.normal[k].chunk.index]), k))
 ```
 
-**A source's own chunks go first.** After the urgent entries (§4.11) and a control-only entry at the
-head of the normal queue, the writer chooses among the pushes of the node's own chunks, those it
-held before any peer (`own_chunk`), over the whole queue, past offers and answers: the rarest with
-card 9, the earliest without it.
+**A source's own chunks go first.** The writer sends urgent entries first (§4.11). If a
+control-only entry heads the normal queue, the writer chooses it next. Otherwise, if the queue
+holds pushes of chunks that the node held before any peer (`own_chunk`), the writer chooses among
+those pushes, across the whole queue and past offers and answers. With card 9 it takes the rarest,
+the earliest on a tie. Without card 9 it takes the earliest.
 
-**Answers before pushes** (`ANSWERS_FIRST`, an option, off). With the option the writer sends queued
-answers, chosen as above, after the node's own chunks and before any other push. The option is the
-one to try where answers wait behind long runs of pushes.
+**The writer can send answers before pushes** (`ANSWERS_FIRST`, an option, off). With the option
+on, the writer chooses among queued answers after the node's own chunks and before any other push,
+by the same rule of rarity and queue order. The option is the one to try where answers wait behind
+long runs of pushes.
 
 #### Rationale
 
-**A source's own chunks first** (decided 2026-11-14, §8, under X3's window in bytes over every
-group). v0.3's rarest-first (card 9) reorders only the chunks ahead of the first control-only entry,
-and its source queues each group's offers after that group's pushes (v0.3 §5.1). With one group the
-offers follow every push, and rarest-first sees them all. A proposer publishes a block's 128 column
-groups at one instant, one group after another, so the first group's offers sit in every peer's
-queue ahead of the other groups' pushes. Rarest-first then sees one group's chunks at a time, the
-offers leave early and draw asks, and the answers and the second copies take the proposer's window
-from its first copies.
+**A source's own chunks first.** v0.3's order is rarest-first (card 9), and it reorders only the
+chunks ahead of the first control-only entry. v0.3's source queued each group's offers after that
+group's pushes (v0.3 §5.1). With one group, the offers follow every push, and rarest-first sees all
+of them. A proposer, though, publishes all 128 column groups of a block at the same instant. It
+queues the pushes and the offers of one group before those of the next. The first group's offers
+then sit in every peer's queue ahead of the other groups' pushes, so rarest-first sees one group's
+chunks at a time. The offers leave early and draw asks, and the answers and the second copies take
+the proposer's window from its first copies. Taking the source's own chunks first, over the whole
+queue, keeps them ahead. The rule was chosen with one window, counted in bytes over every group
+(§4.11): the window part of X3. Its clearest gain in the toy was in custody with a 50 Mbps proposer.
+The single-group cells checked ran exactly as under v0.3's order, and elsewhere the rule changed
+nothing that the seeds could tell apart (protocol-v2-figures.md, §4.12).
 
-**Measured in the toy.** At three seeds and 60 nodes with a 50 Mbps proposer, the custody
-block completes 247 ms sooner at the median and 430 ms sooner at the tail, every seed
-sooner. At seed 7 the proposer's last first copy leaves 0.3 s sooner, it sends 1 992 second copies
-where it sent 2 400 and answers 518 asks where it answered 1 212, and over both blocks it sends 15 %
-fewer chunks, since more of its queued pushes are dropped by a holding while they wait (card 8).
-Elsewhere the rule changes nothing that the seeds can tell apart. Every single-group cell (tier 4,
-variant C, the twelve check cells) runs exactly as under v0.3's order, at 60 nodes and at 500. At 60
-nodes so does every cell with a 1 Gbps proposer, except the honest row cell, whose tail is 22 ms
-sooner while its median moves by between 8 ms sooner and 42 ms later. At 500 nodes, over three
-seeds, the 1 Gbps proposer's custody and sampling cells move within 5 ms at the median and between
-5 ms sooner and 17 ms later at the tail, and its withheld row cell runs exactly as before.
-
-**Not taken:** v0.3's order, and two other cures for the same cause, which lose in the toy.
-Dropping the source's offers, or queueing them after all of the block's pushes, matches the gain
-with a slow proposer but costs 7 to 355 ms at the median with a fast one, whose offers let
-custodians pull from it while its uplink has room.
+**Not taken: v0.3's order, and two other cures for the same cause.** v0.3's order is not taken for
+the reason above. Dropping the source's offers, or queueing them after all of the block's pushes,
+gains about as much with a 50 Mbps proposer. With a fast proposer, both delay completion at the
+median, since its offers let custodians pull from it while its uplink has room
+(protocol-v2-figures.md, §4.12).
 
 **Answers first, as an option.** An answer is a chunk its receiver asked for, so it is never a
-guess, and the asker's clock runs: for a pull on an offer, after the ask window it may ask another
-holder, and a promise still open `PROMISE` after the ask's write parks us for the group (§4.13); a
-sampler's WANT has its own timers (§4.10). A push has no clock. Under v0.3's order an asked chunk is
-rarely the rarest, since a peer of ours holds it, so its answer waits behind fresh pushes.
+guess, and the asker is timing it. For a pull on an offer, the asker may ask another holder after
+the ask window (§4.13). If the promise is still open `PROMISE` after the ask's write, the asker
+parks the asked peer for the group (§4.13). A sampler's WANT has its own timers (§4.10). A push has
+no such clock. Under v0.3's order an asked chunk is rarely the rarest, since a peer of the
+answering node holds it, so its answer waits behind fresh pushes. In the toy, the option moved
+median completion little in most tier 4 cells, and shortened the asks' round trip at the 99th
+percentile in most cells. With cards 8, 9, 12 and 15 off, answers waited behind long runs of
+pushes, and the option cut their wait at the 99th percentile (protocol-v2-figures.md, §4.12).
 
-**Answers first, in the toy.** Checked at three seeds against the source-first rule with the option
-off, completion barely moves: within 5 ms at the median in most tier 4 cells, 39 ms sooner in the
-honest row cell, and 12 ms later in the thin lossy cell (`loss-thin`) on every seed. The asks' round
-trip at the 99th percentile is shorter in most cells, by up to 44 ms, and a few hundredths of a copy
-are saved. With cards 8, 9, 12 and 15 off, a node's answers waited 1.1 to 1.7 s at the 99th
-percentile, and at most 0.22 s with the option. Not taken: three other forms; checked against v0.3's
-order, they lose. The oldest answer first, before a source's own chunks too, costs a 50 Mbps
-proposer 315 ms at the median. An answer's writer ahead of the window's line of writers costs
-`loss-thin` 91 ms at the median. An answer first only once it has waited 100 ms costs `loss-thin`
-12 ms and the 50 Mbps proposer 61 ms.
+**Not taken: three other forms of answers first.** Each cost time in some cells of the toy
+(protocol-v2-figures.md, §4.12). The first sends the oldest answer first, ahead of a source's own
+chunks too: it takes a slow proposer's uplink from its first copies. The second does that, and also
+puts the answer's writer ahead of the window's line of writers (§4.11): it starves the other writers
+at thin links. The third puts an answer first only once it has waited 100 ms.
 
 ### 4.13 The ask window follows the uplink
 
@@ -3047,19 +3024,18 @@ first for the same thin uplinks, and both arrive: the bytes stop falling with th
 tail grows.
 
 **The promise's length** (decided 2026-11-13, §8). Stretching the promise with the window too was
-checked and rejected: with 30 % withholders at 10 Mbps it lengthened the tail by 18.5 % at the
-median of three paired seeds in the research harness, since withholders then went unparked for the
-whole payload. Under the rule as it stands (the window stretched, the promise at 400 ms), the toy's
-count of parked pairs stayed below v0.3's on clean, withholding and mixed networks, since fewer asks
-go out, but rose by about 60 % with 10 % of chunks lost (lost answers break promises).
+checked and rejected: with 30 % withholders at 10 Mbps it lengthened the tail at the median of
+paired seeds in the research harness, since withholders then went unparked for the whole payload.
+Under the rule as it stands (the window stretched, the promise at 400 ms), the toy's count of parked
+pairs stayed below v0.3's on clean, withholding and mixed networks, since fewer asks go out, but
+rose with 10 % of chunks lost (lost answers break promises) (protocol-v2-figures.md, §4.13).
 
-**Evidence** (the research harness of the posts), against v0.3's fixed window on the same seed: at
-10 Mbps per node, over ten paired seeds, every seed faster and leaner, the tail 5.1 % shorter at the
-median (2.2 to 8.4 %) and 0.20 fewer copies (0.15 to 0.23); at 25 Mbps, over ten, fewer copies in
-every seed but only 0.03, and the tail unchanged within the seeds' spread (0.8 % shorter at the
-median, from 2.4 % shorter to 3.3 % longer); with 30 % withholders at 10 Mbps, over three, the tail
-3.5 % shorter and 0.18 fewer copies. The toy's checks (mixed network, silent peers, loss): §6.3,
-`ASK_UPLINK`.
+**Evidence** (the research harness of the posts), against v0.3's fixed window on the same seed
+(protocol-v2-figures.md, §4.13). At 10 Mbps per node every seed was faster and leaner, the tail
+shorter at the median and the copies fewer. At 25 Mbps every seed had fewer copies, but only
+slightly fewer, and the tail was unchanged within the seeds' spread. With 30 % withholders at
+10 Mbps the tail was shorter and the copies fewer. The toy's checks (mixed network, silent peers,
+loss): §6.3, `ASK_UPLINK`.
 
 ## 5. What carries over from v0.3 unchanged
 
