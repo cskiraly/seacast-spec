@@ -1409,12 +1409,13 @@ a routed request and goes to a peer with duty `FORWARD` (below). A promise is ma
 a broken one parks the peer for the group (`protocol.md` §6.1). A `DECLARED` peer's WANT is also its
 interest: `want_p[p][g]` is set from it before the asks are answered, and what the peer does not
 hold yet is kept as a standing request (§4.10). An ask by derived interest makes no promise with a
-timer either: an ask made by `want` (§3), not on an offer, starts none, except a claim's probe
-(`filter_entry`, §4.6). The custodian answers from what it holds, and keeps the ask for later only
-as a standing request: a `DECLARED` peer's WANT, or one marked `standing`. A standing request is
-answered when the chunk is stored, received or rebuilt (`serve_standing`, from `fill` and
-`decode_group`). Standing requests live with the group's state (`GROUP_TTL`) and count against the
-serving limit when answered.
+timer either: an ask marked `want` (§3), one sent in a WANT and not on an offer, starts none,
+except a claim's probe (`filter_entry`, §4.6). The custodian answers from what it holds, and keeps
+the ask for later only as a standing request: a `DECLARED` peer's WANT, or one marked `standing`. A
+claimant still decoding also keeps the probe of its claim (`probe_waiting`, §4.6). A standing
+request is answered when the chunk is stored, received or rebuilt (`serve_standing`, from `fill`
+and `decode_group`). Standing requests live with the group's state (`GROUP_TTL`) and count against
+the serving limit when answered.
 
 **A routed sample request** (a WANT with `hops` above zero, §4.10) may also go to a peer with duty
 `FORWARD` that neither offered the index nor custodies it `[D12]`. That peer answers it from what it
@@ -2486,9 +2487,10 @@ publish (`SOURCE_OFFERS`, above).
     `protocol.md` §5.4, to the work on the source's privacy.
 - **The cost of the later holding.** It names a chunk about a round trip later than at the write.
   A relation peer that got the chunk from a forwarder may push it back to the source until the
-  holding arrives; cancel drops what is still queued. In the toy at 60 nodes, with writes that
-  complete at once, a few of a payload's chunks come back a message at the median of the seeds, and
-  many more at one seed. With §4.11's rule fewer come back, and no column's cells come back
+  holding arrives; cancel drops what is still queued. In the toy's all-home payload cells at 60
+  nodes, with writes that complete at once, a few of a payload's chunks come back a message at the
+  median of the seeds, and many more at one seed. With §4.11's rule fewer come back at the median.
+  The 1 Gbps builder's cell has more come back either way, and no column's cells come back
   (protocol-v2-figures.md, §4.7).
 
 What P4 costs here depends on how many groups a source publishes. For the payload, one group, it
@@ -2914,9 +2916,9 @@ the column cells little at the median, at one seed (protocol-v2-figures.md, §4.
   whose write has not completed cannot take room, so a peer that stops reading while its writer
   heads the line held every free byte. On 2026-11-20 `toy/line_stall_known.py --doc v2` showed it on
   the `push` cell's network: with the source's line head stalled, the other peers' chunks waited in
-  an empty window and none was sent during the check (protocol-v2-figures.md, §4.11). With the rule
-  none was held up. The check counts the sends to the other peers from 600 ms after the stall on
-  (past `WINDOW_TIMEOUT`), and accepts queues left empty.
+  an empty window, and none was sent to them from 600 ms after the stall to the end of the check
+  (protocol-v2-figures.md, §4.11). With the rule none was held up. The check counts the sends to the
+  other peers from 600 ms after the stall on (past `WINDOW_TIMEOUT`), and accepts queues left empty.
 - *The wake when a control write waits* (since `protocol.md` v0.10.9's §7.1). A burst of urgent
   entries woke writers in line that each blocked on its write, and free room went to nobody.
   `protocol.md`'s monitor (its W2) found this in `loss-thin`. So a writer in line whose control
@@ -3541,8 +3543,9 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   `claim_all`: the sender holds or can produce every index, `protocol.md`'s decode claim, made at K
   before the decode. `complete`: the sender's interest in the group is satisfied. Both are
   unverified; a probe verifies a `claim_all` that defers a decode (§4.6).
-- **claimant**: the peer whose `claim_all` defers a node's decode of a group. The node's probe asks
-  it for one index to verify the claim (§4.6, R5).
+- **claimant**: a peer whose `claim_all` for a group has arrived (`claims`). A claim defers the
+  node's decode once, and the node's probe asks one claimant, drawn at random, for one index to
+  verify it (§4.6, R5).
 - **colour**: one of `M` values that partition a group's indices (`colour_of`, §1.4, `[D10]`). A
   chunk is pushed eagerly only on links whose push relation for its family holds its colour. A
   colour is not a subnet (§0).
