@@ -420,6 +420,7 @@ class Tracer3(Tracer):
         # the content line first: what this trace is made from (content.py)
         self.content_line = content.line(content.content(self.toy))
         self.out = gzip.open(out, "wt", compresslevel=1)
+        self.out_path = str(out)
         self.out.write(self.content_line)
         self.counts = Counter()
         self.nodes = []                 # (node, its constants, its replaced names), as each is installed (the nodes line)
@@ -435,6 +436,13 @@ class Tracer3(Tracer):
         # what is traced: §6.1's twelve alone (TRACE3_ONLY=sec61); under --doc v2, the block's names that are
         # protocol.md's all the way down; otherwise the block
         self.doc_v2 = doc_of(argv) == "v2"
+        # under v2, one tracer-wide state of the record and question depth: inside any question, every traced
+        # function at every node runs bare, and so does everything inside a replaced name entered outside any
+        # record; the calls run bare at another node than the record's, and inside such an entry, are counted, by
+        # node and function, in a file beside the trace (OUT.bare.json), not in the trace. Under protocol.md each
+        # node keeps its own state, as before
+        self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0} if self.doc_v2 else None
+        self.bare = Counter()
         # the toy's command line (cli: this script's own main) is read as the toy's parser reads it (toy_args); a
         # directed set's arguments are no command line of the toy's, and are read by their words
         if (toy_reads_a_dump(argv) if cli else any(a.split("=")[0] in ("--xcheck", "--topology") for a in argv)):
@@ -488,6 +496,10 @@ class Tracer3(Tracer):
         self.write({"trailer": {"records": sum(self.counts.values()), "by_fn": dict(sorted(self.counts.items())),
                                 "rest": self.rest_total}})
         self.out.close()
+        if self.doc_v2:                 # the calls run bare at another node, or inside a replaced name entered outside
+            with open(self.out_path + ".bare.json", "w") as f:      # any record: a run output beside the trace
+                json.dump(dict(sorted(self.bare.items())), f, sort_keys=True)
+                f.write("\n")
 
     def start_check(self, out):
         """What must hold of this Python before the toy is imported, so that what runs is what the content line
@@ -646,6 +658,19 @@ class Tracer3(Tracer):
         if bytes(want) != bytes(r):
             raise SystemExit(f"trace3: node {nid}: message_id returned {bytes(r).hex()}, and the document's function "
                              f"gives {bytes(want).hex()} for that chunk: the id stored on it is not the document's")
+
+    def repoint_aliases(self, nd, ns):
+        """Under v2, after the install at the end of construction (design-r4's R1): two names the toy bound to the raw
+        objects before the install are pointed at the installed ones, `hdr` at the view of `desc` (`_v2`'s
+        `hdr=ns["desc"]`) and `chunk_id` at the installed `message_id` (`_v2` binds the toy's `message_id` wrapper
+        to it), and the identities are checked: a raw `hdr` would make every `hdr[g]` read unlogged."""
+        if "hdr" in ns:
+            ns["hdr"] = ns["desc"]
+        if "chunk_id" in ns:
+            ns["chunk_id"] = ns["message_id"]
+        for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
+            if alias in ns and ns[alias] is not ns[name]:
+                raise SystemExit(f"trace3: node {nd.id}: {alias} is not the installed {name}")
 
     def final_check(self):
         """The traced names once more, when the nodes line is written, and again at the trace's end: install runs
@@ -1175,12 +1200,18 @@ class Tracer3(Tracer):
         F.install(rec, ns, [t for t in self.schema(ns) if not (self.doc_v2 and t.name in WINDOW)])
         window = {} if self.doc_v2 else {name: ns[name] for name in WINDOW}    # the installed cell and views: each
         #                                                                         record's end checks they are still there
-        st = {"depth": 0, "ext": 0, "cur": None}
+        st = self.vst if self.doc_v2 else {"depth": 0, "ext": 0, "cur": None}
         key, tr = self.key, self
 
         def sec61(name, fn):
             @functools.wraps(fn)
             def w(*args, **kw):
+                if tr.doc_v2 and (st["supp"] or (st["depth"] and st["node"] != int(nd.id))):
+                    if st["supp"] or st["ext"]:     # inside a question at another node, or inside a replaced name
+                        tr.bare[f"{nd.id} {name}"] += 1     # entered outside any record: bare, and counted
+                        return fn(*args, **kw)
+                    raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record is "
+                                     f"open and no question runs")
                 if st["ext"]:                       # inside an interface call: not §6.1's own call
                     r = fn(*args, **kw)
                     if name == "message_id":        # m2_check there too: the node's store asks it
@@ -1242,6 +1273,8 @@ class Tracer3(Tracer):
                     tr.alias_check(rec, nd.id, args, "start")   # that an alias the call consumes cannot hide
                 rec.tape = r_["tape"]
                 st["cur"], st["depth"], st["reached"], st["defers"] = r_, 1, {name}, 1 if name == "defer" else 0
+                if tr.doc_v2:
+                    st["node"] = int(nd.id)
                 mesh_on()
                 rec.on = True
                 if name == "rarest":            # v2's choose passes the raw queue it took outside a record;
@@ -1263,6 +1296,8 @@ class Tracer3(Tracer):
                     rec.on = False
                     mesh_off()
                     st["depth"], st["cur"] = 0, None
+                    if tr.doc_v2:
+                        st["node"] = None
                 finish(ret=tr.ret_of(name, r))
                 return r
             return w
@@ -1270,6 +1305,18 @@ class Tracer3(Tracer):
         def iface(name, fn, enc):
             @functools.wraps(fn)
             def w(*args, **kw):
+                if tr.doc_v2:
+                    if st["depth"] and st["node"] != int(nd.id):    # another node's record is open
+                        if st["ext"] or st["supp"]:                 #   inside a question there: bare
+                            return fn(*args, **kw)
+                        raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record "
+                                         f"is open and no question runs")
+                    if not st["depth"] and not st["supp"] and name in replaced:     # a replaced name entered
+                        st["supp"] += 1                                             #   outside any record:
+                        try:                                                        #   nothing inside it is a
+                            return fn(*args, **kw)                                  #   record
+                        finally:
+                            st["supp"] -= 1
                 if not st["depth"] or st["ext"]:    # not asked by §6.1's own code
                     return fn(*args, **kw)
                 # the tracer's third state: what the rest of the node reads is behind the tape, but its
@@ -1492,13 +1539,23 @@ class _MeshAnd:
 def main(argv):
     toy, out, rest = Path(argv[0]).resolve(), argv[1], argv[2:]
     tr = Tracer3(toy, out, rest, cli=True)
-    orig = tr.N.Node._override
+    if tr.doc_v2:       # under v2, at the end of the node's construction: after _v2 and every option's binding, so that
+        orig_init = tr.N.Node.__init__      # the tracer sees each name as it finally stands (design-r4's R1)
 
-    def _override(self, ns):
-        orig(self, ns)
-        tr.install(self, ns)
+        def __init__(self, *a, **kw):
+            orig_init(self, *a, **kw)
+            tr.install(self, self.ns)
+            tr.repoint_aliases(self, self.ns)
 
-    tr.N.Node._override = _override
+        tr.N.Node.__init__ = __init__
+    else:               # under protocol.md, inside _override, as before
+        orig = tr.N.Node._override
+
+        def _override(self, ns):
+            orig(self, ns)
+            tr.install(self, ns)
+
+        tr.N.Node._override = _override
     import run                          # noqa: E402: the toy's run.py, from TOYDIR
     try:
         run.main(rest)
