@@ -121,14 +121,14 @@ where one has a control that must come out the other way, it is named:
 - `idontwant_id_known.py`: §4.1, an IDONTWANT entry that is not a HAVE bitmap is a stock id, kept in
   `unwanted[p]` with no penalty; a bitmap beside it must still be read as a HAVE, and not be kept in
   `unwanted[p]`. The toy tells a bitmap by its type, not by the string's first bytes and length.
-  With `--doc v2`, the same on v0.3's wire (`protocol-v2-bindings.md` §3): the toy reads the frame
-  as v2's messages and keeps the stock id in `unwanted[p]`, which v2's `on_want` reads.
+  With `--doc v2`, the same on the gossipsub binding (`protocol-v2-bindings.md` §4): the toy reads
+  the frame as v2's messages and keeps the stock id in `unwanted[p]`, which v2's `on_want` reads.
 - `want_promise_known.py`: `protocol-v2.md` §4.5 and §4.10, an ask sent as a `Want` starts no
-  promise at its write: such an ask sent through v0.3's wire and written by `filter_entry` gets
-  none, and the control, an ask on an offer written the same way, gets v0.5's; a claim's probe gets
-  one at its first write and at a write again. It runs `protocol-v2.md`; the document's
-  `filter_entry` started a promise for every ask until the rule was in its code, which the toy had
-  kept in a wrapper.
+  promise at its write: such an ask sent through the gossipsub binding and written by
+  `filter_entry` gets none, and the control, an ask on an offer written the same way, gets v0.5's;
+  a claim's probe gets one at its first write and at a write again. It runs `protocol-v2.md`; the
+  document's `filter_entry` started a promise for every ask until the rule was in its code, which
+  the toy had kept in a wrapper.
 - `write_wait_known.py [--doc v2]`: §7.1 and §7.2 (`protocol-v2.md` §4.11), a writer in the
   window's line that writes control wakes the first writer in line that can write when its write
   starts to wait for the transport (`write_waits`), and not before. Two writers wait in line, p
@@ -293,10 +293,10 @@ where one has a control that must come out the other way, it is named:
   not pushed again through its column by the repair, where that peer is a custodian short of it
   (`note_push` under every group the chunk fills). The control: a custodian that made no WANT is
   pushed the cell once.
-- `standalone_wire_known.py`: an encoder written from `protocol-v2-bindings.md` §1.
+- `standalone_wire_known.py`: an encoder written from `protocol-v2-bindings.md` §1 to §3.
   - Every message kind round-trips at its smallest and largest.
-  - §1.3's layout, read from the document, must be the encoder's, field by field, with its fixed
-    sizes. The largest bodies equal §1.6's bounds, and §1.7's sizes hold, both tables read from the
+  - §1.2's layout, read from the document, must be the encoder's, field by field, with its fixed
+    sizes. The largest bodies equal §1.4's bounds, and §1.5's sizes hold, both tables read from the
     document.
   - A reader refuses a frame over its kind's bound before reading its body, and an unknown kind's
     frame over the largest known kind's room. It refuses a chunk whose stated decompressed length
@@ -571,9 +571,9 @@ the next version redefines what it changes (`on_frame`, `on_chunk`, `forward`, `
 offer handlers, `on_want`, completion and repair, `publish`, the heartbeat) and keeps what it says
 carries over (the ask discipline, `choose_push`; the window and the writer as its §4.11 and §4.12 adapt them). `node.py` supplies what
 the next version leaves to the environment under its tier 4 setting (its §6.1): the payload object type
-with its parameters, the join tables, the push relation behind the mesh, and the binding of its
-messages onto v0.3's wire (`protocol-v2-bindings.md` §3): a holding is an IDONTWANT bitmap, an offer an
-IHAVE bitmap, an ask a `WantIndex`. Relations are static, as the mesh is for v0.3.
+with its parameters, the join tables, the push relation behind the mesh, and the gossipsub
+binding of its messages (`protocol-v2-bindings.md` §4): a holding is an IDONTWANT bitmap, an offer
+an IHAVE bitmap, an ask a `WantIndex`. Relations are static, as the mesh is for v0.3.
 
 `check.py --doc v2` runs the fifteen cells against the next version's own recording,
 `golden-v2.txt` (`--update` records it, as for v0.3). `check.py --doc v2 --golden golden.txt`
@@ -1299,10 +1299,12 @@ every row was rebuilt by an honest node).
 - Without a fault, under `hoardm20` with the member check alone, and under `claim20`, no alarm was
   sent at seed 11.
 
-**`--wire standalone`** (with `--doc v2`) charges the links the standalone binding's bytes
-(`protocol-v2-bindings.md` §1) in place of v0.3's wire, which stays the default and the recordings'.
-It is a model of bytes: what reaches the receiver, and when, follows from those bytes, but an entry
-is still delivered as one unit, as on v0.3's wire.
+**`--wire standalone`** (with `--doc v2`) charges the links the bytes of the libp2p stream binding
+(`protocol-v2-bindings.md` §1 and §2) in place of the gossipsub binding, which stays the default and
+the recordings'. It is a model of bytes: what reaches the receiver, and when, follows from those
+bytes, but an entry is still delivered as one unit, as on the gossipsub binding. The toy's two wires
+model two header forms for comparison, not one object type's definition: this wire charges
+form (b), and the gossipsub binding charges form (a) (`protocol-v2-bindings.md` §1.6).
 - *Each message is a frame of its own:* a uvarint length, a kind byte and its SSZ, sized before
   compression. The payload's chunk is `protocol.md`'s `Chunk`; a cell is a `CellChunk`.
 - *One WANT per ask:* several asks of one group to one peer are charged a frame each, where one

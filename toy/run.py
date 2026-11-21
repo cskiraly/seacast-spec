@@ -229,10 +229,12 @@ def main(argv):
     ap.add_argument("--uplink", default="ps", choices=("ps", "rr"),
                     help="ps: processor sharing over busy connections (FQ-CoDel's fluid limit); rr: whole entries in turn")
     ap.add_argument("--wire", default="v03", choices=("v03", "standalone"),
-                    help="the binding the links charge: v03, protocol.md's wire (gossipsub frames, the recorded cells); "
-                         "standalone, protocol-v2-bindings.md §1's bytes, each message a frame of its own, a cell's "
-                         "header with the first eager push of its group on a link (--doc v2). A model of bytes: an entry is "
-                         "still delivered as one unit, as on v0.3's wire")
+                    help="the binding the links charge (the values keep their old names, which scripts and recorded "
+                         "cells use): v03, the gossipsub binding, protocol.md's wire (gossipsub frames, the recorded "
+                         "cells); standalone, the libp2p stream binding, the bytes of protocol-v2-bindings.md §1 and §2, "
+                         "each message a frame of its own, a cell's header with the first eager push of its group on a "
+                         "link (--doc v2). A model of bytes: an entry is still delivered as one unit, as on the gossipsub "
+                         "binding")
     ap.add_argument("--send-buffer", type=int, default=None,
                     help="bytes a connection's transport accepts ahead of the link; a writer waits while its backlog "
                          "is at it, as a QUIC stream write blocks. Default 1, one entry at a time per connection: "
