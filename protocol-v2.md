@@ -3449,7 +3449,7 @@ section says what every binding provides, and what the rules do where a binding 
 **What every binding provides:**
 - *Links:* a binding gives a link per connected peer, with its open and its close, which start and
   end §3's per-connection lifetimes.
-- *Whole messages:* what a node writes to a peer arrives as whole messages. How a binding marks
+- *Whole messages:* a binding delivers each message whole, never a part of one. How a binding marks
   where each ends is its own: its frames.
 - *The queue and the write:*
   - `send(p, msg, urgent)` puts a message into the per-peer queue (§3), or reports that a full queue

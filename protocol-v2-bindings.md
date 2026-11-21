@@ -539,11 +539,11 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
      `fq_codel` does, sees the native connection and libp2p's connection to the same peer as one
      flow if both run between the same two sockets. They do if both are dialed from libp2p's
      listening socket. By default, go-libp2p tries to dial from that socket. If the native
-     connection is dialed from a socket of its own, with a source port of its own, such a queue sees
-     it as a separate flow, even on the shared listening port. The rest of this section is written
-     in this model.
+     connection is dialed from a socket of its own, with a source port of its own, such a queue can
+     see it as a separate flow, even on the shared listening port; `fq_codel` hashes flows, and two
+     can collide. The rest of this section is written in this model.
   2. *Beside libp2p, on a port of its own.* A new ENR field gives the port, and a queue that tells
-     flows apart by their addresses and ports sees the native connection as a separate flow.
+     flows apart by their addresses and ports can see the native connection as a separate flow.
   3. *Alone, with no libp2p.* The binding must then define who counts as a peer (its limits and
      gating), its identity and authentication, how a node is found and dialed, and its scoring.
 
@@ -610,20 +610,23 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   (`protocol-v2.md` §4.6) would drop a queued chunk because the peer has said it holds it (cancel,
   `[c8]`), the sender resets the chunk's stream if the chunk is already written. QUIC then sends
   none of the stream's bytes not yet sent, and resends none of those lost (RFC 9000 §3.1, §13.3). A
-  reset takes back nothing already delivered. Once all of a stream's bytes are sent, the sender may
-  let the stream finish instead, and resets it if any of those bytes are declared lost. An answer
+  reset takes back nothing already delivered. Once all of a stream's bytes and its end are sent
+  (QUIC's "Data Sent" state), the sender may let the stream finish instead, and resets it if any of
+  those bytes are declared lost. An answer
   to the peer's probe is exempt, as it is from cancel. Since `filter_entry` clears the probe's mark
   once the answer is written, the sender marks the answer's stream as exempt when it writes the
   answer.
 - **A receiver may stop a chunk stream** (QUIC's `STOP_SENDING`) whose chunk it already holds,
   except the answer to a probe of its own that is not yet judged (`protocol-v2.md` §4.6). The
-  sender then resets the stream as RFC 9000 §3.5 requires. While some of the stream's bytes are not
-  yet sent, it resets the stream at once. Once all are sent, it may wait until they are acknowledged
-  or declared lost, and resets the stream if any are declared lost. A stopped copy is never
-  received whole, so the receiver cannot compute its chunk id (§1.2) or validate it, and `on_chunk`
-  never sees it. It is not a duplicate that `[c14]` acknowledges, and a header it carries is not
-  read. What a receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk
-  comes back at the receiver's next holding of the group, or when the room times out, as below.
+  sender then resets the stream as RFC 9000 §3.5 requires. Until all of the stream's bytes and its
+  end are sent, it resets the stream at once. After that, it may wait until they are acknowledged or
+  declared lost: it resets the stream if any are declared lost, and lets it finish if all are
+  acknowledged. The receiver discards a stopped copy unread, even if its bytes still arrive at
+  QUIC: it computes no chunk id for it (§1.2) and validates nothing, and `on_chunk` never sees it.
+  It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read. What a
+  receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes back at a
+  later holding from the receiver that names the chunk's index, or when the room times out, as
+  below.
 - **The window.** A reset changes nothing in the window: the chunk's room comes back at the peer's
   holding, or when it times out, as for any chunk (`window_release`, `window_timeout`,
   `protocol-v2.md` §4.11).
@@ -652,17 +655,18 @@ This version sends no datagrams (RFC 9221). Two uses are considered:
   so a later holding supersedes a lost one. The last holding of a group has no successor and would
   also go on the control stream.
 - **Payload chunks as datagrams,** where an encoded chunk fits in one. A datagram is never
-  fragmented, so its size is bounded by the path's packet size less QUIC's overhead, by the
-  largest UDP payload the peer accepts (`max_udp_payload_size`, RFC 9000 §18.2), and by the
-  largest datagram frame the peer accepts (`max_datagram_frame_size`, RFC 9221 §3). At the packet
-  sizes the study assumed, that is about 1 160 to 1 415 bytes. A cell's encoded message is 2 140
-  bytes before compression, with its kind byte and without a header (§1.5), and does not fit unless
-  it compresses well. A payload chunk of the default unit also fits only if it compresses well.
-  The study's payload was compressed before it was cut into chunks. With that payload, a payload
-  chunk fits only as a short last chunk, or with a builder's unit far below the default; for a
-  payload of 1 MiB, such a unit gives more chunks than `protocol.md`'s `MAX_CHUNKS` allows a coded
-  group. Offering a chunk whose datagram was lost, when its room in the window times out, would be a
-  new action: today the timeout frees the room (`window_timeout`).
+  fragmented. The encoded chunk, with the DATAGRAM frame's own bytes, must fit the largest datagram
+  frame the peer accepts (`max_datagram_frame_size`, RFC 9221 §3). The UDP payload that carries it,
+  with QUIC's overhead, must fit both the path's packet size and the largest UDP payload the peer
+  accepts (`max_udp_payload_size`, RFC 9000 §18.2). At the packet sizes the study assumed, this
+  leaves the encoded chunk about 1 160 to 1 415 bytes. A cell's encoded message is 2 140 bytes
+  before compression, with its kind byte and without a header (§1.5), and does not fit unless it
+  compresses well. A payload chunk of the default unit also fits only if it compresses well, and a
+  payload's last chunk fits if it is short enough. The study's payload was compressed before it was
+  cut into chunks. With that payload, its chunks fit only with a builder's unit far below the
+  default; for a payload of 1 MiB, such a unit gives more chunks than `protocol.md`'s `MAX_CHUNKS`
+  allows a coded group. Offering a chunk whose datagram was lost, when its room in the window times
+  out, would be a new action: today the timeout frees the room (`window_timeout`).
 
 Datagrams count against the connection's congestion window like any data (RFC 9221 §5.4).
 
@@ -694,8 +698,8 @@ The binding also adds three rows to that table. Its own answers are these:
 - **a written chunk can be cancelled:** yes, by a reset of its stream (§7.3);
 - **a chunk's lost bytes leave a gap only in that chunk's delivery:** yes. Lost bytes leave a gap
   in the ordered delivery of their own stream only. A lost packet that carried bytes of several
-  streams, the control stream among them, leaves a gap on each of those streams, and each waits only
-  for its own bytes to be resent.
+  streams, the control stream among them, can leave a gap on each stream whose bytes are then
+  missing, and each such stream waits only for its own bytes to be resent.
 
 ### 7.8 What it needs from QUIC
 
@@ -714,9 +718,9 @@ This draft leaves these questions open:
 - when a chunk stream still waiting for the link to carry its object type is discarded, and how
   much of the connection's receive credit a receiver keeps for the control stream meanwhile (§7.2);
 - what a receiver sends for a copy it stopped (§7.3): a holding made from what it holds and has
-  verified, or nothing, in which case the sender's room for the chunk comes back when that room
-  times out; and whether a receiver may stop a stream that carries a header it has not yet
-  validated;
+  verified, or nothing, in which case the sender's room for the chunk comes back at a later holding
+  that names its index, or when that room times out; and whether a receiver may stop a stream that
+  carries a header it has not yet validated;
 - which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written before
   and after it;
 - how a server tells a connection opened for a fetch from a link's connection (§7.6): by an ALPN of
@@ -724,8 +728,8 @@ This draft leaves these questions open:
 - how a writer counts the connection's unsent bytes where the implementation buffers a stream's
   bytes (§7.2);
 - whether libp2p's shared QUIC listener, in model 1, lets the binding set its own stream credit:
-  stock go-libp2p v0.50.0 configures that listener with at most five incoming unidirectional streams
-  per connection;
+  stock go-libp2p v0.50.0 configures that listener with at most five concurrent incoming
+  unidirectional streams per connection;
 - whether a stream per group and peer, with fewer streams, does as well as a stream per chunk;
 - how many chunk streams a receiver should grant: in the toy, more to one peer at once than
   go-libp2p's defaults allow, in most custody and row settings;
@@ -741,12 +745,13 @@ This draft leaves these questions open:
 **Beside libp2p, or alone.** Beside libp2p (models 1 and 2), peer management, scoring and
 connection limits stay libp2p's, and the native connection only carries SEACAST's messages. The
 price is a second connection per peer, and so a second congestion controller. In the study, the
-two connections together took a larger share than one connection would behind a FIFO, and behind
-`fq_codel` where it saw them as two flows. Behind `fq_codel` where it saw them as one flow, they
-took one flow's share. Between themselves they share the bottleneck without regard to what either
-carries. A node that runs the binding alone (model 3) has one connection per peer, but the binding
-must then define what libp2p gives the other models. The choice between the models stays open
-because it is not settled whether a node that speaks this binding also runs libp2p on the same port.
+two connections shared the bottleneck with a third bulk connection. Together they took more than
+the third behind a FIFO, and two shares of three behind `fq_codel` where it saw them as two flows.
+Where `fq_codel` saw them as one flow, they took one share of two. Between themselves they share
+the bottleneck without regard to what either carries. A node that runs the binding alone (model 3)
+has one connection per peer, but the binding must then define what libp2p gives the other models.
+The choice between the models stays open because it is not settled whether a node that speaks this
+binding also runs libp2p on the same port.
 
 **A stream per chunk.** Lost bytes hold up only their own stream, so a chunk waits only for its own
 bytes to be resent. On one stream per peer, every later chunk to that peer waits until QUIC has
@@ -770,10 +775,10 @@ libp2p streams kept most of the native binding's gain, under three conditions:
 - **Raised limits.** The limits of libp2p's resource manager on streams per protocol and peer must
   be raised for the protocol. The QUIC transport must also grant enough bidirectional streams, since
   libp2p opens its streams on QUIC as bidirectional ones. In go-libp2p v0.50.0, the QUIC transport
-  grants 256 per connection. In the toy, the chunk streams open at once to one peer exceeded the
-  resource manager's default per protocol and peer (80, at 32 GiB of memory) in half the settings.
-  With each stream counted until QUIC's credit for it could come back, a round trip later, one row
-  setting also exceeded the transport's 256.
+  allows at most 256 concurrent incoming bidirectional streams per connection. In the toy, the
+  chunk streams open at once to one peer exceeded the resource manager's default per protocol and
+  peer (80, at 32 GiB of memory) in half the settings. With each stream counted until QUIC's credit
+  for it could come back, a round trip later, one row setting also exceeded the transport's 256.
 
 **What the native binding adds over a stream per chunk on libp2p:**
 - no negotiation per chunk, where lazy negotiation costs 72 bytes against a cell's 2 140;
@@ -788,10 +793,11 @@ a payload chunk at 50 Mbps. In the toy, giving the control stream priority made 
 difference, so the binding does not depend on it (§7.4).
 
 **No datagrams for chunks, in this version.** At the study's packet sizes, a cell's encoded message
-(2 140 bytes before compression) fits in a datagram only if it compresses well. At the largest
-datagram the study assumed, 1 415 bytes, payload chunks small enough to fit would be eight to
-twelve times as many as with the default unit. With a proof in each, about a third of each
-datagram would be header and proof. A small-chunk mode would need two changes:
+(2 140 bytes before compression) fits in a datagram only if it compresses well. For the study's
+1 MiB payload, in the three chunk formats it tested, chunks small enough to fit a 1 415-byte
+datagram would be eight to thirteen times as many as with the default unit. In the two formats
+with a proof in each chunk, about a third of each datagram would be header and proof. A
+small-chunk mode would need two changes:
 - the group's hashes sent once per group, in place of a proof per chunk;
 - holdings sent less often than one per chunk claimed, since each names the whole bitmap.
 
