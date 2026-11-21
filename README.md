@@ -89,14 +89,16 @@ names how SEACAST diffuses.
 
 ## Where SEACAST stands
 
-- **The latest release is [v0.10.10](https://github.com/cskiraly/seacast-spec/tree/v0.10.10)**, 2026-11-21:
-  `protocol.md` at version 0.10.10, v0.10's rules with the text rewritten for readers, its constants
+- **The latest release is [v0.10.11](https://github.com/cskiraly/seacast-spec/tree/v0.10.11)**, 2026-11-21:
+  `protocol.md` at version 0.10.11, v0.10's rules with the text rewritten for readers, its constants
   in three kinds, reference values for gossipsub's two IHAVE limits, the source's choice of when it
   announces (`SOURCE_OFFERS`), an IDONTWANT's stock ids kept as stock gossipsub keeps them, an open
   question on a coded group's compressed bytes, and a window whose line a writer that cannot write
-  no longer holds, and whose next writer is woken when a write starts to wait; the toy and its
-  recorded cells, the next version's draft, rewritten for readers, with its decisions taken and its
-  bindings in a document of their own, the proofs in `formal/veil/` on Veil's release, with
+  no longer holds, whose next writer is woken when a write starts to wait, and which a closing
+  connection's writer leaves; the toy and its recorded cells, the next version's draft, rewritten
+  for readers and restructured, with its decisions taken, its decision record, its figures and its
+  bindings in companion files, the bindings named by their carriers and a cell group's header in
+  three forms, the proofs in `formal/veil/` on Veil's release, with
   malicious peers, runs that go quiet (Q3) and agreement, which are of v0.8's rules and four later
   ones, the Lean twin of `protocol.md`'s Python with its record, a first piece of a refinement from
   the twin to a Veil model, and a map of how the checks fit together.

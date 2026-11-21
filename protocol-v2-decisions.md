@@ -416,3 +416,8 @@ carried later than its version.
   `write_wait_known.py --doc v2` checks it on all three.
 - v0.10.10 (2026-11-21): `protocol.md` is the same but for its version line, and the proofs in
   `formal/veil/` take in four of its rules added after v0.8; there is nothing to carry.
+- v0.10.11 (2026-11-21): `protocol.md` is the same but for its version line, one row of its §8.1
+  table, the window's line, which this draft names in §3's lifetimes (`leave_line`), and §5.1's
+  citation of the draft's figures, now in `protocol-v2-figures.md`. This draft is restructured: its
+  decisions and its figures are in files of their own, and its bindings are named by their
+  carriers.

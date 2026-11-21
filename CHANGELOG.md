@@ -13,7 +13,7 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## After v0.10.10 — not yet released
+## v0.10.11 — 2026-11-21
 
 The next version's draft gives a cell group's header three forms, moves its decisions and its
 figures to files of their own, names its bindings by their carriers and defines the gossipsub
@@ -127,7 +127,7 @@ binding's extra fields to the byte; its files are rewritten in plain sentences.
 - `protocol-v2-decisions.md` `[D6]`: where it bites names `protocol.md` §1's commitment, which
   §1.1's `verify` checks, as the payload's leaf rule.
 
-## v0.10.10 — 2026-11-21
+## v0.10.10 — 2026-11-21 (`a6ca1fc`)
 
 The proofs in `formal/veil/` take in four rules that `protocol.md` added after v0.8, and no rule
 changes.
