@@ -3491,7 +3491,7 @@ Rendezvous and discovery are outside the bindings (§0).
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
 | a chunk ordered with the messages written before and after it | yes (on Waggle, within its type) | yes, between frames | yes, between frames | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
-| a chunk's lost packet holds up none of the peer's other messages | no on the libp2p stream binding; on Waggle over QUIC, only the chunk's type waits | no | no | yes: the other chunks and the control stream do not wait for it | a lost packet holds up every later frame on its stream until it is resent, and on TCP every later frame on the connection; on every binding, loss also slows the connection's sending (congestion control) |
+| a chunk's lost packet leaves no gap in the delivery of the peer's other messages | no on the libp2p stream binding; on Waggle over QUIC, only the chunk's type waits | no | no | yes: the other chunks and the control stream do not wait for it | a lost packet holds up every later frame on its stream until it is resent, and on TCP every later frame on the connection; on every binding, loss also slows the connection's sending (congestion control) |
 
 **Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
 interest without subscription, a push relation per family and colour with a floor and a direction,

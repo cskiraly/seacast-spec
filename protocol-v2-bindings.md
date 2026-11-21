@@ -674,8 +674,8 @@ stream binding's column, with three changes:
 The binding also adds three rows to that table. Its own answers are these:
 - **a chunk ordered with the messages written before and after it:** no (§7.2);
 - **a written chunk can be cancelled:** yes, by a reset of its stream (§7.3);
-- **a chunk's lost packet holds up none of the peer's other messages:** yes, since the other chunks
-  and the control stream do not wait for it to be resent.
+- **a chunk's lost packet leaves no gap in the delivery of the peer's other messages:** yes, since
+  the other chunks and the control stream do not wait for it to be resent.
 
 ### 7.8 What it needs from QUIC
 
