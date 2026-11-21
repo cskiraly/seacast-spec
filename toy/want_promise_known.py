@@ -9,7 +9,7 @@ routed request's sampler); a claim's probe keeps the promise of §4.6.
 It runs `protocol-v2.md` either way: `protocol.md` has no WANT.
 
 The check, on one node of a small network that is built and not run: the node sends a peer a WANT for one
-index of a group, through the binding's `send` (v0.3's wire, `protocol-v2-bindings.md` §3, where the toy marks
+index of a group, through the binding's `send` (the gossipsub binding, `protocol-v2-bindings.md` §4, where the toy marks
 the IWANT that carries a WANT), and the entry queued for it is written (`filter_entry`). No promise may start
 for that ask. The control: an ask on an offer, an IWANT not so marked, written the same way, must start one.
 And a claim's probe, a WANT that keeps a promise (§4.6): its first write must start one, and so must a write

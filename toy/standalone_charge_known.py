@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""A known answer for the toy's charge on the standalone binding (run.py --wire standalone): for every message kind,
+"""A known answer for the toy's charge on the libp2p stream binding (run.py --wire standalone): for every message kind,
 what the links charge equals the length of the frame standalone_wire_known.py's encoder writes from
-protocol-v2-bindings.md §1 (before compression, as §1.7's sizes are).
+protocol-v2-bindings.md §1 and §2 (before compression, as §1.5's sizes are).
 
     python3 standalone_charge_known.py
 

@@ -17,7 +17,7 @@ the peer holds. On the document before the rule, the stock id went to `on_have`,
 check fails there. The toy tells a bitmap by its type (`wire.is_have_bitmap`), so this does not test the
 document's test of the string's first bytes and length.
 
-With `--doc v2`, the same frame reaches `protocol-v2.md` on v0.3's wire (`protocol-v2-bindings.md` §3): the toy
+With `--doc v2`, the same frame reaches `protocol-v2.md` on the gossipsub binding (`protocol-v2-bindings.md` §4): the toy
 reads the frame as v2's messages, a bitmap in an IDONTWANT as a holding (`on_holding`, v2's §4.3) and any other
 entry as a stock id in `unwanted[p]`, which v2's `on_want` reads (§4.5). Before the binding said so, the toy left
 the stock id out of `unwanted[p]`: the check fails there.
@@ -29,7 +29,7 @@ SEED, NODE, PEER = 7, 2, 1
 G = bytes([0x35]) * 32                              # a group no block commits
 STOCK_ID = bytes([0x22]) * 20                       # a stock message id, another topic's
 V2 = sys.argv[1:] == ["--doc", "v2"]
-RULE = "protocol-v2-bindings.md §3" if V2 else "§4.1"
+RULE = "protocol-v2-bindings.md §4" if V2 else "§4.1"
 
 
 def main():

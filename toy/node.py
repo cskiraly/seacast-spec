@@ -1194,7 +1194,7 @@ class Node:
                 ns["PROMISE"] = scaled
         ns.update(fill=fill, close_promises=close_promises, filter_entry=filter_entry)
 
-    # ---- version 2 (protocol-v2.md): the tier 4 setting on v0.3's wire
+    # ---- version 2 (protocol-v2.md): the tier 4 setting on the gossipsub binding
 
     def _v2_names(self, ns):
         """Names protocol-v2.md's annotations use before its own classes define them."""
@@ -1207,7 +1207,7 @@ class Node:
     def _v2(self, ns):
         """What protocol-v2.md leaves to the environment, under the tier 4 setting (its §6.1): the
         payload object type and its parameters, the join tables, the relations behind the mesh,
-        and the binding of the v2 messages onto v0.3's wire (protocol-v2-bindings.md §3)."""
+        and the binding of the v2 messages onto gossipsub (protocol-v2-bindings.md §4)."""
         node, c = self, self.cfg
         Have, Want, Graft, Prune, Join = ns["Have"], ns["Want"], ns["Graft"], ns["Prune"], ns["Join"]
         ns.update(ALL="ALL", DERIVED="DERIVED", DECLARED="DECLARED", FORWARD="FORWARD", NONE="NONE",
@@ -1636,7 +1636,7 @@ class Node:
                     full = d is not None and hb.bits.v == all_bits(ns["N"](d)).v
                     haves.append(Have(group=hb.group, bits=hb.bits, offer=False,
                                       claim_all=full or hb.claim_all, complete=full or hb.complete))
-                else:                                   # any other entry is a stock id (protocol-v2-bindings.md §3)
+                else:                                   # any other entry is a stock id (protocol-v2-bindings.md §4)
                     stock.append(hb)
             for j in frame.join:                        # --upkeep on: a JOIN first, as on the wire (§4.1)
                 ns["on_join"](p, j)

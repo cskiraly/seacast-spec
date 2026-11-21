@@ -78,7 +78,7 @@ class Sim:
                                                #   payload, COLUMNS groups for a block of columns
         self.pubs = []                         # the publisher per message: node 1 unless the harness's dump names one
         self.gtype = {}                        # group -> object type id, for groups whose id names one ("column", "row")
-        self.wire = cfg.get("wire", "v03")     # the binding the links charge: v0.3's wire, or the standalone one
+        self.wire = cfg.get("wire", "v03")     # the binding the links charge: the gossipsub binding, or the libp2p stream one
         self.headers_sent = set()              # --wire standalone: (sender, receiver, epoch, group) a cell header went
         self.gcol = {}                         # column group -> column index
         self.ghdr = {}                         # column or row group -> its header
@@ -329,7 +329,7 @@ class Sim:
 
     def header_key(self, node, p, e):
         """--wire standalone: the key under which entry e's chunk would carry its block's header, or None: a cell,
-        pushed (not an answer), the first of its group to p on this connection (protocol-v2-bindings.md §1.3)."""
+        pushed (not an answer), the first of its group to p on this connection (protocol-v2-bindings.md §2.3)."""
         f = e.chunk
         if f is None or e.solicited or not self.is_cell(f):
             return None
@@ -338,15 +338,15 @@ class Sim:
 
     def chunk_bytes(self, node, p, e):
         """The bytes entry e's chunk will take on the wire to p, as the links charge them (protocol-v2.md §4.11's
-        wire_size): on the standalone binding with the header a first push carries."""
+        wire_size): on the libp2p stream binding with the header a first push carries."""
         f = e.chunk
         if self.wire != "standalone":
             return Wm.chunk_wire(f)
         return Wm.standalone_chunk(f, self.is_cell(f), self.cfg["blobs"] if self.header_key(node, p, e) else None)
 
     def standalone_wire(self, node, p, e):
-        """(data, control) bytes of entry e on protocol-v2-bindings.md §1's stream, each message a frame of its own.
-        A cell carries the block's header with the first eager push of its group on the link (§1.3; protocol-v2.md
+        """(data, control) bytes of entry e on protocol-v2-bindings.md §2's stream, each message a frame of its own.
+        A cell carries the block's header with the first eager push of its group on the link (§1.2, §2.3; protocol-v2.md
         §2, P2): an unsolicited cell, once per group and connection, with every blob's commitment."""
         data = 0
         f = e.chunk

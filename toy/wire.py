@@ -90,7 +90,7 @@ class Shard:
 
 class HaveBitmap:
     """One group's bitmap, as a message-id string (§2). Under protocol-v2.md the two claims of a
-    holding ride beside the bitmap (protocol-v2-bindings.md §3), charged no bytes here; v0.3 reads them
+    holding travel in version 4 of the strings (protocol-v2-bindings.md §4), charged no bytes here; v0.3 reads them
     from a full bitmap."""
     __slots__ = ("group", "bits", "claim_all", "complete")
 
@@ -126,7 +126,7 @@ class WantIndex:
 
 class FlaggedWant(WantIndex):
     """An ask from a WANT with protocol-v2.md §2's `standing` and `hops` ([D12]) or `probe` (R5), carried
-    beside the index (protocol-v2-bindings.md §3) and charged no bytes here: the same key as the plain ask, the
+    in version 4 of the strings (protocol-v2-bindings.md §4) and charged no bytes here: the same key as the plain ask, the
     same bytes on the wire."""
     __slots__ = ("standing", "hops", "probe")
 
@@ -198,7 +198,7 @@ class _Graft(_Msg):                             # protocol-v2.md §2's GRAFT, se
     kind = "graft"
 
 
-class _Join(_Msg):                              # §2's JOIN, the same: on v0.3's wire it is the subscription
+class _Join(_Msg):                              # §2's JOIN, the same: on the gossipsub binding it is the subscription
     kind = "join"
 
 
@@ -286,15 +286,15 @@ def control_wire(c):
 
 
 def entry_wire(e):
-    """(data bytes, control bytes) of one queue entry on v0.3's wire: one gossipsub frame."""
+    """(data bytes, control bytes) of one queue entry on the gossipsub binding: one gossipsub frame."""
     data = chunk_wire(e.chunk) if e.chunk is not None else 0
     ctrl = (control_wire(e.control) if e.control else 0) + FRAME_OVERHEAD
     return data, ctrl
 
 
-# ---- the standalone binding's sizes (protocol-v2-bindings.md §1; run.py --wire standalone)
-# Each message is a frame of its own on the stream (§1.5): a uvarint length, a kind byte, the body (§1.3). Sizes are
-# before compression (§1.7), as the toy's data are not real bytes.
+# ---- the libp2p stream binding's sizes (protocol-v2-bindings.md §1 and §2; run.py --wire standalone)
+# Each message is a frame of its own on the stream (§2.2): a uvarint length, a kind byte, the body (§1.2). Sizes are
+# before compression (§1.5), as the toy's data are not real bytes.
 
 GROUP_ID = 1 + 32 + 2                   # GroupId: type, key, index
 HAVE_FIXED = GROUP_ID + 1 + 4           # HaveMsg: the group, flags, the bitmap's offset
@@ -330,7 +330,7 @@ def _index(x):
 
 def standalone_control(c):
     """The control messages of an entry, each its own frame: a HAVE per bitmap (an IDONTWANT's is a holding, an
-    IHAVE's an offer), a WANT per ask, a JOIN, GRAFT or PRUNE each (§1.3)."""
+    IHAVE's an offer), a WANT per ask, a JOIN, GRAFT or PRUNE each (§1.2)."""
     n = 0
     for m in c.items:
         for x in m.ids:
