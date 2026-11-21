@@ -1,24 +1,25 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2-bindings.md §1, the standalone binding's bytes: an encoder written from the text.
+"""A known answer for protocol-v2-bindings.md §1 to §3, the bytes of SEACAST's message encoding, of the
+libp2p stream binding and of Waggle's carriage: an encoder written from the text.
 
     python3 standalone_wire_known.py
 
-- Every message kind (§1.2, §1.3) is built at its smallest and its largest, encoded as SSZ, and decoded back to
+- Every message kind (§1.1, §1.2) is built at its smallest and its largest, encoded as SSZ, and decoded back to
   the same message.
-- The largest body of each kind must equal §1.6's bound, the fixed kinds their size, and §1.7's sizes must hold.
-  Both tables are read from the document itself, as is §1.2's table of kinds.
-- Frames (§1.5): every frame §1.6 allows needs at most 3 bytes of length, and a reader that takes a stream of
+- The largest body of each kind must equal §1.4's bound, the fixed kinds their size, and §1.5's sizes must hold.
+  Both tables are read from the document itself, as is §1.1's table of kinds.
+- Frames (§2.2): every frame §1.4 allows needs at most 3 bytes of length, and a reader that takes a stream of
   frames:
   - must refuse a frame over its kind's bound from its length and kind alone, before its body is read;
   - must refuse a chunk whose stated decompressed length is over the bound, before decompressing;
   - must refuse a body that does not decode;
   - must skip a frame of an unknown kind and read the next.
-- Waggle's carriage (§1.8): each message is carried as (objectID, piecesMetadata, pieces) and read back.
+- Waggle's carriage (§3): each message is carried as (objectID, piecesMetadata, pieces) and read back.
 
 `BINDINGS_DOC=<path>` reads another copy of the document: one with a wrong number in a table must fail.
 
 The snappy here is the block format with literals only on the writing side, which any reader takes; the reader
-also takes copies. The toy's runs charge no compression (§1.7: sizes before it).
+also takes copies. The toy's runs charge no compression (§1.5: sizes before it).
 """
 import os
 import re
@@ -262,7 +263,7 @@ def unsnappy(b, bound):
     return bytes(out)
 
 
-# ---- frames (§1.5) and a reader that refuses before it reads
+# ---- frames (§2.2) and a reader that refuses before it reads
 
 
 def frame(kind, m):
@@ -305,7 +306,7 @@ class Reader:
         return kind, dec(kind, body)
 
 
-# ---- Waggle's carriage (§1.8)
+# ---- Waggle's carriage (§3)
 
 
 def to_waggle(kind, m):
@@ -332,9 +333,9 @@ def from_waggle(object_id, meta, pieces, bounds):
     return kind, m
 
 
-# ---- the document's own tables, and §1.3's layout
+# ---- the document's own tables, and §1.2's layout
 
-LAYOUT = {                                  # §1.3 as this encoder writes it: aliases, then each container's fields
+LAYOUT = {                                  # §1.2 as this encoder writes it: aliases, then each container's fields
     "aliases": {"TypeId": "uint8", "FamilyId": "uint16", "Direction": "uint8", "InterestKind": "uint8",
                 "Duty": "uint8", "MAX_HAVE_BYTES": "1024", "Bitmap": "ByteList[MAX_HAVE_BYTES]"},
     "GroupId": [("type", "TypeId"), ("key", "Bytes32"), ("index", "uint16")],
@@ -353,7 +354,7 @@ FIXED = {"uint8": 1, "uint16": 2, "uint32": 4, "uint64": 8, "boolean": 1, "Bytes
 
 
 def doc_layout(text):
-    """§1.3's python block: its aliases and its containers' fields, in order."""
+    """§1.2's python block: its aliases and its containers' fields, in order."""
     sec = text[text.index("### 1.2 The types"):text.index("### 1.3")]
     block = sec[sec.index("```python") + len("```python"):sec.index("```", sec.index("```python") + 9)]
     out, cur = {"aliases": {}}, None
@@ -426,11 +427,11 @@ def main():
         print(f"{what}: {got}{'' if got == want else f'  <-- must be {want}'}")
 
     kinds, bounds, sizes, layout = doc_tables()
-    line("§1.3's layout, as the document writes it, against this encoder's", layout, LAYOUT)
-    line("§1.3's fixed parts: GroupId, JOIN, GRAFT, PRUNE, HAVE, WANT, a cell",
+    line("§1.2's layout, as the document writes it, against this encoder's", layout, LAYOUT)
+    line("§1.2's fixed parts: GroupId, JOIN, GRAFT, PRUNE, HAVE, WANT, a cell",
          [fixed_size(layout, c) for c in ("GroupId", "JoinMsg", "GraftMsg", "PruneMsg", "HaveMsg", "WantMsg",
                                           "CellChunk")], [35, 17, 7, 6, 40, 41, 2139])
-    line("§1.2's kinds, as the document lists them", kinds,
+    line("§1.1's kinds, as the document lists them", kinds,
          {1: "JOIN", 2: "GRAFT", 3: "PRUNE", 4: "HAVE", 5: "WANT", 6: "CHUNK", 7: "CHUNK", 8: "EVIDENCE"})
     root, key = b"\x11" * 32, b"\x22" * 32
     col = group_id(1, root, 127)
@@ -462,30 +463,30 @@ def main():
         lo, hi = enc(k, smallest[k]), enc(k, largest[k])
         line(f"{KINDS[k]}: round trips, smallest and largest", (dec(k, lo) == smallest[k], dec(k, hi) == largest[k]),
              (True, True))
-        line(f"{KINDS[k]}: the largest body against §1.6's bound", len(hi), bounds[k])
+        line(f"{KINDS[k]}: the largest body against §1.4's bound", len(hi), bounds[k])
 
-    line("every frame §1.6 allows: bytes of length, at most", max(len(uvarint(frame_room(k, bounds))) for k in KINDS), 3)
+    line("every frame §1.4 allows: bytes of length, at most", max(len(uvarint(frame_room(k, bounds))) for k in KINDS), 3)
 
-    # §1.7's sizes, on the stream (uncompressed for chunks)
+    # §1.5's sizes, on the stream (uncompressed for chunks)
     on_stream = lambda k, m: len(uvarint(1 + len(enc(k, m)))) + 1 + len(enc(k, m))
     have16 = {"group": col, "flags": 0, "bits": b"\xff" * 16}
     want = lambda i: {"group": col, "flags": 1, "hops": 0, "bits": bits_bytes([i])}
     cell48 = dict(largest[0x07], header=hdr(48))
     pay = lambda p, n: dict(smallest[0x06], proof=[b"\x03" * 32] * p, data=b"\x04" * n)
-    line("§1.7: JOIN, GRAFT, PRUNE",
+    line("§1.5: JOIN, GRAFT, PRUNE",
          [on_stream(1, smallest[1]), on_stream(2, smallest[2]), on_stream(3, smallest[3])],
          [num(sizes["JOIN"]), num(sizes["GRAFT"]), num(sizes["PRUNE"])])
     have = lambda n: {"group": col, "flags": 0, "bits": b"\xff" * n}
-    line("§1.7: a HAVE of b bytes is 42 + b up to b = 86 and 43 + b from 87",
+    line("§1.5: a HAVE of b bytes is 42 + b up to b = 86 and 43 + b from 87",
          ([on_stream(4, have(n)) - n for n in (16, 86, 87, MAX_HAVE_BYTES)], sizes["HAVE, holding or offer"]),
          ([42, 42, 43, 43], "42 + b; 43 + b from b = 87"))
-    line("§1.7: a WANT of index i is 44 + ⌊i/8⌋ up to i = 679 and 45 + ⌊i/8⌋ from 680",
+    line("§1.5: a WANT of index i is 44 + ⌊i/8⌋ up to i = 679 and 45 + ⌊i/8⌋ from 680",
          ([on_stream(5, want(i)) - i // 8 for i in (0, 127, 679, 680)], sizes["WANT, one index i"]),
          ([44, 44, 44, 45], "44 + ⌊i/8⌋; 45 + ⌊i/8⌋ from i = 680"))
-    line("§1.7: a cell without a header, and with a 48-blob header",
+    line("§1.5: a cell without a header, and with a 48-blob header",
          [on_stream(7, smallest[7]), on_stream(7, cell48)],
          [num(x) for x in re.findall(r"\d{1,3}(?: \d{3})*", sizes["CHUNK, a cell"])[0::2]])   # 2 142; 48-blob; 4 790
-    line("§1.7: the payload's chunk, 138 + 32p + data below a 16 384-byte frame and 139 above",
+    line("§1.5: the payload's chunk, 138 + 32p + data below a 16 384-byte frame and 139 above",
          (on_stream(6, pay(1, 1000)) - 32 - 1000, on_stream(6, pay(14, MAX_SEGMENT_SIZE)) - 32 * 14 - MAX_SEGMENT_SIZE),
          (138, 139))
 
