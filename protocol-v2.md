@@ -44,7 +44,7 @@ each with its conditions.*
 
 **Three companion documents** go with this one:
 - [`protocol-v2-bindings.md`](protocol-v2-bindings.md) defines the bindings: how each carries the
-  messages, and the standalone binding's bytes.
+  messages, SEACAST's message encoding, and the bytes of the libp2p stream and Waggle bindings.
 - [`protocol-v2-decisions.md`](protocol-v2-decisions.md) records each decision: when it was taken,
   what was not taken and why, and the runs behind it.
 - [`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind the reasons, the toy's
@@ -95,7 +95,7 @@ how the messages travel. Named mechanisms inside a part keep their own names.
 | completion and repair | the claims, completion per interest, decoding at K, rebuilt chunks, deferral, the probe, evidence | §1.5, §4.6 | |
 | informed scheduling *(local)* | what a node sends next and when: the window in bytes, the projection, the next entry, pacing, the ask window | §4.9, §4.11–4.13 | the byte window |
 | source distribution *(local)* | how a source releases a group: batch order, striping, its paced holding; any node holding chunks first is a source (§1.6) | §4.7 | striped publishing |
-| wire bindings | how the messages travel: standalone (on a stream of its own or in Waggle's framing), on gossipsub's Partial Messages Extension, or on the gossipsub binding (`protocol-v2-bindings.md` §3) | §7; `protocol-v2-bindings.md` | |
+| wire bindings | how the messages travel: the libp2p stream, Waggle, gossipsub and partial-messages bindings (`protocol-v2-bindings.md` §2 to §5) | §7; `protocol-v2-bindings.md` | |
 
 The heartbeat (§4.8) drives three of them: relation upkeep, announcement gossip and pacing. Outside the
 parts, and assumed above: the object type's interface (§1.1: indices, verification, decoding,
@@ -433,8 +433,8 @@ class Evidence(Container):               # [D6]
   still take: a receiver that does not hold the chunks passes it to one of its links with one step
   fewer (§4.10). A pull against an offer, the probe and the repair sample (§4.6) set neither. A
   third field, `probe`, marks the one ask that verifies a peer's claim (§4.6): the claimant answers
-  it whatever the asker's holdings say, once per asker and group. The standalone binding carries
-  `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.3).
+  it whatever the asker's holdings say, once per asker and group. SEACAST's message encoding
+  carries `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
 - **A cell carries its header once per group and link**, so cells can be verified before the block
   (P2). The payload's header is the descriptor, which every chunk carries under design A and the bid
   under design B, a choice `protocol.md` §1 leaves open; the installed block confirms it, as in
@@ -843,7 +843,7 @@ peer's (`on_join`).
   type.
 - **On gossipsub's wires** a JOIN is a subscription (§7): both ends send theirs when the
   connection opens, and one made later goes to every peer, so none is an answer. A sampler's
-  `(DECLARED, NONE)` writes nothing there, so it is never owed (`protocol-v2-bindings.md` §4).
+  `(DECLARED, NONE)` writes nothing there, so it is never owed (`protocol-v2-bindings.md` §6).
 
 **A peer that joins a push relation is announced what the node holds.**
 - **What is announced** (`join_push`): what the node stores of each live group of the relation's
@@ -943,11 +943,11 @@ the GRAFT's direction, which undid the opposite relation at the grafter.
   way since its upkeep was built.
 
 **The backoff after a PRUNE** (decided 2026-11-09).
-- **Why.** Before, the backoff was the client's, and the standalone binding has no client under it,
-  so `candidates` asked again, at the next heartbeat, a peer that had just refused. Where most of a
-  short node's candidates are at their cap for the relation, a draw at random keeps landing on them:
-  with one-way relations capped near their targets the refused GRAFTs repeat at every heartbeat,
-  and the relations can take many heartbeats to rest, or not rest within a run.
+- **Why.** Before, the backoff was the client's, and the libp2p stream binding has no client under
+  it, so `candidates` asked again, at the next heartbeat, a peer that had just refused. Where most
+  of a short node's candidates are at their cap for the relation, a draw at random keeps landing on
+  them: with one-way relations capped near their targets the refused GRAFTs repeat at every
+  heartbeat, and the relations can take many heartbeats to rest, or not rest within a run.
 - **Checked.** Since the backoff touches only when a node grafts, every state `toy/graft_check.py`
   reaches with it is one it reaches without, and the check runs at a backoff of 0.
 
@@ -1266,12 +1266,13 @@ index at a time).
     gate's release and those after the start delay `[D8]` do not.
 - **The limits' values are the client's** (`protocol.md` §8.2). `protocol.md` §8.3 gives reference
   values for gossipsub's: 4096 offer-bearing frames and 5000 ids asked, per peer and heartbeat. What
-  the values mean depends on the binding (§7, `protocol-v2-bindings.md` §2, §3):
+  the values mean depends on the binding (§7, `protocol-v2-bindings.md` §4, §5):
   - on the gossipsub binding, offers are IHAVEs, so a stock gossipsub client applies its own limits;
-  - on the standalone binding, the values are the client's alone (§6.3 says which to avoid);
-  - on the extension binding, offers travel as `partsMetadata`, not as IHAVEs.
+  - on the libp2p stream binding, the values are the client's alone (§6.3 says which to avoid);
+  - on the partial-messages binding, offers travel as `partsMetadata`, not as IHAVEs.
 
-**Open: offers on the extension binding.** Whether the extension limits offers is not checked here.
+**Open: offers on the partial-messages binding.** Whether the extension limits offers is not checked
+here.
 
 #### Rationale
 
@@ -1723,9 +1724,9 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
     alone: it is taken when the claimant answers, only for an index it claims, and spent when that
     answer is written, so a push of the same cell neither uses it nor passes card 8. A second marked
     ask of the group, after one was answered, is a plain ask. The mark costs no byte:
-    on the gossipsub binding (`protocol-v2-bindings.md` §3)
-    and in Partial Messages it is one more bit beside `standing`, and the standalone binding carries
-    `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.3).
+    it is one more bit beside `standing` in version 4 of the strings on the gossipsub binding
+    (`protocol-v2-bindings.md` §4) and in Partial Messages, and SEACAST's message encoding carries
+    `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
   - *The asker's queue keeps the probe.* While the probe waits, the asker's queue writes its marked
     WANT even when another peer's copy came first and the asker holds the cell (`probe_waits`). The
     writer's other checks on an ask still apply: not past the group's lifetime, and not to a
@@ -2821,8 +2822,8 @@ unit. The writer chooses the entry before taking room, since the room depends on
 control takes no room. And an empty window always admits one chunk, so a chunk larger than the
 window is not stuck. `rarest` and `projected` (§4.9) are as before, and `filter_entry` is §4.6's;
 `wire_size(p, entry)` is the binding's, the bytes the entry's chunk takes on the wire to `p`, with
-the header a first push of a cell's group carries on the standalone binding
-(`protocol-v2-bindings.md` §1.3).
+the header a first push of a cell's group carries on the libp2p stream binding in form (b)
+(`protocol-v2-bindings.md` §1.6, §2.3).
 
 **The line skips a writer mid-write,** as `protocol.md` §7.1's does. Writers wait for room first
 come, first served over peers, and keep their place while they wait. A writer whose write has not
@@ -3118,7 +3119,7 @@ versions, with what each brought and when it was carried, is in
 | repair | `(everyone, at once, the mesh peers)` |
 | `START_DELAY`, `SERVE_LIMIT` | 0, unbounded (the stock per-id limit remains) |
 | evidence | none |
-| wire | `protocol.md` §2's magic strings (`protocol-v2-bindings.md` §3) |
+| wire | `protocol.md` §2's magic strings (`protocol-v2-bindings.md` §4) |
 
 **Three differences in the rules, which no recorded cell exercises.**
 - *A source with an empty mesh.* A source with no mesh peer for the payload offers its chunks to its
@@ -3138,7 +3139,7 @@ versions, with what each brought and when it was carried, is in
   acknowledge it; where they differ, each acknowledges its own and ignores the other. No recorded
   cell has two ids for one index.
 - *An IHAVE entry by id.* On the gossipsub binding this document takes offers as bitmaps only
-  (`protocol-v2-bindings.md` §3), where `protocol.md` records a valid structured id in an IHAVE as
+  (`protocol-v2-bindings.md` §4), where `protocol.md` records a valid structured id in an IHAVE as
   an offer, which can draw an ask under its §4.4's checks. No recorded cell names an id in an IHAVE.
 
 The differences the recorded cells do show are in the scheduling (§4.11 to §4.13), which moves
@@ -3316,7 +3317,7 @@ supernode still receiving its columns rebuilds rows nobody withheld.
 | `IWANT_WINDOW` | node | `protocol.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |
 | `MERGE_HOLDINGS` | node | a holding of a group the node publishes that is still in its queue takes the newer chunks instead of a second holding (§4.2; v0.4 §5.1 allows it) | permitted: a source may merge (local policy, as v0.4 words it); the toy keeps it off so that its recorded cells stay comparable |
 | `HAVE_TTL`, `PUSH_TTL`, `GROUP_TTL`, `PARK_TTL`, offers, `GUARD_GRACE`, `RTT_REF`, `TARGET`, `WINDOW_TIMEOUT`, pace tick, `GOSSIP_RETRANSMISSION` | – | `protocol.md` §8.3 unchanged | – |
-| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`protocol.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`protocol-v2-bindings.md` §3) | `protocol.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the standalone binding: not gossipsub's 10 (below) |
+| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`protocol.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`protocol-v2-bindings.md` §4) | `protocol.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (below) |
 
 **Open, for later study:**
 - *`M`:* 1 < M < N.
@@ -3419,7 +3420,7 @@ chunk has come by push: a duplicate pull saved (not counted). In the toy's `ihav
 nodes, one seed, under v0.9's rules; `toy/run.py --doc v2 --ihave-limits M,5000`), against no
 limit, a limit of 10 frames costs the most time at the median for a small saving in copies, 20
 costs less time and saves the most, 40 costs and saves little, and 100 changes neither
-(protocol-v2-figures.md, §6.3). The 5000 asks never bound. On the standalone binding, not
+(protocol-v2-figures.md, §6.3). The 5000 asks never bound. On the libp2p stream binding, not
 gossipsub's 10, since in that cell 20 saves more copies for less delay.
 On the gossipsub binding, batching a
 peer's offers into fewer frames avoids the delay, and with it the saving. At `protocol.md` §8.3's
@@ -3435,13 +3436,16 @@ installed block commits (§4.2), and the offer table's limits (`protocol.md` §8
 
 The protocol is defined on its own messages (§2). A **binding** carries them between two nodes. The
 bindings, their bytes and the rules that hold on one binding only are in
-[`protocol-v2-bindings.md`](protocol-v2-bindings.md). It has three:
-- the standalone binding, on a stream of its own or in Waggle's framing;
-- gossipsub with the Partial Messages Extension;
-- the gossipsub binding (`protocol-v2-bindings.md` §3).
+[`protocol-v2-bindings.md`](protocol-v2-bindings.md). It has four, one per carrier:
+- the libp2p stream binding, on a libp2p stream of its own (`protocol-v2-bindings.md` §2);
+- the Waggle binding, the same protocol in Waggle's framing (`protocol-v2-bindings.md` §3);
+- the gossipsub binding, `protocol.md`'s wire (`protocol-v2-bindings.md` §4);
+- the partial-messages binding, gossipsub with the Partial Messages Extension
+  (`protocol-v2-bindings.md` §5).
 
-A node may speak more than one, and negotiates per link which one a peer takes. This section says what
-every binding provides, and what the rules do where a binding lacks a capability.
+A native QUIC binding is being drafted. A node may speak more than one binding, and negotiates per
+link which one a peer takes. This section says what every binding provides, and what the rules do
+where a binding lacks a capability.
 
 **What every binding provides:**
 - *Links:* a link per connected peer, with its open and its close, which start and end §3's
@@ -3456,11 +3460,14 @@ every binding provides, and what the rules do where a binding lacks a capability
   - a write completes as §4.11's "Below the writer" says.
 - *Limits before state:* a bound on each message kind's size, checked before the receiver holds any
   state for the message (X6), after the binding's own bound on its frame.
-- *The header:* a cell group's header reaches a peer before or with its first cell of the group (§2).
-  A binding validates a block's cell header no later than it installs the block (§4.2). It validates a
-  header a chunk carries apart from the chunk, before the chunk is handled. A copy whose id is already
-  seen or waiting still brings its header (`on_header_validated`), and a header that fails never marks
-  the chunk's id as seen, so an honest copy of the chunk is still taken.
+- *The header:* a cell group's header travels in one of three forms, which the object type's
+  definition fixes (`protocol-v2-bindings.md` §1.6): (a) from the block, with none on the wire;
+  (b) in every cell message; (c) in a header message of its own. In all three, a cell is verified
+  only once its header is validated, and a cell that comes before its header waits for it (§4.2).
+  A binding validates a block's cell header no later than it installs the block (§4.2). It
+  validates a header a chunk carries apart from the chunk, before the chunk is handled. A copy whose
+  id is already seen or waiting still brings its header (`on_header_validated`), and a header that
+  fails never marks the chunk's id as seen, so an honest copy of the chunk is still taken.
 - *The fork:* a link carries an object type only where both ends run it at the same fork, since a
   type's header and limits change at forks.
 - *A chunk's id and size:* `chunk_id(f)`, and `wire_size(p, entry)`, the bytes its write to `p` will
@@ -3470,25 +3477,25 @@ Rendezvous and discovery are outside the bindings (§0).
 
 **The capabilities the bindings differ in**, and what the rules do without each:
 
-| capability | standalone | extension | the gossipsub binding | without it |
+| capability | the libp2p stream and Waggle bindings | the partial-messages binding | the gossipsub binding | without it |
 |---|---|---|---|---|
-| interest without subscription: a JOIN per link, `DECLARED` interest told only to the peers asked (§1.2) | yes | for a sampler only | for a sampler only | a sampler subscribes to nothing, its WANTs are its interest, and their answers are admitted by their WANT (`protocol-v2-bindings.md` §4) |
+| interest without subscription: a JOIN per link, `DECLARED` interest told only to the peers asked (§1.2) | yes | for a sampler only | for a sampler only | a sampler subscribes to nothing, its WANTs are its interest, and their answers are admitted by their WANT (`protocol-v2-bindings.md` §6) |
 | relations per family and colour, with a direction and a floor per colour (§1.3, §4.1) | yes | `BOTH` only, a colour field, no floor per colour | stock: `BOTH`, one colour | the relation is the topic's mesh |
 | the answered GRAFT, and `PRUNE_BACKOFF` this document's (§4.1) | yes | no: accepted in silence, gossipsub's backoff | no (the toy runs it under `--upkeep on`) | a GRAFT's sender is in the relation from its GRAFT, and the ends' agreement rests on the backoff after a PRUNE (§4.1) |
-| a holding's claims; the WANT's `standing`, `hops` and `probe` (§2) | yes | in extension fields | beside the bitmap or the index | – (every binding carries them) |
-| EVIDENCE (§2) | its kind reserved | a full message on the rendezvous topic | no | none in this version (`[D6]`) |
+| a holding's claims; the WANT's `standing`, `hops` and `probe` (§2) | yes | in extension fields | in version 4 of the strings (`protocol-v2-bindings.md` §4), charged nothing in the toy | – (every binding carries them) |
+| EVIDENCE (§2) | its kind reserved | a full message on the rendezvous topic | reserved: a full message on the rendezvous topic | none in this version (`[D6]`) |
 | a frame of one message, or several (§4's `on_frame`) | one | several (gossipsub's frame) | several | the handling order of one frame is §4's; where a frame holds one message, the IHAVE limits (§4.3) count messages, and one answer per id per frame (§4.5) is one per message |
 | merging queued entries (`merge_waiting`, §4.2, permitted; §4.1's one GRAFT or PRUNE of a relation per frame) | the client's | the client's | the client's | – (a choice, not a capability) |
-| how a cell's header travels (§2) | with the first eager push of its group on a link | the partial columns' own rule | beside the chunk, charged nothing in the toy | – |
+| how a cell's header travels (§2), in the form the object type's definition fixes (`protocol-v2-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`protocol-v2-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`protocol-v2-bindings.md` §4); the toy charges no header there, as in (a) | – |
 | an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | the writer's urgent lane alone, as one stream per peer gives |
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | gossipsub's scoring of its own messages |
 
-**Where the gains are.** The standalone binding is where X2's gains are had: interest without
-subscription, a push relation per family and colour with a floor and a direction, and scoring on
-these messages. The extension binding gives up the first two, but for a sampler's interest, and
-keeps the rollout inside existing topics; it is the binding for columns while the extension is the
-deployed path. A mixed network needs a bridge between a binding and the stock path that does not
-double the bytes; it is outside this version (`[D1]`, §8).
+**Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
+interest without subscription, a push relation per family and colour with a floor and a direction,
+and scoring on these messages. The partial-messages binding gives up the first two, but for a
+sampler's interest, and keeps the rollout inside existing topics; it is the binding for columns
+while the extension is the deployed path. A mixed network needs a bridge between a binding and the
+stock path that does not double the bytes; it is outside this version (`[D1]`, §8).
 
 **A fetch outside the links** `[D12]` (possible, binding-dependent). A binding may offer one
 capability beyond its links: fetching a sample quickly from a node of the known node set, a node
@@ -3500,8 +3507,8 @@ whose custody the sampler computes from its node id, that is not a link.
 - *What the protocol needs:* only the notion of such a fetch, a WANT answered by a CHUNK from a node
   that is not a link, and its privacy rule: one sample per node, as on links (§4.10). The serving
   limit and the second phase's cap apply as on a link.
-- *How it is carried* is the binding's (`protocol-v2-bindings.md` §5), so the protocol's rules do not
-  depend on it.
+- *How it is carried* is the binding's (`protocol-v2-bindings.md` §7), so the protocol's rules
+  do not depend on it.
 
 ## 8. Decisions, and where they bite
 
