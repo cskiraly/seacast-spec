@@ -70,6 +70,12 @@ What is logged, exactly (the contract; footprint_test.py has a case for each lin
 - **A row made in the call:** every entry under it is written, each missing before the call, in a callee's `cw`
   and in the record. So a new PeerQueue's other lane is there, as the toy's is, and a later touch of it is no
   value "before the call".
+- **Rows read on the way down (`row_reads`: the tables a trace's header names so; under protocol-v2.md, `owed`,
+  `planned`, `queue` and `tied`).** In such a table a row above an entry touched is read, not observed: the
+  Python's `t[g][i]` evaluates `t[g]` first. And each consulting form on a level above the last logs the row's
+  presence, there or not: `t[g]` before it indexes (so a missing row is read as missing, then raises KeyError(g)),
+  `t.get(g)` and `t.get(g, d)` with no scan, and `g in t`. A pop, a `del`, an assignment and a level read as a
+  whole log as in any table. The other tables, and every table of a trace without the member, as above.
 - **A level held as attributes (the toy's `PeerQueue`, whose two lanes are `urgent` and `normal`).** A container
   of a type in ATTR_LEVELS has those attributes as its keys: reading one through a view (`queue[p].normal`) is a
   read of that entry, assigning one (`queue[p].normal = [...]`) a write, and a change of the list in place
@@ -119,6 +125,9 @@ CW_WRITES = True
 # A pop that finds nothing is a read and no write (the contract's line above). The control (footprint_test.py
 # --broken-pop-miss) turns it off: every pop is then a write too, also of a missing entry.
 POP_MISS_READ = True
+# The rows of a recorder's `row_reads` read on the way down (the contract's line above). The control
+# (footprint_test.py --broken-row-reads) turns it off: the views then log as for any table.
+ROW_READS = [True]
 # the attribute reads of an own table that a callee may make, unlogged: the toy's `listed` reads the count
 # that `offers` keeps of the lists each announcer is in. Its answer is on the tape, trusted as it was before
 CALLEE_ATTRS = {("offers", "listed")}
@@ -186,7 +195,12 @@ class Recorder:
         self.tape = None                # the call's tape, for the reads of foreign tables
         self.callee = None              # a call the block makes on the tape, in progress: its own log
         self.roots = {}                 # table name -> (Table, raw container)
+        self.row_reads = frozenset()    # the tables whose rows are read on the way down (the contract's line)
         self.clear()
+
+    def reads_rows(self, t):
+        """Whether a table's rows are read on the way down: a table that keeps its rows, named in `row_reads`."""
+        return t.rows and t.name in self.row_reads and ROW_READS[0]
 
     def clear(self):
         self.pre = {}                   # entry -> its encoded value at its first touch in the call
@@ -232,8 +246,9 @@ class Recorder:
     # ---- the log
     def _touch(self, t, p, rw):
         if t.rows:                          # presence: the rows above an entry, observed, so that one the access
-            for j in range(1, len(p)):      #   makes or removes shows as a write
-                self._touch1(t, p[:j], "o")
+            above = "r" if self.reads_rows(t) else "o"      # makes or removes shows as a write; read, outermost
+            for j in range(1, len(p)):                      #   first, in a table of `row_reads`
+                self._touch1(t, p[:j], above)
         self._touch1(t, p, rw)
 
     def _before(self, t, p, *pres):
@@ -795,6 +810,8 @@ class View:
         if self._leaf():
             self._r.read(self._t, self._p + (k,))
             return self._o[k]
+        if self._r.reads_rows(self._t):             # the row's presence, there or not, before the Python indexes
+            self._r.read(self._t, self._p + (k,))
         return self._sub(k, self._o[k])
 
     def get(self, k, default=None):
@@ -804,6 +821,9 @@ class View:
             self._r.read(self._t, self._p + (k,))
             return self._o.get(k, default)
         v = _peek(self._o, k)
+        if self._r.reads_rows(self._t):             # the row's presence, there or not; no scan
+            self._r.read(self._t, self._p + (k,))
+            return default if v is ABSENT else self._sub(k, v)
         if v is ABSENT:                             # a level that is not there: read as a whole, and empty
             self._r.scan(self._t, self._p + (k,))
             return default
@@ -811,7 +831,7 @@ class View:
 
     def __contains__(self, k):
         if self._r.on:
-            if self._leaf():
+            if self._leaf() or self._r.reads_rows(self._t):     # a row of `row_reads`: its presence alone
                 self._r.read(self._t, self._p + (k,))
             elif self._t.rows and self._t.presence_in:      # the row's own entry says whether it is there
                 self._r.read(self._t, self._p + (k,))

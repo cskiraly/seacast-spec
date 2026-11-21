@@ -108,6 +108,12 @@ def check(toy, trace):
     #                                              drop_offer's (directed6o.py), §6.4's (directed64.py, directed64h.py), §4.6's (directed46.py), §4.3's (directed43.py), §4.1's (directed41.py), §4.6's decode's (directed46d.py), §3's (directed3v.py)
     if h.get("whole") is not whole:
         why.append(f"whole: {h.get('whole')!r}, must be {whole!r} for this kind of trace")
+    # the rows the views read on the way down: under --doc v2 exactly trace3.ROW_READS_V2, and in no other trace
+    v2 = trace3.doc_of(h.get("args") or []) == "v2"
+    if v2 and h.get("row_reads") != list(trace3.ROW_READS_V2):
+        why.append(f"row_reads: {h.get('row_reads')!r}, must be {list(trace3.ROW_READS_V2)!r} under --doc v2")
+    if not v2 and "row_reads" in h:
+        why.append(f"row_reads: {h['row_reads']!r} in a trace not run with --doc v2")
     return why
 
 

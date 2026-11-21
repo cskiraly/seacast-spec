@@ -283,6 +283,30 @@ def case(name, body, reads=(), scans=(), writes=(), rest=(), tape=(), raises=Non
     return ok
 
 
+def logged(body, make):
+    """What a body logs on a fresh table: its reads, scans, writes, rest, tape, and what it raised."""
+    ns, rec, raw = make()
+    REC[0] = rec
+    rec.clear()
+    rec.on = True
+    got = None
+    try:
+        body(ns, raw)
+    except Exception as e:              # noqa: BLE001
+        got = type(e).__name__
+    rec.on = False
+    r, s, w = rec.footprint()
+    return {"reads": r, "scans": s, "writes": w, "rest": rec.rest(False), "tape": rec.tape, "raises": got}
+
+
+def same_log(name, body, make, other):
+    """A body logs on `make`'s tables what it logs on `other`'s, and something."""
+    a, b = logged(body, make), logged(body, other)
+    ok = a == b and any(a[k] for k in ("reads", "scans", "writes", "rest", "tape"))
+    print(f"case, {name}: {'as the contract says' if ok else 'NOT  <-- FAIL: ' + repr(a)[:200] + ' against ' + repr(b)[:200]}")
+    return ok
+
+
 def main():
     ok = True
     # ---- reads
@@ -646,6 +670,62 @@ def main():
             raise
     ok &= case("Q11 one entry in two lanes: trace3.py's alias check refuses the run", alias, raises="AliasRefused",
                make=Q)
+    # ---- rows read on the way down (`row_reads`, the four tables under --doc v2): RR1 to RR16; their control:
+    #      --broken-row-reads. RR12 to RR16 are the forms that log as in any table, and pass under the control too
+    def rr(make):
+        def f():
+            ns, rec, raw = make()
+            rec.row_reads = frozenset(("owed", "planned", "queue", "tied"))
+            return ns, rec, raw
+        return f
+    RT, RP, RQ = rr(fresh_tied), rr(fresh_planned), rr(fresh_queue)
+    ok &= case("RR1 tied[r][p][g] read: the rows [r] and [r, p] read, outermost first, then the bitmap; none observed",
+               lambda ns, raw: ns["tied"]["r1"][1]["g"].has(0),
+               reads=[["tied", ["r1"], True], ["tied", ["r1", 1], True], ["tied", ["r1", 1, "g"], 1]], make=RT)
+    ok &= case("RR2 a bitmap set under missing rows: each row read as missing, then the rows and the bitmap written",
+               lambda ns, raw: ns["tied"]["r9"][5]["g"].set(2),
+               reads=[["tied", ["r9"], None], ["tied", ["r9", 5], None], ["tied", ["r9", 5, "g"], None]],
+               writes=[["tied", ["r9"], True], ["tied", ["r9", 5], True], ["tied", ["r9", 5, "g"], 4]], make=RT,
+               post=lambda raw: stored(raw, "tied", "r9"))
+    ok &= case("RR3 planned[g][i], both there: the row read, then the leaf",
+               lambda ns, raw: 2 in ns["planned"]["g1"][0], reads=[["planned", ["g1"], True], ["planned", ["g1", 0], [2, 5]]],
+               make=RP)
+    ok &= case("RR4 planned[g][i], the row there and the leaf missing: the row read, the leaf read as missing, KeyError",
+               lambda ns, raw: ns["planned"]["g1"][7], reads=[["planned", ["g1"], True], ["planned", ["g1", 7], None]],
+               raises="KeyError", make=RP)
+    ok &= case("RR5 planned[g][i], the row missing: the row read as missing, then KeyError(g); no row made",
+               lambda ns, raw: ns["planned"]["g9"][0], reads=[["planned", ["g9"], None]], raises="KeyError", make=RP,
+               post=lambda raw: "g9" not in raw["planned"])
+    ok &= case("RR6 tied.get(r) of a row there: the row read; nothing under it, no scan",
+               lambda ns, raw: ns["tied"].get("r1"), reads=[["tied", ["r1"], True]], make=RT)
+    ok &= case("RR7 tied.get(r) of a missing row: the row read as missing; no scan",
+               lambda ns, raw: ns["tied"].get("r7"), reads=[["tied", ["r7"], None]], make=RT)
+    ok &= case("RR8 tied.get(r, {}) of a missing row: the row read as missing; no scan; the default handed out",
+               lambda ns, raw: ns["tied"].get("r7", {}), reads=[["tied", ["r7"], None]], make=RT)
+    ok &= case("RR9 `r in tied`, the row there: its presence read alone; nothing under it, no scan",
+               lambda ns, raw: "r2" in ns["tied"], reads=[["tied", ["r2"], True]], make=RT)
+    ok &= case("RR10 `r in tied`, the row missing: its presence read as missing; no scan",
+               lambda ns, raw: "r7" in ns["tied"], reads=[["tied", ["r7"], None]], make=RT)
+    ok &= case("RR11 queue[p].normal: the row read, then the lane",
+               lambda ns, raw: ns["queue"][1].normal, reads=[["queue", [1], True], ["queue", [1, "normal"], iw]], make=RQ)
+    ok &= same_log("RR12 tied.pop(r) at the top: the log without row_reads",
+                   lambda ns, raw: ns["tied"].pop("r2"), RT, fresh_tied)
+    ok &= same_log("RR13 del tied[r] at the top: the log without row_reads",
+                   lambda ns, raw: ns["tied"].__delitem__("r2"), RT, fresh_tied)
+    ok &= same_log("RR14 tied.values() at the top: the log without row_reads",
+                   lambda ns, raw: list(ns["tied"].values()), RT, fresh_tied)
+    ok &= same_log("RR15 tied.items() at the top, then a row's level read whole through it: the log without row_reads",
+                   lambda ns, raw: [len(v) for k, v in ns["tied"].items() if k == "r2"], RT, fresh_tied)
+    ok &= same_log("RR16 list(queue) by the block: the log without row_reads",
+                   lambda ns, raw: list(ns["queue"]), RQ, fresh_queue)
+    # and the same forms without `row_reads`: today's logs (a row there observed, `t[g]` of a missing row unlogged)
+    ok &= case("RR-off 1 planned[g][i], the row missing, without row_reads: KeyError(g) with nothing logged",
+               lambda ns, raw: ns["planned"]["g9"][0], raises="KeyError", make=fresh_planned)
+    ok &= case("RR-off 2 tied.get(r) of a row there, without row_reads: nothing logged",
+               lambda ns, raw: ns["tied"].get("r1"), make=fresh_tied)
+    ok &= case("RR-off 3 tied.get(r) of a missing row, without row_reads: the level read whole, and empty",
+               lambda ns, raw: ns["tied"].get("r7"), reads=[["tied", ["r7"], None]], scans=[["tied", ["r7"]]],
+               make=fresh_tied)
     # ---- ordered levels below the top, a pop above them, and items() of an ordered top level
     O = fresh_ordered
     r1 = [["tied", ["r1"], True], ["tied", ["r1", 1], True], ["tied", ["r1", 1, "g"], 1], ["tied", ["r1", 3], True],
@@ -1058,6 +1138,8 @@ if __name__ == "__main__":
         F.DequeView._log = _log
     if sys.argv[1:] == ["--broken-pop-miss"]:   # and views that take a pop that finds nothing as a write too
         F.POP_MISS_READ = False
+    if sys.argv[1:] == ["--broken-row-reads"]:  # and views that read no row on the way down (row_reads ignored)
+        F.ROW_READS[0] = False
     if sys.argv[1:] == ["--broken-list"]:   # and a view of a list that logs nothing
         F.ListView._log = lambda self, write=False: None
     if sys.argv[1:] == ["--broken-alias"]:  # and an alias check that refuses nothing

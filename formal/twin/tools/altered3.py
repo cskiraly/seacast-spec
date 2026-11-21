@@ -771,6 +771,74 @@ def v2_controls(v2trace, work, head):
         "a may_ask record of a v2 cell, alone": (alone(hdr, consts, rec), 0, None),
         "the same, its read of asked_at as now": (alone(hdr, consts, now), 1, "]: tape"),
     }, work, head, "v2")
+    return bad + row_reads_controls(v2trace, work, head)
+
+
+ROW_DEPTH = {"owed": 2, "planned": 2, "queue": 2, "tied": 3}     # the keys of the four tables that keep their rows
+
+
+def passed_rows(r):
+    """A record's reads of a row of owed, queue or tied that only an access on the way down makes: a path shorter
+    than its table's, under no level the record scans (a scan reads its row in any trace)."""
+    def scanned(t, p):
+        return any(s[0] == t and p[:len(s[1])] == s[1] for s in r["scans"])
+    return [x for x in r["reads"] if x[0] in ("owed", "queue", "tied") and len(x[1]) < ROW_DEPTH[x[0]]
+            and not scanned(x[0], x[1])]
+
+
+def row_reads_controls(v2trace, work, head):
+    """The header's `row_reads`: the twin reads a row on the way down as the Python's read only where the header
+    names its table, and a v2 trace's view logs those reads. On the first record of the V2 trace with a row read
+    that only such an access makes (`passed_rows`), each with the outcome written before it first ran:
+    - alone, as written: it replays, and every read of the Python's is the twin's;
+    - the member taken out (the twin's mode off): it replays, and the rows are reads the twin did not make (a
+      count above 0, which the replays step refuses);
+    - those rows moved from its reads to its rest (the leaf-only view, where a row above an entry is observed): it
+      fails, the twin reading a row the Python did not;
+    - the member with another list, and the member in a trace not run with --doc v2: refused by the header."""
+    hdr, consts, rec = first(v2trace, lambda d: bool(passed_rows(d)) and "raises" not in d)
+    h = hdr["header"]
+    assert h.get("row_reads") == list(ROW_DEPTH), "V2's header does not name the four tables in row_reads"
+    rows = passed_rows(rec)
+
+    def variant(drop=False, **change):
+        out = copy.deepcopy(hdr)
+        out["header"].update(change)
+        if drop:
+            out["header"].pop("row_reads")
+        return out
+
+    leaf = copy.deepcopy(rec)
+    leaf["reads"] = [x for x in rec["reads"] if x not in rows]
+    leaf["rest"] = sorted(rec["rest"] + rows, key=lambda x: json.dumps(x[:2], separators=(",", ":")))
+    retable(leaf)
+    args = list(h["args"])
+    k = args.index("--doc")
+    bad = 0
+    cases = {   # name -> (the lines, the replay's exit code, the reads not made: None for any, or a test)
+        f"a {rec['fn']} record with {len(rows)} rows read on the way down, alone": (
+            alone(hdr, consts, rec), 0, lambda n: n == 0, None),
+        "the same, the header's row_reads taken out (the twin's mode off)": (
+            alone(variant(drop=True), consts, rec), 0, lambda n: n >= 1, None),
+        "the same, its rows on the way down moved to its rest (the leaf-only view)": (
+            alone(hdr, consts, leaf), 1, None, "(a row on its way down)"),
+        "the same, row_reads naming tied alone": (
+            alone(variant(row_reads=["tied"]), consts, rec), 1, None,
+            'header: row_reads is not ["owed","planned","queue","tied"]: ["tied"]'),
+        "the same, row_reads in a trace not run with --doc v2": (
+            alone(variant(args=args[:k] + args[k + 2:]), consts, rec), 1, None,
+            "header: row_reads in a trace of protocol.md"),
+    }
+    for name, (ls, want, fewer_ok, why) in cases.items():
+        f = work / f"v2-rowreads-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
+        write(f, ls)
+        rc, m, ex, fewer, out, _ = run(f, "--content", head)
+        said = why is None or why in out
+        ok = rc == want and said and (fewer_ok is None or (fewer is not None and fewer_ok(fewer)))
+        bad += not ok
+        print(f"v2, row_reads, {name}: replay rc={rc}, must be {want}; reads not made {fewer}"
+              f"{'' if why is None else ('; says: ' if said else '; does NOT say: ') + why}{'' if ok else '  <-- FAIL'}")
+    print("ok: every control of row_reads as it must be" if not bad else f"{bad} controls of row_reads wrong")
     return bad
 
 

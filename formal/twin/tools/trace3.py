@@ -134,6 +134,10 @@ FOREIGN = ("known_id",                     # `queue`, `pending_ids` and `stop_pu
            "chunks")     # (`unwanted` is own: on_frame writes it)
 #                                             the writer reads §5.2's (`peer_has` and `holders`, §4.3's, are the
 #                                             twin's own: on_have asks `g in planned`)
+# Under --doc v2, the tables that keep their rows, whose rows the views read on the way down (footprint.py's
+# `row_reads`), as the header's `row_reads` names them; the replay reads them so in a v2 trace alone, and this list
+# alone. A protocol.md trace has neither
+ROW_READS_V2 = ("owed", "planned", "queue", "tied")
 # §7.1's three, the twin's own. Under protocol.md a cell holds the count and views hold the line and the sends;
 # under --doc v2 they are not installed (there the count is bytes and a send's value a pair, and no traced function
 # of protocol.md touches them)
@@ -544,8 +548,11 @@ class Tracer3(Tracer):
         for d in (N.DOC, N.DOC2):       # the documents the toy reads are the two the content line names
             if Path(d).resolve() != self.toy.parent / Path(d).name:
                 raise SystemExit(f"trace3: the toy reads a document that is not beside it: {d}")
-        self.write({"header": {"format": 7, "whole": whole, "own": list(OWN), "foreign": list(FOREIGN),
-                               "traced": sorted(self.traced), "tracer": "trace3.py", "args": argv}})
+        hd = {"format": 7, "whole": whole, "own": list(OWN), "foreign": list(FOREIGN)}
+        if self.doc_v2:
+            hd["row_reads"] = list(ROW_READS_V2)
+        hd.update({"traced": sorted(self.traced), "tracer": "trace3.py", "args": argv})
+        self.write({"header": hd})
 
     def write_nodes(self):
         """The nodes line: every node the tracer was installed at, by what the replay needs of it: its
@@ -1318,6 +1325,8 @@ class Tracer3(Tracer):
                           and c.cell_contents.__code__.co_name == "message_id")
         self.doc_mid[int(nd.id)] = mid_fn
         rec = F.Recorder()
+        if self.doc_v2:
+            rec.row_reads = frozenset(ROW_READS_V2)
         views = [t for t in self.schema(ns) if not (self.doc_v2 and t.name in WINDOW)]
         F.install(rec, ns, views)
         window = {} if self.doc_v2 else {name: ns[name] for name in WINDOW}    # the installed cell and views: each

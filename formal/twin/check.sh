@@ -64,7 +64,7 @@
 #   v2cells   every cell under protocol-v2.md: each digest golden-v2.txt's, each replayed (its records are of the
 #             names that are protocol.md's all the way down); the tracer's self-test of those names
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
-#   viewcontrols     22 broken views, each failing its own count of the views' cases, as written here; and
+#   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
 #             line after the verdict, a line on stderr, exit code 2) refused, the plain one taken
 #   tracercontrols   a tracer whose views let an assignment through unlogged, and 29 faults planted in the tracer:
@@ -747,17 +747,17 @@ s_viewcontrols() {      # each broken view must fail its own cases, as many as w
   while read -r opt n what; do
     views_control "$opt" "$what" "$n" || bad=1
   done <<'EOF_VIEWS'
---broken 11 do not log 'k in t'
+--broken 13 do not log 'k in t'
 --broken-level 3 do not note at the assignment what a level brings
 --broken-alloc 7 store the row a read of a missing one hands out
---broken-copy 10 hand out a fresh entry of no table for a missing one
+--broken-copy 11 hand out a fresh entry of no table for a missing one
 --broken-callee 26 keep no log apart for a call on the tape
 --broken-keys 1 put no keys on the tape for another section's level
 --broken-mesh 1 answer the mesh question in rising order
 --broken-rows 19 observe no row above an entry touched
 --broken-bread 2 take no block's read after a callee's or an observation
 --broken-order 4 keep a callee's own order of touches
---broken-lanes 10 do not take a PeerQueue's lane as a key
+--broken-lanes 11 do not take a PeerQueue's lane as a key
 --broken-ordered 4 put no order of an ordered level on the tape
 --broken-alias 1 have an alias check that refuses nothing
 --broken-made-rows 3 write only the touched entry of a row made in the call
@@ -769,11 +769,12 @@ s_viewcontrols() {      # each broken view must fail its own cases, as many as w
 --broken-cell 3 log the count's += and -= as a write alone
 --broken-line 4 log the line's changes as a write alone
 --broken-pop-miss 5 take a pop that finds nothing as a write too
+--broken-row-reads 11 read no row on the way down where a trace's header asks for it
 EOF_VIEWS
   [ "$bad" = 0 ] || no "a broken view does not fail its cases as written (views-controls.txt)"
-  [ "$(grep -c ', as they must$' "$OUT/views-controls.txt")" = 22 ] || no "not 22 broken views fail as written (views-controls.txt)"
+  [ "$(grep -c ', as they must$' "$OUT/views-controls.txt")" = 23 ] || no "not 23 broken views fail as written (views-controls.txt)"
   views_control_controls
-  echo "  $(grep -c ', as they must$' "$OUT/views-controls.txt") of 22 broken views fail their cases, as they must"
+  echo "  $(grep -c ', as they must$' "$OUT/views-controls.txt") of 23 broken views fail their cases, as they must"
 }
 s_tracercontrols() {
   local f want bad
