@@ -256,6 +256,21 @@ def fit(head, note, change):
     return [one] if len(one) <= WIDTH else [f"  {head} := do", f"    {note}", f"    {change}"]
 
 
+def passing(t, n):
+    """The note of the rows an access goes through on its way down, in a table that keeps its rows: the rows of the
+    first `n` levels under the top, outermost first (`n` is the number of outer keys the access subscripts). None for
+    an access of the top level, and for a table without rows."""
+    ks = [k for k, _ in t.keys]
+    rows = [rowcell(t, ks[:d]) for d in range(1, n + 1)] if t.rows else []
+    return f'    note (.pass "{t.name}" [{", ".join(rows)}])' if rows else None
+
+
+def through(t, n, head, body):
+    """An operation `head := do` with its `body` lines, and the note of the rows it goes through first, if any."""
+    p = passing(t, n)
+    return [f"  {head} := do", *([p] if p else []), *body]
+
+
 def of_state():
     out, later = [], []
     for t in TABLES:
@@ -273,20 +288,27 @@ def of_state():
             ins = inserted(f"s.{f}", ks, v["param"])
             # a table that keeps its rows keeps them when an entry goes; one that does not, has no empty row to show
             ers = modified(f"s.{f}", ks) if t.rows else inserted(f"s.{f}", ks, None, "erase")
-        out.append(f"  {t.read[0]} {vars_(t)} := do {note_r}; return {got}")
+        leaf = len(ks) - 1                  # the outer keys of an entry: the rows an access of it goes through
+        if passing(t, leaf):
+            out += through(t, leaf, f"{t.read[0]} {vars_(t)}", [f"    {note_r}", f"    return {got}"])
+        else:
+            out.append(f"  {t.read[0]} {vars_(t)} := do {note_r}; return {got}")
         if t.write and VALUES[t.value]["read"] == "member":
             k = ks[0]
             out += [f"  {t.write[0]} {vars_(t)} {v['param']} := do", f"    {note_w}", "    modify fun s => { s with",
                     f"      {f} := if {v['param']} then s.{f}.insert {k} else s.{f}.erase {k} }}"]
         elif t.write and t.rows:            # the rows a write makes are written too
-            out += [f"  {t.write[0]} {vars_(t)} {v['param']} := do", "    let s ← get"]
+            out += through(t, leaf, f"{t.write[0]} {vars_(t)} {v['param']}", ["    let s ← get"])
             for d in range(1, len(ks)):
                 out.append(f"    if !{chain(f's.{f}', ks[:d - 1])}.contains {ks[d - 1]} then note (.write ({rowcell(t, ks[:d])}))")
             mod = f"    modify fun s => {{ s with {f} := {ins} }}"
             out += [f"    {note_w}", *([mod] if len(mod) <= WIDTH else ["    modify fun s => { s with", f"      {f} := {ins} }}"])]
         elif t.write:
             out += fit(f"{t.write[0]} {vars_(t)} {v['param']}", note_w, f"modify fun s => {{ s with {f} := {ins} }}")
-        if t.erase:
+        if t.erase and passing(t, leaf):
+            out += through(t, leaf, f"{t.erase[0]} {vars_(t)}",
+                           [f"    {note_w}", f"    modify fun s => {{ s with {f} := {ers} }}"])
+        elif t.erase:
             out += fit(f"{t.erase[0]} {vars_(t)}", note_w, f"modify fun s => {{ s with {f} := {ers} }}")
         if t.clear:                                 # the table emptied, each entry there written
             assert len(ks) == 1, f"{t.name}: clear is for a table of one key"
@@ -295,13 +317,17 @@ def of_state():
                     f"    modify fun s => {{ s with {f} := {{}} }}"]
         for d, rd, _, er, _ in t.row_ops:           # the row read as the views read it, and erased as they pop it:
             given = ks[:d]                          #   the row written, and every entry under it
-            out.append(f"  {rd} {' '.join(given)} := do note (.read ({rowcell(t, given)})); "
-                       f"return {chain(f'(← get).{f}', given[:-1])}.contains {given[-1]}")
-            out += [f"  {er} {' '.join(given)} := do",
-                    f"    let l := {listed(chain(f'(← get).{f}', given), ks[d:])}",
-                    f"    note (.write ({rowcell(t, given)}))",
-                    f"    for c in {found(t, 'l', ks[d:], given)} do note (.write c)",
-                    f"    modify fun s => {{ s with {f} := {modified(f's.{f}', given)} }}"]
+            note_row = f"note (.read ({rowcell(t, given)}))"
+            has = f"{chain(f'(← get).{f}', given[:-1])}.contains {given[-1]}"
+            if passing(t, d - 1):                   # a row below the top level: the rows above it gone through
+                out += through(t, d - 1, f"{rd} {' '.join(given)}", [f"    {note_row}", f"    return {has}"])
+            else:
+                out.append(f"  {rd} {' '.join(given)} := do {note_row}; return {has}")
+            out += through(t, d - 1, f"{er} {' '.join(given)}",
+                           [f"    let l := {listed(chain(f'(← get).{f}', given), ks[d:])}",
+                            f"    note (.write ({rowcell(t, given)}))",
+                            f"    for c in {found(t, 'l', ks[d:], given)} do note (.write c)",
+                            f"    modify fun s => {{ s with {f} := {modified(f's.{f}', given)} }}"])
         for s in t.scans:
             d = depth(s)
             if VALUES[t.value]["read"] == "member":
@@ -313,9 +339,9 @@ def of_state():
             else:
                 given = ks[:d]
                 lvl = f".{s.level}" if not d else f"(.{s.level} {' '.join(given)})"
-                block = [f"  {s.name}{''.join(' ' + k for k in given)} := do",
-                         f"    let l := {listed(chain(f'(← get).{f}', given), ks[d:])}",
-                         f"    note (.scan {lvl} ({found(t, 'l', ks[d:], given)}))", "    return l"]
+                block = through(t, d, f"{s.name}{''.join(' ' + k for k in given)}",   # a row's level: its rows
+                                [f"    let l := {listed(chain(f'(← get).{f}', given), ks[d:])}",
+                                 f"    note (.scan {lvl} ({found(t, 'l', ks[d:], given)}))", "    return l"])
             (out if s.used else later).extend(block)
     return out + later
 
@@ -706,6 +732,7 @@ def state_file():
         "  | read (c : Cell)",
         "  | write (c : Cell)",
         "  | scan (l : Level) (found : List Cell)  -- a level read as a whole, and the entries it held",
+        "  | pass (table : String) (rows : List Cell)  -- the rows an access went through on its way down, outermost first",
         "  deriving BEq, Repr",
         "",
         "/-- The twin's own tables, by the names a trace's header and its records give them, in the schema's order. -/",
@@ -736,8 +763,10 @@ def tables_file():
         "",
         "`Tables.ofState` is the interface over the twin's `State`: each operation does its work on the state and notes",
         "what it touched (`Touch`): the entry read or written, or the level read as a whole with the entries it held.",
-        "The replay collects the notes and compares them with what the Python read and wrote",
-        "(`Replay.lean`); a proof's interpreter notes nothing.",
+        "An access below a table's top level in a table that keeps its rows also notes the rows it went through",
+        "(`pass`), before its other notes. The replay collects the notes and compares them with what the Python read",
+        "and wrote (`Replay.lean`); it takes a pass as a read of each row only where the trace's header names the table",
+        "in `row_reads`, and as nothing otherwise. A proof's interpreter notes nothing.",
         "",
         "The notes are this file's word for what its operations do. The replay does not take that word alone: it also",
         "compares the twin's whole state after a call with the record's (`Replay.lean`, `wholeState`), and the mutants",

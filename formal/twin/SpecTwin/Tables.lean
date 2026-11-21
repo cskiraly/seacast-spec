@@ -12,8 +12,10 @@ entry, write it, or read a level as a whole.
 
 `Tables.ofState` is the interface over the twin's `State`: each operation does its work on the state and notes
 what it touched (`Touch`): the entry read or written, or the level read as a whole with the entries it held.
-The replay collects the notes and compares them with what the Python read and wrote
-(`Replay.lean`); a proof's interpreter notes nothing.
+An access below a table's top level in a table that keeps its rows also notes the rows it went through
+(`pass`), before its other notes. The replay collects the notes and compares them with what the Python read
+and wrote (`Replay.lean`); it takes a pass as a read of each row only where the trace's header names the table
+in `row_reads`, and as nothing otherwise. A proof's interpreter notes nothing.
 
 The notes are this file's word for what its operations do. The replay does not take that word alone: it also
 compares the twin's whole state after a call with the record's (`Replay.lean`, `wholeState`), and the mutants
@@ -603,8 +605,12 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
   setMine g b := do note (.write (.mine g)); modify fun s => { s with mine := s.mine.insert g b }
   state? g := do note (.read (.state g)); return (← get).state.get? g
   setState g st := do note (.write (.state g)); modify fun s => { s with state := s.state.insert g st }
-  tied? r p g := do note (.read (.tied r p g)); return (((← get).tied.getD r {}).getD p {}).get? g
+  tied? r p g := do
+    note (.pass "tied" [.tiedRow r, .tiedPeerRow r p])
+    note (.read (.tied r p g))
+    return (((← get).tied.getD r {}).getD p {}).get? g
   setTied r p g b := do
+    note (.pass "tied" [.tiedRow r, .tiedPeerRow r p])
     let s ← get
     if !s.tied.contains r then note (.write (.tiedRow r))
     if !(s.tied.getD r {}).contains p then note (.write (.tiedPeerRow r p))
@@ -612,6 +618,7 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     modify fun s => { s with
       tied := s.tied.insert r ((s.tied.getD r {}).insert p (((s.tied.getD r {}).getD p {}).insert g b)) }
   eraseTied r p g := do
+    note (.pass "tied" [.tiedRow r, .tiedPeerRow r p])
     note (.write (.tied r p g))
     modify fun s => { s with tied := s.tied.modify r (·.modify p (·.erase g)) }
   tiedRow? r := do note (.read (.tiedRow r)); return (← get).tied.contains r
@@ -620,8 +627,12 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     note (.write (.tiedRow r))
     for c in l.flatMap fun (p, gs) => .tiedPeerRow r p :: gs.map fun (g, _) => .tied r p g do note (.write c)
     modify fun s => { s with tied := s.tied.erase r }
-  tiedPeerRow? r p := do note (.read (.tiedPeerRow r p)); return ((← get).tied.getD r {}).contains p
+  tiedPeerRow? r p := do
+    note (.pass "tied" [.tiedRow r])
+    note (.read (.tiedPeerRow r p))
+    return ((← get).tied.getD r {}).contains p
   eraseTiedPeerRow r p := do
+    note (.pass "tied" [.tiedRow r])
     let l := (((← get).tied.getD r {}).getD p {}).toList
     note (.write (.tiedPeerRow r p))
     for c in l.map fun (g, _) => .tied r p g do note (.write c)
@@ -631,20 +642,29 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     note (.scan .tiedAll (l.flatMap fun (r, ps) => .tiedRow r :: ps.flatMap fun (p, gs) => .tiedPeerRow r p :: gs.map fun (g, _) => .tied r p g))
     return l
   allTiedRoot r := do
+    note (.pass "tied" [.tiedRow r])
     let l := ((← get).tied.getD r {}).toList.map fun (p, m) => (p, m.toList)
     note (.scan (.tiedRoot r) (l.flatMap fun (p, gs) => .tiedPeerRow r p :: gs.map fun (g, _) => .tied r p g))
     return l
   allTiedPeer r p := do
+    note (.pass "tied" [.tiedRow r, .tiedPeerRow r p])
     let l := (((← get).tied.getD r {}).getD p {}).toList
     note (.scan (.tiedPeer r p) (l.map fun (g, _) => .tied r p g))
     return l
-  lane? p l := do note (.read (.queue p l)); return ((← get).queue.getD p {}).get? l
+  lane? p l := do
+    note (.pass "queue" [.queueRow p])
+    note (.read (.queue p l))
+    return ((← get).queue.getD p {}).get? l
   setLane p l es := do
+    note (.pass "queue" [.queueRow p])
     let s ← get
     if !s.queue.contains p then note (.write (.queueRow p))
     note (.write (.queue p l))
     modify fun s => { s with queue := s.queue.insert p ((s.queue.getD p {}).insert l es) }
-  eraseLane p l := do note (.write (.queue p l)); modify fun s => { s with queue := s.queue.modify p (·.erase l) }
+  eraseLane p l := do
+    note (.pass "queue" [.queueRow p])
+    note (.write (.queue p l))
+    modify fun s => { s with queue := s.queue.modify p (·.erase l) }
   allQueue := do
     let l := (← get).queue.toList.map fun (p, m) => (p, m.toList)
     note (.scan .queueAll (l.flatMap fun (p, ls) => .queueRow p :: ls.map fun (l, _) => .queue p l))
@@ -668,13 +688,20 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     let l := (← get).tieSlot.toList
     note (.scan .tieSlot (l.map fun ((r, p), _) => .tieSlot r p))
     return l
-  owed? p g := do note (.read (.owed p g)); return ((← get).owed.getD p {}).get? g
+  owed? p g := do
+    note (.pass "owed" [.owedRow p])
+    note (.read (.owed p g))
+    return ((← get).owed.getD p {}).get? g
   setOwed p g b := do
+    note (.pass "owed" [.owedRow p])
     let s ← get
     if !s.owed.contains p then note (.write (.owedRow p))
     note (.write (.owed p g))
     modify fun s => { s with owed := s.owed.insert p ((s.owed.getD p {}).insert g b) }
-  eraseOwed p g := do note (.write (.owed p g)); modify fun s => { s with owed := s.owed.modify p (·.erase g) }
+  eraseOwed p g := do
+    note (.pass "owed" [.owedRow p])
+    note (.write (.owed p g))
+    modify fun s => { s with owed := s.owed.modify p (·.erase g) }
   owedRow? p := do note (.read (.owedRow p)); return (← get).owed.contains p
   eraseOwedRow p := do
     let l := ((← get).owed.getD p {}).toList
@@ -682,6 +709,7 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     for c in l.map fun (g, _) => .owed p g do note (.write c)
     modify fun s => { s with owed := s.owed.erase p }
   allOwed p := do
+    note (.pass "owed" [.owedRow p])
     let l := ((← get).owed.getD p {}).toList
     note (.scan (.owed p) (l.map fun (g, _) => .owed p g))
     return l
@@ -723,8 +751,12 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     modify fun s => { s with serveCount := s.serveCount.insert p ((s.serveCount.getD p {}).insert m n) }
   origin g := do note (.read (.origin g)); return (← get).origin.get? g
   setOrigin g b := do note (.write (.origin g)); modify fun s => { s with origin := s.origin.insert g b }
-  plannedTargets? g i := do note (.read (.planned g i)); return ((← get).planned.getD g {}).get? i
+  plannedTargets? g i := do
+    note (.pass "planned" [.plannedRow g])
+    note (.read (.planned g i))
+    return ((← get).planned.getD g {}).get? i
   setPlanned g i ps := do
+    note (.pass "planned" [.plannedRow g])
     let s ← get
     if !s.planned.contains g then note (.write (.plannedRow g))
     note (.write (.planned g i))

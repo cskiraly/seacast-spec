@@ -4,20 +4,20 @@ import SpecTwin.V2.Sample
 /-! # Replaying a record of a trace under protocol-v2.md
 
 `runV2` replays one record of a trace whose header names protocol-v2.md, as `Replay.run` replays one under
-`protocol.md`, and with the same verdict (`Replay.judge`) (design §6).
+`protocol.md`, and with the same verdict (`Replay.judge`).
 
 - **The tape.** v2's questions are the replay's `call` entries: a name, the arguments as compact JSON, the answer
   (`Replay.askCall`), in the forms the instance below writes. `entryV2` reads the entries whose form
   `protocol.md`'s reader does not take or reads otherwise: an `order` and two `keys` entries, `after` with v2's
   timers, `valid_have` of a whole HAVE, `shuffled` of pairs, `forward` with three arguments, a read of `chunks`
-  with no check of the chunk's place (design §4.3), and v2's question names.
+  with no check of the chunk's place (`chunksReadV2`), and v2's question names.
 - **The draws.** A `choice` answer must be a member of the question's list; where the Python draws from a set
   (`choice(list(s))`), the question's list is compared as a set. A `shuffled` answer must be a permutation of
   its question, and a `sample_without_replacement` answer k distinct members.
 - **The orders.** An `order` or `keys` answer must be a permutation of the members the twin computed
   (`Replay.permOf`).
 - **The functions.** `runV2` runs v2's 68 functions by their Python names, hands a record of one of
-  `protocol.md`'s functions that v2 keeps (`keptV2`, design §8) to `Replay.run`, and refuses every other name,
+  `protocol.md`'s functions that v2 keeps (`keptV2`) to `Replay.run`, and refuses every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
@@ -165,9 +165,10 @@ def callNamesV2 : List String :=
 /-- v2's own timers, the targets `after` names beside `protocol.md`'s four. -/
 def timersV2 : List String := ["reconsider", "ask_sample", "resample"]
 
-/-- A read of `chunks[g][i]` under v2: the chunk held there, which need not name that place (design §4.3); its
-own id must still agree with its own coordinates (`chunkF`). A missing chunk is outside the domain, as under
-`protocol.md`. -/
+/-- A read of `chunks[g][i]` under v2: the chunk held there, which need not name that place. A rebuilt row's
+chunks are column chunks, which `decode_group` stores under the row's places, and `fill` stores a received chunk
+under each axis's place the same way; the chunk keeps its own coordinates and id. Its own id must still agree
+with its own coordinates (`chunkF`). A missing chunk is outside the domain, as under `protocol.md`. -/
 def chunksReadV2 (path v : Json) : Except String Entry := do
   let #[g, i] ← path.getArr? | throw s!"not a place of chunks: {path.compress}"
   if v == .null then throw s!"chunks: no chunk there, where the Python raises: {path.compress}"
@@ -201,7 +202,7 @@ def entryV2 (j : Json) : Option (Except String Entry) :=
       | _, _ => none
   | _ => none
 
-/-- A `KeyError`'s key under v2 (design §4.4): a group `["group", g]`, a type `["type", tid]`, or an integer in
+/-- A `KeyError`'s key under v2: a group `["group", g]`, a type `["type", tid]`, or an integer in
 the signed form; as the twin's crash names it. -/
 def raisesKeyV2 (j : Json) : Except String String :=
   match j with
@@ -339,7 +340,7 @@ instance : NodeV2 R where
   claimsOrder gs := do
     permOf "claims' keys" gs (← askCall "keys" [Json.str "claims", Json.arr #[]] (groupList "keys of claims"))
   ownInterest g := askCall "own_interest" [Json.str g] intOf
-  -- the names a node can replace (design §1.4), asked where its line names one
+  -- the names a node's line can give as replaced: asked where it does, the document's body run elsewhere
   forwardNode f p axes :=
     askCall "forward" [chunkJson f, (p : Json), optJson (fun l => Json.arr (l.map giJson).toArray) axes] nothing
   pushRebuiltNode g new := askCall "push_rebuilt" [Json.str g, natsJson new] nothing
@@ -350,14 +351,13 @@ instance : NodeV2 R where
   noteClaimNode p g := askCall "note_claim" [(p : Json), Json.str g] nothing
   knownInScopeNode g := askCall "known_in_scope" [Json.str g] nat
 
-/-- The functions left out that the 71 call (design §8): a question at every node until transcribed. -/
+/-- The functions that the 71 call and this cycle leaves out: a question at every node until transcribed. -/
 instance : V2Later R where
   windowRelease p g i := askCall "window_release" [(p : Json), Json.str g, (i : Json)] nothing
 
 /-! ## One record -/
 
-/-- v2's functions this cycle covers, by their Python names: the 66 and main's `fill` and `serve_standing`
-(design §8). -/
+/-- v2's functions this cycle covers, by their Python names: the 66 and main's `fill` and `serve_standing`. -/
 def fnsV2 : List String :=
   ["colour_of", "send_relation", "send_join", "prune", "yes", "no", "queue_owed_relations", "interest_of_peer",
    "wants_from_me", "serves", "counted", "keep_coverage", "keep_floor",
@@ -372,12 +372,12 @@ def fnsV2 : List String :=
    "forward", "on_validated", "defer", "on_chunk", "on_holding", "on_offer",
    "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample"]
 
-/-- The functions of `protocol.md` that a record under v2 may name, which `Replay.run` serves (design §8): the 16
+/-- The functions of `protocol.md` that a record under v2 may name, which `Replay.run` serves: the 16
 the 71 call directly, the two timer targets `promise_due` and `ask_parked`, `message_id` (the alias `chunk_id`),
 `retry_offer`, the three that the v2 form of `on_block_installed` calls besides (`drop_tie`, `ledger`,
 `validate_chunk`), and every function those reach in `protocol.md`'s code, with the node's own `held`. None of
 them reaches a name v2 redefines. Computed from the extracted code (`protocol.md` at the spec's pin) by a scan of
-the names each function's body uses; the manifest's generated list replaces it (design §6). -/
+the names each function's body uses; a list generated per document is to replace it. -/
 def keptV2 : List String :=
   ["K", "N", "add_offer", "announcers", "ask_parked", "choose_push", "close_promises", "committed_descriptor",
    "drop_beyond", "drop_group", "drop_offer", "drop_tie", "group_id", "group_key", "guard_fails", "have_bits",
@@ -387,13 +387,14 @@ def keptV2 : List String :=
 
 set_option maxHeartbeats 1600000 in
 /-- What one replayed record of a trace under protocol-v2.md gives: the branches it took and how many of the
-Python's reads the twin did not make, or the first difference. `params` are the types' parameters at the node. -/
+Python's reads the twin did not make, or the first difference. `params` are the types' parameters at the node;
+`rowReads` the tables whose rows the trace's view logs as read (`rowReadsOf`, the header's `row_reads`). -/
 def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (replaced traced : List String)
-    (r : Record) : Except String (Array String × Nat) := do
+    (r : Record) (rowReads : List String := []) : Except String (Array String × Nat) := do
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
-  if keptV2.contains r.fn then return ← run c replaced traced r
+  if keptV2.contains r.fn then return ← run c replaced traced r rowReads
   let ctx : Ctx2 := { base := { c, now := Float.ofBits r.t, replaced }, c2, params }
-  let rs0 : RSt := { tape := r.tape, twin := ← load r }
+  let rs0 : RSt := { tape := r.tape, twin := ← load r, rowReads }
   let exec {α} (x : M2 R α) (ok : α → Except String Bool) : Except String (Except String (State × Bool) × RSt) := do
     let (res, rs) := Id.run (((x.run ctx).run).run rs0)
     match res with

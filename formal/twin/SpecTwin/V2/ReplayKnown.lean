@@ -31,16 +31,18 @@ def params : TypeId → Option TypeParams := fun T => if T == "row" then some { 
 def traced : List String := fnsV2 ++ keptV2
 
 /-- A record's line: its fields as JSON text, in the tracer's order. -/
-def line (fn args reads writes rest tape : String) (out : List (String × String)) (reached tables : String) :
-    String :=
-  let fs := [("n", "1"), ("t", "0"), ("fn", s!"\"{fn}\""), ("args", args), ("reads", reads), ("scans", "[]"),
+def line (fn args reads writes rest tape : String) (out : List (String × String)) (reached tables : String)
+    (scans : String := "[]") : String :=
+  let fs := [("n", "1"), ("t", "0"), ("fn", s!"\"{fn}\""), ("args", args), ("reads", reads), ("scans", scans),
              ("writes", writes), ("rest", rest), ("tape", tape)] ++ out ++
             [("reached", reached), ("tables", tables)]
   "{" ++ ", ".intercalate (fs.map fun (k, v) => s!"\"{k}\": {v}") ++ "}"
 
-/-- The replay of one line at a node with these constants and replaced names. -/
-def replay (l : String) (c : Consts := c0) (replaced : List String := []) : Except String (Array String × Nat) := do
-  runV2 c c2 params replaced traced (← record (← Json.parse l) docV2)
+/-- The replay of one line at a node with these constants and replaced names, and these tables' rows read where
+an access goes through them (a header's `row_reads`). -/
+def replay (l : String) (c : Consts := c0) (replaced : List String := []) (rowReads : List String := []) :
+    Except String (Array String × Nat) := do
+  runV2 c c2 params replaced traced (← record (← Json.parse l) docV2) rowReads
 
 def passes (l : String) (c : Consts := c0) (replaced : List String := []) : Bool :=
   match replay l c replaced with
@@ -138,5 +140,63 @@ def r6raise (out : List (String × String)) : String :=
   (r6 s!"[{probeOk}]" "[]" "[\"probe\", \"probe_ok\"]")
 #guard passes (r6raise [("raises", "\"KeyError\""), ("raises_key", s!"[\"group\", {gq}]")])
 #guard failsWith "crash: KeyError" (r6raise (ret "null"))
+
+/-! ## Rows read on the way down: `tie(7, f)` under a view that logs them
+
+protocol.md's `tie`, which v2 keeps, on its path where the copy's group is tied for the peer already: it reads
+`tied[root][7][g]` in `tie_room` and again to set the index, and the view logs the two rows the subscripts go
+through, `tied[root]` and `tied[root][7]`, before the entry. With the rows named in `row_reads` the twin's
+accesses read them too; without, the twin reads the entry alone, and the Python's two row reads are counted as
+reads it did not make. -/
+
+def rootq : String := s!"\"{root}\""
+def rowsRead : String := s!"[\"tied\", [{rootq}], true], [\"tied\", [{rootq}, 7], true], "
+def tie7 (rows : String) : String :=
+  line "tie" s!"[7, {chunk3}]"
+    (s!"[[\"desc\", [{gq}], null], " ++ rows ++
+     s!"[\"tied\", [{rootq}, 7, {gq}], 1], [\"tie_slot\", [[{rootq}, 7]], 1]]")
+    s!"[[\"tied\", [{rootq}, 7, {gq}], 9]]" "[]"
+    s!"[[\"expired\", [{gq}], false], [\"live\", [1], true], [\"admitted\", [7, {chunk3}], true]]" (ret "null")
+    "[\"close_promises\", \"tie\", \"tie_room\"]" "[\"desc\", \"promises\", \"tie_slot\", \"tied\"]"
+    (scans := "[[\"promises\", []]]")
+
+/-- The "fewer" count of a replay that passes, or none. -/
+def fewer (l : String) (rowReads : List String) : Option Nat :=
+  match replay l (rowReads := rowReads) with
+  | .ok (_, n) => some n
+  | .error _ => none
+
+#guard fewer (tie7 rowsRead) rowTables == some 0
+#guard fewer (tie7 rowsRead) [] == some 2
+#guard match replay (tie7 "") (rowReads := rowTables) with
+  | .error e => e.startsWith "footprint, reads: the twin reads an entry the Python did not read: " &&
+                (e.splitOn "a row on its way down").length > 1
+  | .ok _ => false
+#guard fewer (tie7 "") [] == some 0
+
+/-! ## The header's `row_reads` -/
+
+def hdr (s : String) : Json := (Json.parse s).toOption.getD .null
+def four : String := "[\"owed\", \"planned\", \"queue\", \"tied\"]"
+def readsAs (l : List String) (s : String) : Bool :=
+  match rowReadsOf (hdr s) with
+  | .ok l' => l' == l
+  | .error _ => false
+def refused (pre : String) (s : String) : Bool :=
+  match rowReadsOf (hdr s) with
+  | .error e => e.startsWith pre
+  | .ok _ => false
+
+#guard readsAs rowTables s!"\{\"args\": [\"--doc\", \"v2\"], \"row_reads\": {four}}"
+#guard readsAs rowTables s!"\{\"args\": [\"--doc=v2\"], \"row_reads\": {four}}"
+#guard readsAs [] "{\"args\": [\"--doc\", \"v2\"]}"
+#guard readsAs [] "{\"args\": []}"
+#guard refused "header: row_reads in a trace of protocol.md" s!"\{\"args\": [], \"row_reads\": {four}}"
+#guard refused "header: row_reads in a trace of protocol.md" s!"\{\"row_reads\": {four}}"
+#guard refused "header: row_reads in a trace of protocol.md" s!"\{\"args\": [\"--doc\"], \"row_reads\": {four}}"
+#guard refused "header: row_reads is not " "{\"args\": [\"--doc\", \"v2\"], \"row_reads\": [\"tied\"]}"
+#guard refused "header: row_reads is not "
+  "{\"args\": [\"--doc\", \"v2\"], \"row_reads\": [\"tied\", \"queue\", \"planned\", \"owed\"]}"
+#guard refused "header: row_reads is not " "{\"args\": [\"--doc\", \"v2\"], \"row_reads\": true}"
 
 end SpecTwin.V2.ReplayKnown

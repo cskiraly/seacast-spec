@@ -14,19 +14,16 @@ and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes a
   (§5.2) and `N` (§1). v2's functions of the same names as `protocol.md`'s (`announce`, `note_push`, `unpush`,
   `send_have`, `origin_written`, `origin_acked`, `send_gossip`, `projected`) are this namespace's, and calls
   among them name it (`V2.announce`).
-- **`suppression_scope(g)` is a set the tracer proxies** (design §3.1, §3.2): the twin computes its members in
+- **`suppression_scope(g)` is a set the tracer proxies**: the twin computes its members in
   the order `links(T)` gives them, and each caller asks the order it iterates them in, once per iteration, with
   the place named for the caller.
 - **`planned` and `origin` are plain dicts** in the toy, so `planned[g][i]` and `origin[g]` raise `KeyError` on
   a missing key, as they crash here. `planned[g][i]` is read once per peer of the pool, as the comprehension
-  reads it: not at all where the pool is empty. It is read as its leaf alone, as the tracer's view logs it
-  (`tools/footprint.py`'s `__getitem__` logs no read of a level it passes through). **A gap on the two raises:**
-  today's view logs nothing where `planned[g]` is missing, and the leaf's read alone where only `[i]` is. The
-  twin reads the leaf, then the row to tell the two apart, so a record that raises there fails the replay
-  (the extra row read), unless the call's caller read the row first (`on_holding`'s `g in planned`), and a
-  missing row fails it on the leaf's read too. The tracer's v2 view closes it: on `planned`, `tied`, `owed` and
-  `queue`, every form that consults a row logs its presence, and the twin then reads the row, then the leaf, under
-  a mode the trace's header turns on.
+  reads it: not at all where the pool is empty. It is read as v2's view logs it, the view that the header's
+  `row_reads` names: the row `planned[g]` first (`planned`), so that a missing row raises before any leaf is read,
+  then the leaf (`plannedTargets?`, which goes through the row again). A view that logs no read of a row the
+  access goes through (`tools/footprint.py`'s `__getitem__`, in a trace without `row_reads`) logs the leaf alone,
+  and a record of `origin_acked` made under it fails the replay on the twin's read of the row.
 - **Questions asked twice where the Python calls twice:** `announce_extra` asks `links(T)` twice, `source_pool`
   a second time where no relation peer holds the colour, `offer_at_publish` reads `N(d)` twice, and `projected`
   asks `T.threshold(h)` twice.
@@ -96,7 +93,7 @@ def sendHave (p : Peer) (g : Group) : M2 m Unit := do
   branch "send_have: sent"
 
 /-- A call `send_have(p, g)` as the node binds the name: the node's own where its line names it as replaced, a
-question (design §1.4), else the document's -/
+question to the node, else the document's -/
 def sendHaveCall (p : Peer) (g : Group) : M2 m Unit := do
   if (← read).base.replaced.contains "send_have" then NodeV2.sendHaveNode p g else sendHave p g
 
@@ -268,11 +265,11 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
   let c ← colourOf g i
   -- `[q for q in source_pool(T, g, c) if q not in planned[g][i]]`: planned[g][i] read once per peer
   let ps ← (← sourcePool T g c).filterM fun q => do
-    match ← plannedTargets? g i with                          -- the leaf alone, as the tracer's view logs it
+    if !(← planned g) then                                    -- the row, then the leaf, as v2's view logs them
+      return (← crash s!"KeyError: {g} (origin_acked: planned[g])")
+    match ← plannedTargets? g i with
     | some ts => return !ts.contains q
-    | none =>                                                 -- (the raises' reads: a gap, in the header)
-      if !(← planned g) then return (← crash s!"KeyError: {g} (origin_acked: planned[g])")
-      return (← crash s!"KeyError: {i} (origin_acked: planned[g][i])")
+    | none => return (← crash s!"KeyError: {i} (origin_acked: planned[g][i])")
   for p in ps do
     V2.announce p g (1 <<< i)                                 -- a refused push is owed (v0.7)
   branch "origin_acked: the holding grows"

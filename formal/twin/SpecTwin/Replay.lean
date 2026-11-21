@@ -447,6 +447,27 @@ def lineTail (line : String) : Option (List String × List String) :=
     | _ => none
   | _ => none
 
+/-- The document a trace's arguments name, read from the words as the tracer reads them: `--doc D` or `--doc=D`,
+the first of them; none for protocol.md. -/
+def docOf : List String → Option String
+  | "--doc" :: d :: _ => some d
+  | a :: rest => if a.startsWith "--doc=" then some (a.drop 6).toString else docOf rest
+  | [] => none
+
+/-- The tables that keep their rows: the only list a header's `row_reads` may give. -/
+def rowTables : List String := ["owed", "planned", "queue", "tied"]
+
+/-- The tables whose rows a trace's view logs as read where an access goes through them: the header's
+`row_reads`, or none where it has no such member. The member is protocol-v2.md's alone (the header's arguments
+name `--doc v2`), and it lists exactly `rowTables`, in that order. -/
+def rowReadsOf (hd : Json) : Except String (List String) := do
+  let .ok j := hd.getObjVal? "row_reads" | return []
+  if docOf ((hd.getObjValAs? (List String) "args").toOption.getD []) != some "v2" then
+    throw "header: row_reads in a trace of protocol.md"
+  if j != .arr (rowTables.map Json.str).toArray then
+    throw s!"header: row_reads is not {(Json.arr (rowTables.map Json.str).toArray).compress}: {j.compress}"
+  return rowTables
+
 /-! ## Answering the twin from the tape -/
 
 structure RSt where
@@ -455,6 +476,8 @@ structure RSt where
   entered : Array String := #[]           -- the twin's functions entered, for the record's `reached`
   touches : Array Touch := #[]            -- what the twin read and wrote of its state, in order
   twin : State := {}                      -- the twin's state, kept also where it raises
+  rowReads : List String := []           -- the tables whose rows the trace's view logs as read where an access
+                                          --   goes through them (the header's `row_reads`)
 
 /-- The replay's state, the twin's with it, lies under the exceptions, so that it survives a raise. -/
 abbrev R := ExceptT String (StateM RSt)
@@ -853,6 +876,12 @@ def footprint (r : Record) (rs : RSt) : Except String Nat := do
         throw s!"footprint, reads: the twin's scan holds an entry the Python did not read: {reprStr l}: {reprStr c}"
       scanned := l :: scanned
     | .write c => if !written.contains c then written := c :: written
+    | .pass tb rows =>                    -- the rows an access went through: reads where the view logs them
+      if rs.rowReads.contains tb then
+        for c in rows do
+          if !(pyRead.contains c || written.contains c) then
+            throw s!"footprint, reads: the twin reads an entry the Python did not read: {reprStr c} (a row on its way down)"
+          read := c :: read
   for (c, v) in r.writes do               -- rule 3: the Python's writes, made, and to the same values
     if !written.contains c then
       throw s!"footprint, writes: the twin does not write an entry the Python writes: {reprStr c}"
@@ -907,11 +936,12 @@ def judge (traced : List String) (r : Record) (res : Except String (State × Boo
 set_option maxHeartbeats 400000 in
 /-- What one replayed record gives: the branches it took and how many of the Python's reads the twin did not
 make, or the first difference. -/
-def run (c : Consts) (replaced traced : List String) (r : Record) : Except String (Array String × Nat) := do
+def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : List String := []) :
+    Except String (Array String × Nat) := do
   let ctx : Ctx := { c, now := Float.ofBits r.t, replaced }
   -- a node that runs something else under a traced name has no record of that function
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
-  let rs0 : RSt := { tape := r.tape, twin := ← load r }
+  let rs0 : RSt := { tape := r.tape, twin := ← load r, rowReads }
   -- the twin's run: its state with whether its return value is the toy's, or its error; and the replay's state
   -- (the tape left, the branches taken, the twin's state where it raised)
   -- The return value is compared only where the Python returned: where it raised, the record has none, and a

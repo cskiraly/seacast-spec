@@ -474,8 +474,10 @@ QMOVE = {       # name -> (what it changes, file, old, new)
                                      "    for q in ← queueOrder (((← allQueue).filter fun (_, ls) => ls.any fun (_, es) => "
                                      "!es.isEmpty).map (·.1)) do"),
     "tables-lane-read-none": ("the tables: a read of a lane notes itself and answers none", TABLES,
-                              "  lane? p l := do note (.read (.queue p l)); return ((← get).queue.getD p {}).get? l",
-                              "  lane? p l := do note (.read (.queue p l)); return none"),
+                              "  lane? p l := do\n    note (.pass \"queue\" [.queueRow p])\n    note (.read (.queue p l))\n"
+                              "    return ((← get).queue.getD p {}).get? l",
+                              "  lane? p l := do\n    note (.pass \"queue\" [.queueRow p])\n    note (.read (.queue p l))\n"
+                              "    return none"),
     # on_validated's calls on the tape
     "validated-no-store": ("on_validated: the chunk not stored", SEC42,
                            "  store g i f                                               -- also records known_id[g][i] = message_id(f)\n", ""),
@@ -529,12 +531,12 @@ QMOVE = {       # name -> (what it changes, file, old, new)
                                        "        else if b' != b then setTied r q g b'               --     `bits.clear(i)` for each i >= n, in place\n",
                                        "        else if b' != b then eraseTied r q g\n"),
     "tables-tied-write-none": ("the tables: a write of a tie notes itself and its rows, and writes nothing", TABLES,
-                               "  setTied r p g b := do\n    let s ← get\n"
+                               "  setTied r p g b := do\n    note (.pass \"tied\" [.tiedRow r, .tiedPeerRow r p])\n    let s ← get\n"
                                "    if !s.tied.contains r then note (.write (.tiedRow r))\n"
                                "    if !(s.tied.getD r {}).contains p then note (.write (.tiedPeerRow r p))\n"
                                "    note (.write (.tied r p g))\n    modify fun s => { s with\n"
                                "      tied := s.tied.insert r ((s.tied.getD r {}).insert p (((s.tied.getD r {}).getD p {}).insert g b)) }",
-                               "  setTied r p g _ := do\n    let s ← get\n"
+                               "  setTied r p g _ := do\n    note (.pass \"tied\" [.tiedRow r, .tiedPeerRow r p])\n    let s ← get\n"
                                "    if !s.tied.contains r then note (.write (.tiedRow r))\n"
                                "    if !(s.tied.getD r {}).contains p then note (.write (.tiedPeerRow r p))\n"
                                "    note (.write (.tied r p g))"),
@@ -760,8 +762,9 @@ AEND = {        # name -> (what it changes, file, old, new)
                              "  let r := has.popcount + c.FAN_IN * (sent.minus has).popcount ≥ k\n",
                              "  let r := has.popcount + c.FAN_IN * sent.popcount ≥ k\n"),
     "tables-owed-erase-none": ("the tables: an erase of owed notes itself and erases nothing", TABLES,
-                               "  eraseOwed p g := do note (.write (.owed p g)); modify fun s => { s with owed := s.owed.modify p (·.erase g) }\n",
-                               "  eraseOwed p g := do note (.write (.owed p g))\n"),
+                               "  eraseOwed p g := do\n    note (.pass \"owed\" [.owedRow p])\n    note (.write (.owed p g))\n"
+                               "    modify fun s => { s with owed := s.owed.modify p (·.erase g) }\n",
+                               "  eraseOwed p g := do\n    note (.pass \"owed\" [.owedRow p])\n    note (.write (.owed p g))\n"),
     "tables-slot-held-write-none": ("the tables: a write of slot_held notes itself and writes nothing", TABLES,
                                     "      slotHeld := if armed then s.slotHeld.insert p else s.slotHeld.erase p }\n",
                                     "      slotHeld := s.slotHeld }\n"),

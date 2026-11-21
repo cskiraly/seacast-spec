@@ -258,6 +258,7 @@ inductive Touch where
   | read (c : Cell)
   | write (c : Cell)
   | scan (l : Level) (found : List Cell)  -- a level read as a whole, and the entries it held
+  | pass (table : String) (rows : List Cell)  -- the rows an access went through on its way down, outermost first
   deriving BEq, Repr
 
 /-- The twin's own tables, by the names a trace's header and its records give them, in the schema's order. -/

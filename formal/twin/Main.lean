@@ -26,7 +26,7 @@ def members (what : String) (j : Json) (may must : List String) : Except String 
   if let some f := must.find? (!kvs.keys.contains ·) then throw s!"{what}: no {f}"
 
 def headerFields : List String :=
-  ["format", "whole", "own", "foreign", "traced", "tracer", "args"]
+  ["format", "whole", "own", "foreign", "traced", "tracer", "args", "row_reads"]
 
 /-- The content line (`tools/content.py`): `{"content":{"files":{NAME:SHA256,...},"version":2}}`, or version 1
 (each document named by its bytes, not by its code). Its names with their hashes, or why it is not one. A trace
@@ -181,6 +181,7 @@ def main (args : List String) : IO UInt32 := do
   let mut nodesSeen := false
   let mut whole := false                -- the header's: a trace of the whole state (a directed set)
   let mut traced? : Option (List String) := none   -- the functions the tracer traced, as the header lists them
+  let mut rowReads : List String := []  -- the header's: the tables whose rows the view logs as read (rowReadsOf)
   let mut t : Tally := {}
   let mut trailer : Option Nat := none
   let mut trailerRest : Option Nat := none
@@ -258,6 +259,11 @@ def main (args : List String) : IO UInt32 := do
       traced? := (do names "traced" (← hd.getObjVal? "traced") : Except String (List String)).toOption
       headerOk := contentOk && format == some 7 && schema && traced?.isSome
       if traced?.isNone then IO.println "header: traced is not a sorted list of names, none twice"
+      match rowReadsOf hd with
+      | .ok l => rowReads := l
+      | .error e =>
+        IO.println e
+        headerOk := false
       -- a subset names a function the header lists as traced, or a table of the twin's own: else it would pick
       -- no record, and a mutant replayed on it would pass unread
       if let some w := only? then
@@ -325,7 +331,7 @@ def main (args : List String) : IO UInt32 := do
     byFn := byFn.insert counted (byFn.getD counted 0 + 1)
     let (n, ok) := t.perFn.getD r.fn (0, 0)
     let some (c, rp) := nodes[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
-    match run c rp (traced?.getD []) r with
+    match run c rp (traced?.getD []) r rowReads with
     | .ok (marks, fewer) =>
       t := { t with ok := t.ok + 1, perFn := t.perFn.insert r.fn (n + 1, ok + 1),
                     branches := marks.foldl (fun m b => m.insert b (m.getD b 0 + 1)) t.branches,
