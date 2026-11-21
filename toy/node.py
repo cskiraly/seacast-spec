@@ -618,6 +618,7 @@ class Node:
             "D_LAZY": c["D_LAZY"], "GOSSIP_FACTOR": c["GOSSIP_FACTOR"],
             "GOSSIP_RETRANSMISSION": c["GOSSIP_RETRANSMISSION"],
             "MAX_PENDING_GROUPS": c.get("MAX_PENDING_GROUPS", math.inf),     # the client's (§8.2): no limit
+            "SERVE_BUDGET": c.get("SERVE_BUDGET", math.inf),     # protocol-v2.md §6.3: the client's; no limit
             "MAX_IHAVE_MESSAGES": c.get("MAX_IHAVE_MESSAGES", math.inf),     # the client's (§8.2): no limit
             "MAX_IHAVE_LENGTH": c.get("MAX_IHAVE_LENGTH", math.inf),         #   unless --ihave-limits
             "HAVE_TTL": c["HAVE_TTL"], "PUSH_TTL": c["PUSH_TTL"],
@@ -1354,6 +1355,7 @@ class Node:
 
         ns.update(PAYLOAD=P, hdr=ns["desc"], T_of={}, rebuilt=lazy(LazyBits), interest=InterestMap(),   # §8.1: a read
                   known_at=DefaultMap(0.0), served=lazy2(zero), want_p=lazy(lazy_dict),               #   creates nothing
+                  served_hb=lazy(zero), offered_to=lazy2(LazyBits),
                   join_recv=lazy(lazy_dict), join_sent=lazy(lazy_dict),
                   push_out=lazy3(LazySet), push_in=lazy3(LazySet), grafted_out=lazy3(LazySet), grafted_in=lazy3(LazySet),
                   owed_relations=lazy(LazyList), backoff=lazy3(lazy_dict), standing=lazy2(LazySet),
@@ -1919,7 +1921,7 @@ class Node:
         for name in ("join_recv", "join_sent", "push_out", "push_in", "grafted_out", "grafted_in",
                      "owed_relations", "backoff", "peer_has", "pushed", "sent_to", "served", "want_p", "forwarded",
                      "queue", "owed", "owed_answers", "unwanted", "serve_count", "ihave_frames", "ihave_asked",
-                     "probe_served", "probe_answers", "offered"):
+                     "probe_served", "probe_answers", "offered", "served_hb", "offered_to"):
             m = ns.get(name)
             if m is not None and q in m:
                 del m[q]

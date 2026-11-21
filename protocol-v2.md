@@ -478,6 +478,8 @@ holders: Dict[GroupId, Dict[int, Set[PeerId]]]        # [c9] distinct live holde
 pushed: Dict[PeerId, Dict[GroupId, PushEntry]]        # bits, first_push, ttl               [c16]
 sent_to: Dict[PeerId, Dict[GroupId, Bitmap]]          # [c12]
 served: Dict[PeerId, Dict[GroupId, int]]              # new: chunks answered (R6)
+served_hb: Dict[PeerId, int]                          # new: answers to p this heartbeat that SERVE_BUDGET counts (§4.5)
+offered_to: Dict[PeerId, Dict[GroupId, Bitmap]]       # new: what we offered p, whose asks the budget does not count
 promises: Dict[Tuple[Ask, PeerId], float]             # protocol.md §6.1, unchanged
 offers: Dict[Ask, List[PeerId]]
 tried: Dict[Ask, Dict[PeerId, float]]
@@ -518,7 +520,9 @@ first, and leaves a tombstone until the window has passed the slot. The probe's 
 group's state, and a peer's entries in them also go with its connection (a bit of `probe_answers`
 whose answer is never written stays until then). A peer's claims go with its connection
 (`claims_close`, §4.6). Per-peer entries live `HAVE_TTL` and `PUSH_TTL` heartbeats or until the
-connection closes. Relations live until PRUNE or disconnection; a GRAFT of ours lives until it is
+connection closes. What the node offered a peer (`offered_to`) lives with the group's state or until
+the connection closes, and the serving budget's count (`served_hb`) starts again at each heartbeat.
+Relations live until PRUNE or disconnection; a GRAFT of ours lives until it is
 answered, until a PRUNE of either end ends it or until the connection closes; an owed JOIN, GRAFT
 or PRUNE (§4.1) lives until the writer queues it or the connection closes; and a backoff lives
 until it runs out or the connection closes. A writer's place in the window's line (`waiters`,
@@ -1345,6 +1349,7 @@ def forward(f, from_peer, axes=None):                                      # axe
 
 def announce(p, g, bits):                                                  # [c3, c7] an offer
     b = bits & ~pushed[p][g] & ~peer_has[p][g].bits & interest_of_peer(p, g)   # an empty bitmap is not sent
+    if b: offered_to[p][g] = offered_to[p][g] | b                         # §4.5: its asks are outside the budget
     if b and not send(p, Have(group=g, bits=b, offer=True, claim_all=False, complete=False), urgent=False):
         owe(p, g, b)                                                       # refused by a full queue: owed (v0.5)
 
@@ -1404,6 +1409,9 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
             if gi and gi.hops > 0: route_want(p, gi.group, gi.index, gi.hops)   # §4.10: one step on
             continue
         if mid in unwanted[p] and not flagged: continue    # (R5) nor does a receipt of p's stop the probe's answer
+        counted = not flagged and not (gi and offered_to[p][gi.group].has(gi.index))   # §4.5: the budget's
+        if counted and served_hb[p] >= SERVE_BUDGET: continue   #   exemptions: a probe, an ask on our offer;
+        if counted: served_hb[p] += 1                  #   over it, refused without penalty
         serve_count[p][mid] += 1
         if serve_count[p][mid] > GOSSIP_RETRANSMISSION: continue   # stock: 3 answers per id per peer
         if gi: served[p][gi.group] += 1
@@ -1414,6 +1422,9 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
 def serve_standing(g, i):                              # §4.10: the chunk a WANT waited for is here
     for q in standing[g].pop(i, ()):
         if peer_has[q][g].has(i) or served[q][g] >= type_of_group(g).params.SERVE_LIMIT: continue
+        counted = not offered_to[q][g].has(i)          # §4.5: the budget counts it, unless it asked on our offer
+        if counted and served_hb[q] >= SERVE_BUDGET: continue   # over it: dropped, without penalty
+        if counted: served_hb[q] += 1
         served[q][g] += 1
         if not enqueue(q, Entry(chunk=chunks[g][i], solicited=True), urgent=False):   # an answer, like any
             owed_answers[q][g].set(i)                  #   other: refused by a full queue, owed (v0.5 §7.2)
@@ -1493,6 +1504,15 @@ node that claimed the group whole and is still decoding holds every index in `mi
 comes before the gate is kept as any ask is, and tested when the gate opens (`drop_outside`, from
 `on_header_validated`); a routed one is kept apart (`routed_standing`), so that the test still
 exempts it. An ask for an index the asker itself claimed is penalised as before.
+
+**A node answers one peer at most `SERVE_BUDGET` chunks a heartbeat** across groups (`served_hb`),
+as `[R6]`'s limit bounds one group. The answers to asks on the node's own offers (`offered_to`,
+recorded in `announce`) and to a claim's probe are not counted; without the first exemption, a node
+that had spent its budget would offer chunks and then refuse them. An ask over the budget is
+refused, and a standing request's answer dropped, without penalty, and the budget starts again at
+each heartbeat. Its bound (§6.3) covers what an honest peer asks of the node in a heartbeat other
+than on its offers. Without it, where `SERVE_LIMIT` is unbounded, a peer could have a node answer
+every chunk it holds, every heartbeat.
 
 **A WANT is held to two bounds** before it can leave any state, as `protocol.md` §8.2 holds HAVEs
 and offers. An index the group does not have, once the node knows the group's count (`hdr`), is
@@ -2649,6 +2669,7 @@ def on_heartbeat():
     ihave_frames.clear(); ihave_asked.clear()                 # §4.3's limits start again, and the
     for a in held_back.values(): retry_offer(a)               #   retry runs for what they held back,
     held_back.clear()                                         #   which they do not count
+    served_hb.clear()                                         # §4.5's serving budget starts again
     drop_stale_waits()                                        # protocol.md §4.2: copies and ties past their window
     ids = gossip_history.gossip_ids()                         # stock: ids of the last 3 heartbeats
     for T in joined_types(): keep_floor(T)                    # §4.1, links for the floor per family
@@ -3389,6 +3410,7 @@ nobody withheld.
 | `ALARM_WAIT`, `ALARM_NEXT`, `ALARM_MAX` | object type | a custodian's alarm: how long after `known_at` a custodian lacking a cell of its custody asks a member of the row's subnet; how long before it asks another; and how many it asks (§4.6) | option, off; for networks without an honest supernode. The wait is stated by its bound: above the honest custodians' tail on the network. The measurements use 3.5 s, 1.5 s and 3 |
 | `START_DELAY` | object type | seconds from the group id being known to the first ask | `[D8]`, decided: 1 s for rows, as in every measurement of the toy and the research harness; 0 for the payload and columns. Shorter for rows at a cost: with liars, row members are left short (§8) |
 | `SERVE_LIMIT` | object type | chunks served per peer and group (R6) | stated by its bound: at least what an honest peer's interest may need from the node in the group, K for a row member (it completes at K) and the index count for a column's custodian; a sampler asks one cell per peer and block. Rows: 64 (K) in the toy and the research harness; columns: no limit in the measurements |
+| `SERVE_BUDGET` | node, per peer | answers given one peer in a heartbeat, across groups, the answers to asks on the node's own offers and to a claim's probe not counted; an ask over it is refused, and a standing request's answer dropped, without penalty (§4.5) | stated by its bound (`protocol.md` §8.3's kinds): at least what an honest peer asks of the node in a heartbeat other than on its offers: a sampler's one cell per peer and block, the cells of a row member's repair sample, and a peer's asks by derived interest at a block's arrival. No limit in the measurements |
 | `PROMISE` | node | how long an offer's promise runs before a broken one parks the peer for the group (`protocol.md` §6.1: 400 ms), one value for every object type in the code (`filter_entry`) | the payload's promise stays at 400 ms (§4.13); a promise per peer that follows its answer times is permitted as local policy, with 400 ms the default (§8, decided); a longer promise for cells, so one per object type, is open (below) |
 | `SAMPLE_RETRY` | object type | seconds a sampler waits for its first-phase standing request before the second phase asks another peer (§4.10) | `[D12]`, stated by its bound: longer than the honest path's latest sample, the custodians' tail plus a hop; 2 s in every measurement, LiteDAS suggests 4 s; a shorter wait is open (below) |
 | `SAMPLE_RETRY2`, `SAMPLE_OUTSTANDING` | object type | the second phase's wait per peer, and its asks in flight per block (§4.10, LiteDAS) | `[D12]`, stated by their bounds: the wait at least a routed request's round trip (two hops out and back), the asks in flight at least 1; 0.5 s and 4 in every measurement, no other value tried |

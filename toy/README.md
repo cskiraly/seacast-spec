@@ -151,6 +151,10 @@ where one has a control that must come out the other way, it is named:
   claimed whole, and an ask that came while the gate was closed, kept and then dropped by
   `drop_outside` when it opens. Two honest runs, custody with samplers and the rows, ignore no ask.
   It fails on the document before the rule.
+- `serve_budget_known.py`: `protocol-v2.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
+  budget set to two, of three asks for cells the node holds, not on its offers, two are answered and
+  the third refused; an ask on its offer is answered over the budget; after the heartbeat, asks are
+  answered again. No penalty. It fails on the document before the budget.
 - `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the relations one link may carry
   (`MAX_RELATIONS`). With the limit set to what the link carries, a GRAFT for a new column family is
   answered no and makes no relation; one for a family the link carries is answered yes again; with
