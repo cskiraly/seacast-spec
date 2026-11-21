@@ -57,13 +57,12 @@ announced to every peer and invites GRAFTs; the *mesh* is one symmetric pusher s
 scope of IDONTWANT; *gossip* is message ids sent to a few random non-mesh peers per heartbeat.
 `protocol.md` runs inside those notions and loosens them from within: it uses chunks as messages,
 carries HAVE bitmaps inside IDONTWANT and IHAVE and asks by index inside IWANT, and its source
-stripes over every connection.
-This document unbundles them. What a node receives (*interest*), what it does for others (*duty*),
-whom it pushes to and for which indices (the *push relation*, per family and colour: §1.1, §1.4),
-whom it tells what it holds (the *announce relation*), and where it finds peers (*rendezvous*) are
-five separate things, each with its own parameter. Variant C of the posts, one topic per index
-with everyone subscribed, and `protocol.md`, one topic with one mesh, are two settings of the same
-protocol (§6).
+stripes over every connection. This document unbundles them. What a node receives (*interest*), what
+it does for others (*duty*), whom it pushes to and for which indices (the *push relation*, per
+family and colour: §1.1, §1.4), whom it tells what it holds (the *announce relation*), and where it
+finds peers (*rendezvous*) are five separate things, each with its own parameter. Variant C of the
+posts, one topic per index with everyone subscribed, and `protocol.md`, one topic with one mesh, are
+two settings of the same protocol (§6).
 
 **What is assumed and not restated.** The consensus-side objects and their verification are
 assumed: the payload's descriptor committed in the bid and its Merkle tree over Reed–Solomon chunks
@@ -189,12 +188,11 @@ class TypeParams:                                    # per object type; values i
 | `derived_interest` | all | all of the column if `c ∈ get_custody_groups(node_id, cgc)`, else none | all of the row if it is the node's row subnet, else none |
 
 A **group** `g` is one instance of an object type: its id is computable before any chunk of it
-exists (`protocol.md` §1; partial columns; the RowDAS design §4), so a receiver can hold state
-for it,
-exchange bitmaps about it and ask for it before it holds anything. Its **header** arrives through
-the object type's gate and is what the verifier needs. A **chunk** is one index of a group with the
-proof that verifies it alone; `project` says which (group, index) pairs it fills, one for the
-payload and two for a cell, which belongs to a column and to a row (R4). A **family** is the key
+exists (`protocol.md` §1; partial columns; the RowDAS design §4), so a receiver can hold state for
+it, exchange bitmaps about it and ask for it before it holds anything. Its **header** arrives
+through the object type's gate and is what the verifier needs. A **chunk** is one index of a group
+with the proof that verifies it alone; `project` says which (group, index) pairs it fills, one for
+the payload and two for a cell, which belongs to a column and to a row (R4). A **family** is the key
 on which relations are formed (§1.3): where interest is structured, as custody is, a node needs
 pushers for each family it has duty in, and the rendezvous is per family (one topic per column).
 
@@ -241,11 +239,10 @@ node keeps, per object type and family, two **relations**:
   peer it pushes to, which it offers what it chose not to push; beyond that its width is a
   parameter `[D5]`.
 
-The **suppression scope** of a group is the set of peers that may push it to us.
-`protocol.md`'s mesh is the
-case where both relations are the same symmetric set of eight and the scope is the mesh. A type
-whose relation is symmetric (`SYMMETRIC`, as `protocol.md`'s mesh, §6.1) keeps it as one relation
-both ways, grafted and pruned with direction `BOTH` (§4.1).
+The **suppression scope** of a group is the set of peers that may push it to us. `protocol.md`'s
+mesh is the case where both relations are the same symmetric set of eight and the scope is the mesh.
+A type whose relation is symmetric (`SYMMETRIC`, as `protocol.md`'s mesh, §6.1) keeps it as one
+relation both ways, grafted and pruned with direction `BOTH` (§4.1).
 
 **Sampling links and the coverage floor** `[D12]`. A sample is served by a peer whose interest holds
 it (§4.10), so a node that samples an object type keeps, for every family of the type, at least
@@ -329,22 +326,20 @@ family, and opens more where churn leaves it short (`keep_floor`, §4.1).
 
 A node says two different things about what it holds, and they are not interchangeable. A
 **holding** ("I hold these, verified") goes to whoever may push to us: it suppresses pushes, it
-acknowledges the chunk just received (the window, `protocol.md` §7.1),
-and it counts the sender as a holder
-for rarest-first and cancel. An **offer** ("you may ask me for these") goes to a peer we chose not
-to push a chunk to, or to a peer outside the relation: it feeds that peer's offer table and nothing
-else. A pusher's holding is not an offer, since it may be pushing that very chunk; an offer is not a
-holding count, since what the pull discipline needs is who can serve.
-`protocol.md` carries the two in
-IDONTWANT and IHAVE; here they are one message with a flag (§2) and two handlers (§4.3).
+acknowledges the chunk just received (the window, `protocol.md` §7.1), and it counts the sender as a
+holder for rarest-first and cancel. An **offer** ("you may ask me for these") goes to a peer we
+chose not to push a chunk to, or to a peer outside the relation: it feeds that peer's offer table
+and nothing else. A pusher's holding is not an offer, since it may be pushing that very chunk; an
+offer is not a holding count, since what the pull discipline needs is who can serve. `protocol.md`
+carries the two in IDONTWANT and IHAVE; here they are one message with a flag (§2) and two handlers
+(§4.3).
 
 A holding carries two **claims** besides its bitmap `[D3]`: `claim_all`, the sender holds or can
-produce every index (it has reached K and will decode: `protocol.md`'s decode claim,
-made at K, before the
-decode, because a group whose chunks do not form a codeword fails at every node), and `complete`,
-the sender's interest in this group is satisfied, so nothing more need be pushed or announced to
-it. Both are unverified; the window and serving treat them as such, and a claim not followed by the
-chunks it implies counts against the claimant (R5).
+produce every index (it has reached K and will decode: `protocol.md`'s decode claim, made at K,
+before the decode, because a group whose chunks do not form a codeword fails at every node), and
+`complete`, the sender's interest in this group is satisfied, so nothing more need be pushed or
+announced to it. Both are unverified; the window and serving treat them as such, and a claim not
+followed by the chunks it implies counts against the claimant (R5).
 
 **Completion** is per interest. A node with interest `ALL` is complete at K distinct chunks. A
 custodian is complete at every index of its column. A row member is complete at K cells (it stops
@@ -423,19 +418,18 @@ class Evidence(Container):               # [D6]
 - **WANT is per recipient** (the RowDAS design's reading of `requests`): what the sender asks *this*
   peer for, not what it lacks, and the peer sends it what it holds of that now and, for a standing
   WANT (below), the rest when it arrives, within the group's lifetime (§4.10). The ask discipline of
-  `protocol.md` §6.1 sends one index per peer at a time and carries over for pulls against
-  offers; a bitmap
-  lets a client batch, and a sampler declares its indices in one. There is no third bitmap for need
-  `[D2]`: a peer with `DERIVED` or `ALL` interest needs no WANT to declare what both ends can
-  compute (its pulls on offers are asks, §4.3), and a declared interest is only ever told to the
+  `protocol.md` §6.1 sends one index per peer at a time and carries over for pulls against offers; a
+  bitmap lets a client batch, and a sampler declares its indices in one. There is no third bitmap
+  for need `[D2]`: a peer with `DERIVED` or `ALL` interest needs no WANT to declare what both ends
+  can compute (its pulls on offers are asks, §4.3), and a declared interest is only ever told to the
   peers it is asked of (I6). Two fields say how long a WANT stands and how far it goes `[D12]`:
   `standing`, answered when the chunks arrive as well as from what is held (a sampler's WANT always
   is, on a `DECLARED` link whether or not it says so); `hops`, the forwarding steps the request may
   still take: a receiver that does not hold the chunks passes it to one of its links with one step
   fewer (§4.10). A pull against an offer, the probe and the repair sample (§4.6) set neither. A
   third field, `probe`, marks the one ask that verifies a peer's claim (§4.6): the claimant answers
-  it whatever the asker's holdings say, once per asker and group. SEACAST's message encoding
-  carries `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
+  it whatever the asker's holdings say, once per asker and group. SEACAST's message encoding carries
+  `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
 - **A cell group's header travels in one of three forms**, which the object type's definition fixes
   (`protocol-v2-bindings.md` §1.6, and §7): from the block, in every cell message, or in a header
   message of its own. On the libp2p stream binding, the second form carries the header once per
@@ -530,12 +524,12 @@ repair sample's `ask_custodian`) skip an expired axis; `check_completion` finds 
 A dropped group's later chunks are not stored, forwarded, offered or kept for heartbeat gossip on
 that axis (`fill`, `forward`, `push_rebuilt`), as `protocol.md`'s `on_validated` returns for one.
 Offered, such a chunk would draw asks that the node does not answer, and an asker's promise could
-break against an honest node.
-The sampler's `sample`, `resample` and `ask_sample` check it (§4.10), so a draw or a retry after
-the expiry makes no park, interest or WANT again. Reading a missing entry allocates nothing; the
-admission checks of `protocol.md` §8.2 and the limits of §6.3 come first. A node may hold state
-for a group it has no interest in, when it holds chunks of it or a peer's interest names it (a
-reconstructor's non-custodied columns, R4); the number of such groups per slot is bounded (§6.3).
+break against an honest node. The sampler's `sample`, `resample` and `ask_sample` check it (§4.10),
+so a draw or a retry after the expiry makes no park, interest or WANT again. Reading a missing entry
+allocates nothing; the admission checks of `protocol.md` §8.2 and the limits of §6.3 come first. A
+node may hold state for a group it has no interest in, when it holds chunks of it or a peer's
+interest names it (a reconstructor's non-custodied columns, R4); the number of such groups per slot
+is bounded (§6.3).
 
 **Helpers not written out**, beyond `protocol.md` §8.1's, are these: `type_of_group(g)` (the object
 type a group id names), `links(T)` (the peers with a JOIN for `T` both ways: theirs received, ours
@@ -575,11 +569,10 @@ groups of a block, from their ids alone).
 
 ## 4. Events
 
-Validation runs off the receive path as in `protocol.md` §4.1.
-The order of handling one frame (a binding's unit
-on the wire, which may carry several messages; `protocol-v2-bindings.md` §0) is `protocol.md`'s:
-chunks, then offers (which produce asks), then asks (which produce answers), then GRAFT and PRUNE,
-then holdings, then the response.
+Validation runs off the receive path as in `protocol.md` §4.1. The order of handling one frame (a
+binding's unit on the wire, which may carry several messages; `protocol-v2-bindings.md` §0) is
+`protocol.md`'s: chunks, then offers (which produce asks), then asks (which produce answers), then
+GRAFT and PRUNE, then holdings, then the response.
 
 ```python
 def on_frame(p, frame):
@@ -2938,13 +2931,11 @@ the column cells little at the median, at one seed (protocol-v2-figures.md, §4.
   `toy/write_wait_known.py --doc v2` checks four cases on each of the three paths, with p the writer
   that writes control and q the other writer in line: q has no run queued when `next_to_send`
   returns p's control, q has one after p's write starts to wait, and q has none when p is not in
-  line or when the window is full. Where p is in line, it keeps its place at the head.
-  `protocol.md` has no such third path: its
-  control-only entry goes through `release_unused_slot`, which gives back the writer's slot and
-  also takes the writer out of the line when it holds none, so there a control-only entry is never
-  written from the line.
-  `wake_front` is this document's own, since its room is counted in bytes (`W_BYTES`), where
-  `protocol.md`'s counts slots.
+  line or when the window is full. Where p is in line, it keeps its place at the head. `protocol.md`
+  has no such third path: its control-only entry goes through `release_unused_slot`, which gives
+  back the writer's slot and also takes the writer out of the line when it holds none, so there a
+  control-only entry is never written from the line. `wake_front` is this document's own, since its
+  room is counted in bytes (`W_BYTES`), where `protocol.md`'s counts slots.
 - *Replaced: the wake before the write* (v0.10.7's). It woke the next writer in line before every
   control write of a writer in line, whether or not the write then waited. A write that completes at
   once leaves its writer able to write, and waking another then would change the schedule of the

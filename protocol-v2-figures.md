@@ -77,11 +77,10 @@ steps per end. A count covers the states reached within the bound. A state "at r
 queued, owed or on the wire. The text checked is the draft of 2026-11-10, with the answered GRAFT,
 the yes again and the symmetric relation (`protocol-v2.md` §4.1); the figures were first written
 into the text on the main line in spec `0d968d8` (2026-11-14). The four modes printed the same
-counts again on the draft of
-2026-11-14, and the one-way mode did so on the draft of 2026-11-16; no later run is recorded. The
-controls are the earlier texts kept in `toy/controls/`. The control of the answered GRAFT is the
-text of 2026-11-03, the control of the owed JOIN is the text of 2026-11-04, and the control of the
-yes again is the text of 2026-11-08.
+counts again on the draft of 2026-11-14, and the one-way mode did so on the draft of 2026-11-16; no
+later run is recorded. The controls are the earlier texts kept in `toy/controls/`. The control of
+the answered GRAFT is the text of 2026-11-03, the control of the owed JOIN is the text of
+2026-11-04, and the control of the yes again is the text of 2026-11-08.
 
 - **The answered GRAFT** (one-way, three steps) reaches 2 367 518 states, 846 of them at rest, and
   the ends agree in every one of those. Before the yes again, the text of 2026-11-08 reached
@@ -907,16 +906,15 @@ the window in bytes, with the slot window's figures beside it (04:40; the toy's 
 commit gives every table). The figures were first written that day [`08fbc3d`, 2026-10-21]. Each
 cell ran at one seed, which the record does not name; the toy's default then was seed 7. The
 baseline is `protocol.md`'s slot window, in the same cell and seed. Every write was taken at once.
-The custody setting publishes
-a block of 32 blobs as 128 column groups, gives each node a derived custody of 8 columns and a floor
-of 6 custodian peers (2 for the proposer), and makes node 1 the proposer. The row cells at 60 nodes
-have degree 30, a 1 Gbps proposer and 6 reconstructors; at 500 nodes, they have degree 70, 32
-subnets and 50 reconstructors. The rules are the draft's of 2026-10-07 under v0.3's order of the
-queue, before §4.12's source rule (the same day at 11:05) except where a figure names it. The rules
-changed since are §4.12's source rule; P4 and v0.5 (2026-10-21; "Tables further down that predate
-2026-10-21 were recorded without P4", the toy's README); v0.9's source rules (2026-11-11); the probe
-of a claim (R5, 2026-11-15, §4.6), in the row cells; and the line skip (2026-11-20) and the wake at
-the wait (v0.10.9).
+The custody setting publishes a block of 32 blobs as 128 column groups, gives each node a derived
+custody of 8 columns and a floor of 6 custodian peers (2 for the proposer), and makes node 1 the
+proposer. The row cells at 60 nodes have degree 30, a 1 Gbps proposer and 6 reconstructors; at
+500 nodes, they have degree 70, 32 subnets and 50 reconstructors. The rules are the draft's of
+2026-10-07 under v0.3's order of the queue, before §4.12's source rule (the same day at 11:05)
+except where a figure names it. The rules changed since are §4.12's source rule; P4 and v0.5
+(2026-10-21; "Tables further down that predate 2026-10-21 were recorded without P4", the toy's
+README); v0.9's source rules (2026-11-11); the probe of a claim (R5, 2026-11-15, §4.6), in the row
+cells; and the line skip (2026-11-20) and the wake at the wait (v0.10.9).
 - Under the slot window, a 50 Mbps proposer of 128 column groups took 9 173 ms for a 9 MB block,
   which needs about 2 s at 50 Mbps: it was held to about 10 Mbps. A 1 Gbps proposer was held to
   about a fifth of its uplink. These figures come from the custody setting at 60 nodes, degree 30.
@@ -1257,13 +1255,13 @@ not hurt in the toy gives no figure.
 fifth of them samplers of eight cells, the 1 Gbps proposer, two blocks, degree 70 or 16, honest and
 with 30 % withholding custodians (`--fault wh30`). Routed requests are on (`ROUTE_HOPS` 1), with a
 floor of one cover or of two. The cells ran at seeds 7 to 16: 2 000 sampler-blocks for each
-configuration (100 samplers, two blocks, ten seeds). A time
-is the median over the 20 blocks. They ran on 2026-10-26 on the draft of 2026-10-23, and were
-recorded in the toy's README ("A sampler's reach"). The figures were first written into the text on
-the main line in spec `0d968d8` (2026-11-14). The transport took every write at once
-(`--send-buffer 0`). `SAMPLE_RETRY` was 2 s, `SAMPLE_RETRY2` 0.5 s and `SAMPLE_OUTSTANDING` 4. The
-runs predate ties (2026-10-26), the IHAVE limits (2026-10-27), v0.9's source at the acknowledgement
-(2026-11-11) and the transport (2026-11-15); they were not run again.
+configuration (100 samplers, two blocks, ten seeds). A time is the median over the 20 blocks. They
+ran on 2026-10-26 on the draft of 2026-10-23, and were recorded in the toy's README ("A sampler's
+reach"). The figures were first written into the text on the main line in spec `0d968d8`
+(2026-11-14). The transport took every write at once (`--send-buffer 0`). `SAMPLE_RETRY` was 2 s,
+`SAMPLE_RETRY2` 0.5 s and `SAMPLE_OUTSTANDING` 4. The runs predate ties (2026-10-26), the IHAVE
+limits (2026-10-27), v0.9's source at the acknowledgement (2026-11-11) and the transport
+(2026-11-15); they were not run again.
 
 - **`SAMPLE_RETRY`:** the custodians' 99th percentile was 0.67 to 0.70 s, honest [666 to 678 ms at
   70 links, 694 to 702 ms at 16]. Under 30 % withholders the samplers' median was 2.5 to 2.9 s.
@@ -1466,10 +1464,9 @@ The record of `[D12]` cites §1.3's, §4.10's and §6.3's entries. Its own figur
 samplers of eight cells, the 1 Gbps proposer, seed 7 unless an item says otherwise, on the draft of
 2026-10-23. "Before one sample per peer" is that draft before that day's changes, which made one
 sample per peer; "after" is the draft with them. The transport took every write at once
-(`--send-buffer 0`). The figures were first written into the text on the main line in spec
-`0d968d8` (2026-11-14). The runs predate ties
-(2026-10-26), v0.9's source at the acknowledgement (2026-11-11) and the transport (2026-11-15). They
-were not run again.
+(`--send-buffer 0`). The figures were first written into the text on the main line in spec `0d968d8`
+(2026-11-14). The runs predate ties (2026-10-26), v0.9's source at the acknowledgement (2026-11-11)
+and the transport (2026-11-15). They were not run again.
 
 - **Why diversity** (honest, three blocks, the floor of one cover and routed requests, before one
   sample per peer): the proposer was asked for 28 of 288 samples, up to 5 of one sampler's 8 in a

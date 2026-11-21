@@ -48,9 +48,9 @@ says what was not taken:
 - **`[D4]` the repair floor.** A node that may rebuild keeps at least `REPAIR_FLOOR` links to
   custodians of each column that it does not custody (§4.6). The parameter is at least 1. Without
   the floor, some runs of the toy's row cell with half the columns withheld left custodians short,
-  each one by a missing
-  link; with a floor of 1, every run completed (protocol-v2-figures.md, §6.2). Opening a link only
-  when a rebuilt cell has nowhere to go (§4.6) was not taken; it is kept as an option.
+  each one by a missing link; with a floor of 1, every run completed (protocol-v2-figures.md, §6.2).
+  Opening a link only when a rebuilt cell has nowhere to go (§4.6) was not taken; it is kept as an
+  option.
 - **`[D6]` the payload's consistency route.** This version has no such route: it leaves the
   consistency of the payload to level 2 and the application, and `EVIDENCE` stays a hook that an
   object type may fill. Three routes were not taken here, and each needs work outside this
@@ -146,9 +146,9 @@ row settings a row member's 64th cell, by at most +20 ms at the median over the 
     in rows with half the columns withheld and a 1 Gbps proposer, with fewer offers and fewer
     copies. With liars and no withheld columns it is close by the rule as written, the median over
     the seeds, but not on every seed: the custodians' median is inside the bound on the middle seed
-    and outside it on another. It is not close with
-    half withheld. No node is short in either (protocol-v2-figures.md, [D5]). Three seeds show a
-    pass or a fail, not a comparison, and do not show the 60-node shortfall gone.
+    and outside it on another. It is not close with half withheld. No node is short in either
+    (protocol-v2-figures.md, [D5]). Three seeds show a pass or a fail, not a comparison, and do not
+    show the 60-node shortfall gone.
   - *The rows' `NONE`* left row members short on every seed in every row setting: the rows need
     the offers to every joined peer.
   - *The columns' `SAMPLE`* (the heartbeat's paced gossip) was close where `NONE` was, except in the
@@ -219,8 +219,8 @@ subnet custodies.
 - *The odds.* In a network model of the toy's 500-node rows, in one network whose hoarders repair
   the members' cells and leave a few columns unrepaired, the bias over linked members makes it only
   somewhat less likely that every honest member of the subnet passes the member check, the case in
-  which nobody repairs the row and it stays short.
-  It makes that unlikely only with every member known, a view the node does not have.
+  which nobody repairs the row and it stays short. It makes that unlikely only with every member
+  known, a view the node does not have.
 - *Where hoarders mark their rebuilt cells seen,* the uniform sample already catches them in the
   model. Beside that option, the runs (a toy check) showed nothing from the bias
   (protocol-v2-figures.md, §4.6, "Biasing the repair sample").
@@ -307,8 +307,9 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   it.
 - **The gossipsub binding to the byte.** Its extra fields, a holding's `claim_all` and `complete`
   and a WANT's `standing`, `hops` and `probe`, travel in version 4 of the id strings, and a WANT's
-  index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). EVIDENCE is reserved
-  there, as a full message on the rendezvous topic, as it is on the libp2p stream binding.
+  index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). On that binding,
+  EVIDENCE is reserved as a full message on the rendezvous topic, as SEACAST's message encoding
+  reserves its kind `0x08` (§1.1 there).
 - **A cell group's header in three forms** (§1.6 there): from the block, in every cell, or in a
   message of its own. Each object type's definition fixes one form, never mixed on one topic. The
   same three are open on the libp2p stream, Waggle and gossipsub bindings; the partial-messages
@@ -354,12 +355,12 @@ carried later than its version.
 - v0.10 (2026-11-15) comes in as follows:
   - The toy's default transport keeps `protocol.md` §7.3's rule, one entry at a time per
     connection, and both recordings were made again (`protocol-v2-figures.md`'s preamble, §6.1).
-  - What waits for a gate is carried where this document uses `protocol.md`'s functions: `tie`,
-    with `tie_room`'s limits, the limit of unknown groups and the slot it records (`tie_slot`);
+  - What waits for a gate is carried where this document uses `protocol.md`'s functions: `tie`, with
+    `tie_room`'s limits, the limit of unknown groups and the slot it records (`tie_slot`);
     `close_promises`, which `protocol.md` now gives as code, called from `fill` and `tie`; and
-    `on_block_installed`, which drops at
-    installation a tied index the group, known by then, does not have, and whose level 1 for the
-    payload is `validate_chunk` with its new check of the copy's slot (`protocol.md` §3, §4.2).
+    `on_block_installed`, which drops at installation a tied index the group, known by then, does
+    not have, and whose level 1 for the payload is `validate_chunk` with its new check of the copy's
+    slot (`protocol.md` §3, §4.2).
   - The announcers beyond a chunk's ordered list are tried in the node's own order, in
     `protocol.md`'s ask path, which this document keeps (`protocol.md` §6.1).
   - Since 2026-11-16, this document carries the following where it has functions of its own
@@ -386,14 +387,13 @@ carried later than its version.
   the bounds of §6.3 in the kinds of §8.3, the IHAVE values (§4.3, §6.3), "acknowledged" (§4.7), and
   `SOURCE_OFFERS` (§4.7, §6.3).
 - v0.10.4 (2026-11-18): `protocol.md` says what heartbeat gossip tells of the source, names as open
-  the case of a chunk that is never acknowledged, and keeps an IDONTWANT entry that is not a
-  HAVE bitmap as
-  stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped group and in
-  its reading of bitmaps and ids. This draft runs on the same toy. It carries the IDONTWANT rule
-  onto the gossipsub binding (`protocol-v2-bindings.md` §4), where the toy now keeps such an entry
-  in `unwanted[p]`. §4.7 already says that, for a type that gossips (`ANNOUNCE_EXTRA = SAMPLE`), the
-  source's heartbeat gossip draws on every chunk at either setting, and its open item on a chunk
-  that is never acknowledged is the one `protocol.md` §5.1 names.
+  the case of a chunk that is never acknowledged, and keeps an IDONTWANT entry that is not a HAVE
+  bitmap as stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped
+  group and in its reading of bitmaps and ids. This draft runs on the same toy. It carries the
+  IDONTWANT rule onto the gossipsub binding (`protocol-v2-bindings.md` §4), where the toy now keeps
+  such an entry in `unwanted[p]`. §4.7 already says that, for a type that gossips
+  (`ANNOUNCE_EXTRA = SAMPLE`), the source's heartbeat gossip draws on every chunk at either setting,
+  and its open item on a chunk that is never acknowledged is the one `protocol.md` §5.1 names.
 - v0.10.5 (2026-11-19): `protocol.md` is the same but for its version line, and the proofs in
   `formal/veil/` move to Veil's release. The toy's `accepted` answers whether the id was stored, as
   `protocol.md`'s helper list says, so under this draft a later copy of a copy that level 1 rejected
@@ -415,4 +415,4 @@ carried later than its version.
   replaces the wake before the write on the three control paths, and `wake_front` loses `past`;
   `write_wait_known.py --doc v2` checks it on all three.
 - v0.10.10 (2026-11-21): `protocol.md` is the same but for its version line, and the proofs in
-  `formal/veil/` take in four of its rules added after v0.8; nothing to carry.
+  `formal/veil/` take in four of its rules added after v0.8; there is nothing to carry.
