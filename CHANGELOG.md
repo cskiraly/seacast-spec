@@ -27,9 +27,10 @@ are rewritten in plain sentences.
   message, form (b) in every copy of each cell's message, and form (c) in a header message of its
   own on each family's topic.
 - `protocol-v2-bindings.md` §4: on the gossipsub binding, a holding and a WANT carry their extra
-  fields in version 4 of the strings, and an offer keeps version 1; an entry with a reserved bit
-  set, a WANT of the wrong length, or a WANT whose `hops` is over its type's `ROUTE_HOPS` is
-  ignored without penalty.
+  fields in version 4 of the strings, whose 32-byte group is `protocol.md` §2's group key, and an
+  offer keeps version 1; an entry with a reserved bit set, a WANT of the wrong length, or a WANT
+  whose `hops` is over its type's `ROUTE_HOPS` is ignored without penalty, and an IDONTWANT entry
+  with a reserved bit set is not read as a holding.
 
 ### Added
 - `protocol-v2-decisions.md`: the draft's decision record, with an index of the decisions, the
@@ -40,6 +41,10 @@ are rewritten in plain sentences.
 - `protocol-v2.md`: a reading guide in §0, and a glossary of the document's own terms, each with
   the section that defines it.
 - `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
+- `protocol-v2-bindings.md` §1.6: "Open: a cell before its block, under form (a)".
+- `protocol-v2-bindings.md` §4: "Open: the strings for cell groups, and the versions written": the
+  32 bytes that name a column's or a row's group, the version a node writes when it has no flag to
+  carry, and whether every binding ignores a WANT whose `hops` is over `ROUTE_HOPS`.
 - `protocol-v2-bindings.md` §0, `protocol-v2.md` §7: a native QUIC binding is being drafted.
 
 ### Changed
@@ -65,8 +70,12 @@ are rewritten in plain sentences.
   figures and the glossary are named.
 - `toy/README.md`, `toy/run.py` (help text only): the bindings by their carriers; `--wire` keeps
   its values, and the two wires model two of the header's forms.
-- `toy/standalone_wire_known.py`: it reads the bindings' types, limits and sizes under their new
-  headings, and cites the new sections.
+- `protocol.md` §5.1: the figures it cites from the draft are in `protocol-v2-figures.md`.
+- `toy/`: comments, docstrings and printed strings cite the bindings by their new sections and name
+  them by their carriers; `toy/standalone_wire_known.py` reads the bindings' types, limits and
+  sizes under their new headings.
+- `toy/node.py`, `toy/wire.py`: comments and docstrings say what the toy charges for version 4's
+  fields, and that its receive path under `protocol-v2.md` also reads the claims from a full bitmap.
 
 ### Fixed
 - `protocol.md` §8.1: the table names the window's line, which a writer leaves when it takes a
@@ -75,15 +84,25 @@ are rewritten in plain sentences.
   room, has nothing to send, or its connection closes (`leave_line`).
 - `protocol-v2.md` §4.2: an arrival leaves an axis that held the index as rebuilt unreceived, and
   `on_validated` still forwards on it.
+- `protocol-v2.md` §2: a cell's header travels in one of the three forms, and on the libp2p stream
+  binding the second form carries it once per group and link.
 - `protocol-v2.md` §4.5: an ask by derived interest makes no promise with a timer, since an ask
-  sent as a WANT starts none, except a claim's probe (`filter_entry`).
+  made by `want`, not on an offer, starts none, except a claim's probe (`filter_entry`); the
+  custodian answers from what it holds, and keeps the ask for later only as a standing request.
+- `protocol-v2.md` §4.7: merging the source's holdings moves copies by 0.01 at most.
 - `protocol-v2.md` §4.9, §5: `projected` is `protocol.md` §7.2's.
+- `protocol-v2.md` §4.11: the line-stall check counts the sends to the other peers from 600 ms
+  after the stall on, and accepts queues left empty.
 - `protocol-v2.md` §4.13: at 50 Mbps and above, the ask window is `protocol.md`'s.
 - `protocol-v2.md` preamble, §6.2: the toy checks the tier 4 setting against its own recorded cells
   (`check.py --doc v2`), which §6.1 compares with `protocol.md`'s.
 - `protocol-v2-figures.md` §4.6: where the toy's records differ from the old text, the entry gives
   the records: the probe that passed on the claimant's own copy, the seeds traced, a median's
   range, a saving per cell, and the tails with the fast class off.
+- `protocol-v2-figures.md` §4.6: with supernodes, the 500-node medians run from 1 170 to 1 179 ms,
+  over both arms.
+- `protocol-v2-figures.md` §4.7: the chunks that come back at the source are given as a seed's mean
+  a message: at most 59 at one seed, and at most 17 with §4.11's rule.
 - `protocol-v2-figures.md` §4.7, §4.11: the figure on the columns that no node but the source
   custodies gives both cells that count it, and the window's sampling cell is given as its record
   has it.
@@ -91,6 +110,8 @@ are rewritten in plain sentences.
   in §4.3's cells and that C3 is C2 with hoarders in place of the liars.
 - `protocol-v2-decisions.md`: six places said exactly, among them how a slow honest peer is parked
   and that every member passing the member check leaves the row unrepaired.
+- `protocol-v2-decisions.md` `[D6]`: where it bites names `protocol.md` §1's commitment, which
+  §1.1's `verify` checks, as the payload's leaf rule.
 
 ## v0.10.10 — 2026-11-21
 
