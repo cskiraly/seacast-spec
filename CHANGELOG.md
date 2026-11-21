@@ -13,6 +13,85 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
+## After v0.10.10 — not yet released
+
+The next version's draft moves its decisions and its figures to files of their own, names its
+bindings by their carriers and defines the gossipsub binding's extra fields to the byte; its files
+are rewritten in plain sentences.
+
+### Rules
+- `protocol-v2-bindings.md` §1.6: a cell group's header travels in one of three forms: from the
+  block, in every cell message, or in a header message of its own; the object type's definition
+  fixes the form, and no topic mixes two forms.
+- `protocol-v2-bindings.md` §4: on the gossipsub binding, form (a) puts the header in no cell's
+  message, form (b) in every copy of each cell's message, and form (c) in a header message of its
+  own on each family's topic.
+- `protocol-v2-bindings.md` §4: on the gossipsub binding, a holding and a WANT carry their extra
+  fields in version 4 of the strings, and an offer keeps version 1; an entry with a reserved bit
+  set, a WANT of the wrong length, or a WANT whose `hops` is over its type's `ROUTE_HOPS` is
+  ignored without penalty.
+
+### Added
+- `protocol-v2-decisions.md`: the draft's decision record, with an index of the decisions, the
+  dated record from `protocol-v2.md` §8, and the list of the versions of `protocol.md` carried,
+  from §5.
+- `protocol-v2-figures.md`: the figures behind `protocol-v2.md`'s reasons, by the section that
+  cites them, each with its conditions.
+- `protocol-v2.md`: a reading guide in §0, and a glossary of the document's own terms, each with
+  the section that defines it.
+- `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
+- `protocol-v2-bindings.md` §0, `protocol-v2.md` §7: a native QUIC binding is being drafted.
+
+### Changed
+- `protocol-v2.md`, `protocol-v2-decisions.md`: the Rationales, §6 and the decision record keep
+  their reasons and alternatives in words and point to `protocol-v2-figures.md` for the figures;
+  `protocol-v2.md` §8 points to `protocol-v2-decisions.md`, and §5 keeps the map of functions.
+- `protocol-v2-bindings.md`: the bindings are named by their carriers, and the sections follow
+  them: SEACAST's message encoding (§1), the libp2p stream binding (§2), the Waggle binding (§3),
+  the gossipsub binding (§4) and the partial-messages binding (§5).
+- `protocol-v2.md`: it cites the bindings by their new sections and names them by their carriers;
+  §7's capability table takes the carriers as columns, and its header rule says what all three of
+  the header's forms satisfy.
+- `protocol-v2-bindings.md` §4: EVIDENCE is reserved on the gossipsub binding, which no longer
+  lists it among what it gives up.
+- `protocol-v2.md`, `protocol-v2-decisions.md`, `protocol-v2-figures.md`: each "v0.3" names what
+  it means: `protocol.md`, the gossipsub binding, or draft v0.3's own rules.
+- `protocol-v2.md`, `protocol-v2-bindings.md`, `protocol-v2-decisions.md`,
+  `protocol-v2-figures.md`: plain sentences, with the code, every number, code span, heading, bold
+  lead and obligation word the same.
+- `protocol-v2-figures.md` §6.1: the comparison of `ihave-limits` with `protocol.md`'s is dated,
+  since `protocol.md`'s recording moved on 2026-11-20.
+- `README.md`: the bindings document's entry names the carriers, and the decision record, the
+  figures and the glossary are named.
+- `toy/README.md`, `toy/run.py` (help text only): the bindings by their carriers; `--wire` keeps
+  its values, and the two wires model two of the header's forms.
+- `toy/standalone_wire_known.py`: it reads the bindings' types, limits and sizes under their new
+  headings, and cites the new sections.
+
+### Fixed
+- `protocol.md` §8.1: the table names the window's line, which a writer leaves when it takes a
+  slot, finds no chunk to send, or its peer's queue closes.
+- `protocol-v2.md` §3: the lifetimes name the window's line, which a writer leaves when it takes
+  room, has nothing to send, or its connection closes (`leave_line`).
+- `protocol-v2.md` §4.2: an arrival leaves an axis that held the index as rebuilt unreceived, and
+  `on_validated` still forwards on it.
+- `protocol-v2.md` §4.5: an ask by derived interest makes no promise with a timer, since an ask
+  sent as a WANT starts none, except a claim's probe (`filter_entry`).
+- `protocol-v2.md` §4.9, §5: `projected` is `protocol.md` §7.2's.
+- `protocol-v2.md` §4.13: at 50 Mbps and above, the ask window is `protocol.md`'s.
+- `protocol-v2.md` preamble, §6.2: the toy checks the tier 4 setting against its own recorded cells
+  (`check.py --doc v2`), which §6.1 compares with `protocol.md`'s.
+- `protocol-v2-figures.md` §4.6: where the toy's records differ from the old text, the entry gives
+  the records: the probe that passed on the claimant's own copy, the seeds traced, a median's
+  range, a saving per cell, and the tails with the fast class off.
+- `protocol-v2-figures.md` §4.7, §4.11: the figure on the columns that no node but the source
+  custodies gives both cells that count it, and the window's sampling cell is given as its record
+  has it.
+- `protocol-v2-figures.md`: five places said exactly, among them that the limits changed no event
+  in §4.3's cells and that C3 is C2 with hoarders in place of the liars.
+- `protocol-v2-decisions.md`: six places said exactly, among them how a slow honest peer is parked
+  and that every member passing the member check leaves the row unrepaired.
+
 ## v0.10.10 — 2026-11-21
 
 The proofs in `formal/veil/` take in four rules that `protocol.md` added after v0.8, and no rule
