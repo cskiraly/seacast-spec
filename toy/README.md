@@ -144,6 +144,13 @@ where one has a control that must come out the other way, it is named:
 - `xcheck_observes_known.py [--doc v2]`: `--xcheck` only observes. `check.py`'s push cell runs with
   and without it, and both give the same digest. Under `protocol-v2.md` it fails on the toy before
   its fix, whose wrapper of `track_in_flight` took two arguments where that document passes three.
+- `outside_ask_known.py`: `protocol-v2.md` §4.5, an ask outside what a node serves. Once the gate is
+  open, a standing WANT for a column the node neither holds nor custodies keeps no standing request
+  and draws no penalty; a sampler's WANT for one adds no bit to its interest. The controls: a column
+  the node custodies, a routed WANT to a forwarding node (kept, and marked routed), a group the node
+  claimed whole, and an ask that came while the gate was closed, kept and then dropped by
+  `drop_outside` when it opens. Two honest runs, custody with samplers and the rows, ignore no ask.
+  It fails on the document before the rule.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an
   index it has already received, is acknowledged and neither forwarded nor put in the gossip
   history; a copy of an index held only as rebuilt is still forwarded, and the publisher's first

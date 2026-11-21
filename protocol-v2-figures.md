@@ -168,6 +168,26 @@ they were not run again.
 - Under the rows setting, the busiest peer reached 1 254 frames and 178 asks [857 to 1 254 frames
   and 78 to 178 asks over the three seeds].
 
+## §4.5 An ask arrives, and serving
+
+### Asks outside what a node serves
+
+**Conditions.** The count ran on 2026-11-21 on the spec of release v0.10.7 (`c67d0e5`), before the
+rule: an instrument around each node's `on_want` classed every honest ask as held, or as inside or
+outside what the receiving node serves, without changing the run (each cell gave the same digest
+with the instrument and without it). The runs have 60 nodes, degree 30 and three blocks, at seeds 7,
+8 and 9, with the toy's default transport (`--send-buffer 1`): custody alone and custody with a
+fifth of the nodes sampling (both with a 1 Gbps proposer, `--net bld`), the rows, and custody with
+samplers under `--upkeep on --churn 2`. The tier 4 setting's fifteen recorded cells cannot show such
+an ask: every node there declares interest `ALL`. In the strict reading the instrument used, a node
+that has not yet validated a group's header cannot derive its own interest in the group.
+- Custody alone and the rows had no ask the receiving node did not hold (12 912 to 13 286 and
+  50 963 to 52 438 asks a run).
+- Custody with samplers had 191 to 217 outside asks a run, 2.2 % to 3.0 % of the asks, with churn
+  and without. Every one was a sampler's standing WANT that reached a custodian 6 to 9 ms after the
+  block's publish, before the custodian had validated the header, for a column it custodies; the
+  asker believed it could ask in every case.
+
 ## §4.6 Completion, the claims, decoding and repair
 
 **Conditions.** Every figure below comes from the toy (`toy/run.py --doc v2`) in the rows setting

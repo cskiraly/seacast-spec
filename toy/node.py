@@ -1354,6 +1354,7 @@ class Node:
                   join_recv=lazy(lazy_dict), join_sent=lazy(lazy_dict),
                   push_out=lazy3(LazySet), push_in=lazy3(LazySet), grafted_out=lazy3(LazySet), grafted_in=lazy3(LazySet),
                   owed_relations=lazy(LazyList), backoff=lazy3(lazy_dict), standing=lazy2(LazySet),
+                  routed_standing=lazy2(LazySet),
                   claims=lazy(LazySet), reconsider_at={}, deferred=DefaultMap(False), duty_at={}, waited=DefaultMap(False),
                   probe={}, probed={},
                   probe_asks=set(), probe_sent=set(), probe_ok={}, probe_served=lazy2(false),
@@ -1396,6 +1397,9 @@ class Node:
 
         def node_id(p):
             return node.sim.peer_id(p)
+
+        def own_id():                                   # protocol-v2.md §3's helper: the node's own id
+            return node.sim.peer_id(node.id)
 
         def in_pushers(T, fam, col):
             return [q for q in node.peers if col in ns["push_in"][q][T][fam]]
@@ -1921,7 +1925,7 @@ class Node:
         ns["claims_close"](q)
         if getattr(self, "alarm_close", None):      # --alarm-wait: the alarm's asks to q not yet written are settled
             self.alarm_close(q)
-        for name in ("holders", "standing"):
+        for name in ("holders", "standing", "routed_standing"):
             for idx in ns[name].values():
                 for s in idx.values():
                     s.discard(q)

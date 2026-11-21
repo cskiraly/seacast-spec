@@ -479,6 +479,7 @@ tried: Dict[Ask, Dict[PeerId, float]]
 asked_at: Dict[Ask, float]
 park: Dict[PeerId, Dict[GroupId, float]]
 standing: Dict[GroupId, Dict[int, Set[PeerId]]]       # new: WANTs for chunks we do not hold yet (§4.10)
+routed_standing: Dict[GroupId, Dict[int, Set[PeerId]]]   # new: those a routed request made (§4.5's exemption)
 sampled_from: Dict[BlockId, Set[PeerId]]              # new: the peers asked for a sample of a block, one each (I6) [D12]
 samples_in_flight: Dict[BlockId, int]                 # new: our second-phase sample asks in flight
 held_samples: Dict[BlockId, List[Tuple[GroupId, int]]]   # new: second-phase asks waiting for room
@@ -536,7 +537,8 @@ is bounded (§6.3).
 **Helpers not written out**, beyond `protocol.md` §8.1's, are these: `type_of_group(g)` (the object
 type a group id names), `links(T)` (the peers with a JOIN for `T` both ways: theirs received, ours
 queued rather than owed, §4.1), `our_join(T)` (the JOIN the node sends for `T`: its interest,
-custody count, duty and `M`, §1.2), `joined_types()`, `node_id(p)`, `in_pushers(T, fam, c)` and
+custody count, duty and `M`, §1.2), `joined_types()`, `node_id(p)`, `own_id()` (the node's own id),
+`in_pushers(T, fam, c)` and
 `out_pushees(T, fam, c)` (the peers whose relation holds that colour), `candidates(T, fam, c, d)`
 (joined peers with duty whose interest holds the family, by `link_cover`; not yet in the relation of
 colour `c` and direction `d`, with `BOTH` in neither; with no GRAFT of ours for it unanswered; and
@@ -1122,6 +1124,7 @@ def on_header_validated(root):                       # (P2) a block's cell heade
         del tied[root][p]; tie_slot.pop((root, p), None)          #   the root: its tie's slot goes too (§8.1)
     if not tied[root]: tied.pop(root, None)
     for g in groups:                                  # every column and row group of the block
+        drop_outside(g)                               # §4.5: the asks that came before the header, tested now
         for a in ledger(g): retry_offer(a)            # offered meanwhile, or released, asked for now (v0.5 §4.4)
 ```
 
@@ -1340,6 +1343,8 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
     for a in asks:
         gi = group_index(a)
         if gi and expired(gi.group): continue          # past its active lifetime: ignored, no penalty
+        if (gi and outside(p, gi.group, gi.index, gi.hops > 0)   # §4.5: not ours to serve p: ignored, with no
+                and not peer_has[p][gi.group].has(gi.index)): continue   #   penalty and no state (p's claim: below)
         declared = gi and join_recv[p][type_of_group(gi.group)].interest == DECLARED
         if declared:                                   # its WANT is its interest (§1.2)
             want_p[p][gi.group] = want_p[p].get(gi.group, EMPTY) | bitmap({gi.index})
@@ -1357,6 +1362,7 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
             elif (gi and (declared or gi.standing)     #   whether it came before the probe or after it
                   and probe_waiting[gi.group].get(p) != gi.index):
                 standing[gi.group][gi.index].add(p)    # §4.10: answered when the chunk arrives
+                if gi.hops > 0: routed_standing[gi.group][gi.index].add(p)   # §4.5: kept apart for the test
             if gi and gi.hops > 0: route_want(p, gi.group, gi.index, gi.hops)   # §4.10: one step on
             continue
         if mid in unwanted[p] and not flagged: continue    # (R5) nor does a receipt of p's stop the probe's answer
@@ -1401,6 +1407,25 @@ def may_be_asked(p, g, i, routed=False) -> bool:       # (P7) scoring reads inte
     T = type_of_group(g)
     return (offered_us(p, g, i) or interest_of_peer(p, g).has(i) or peer_has[p][g].claim_all
             or routed and join_recv[p][T].duty == FORWARD)   # [D12] a routed request may go to any forwarding node
+
+def outside(p, g, i, routed) -> bool:                  # §4.5: may_be_asked as p reads us is false, once we can tell:
+    T = type_of_group(g)                               #   the gate is open, so our interest in g is known
+    if not authenticable(g) or g in origin or mine[g].has(i): return False   # held, or claimed whole (decoding)
+    if routed and join_sent[p][T].duty == FORWARD: return False   # [D12] a routed request to a forwarding node
+    return not our_interest_for(p, g).has(i)           # never offered: an offer names only what we hold
+
+def our_interest_for(p, g) -> Bitmap:                  # §4.5: our interest in g as we declared it to p
+    T = type_of_group(g); j = join_sent[p][T]
+    if j.interest == ALL: return EVERY_INDEX
+    if j.interest == DERIVED: return T.derived_interest(g, hdr.get(g), own_id(), j)
+    return EMPTY                                       # DECLARED: a sampler is asked only for what it holds
+
+def drop_outside(g):                                   # §4.5: what came before the gate, tested once it opens: a
+    for i in list(standing[g]):                        #   standing request, and the index a DECLARED peer's WANT
+        for q in [q for q in standing[g][i] if outside(q, g, i, q in routed_standing[g][i])]:   # added to its
+            standing[g][i].discard(q); routed_standing[g][i].discard(q)                         #   interest
+    for q in [q for q in want_p if g in want_p[q]]:
+        want_p[q][g] = want_p[q][g] & ~bitmap({i for i in want_p[q][g] if outside(q, g, i, False)})
 ```
 
 **A node serves what it holds**, received or rebuilt, to anyone who asks, within the serving limit
@@ -1418,6 +1443,25 @@ claimant still decoding also keeps the probe of its claim (`probe_waiting`, §4.
 request is answered when the chunk is stored, received or rebuilt (`serve_standing`, from `fill`
 and `decode_group`). Standing requests live with the group's state (`GROUP_TTL`) and count against
 the serving limit when answered.
+
+**An ask outside what a node serves is ignored** once the group's gate is open (`outside`; the gate
+is `authenticable`, §4.2). Such an ask is for an index the node does not hold, outside its interest
+as it declared it to the asker (`our_interest_for`, from `join_sent[p][T]`), in a group it has not
+claimed whole, and it is not a routed request to a node whose duty towards the asker is `FORWARD`
+(`[D12]`). The node answers nothing, keeps no standing request and no bit of a `DECLARED` peer's
+interest for it, and does not penalise the asker. An offer names only what the node holds, and its
+holdings only grow within the group's lifetime, so the test needs no record of the node's offers. A
+node that claimed the group whole and is still decoding holds every index in `mine`. An ask that
+comes before the gate is kept as any ask is, and tested when the gate opens (`drop_outside`, from
+`on_header_validated`); a routed one is kept apart (`routed_standing`), so that the test still
+exempts it. An ask for an index the asker itself claimed is penalised as before.
+- *Why no penalty.* The asker's view can lag the node's honestly: a header the asker holds first, a
+  JOIN or an offer in flight. In the toy's custody runs with samplers, the asks a strict test would
+  call outside were all such races: a sampler's standing WANT reaching a custodian before the
+  custodian had validated the header, for a column it custodies (protocol-v2-figures.md, §4.5). The
+  rule therefore ignores without penalty, and tests what came before the gate once the gate opens.
+  Without the rule, such an ask kept a standing request, or a bit of a `DECLARED` peer's interest,
+  that the node could never answer until `GROUP_TTL`: a table any peer could grow.
 
 **A routed sample request** (a WANT with `hops` above zero, §4.10) may also go to a peer with duty
 `FORWARD` that neither offered the index nor custodies it `[D12]`. That peer answers it from what it
