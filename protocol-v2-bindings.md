@@ -528,9 +528,10 @@ control, and priorities between streams.
   libp2p. Three models are considered:
   1. *Beside libp2p, on libp2p's port.* The native connection shares the UDP port of libp2p's QUIC
      transport, and the ALPN tells the two apart. libp2p's peer choice, gating, scoring and identity
-     are reused. Dialed from libp2p's listening socket, the native connection is one flow with
-     libp2p's at the host's queue; dialed from a socket of its own, it is a flow of its own, even on
-     the shared port. The rest of this section is written in this model.
+     are reused. If the native connection is dialed from libp2p's listening socket, the host's
+     queue sees it and libp2p's connection as one flow. If it is dialed from a socket of its own,
+     it is a flow of its own, even on the shared port. The rest of this section is written in this
+     model.
   2. *Beside libp2p, on a port of its own.* A new ENR field gives the port, and the native
      connection is a flow of its own at the host's queue.
   3. *Alone, with no libp2p.* The binding must then define who counts as a peer (its limits and
@@ -540,9 +541,9 @@ control, and priorities between streams.
   (quic-go behind Linux's `fq_codel`), two QUIC connections dialed from one UDP socket were one
   flow, and a connection dialed from a socket of its own was a flow of its own. In the toy, behind
   a fair queue, a flow of its own let the node's other messages wait less behind SEACAST's chunks,
-  at no measurable cost to SEACAST, and a strict ranking of either flow over the other starved the
-  lower one. Neither finding chooses a model. In every model, the ALPN, the link's open and close,
-  the stream credit and the streams (§7.2) are as this section gives them.
+  at no measurable cost to SEACAST, and strict priority for either flow starved the other. Neither
+  finding chooses a model. In every model, the ALPN, the link's open and close, the stream credit
+  and the streams (§7.2) are as this section gives them.
 
 ### 7.2 The streams
 
@@ -567,12 +568,12 @@ control, and priorities between streams.
   that ends before a whole message, is a violation: the receiver penalises the peer and closes the
   connection.
 - **Chunks before the JOIN.** A receiver reads a chunk stream's kind and group, and reads the rest
-  only once it has read the peer's JOIN for the group's object type. Until then the stream waits
-  unread, and what has arrived of it stays within the stream credit the receiver granted (§7.1). On
-  a connection opened for a fetch, the client reads the answer without a JOIN (§7.6).
+  only once it has read the peer's JOIN for the group's object type. Until then the rest of the
+  stream waits unread, and the stream credit the receiver granted caps how much of it can arrive
+  (§7.1). On a connection opened for a fetch, the client reads the answer without a JOIN (§7.6).
 - **The order.** Messages on the control stream arrive in the order written. A chunk stream is not
-  ordered with any other stream: a chunk can arrive before or after the control messages written
-  before or after it.
+  ordered with any other stream: a chunk can arrive ahead of a control message written before it,
+  or behind one written after it.
 - **The writer and the transport.** A writer writes one chunk stream at a time, and starts the next
   when the last write has returned. This keeps `protocol.md` §7.3's rule (less than one chunk
   unsent per connection) as one stream per peer keeps it.
@@ -600,9 +601,9 @@ control, and priorities between streams.
 - **The control stream goes first.** Where the QUIC implementation lets a sender order its streams
   (RFC 9000 §2.3 recommends that implementations offer this), a node gives its control stream a
   higher priority than its chunk streams. A holding, an offer or an ask written while a chunk is
-  being sent then goes ahead of the chunk's remaining bytes, behind what is already queued on the
-  control stream and within that stream's flow-control credit. This is the urgent lane at the
-  transport, beside the writer's (`protocol-v2.md` §4.12).
+  being sent then goes ahead of the chunk's remaining bytes, as far as the control stream's
+  flow-control credit allows. It still follows whatever is already queued on the control stream.
+  This is the urgent lane at the transport, beside the writer's (`protocol-v2.md` §4.12).
 - **Without priorities,** the implementation's own sharing between streams applies. With streams
   taking turns per packet, a control message still waits about one packet rather than the rest of
   a chunk.
@@ -638,16 +639,17 @@ Datagrams count against the connection's congestion window like any data (RFC 92
 
 ### 7.7 What it gives up and adds
 
-In `protocol-v2.md` §7's table, the native binding has a column of its own. It is the libp2p stream
-binding's, with three changes:
+In `protocol-v2.md` §7's table, the native binding has a column of its own. It matches the libp2p
+stream binding's column, with three changes:
 - **the urgent lane at the transport:** yes, where the implementation orders streams (§7.4);
 - **a frame:** one message, as on the libp2p stream binding; a chunk's frame is its stream;
 - **how a cell's header travels:** as on the libp2p stream binding, with form (c) on the control
   stream (§7.2).
 
-The binding also adds three rows to that table: a chunk ordered with the messages written before
-and after it (no, §7.2); a written chunk cancelled (yes, by a reset of its stream, §7.3); and a lost
-packet holding up only the streams whose bytes it carried (yes).
+The binding also adds three rows to that table. Its own answers are these:
+- **a chunk ordered with the messages written before and after it:** no (§7.2);
+- **a written chunk can be cancelled:** yes, by a reset of its stream (§7.3);
+- **a lost packet holds up only the streams whose bytes it carried:** yes.
 
 ### 7.8 What it needs from QUIC
 
