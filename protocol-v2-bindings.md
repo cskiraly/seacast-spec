@@ -1,10 +1,10 @@
-# SEACAST's next version (draft): its bindings
+# SEACAST's next version: its bindings
 
-> **DRAFT.** This document is a companion of [`protocol-v2.md`](protocol-v2.md), released with it.
+> This document is a companion of [`protocol-v2.md`](protocol-v2.md), released with it.
 > SEACAST's message encoding and the libp2p stream and Waggle bindings are defined to the byte
 > (§1 to §3); the two bindings onto gossipsub's wires are defined to the field (§4, §5), and the
-> gossipsub binding's extra fields are defined to the byte. The draft is checked in the toy only:
-> no client speaks these bytes yet.
+> gossipsub binding's extra fields are defined to the byte. The bindings are checked in the toy
+> only: no client speaks these bytes yet, and they are not model-checked.
 
 *This document was written on 2026-11-17 from `protocol-v2.md` §7 of that date, which it takes
 over whole, and from the bytes of SEACAST's message encoding and of the libp2p stream and Waggle

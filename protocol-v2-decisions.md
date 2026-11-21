@@ -1,4 +1,4 @@
-# SEACAST's next version (draft): its decisions
+# SEACAST's next version: its decisions
 
 This is the decision record of [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next
 version (v2). It lists the design decisions `[D1]` to `[D12]` and the others that the draft took:

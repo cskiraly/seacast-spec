@@ -1,4 +1,4 @@
-# SEACAST's next version (draft): its figures
+# SEACAST's next version: its figures
 
 This file holds the figures behind [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next
 version, and behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).

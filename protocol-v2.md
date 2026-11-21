@@ -1,6 +1,6 @@
-# SEACAST's next version (draft): the protocol on its own notions
+# SEACAST's next version: the protocol on its own notions
 
-> **DRAFT.** Its decisions are taken (§8). It is checked in the toy only; no client runs it, and
+> This document's decisions are taken (§8). It is checked in the toy only; no client runs it, and
 > the research harness's simulations ran only designs that it contains as settings (§6.2). It is
 > not model-checked, except that §4.1's JOIN and answered GRAFT (messages defined in §2) were
 > checked exhaustively for one link and one relation in small bounds.

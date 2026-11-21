@@ -559,7 +559,7 @@ fixed in `protocol.md` since the window is v0.3's:
 
 ## The next version (`--doc v2`)
 
-*The next version is a draft, checked in this toy only (its banner). Figures below from fewer than ten
+*The next version is checked in this toy only (its banner). Figures below from fewer than ten
 seeds, a single seed unless stated, are toy checks of a mechanism, not measurements. Those of runs
 with a payload (tier 4, variant C) were recorded before 2026-10-23, under the descriptor's group id
 as the payload's name; under the group's key their exact values move as any renaming's do

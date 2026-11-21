@@ -12,7 +12,7 @@ names how SEACAST diffuses.
   chunks), and the chunks spread by push and pull, which tier 4 guides with HAVE bitmaps. The
   document covers every tier. The wire is specified to the field; byte-exact layouts follow later.
   Its §0 says how to read it.
-- [`protocol-v2.md`](protocol-v2.md): **a draft** of SEACAST's next version, the protocol on its own
+- [`protocol-v2.md`](protocol-v2.md): **SEACAST's next version**, the protocol on its own
   notions: object types, interest and duty, push and announce relations per family and colour, one
   HAVE and one WANT per link and group, claims, and repair as one rule with parameters. It contains
   `protocol.md` as one setting (but for a source with no mesh peer, its §6.1), and variant C,
@@ -107,7 +107,8 @@ names how SEACAST diffuses.
 - **Each measurement says which code it ran.** The SEACAST post's figures ran on a research
   implementation; `protocol.md` §9 lists where it does as this text does and where it does not, and
   each results record names its code.
-- **SEACAST's next version is a draft**, `protocol-v2.md` (above), checked in the toy only.
+- **SEACAST's next version**, `protocol-v2.md` (above), is checked in the toy only, and no client
+  runs it yet.
 - **What the checks show.** How the toy, the Quint model, the Veil proofs and the Lean twin fit
   together, and what each shows at this commit:
   [`formal/README.md`](formal/README.md#how-the-checks-fit-together).

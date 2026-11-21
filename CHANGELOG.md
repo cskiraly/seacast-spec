@@ -45,6 +45,8 @@ binding's extra fields to the byte; its files are rewritten in plain sentences.
   the strings for cell groups and the versions written.
 
 ### Changed
+- `protocol-v2.md` and its bindings, decisions and figures: no longer labelled draft; their opening
+  notes say they are checked in the toy only and that no client runs them yet.
 - `protocol-v2-bindings.md`: the bindings are named by their carriers (libp2p stream, Waggle,
   gossipsub, partial messages), each in a section of its own; `protocol-v2.md` cites them so.
 - `protocol-v2-bindings.md` §4: EVIDENCE is reserved on the gossipsub binding.
