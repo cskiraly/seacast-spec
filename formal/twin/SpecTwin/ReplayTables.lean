@@ -101,8 +101,9 @@ def cell (table : String) (path : Json) : Except String Cell := do
   | "forwarded", #[p] => return .forwarded (← nat p)
   | _, _ => throw s!"not an entry of §6.1's tables: {table}{path.compress}"
 
-/-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. -/
-def val (c : Cell) (j : Json) : Except String (Option Val) := do
+/-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the
+document whose forms a lane and a peer's holding take (`laneEntries`, `haveEntry`). -/
+def val (c : Cell) (j : Json) (f : Form := .v1) : Except String (Option Val) := do
   if j == .null then return none
   match c with
   | .askedAt _ | .tried .. | .promise .. | .park .. | .sent _ | .backoff .. | .knownAt _ | .reconsiderAt _ | .dutyAt _ => return some (.time (← bits64 j))
@@ -127,14 +128,14 @@ def val (c : Cell) (j : Json) : Except String (Option Val) := do
   | .heldBack _ => return some (.key (← key j))
   | .state _ => return some (.state (← groupState j))
   | .tied .. | .owed .. => return some (.bits (← nat j))
-  | .queue .. => return some (.lane (← laneEntries j))
+  | .queue .. => return some (.lane (← laneEntries j f))
   | .pending _ =>
     let l ← waitList j
     if l.isEmpty then throw "an empty list of waits as a value"
     return some (.waits l)
   | .tieSlot .. | .probe _ | .probed _ | .probeWaiting .. => return some (.slot (← nat j))
   | .slotHeld _ | .stopPull _ | .deferred _ | .waited _ | .rsampleFinal _ => if j == .bool true then return some .flag else throw s!"not a set's member: {j.compress}"
-  | .peerHas .. => return some (.have (← haveEntry j))
+  | .peerHas .. => return some (.have (← haveEntry j f))
   | .paceQueue _ =>
     let l ← jobList j
     if l.isEmpty then throw "an empty pace queue as a value"

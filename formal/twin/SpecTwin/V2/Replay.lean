@@ -17,9 +17,13 @@ import SpecTwin.V2.Kept
   its question, and a `sample_without_replacement` answer k distinct members.
 - **The orders.** An `order` or `keys` answer must be a permutation of the members the twin computed
   (`Replay.permOf`).
+- **The values.** A record's values are read in protocol-v2.md's forms (`docV2`, `Form.v2`): `peer_has`'s entry
+  with its two claims, and a lane's controls with v2's IWANT, holdings and relation controls. Each position has
+  one codec, injective there. An IWANT that `protocol.md`'s code enqueues on its own reads into `Msg.iwant`, and
+  `respond`'s entry, whose IWANT a lane holds as `.iwantV2`, is built so by its v2 form.
 - **The functions.** `runV2` runs v2's 68 functions by their Python names, hands a record of one of
-  `protocol.md`'s functions that v2 keeps (`keptV2`) to `Replay.run`, runs the two of them that call v2's
-  functions (`keptFormsV2`) in their v2 forms (`V2/Kept.lean`), and refuses every other name,
+  `protocol.md`'s functions that v2 keeps (`keptV2`) to `Replay.run`, runs the three that take another form under
+  v2 (`keptFormsV2`) in their v2 forms (`V2/Kept.lean`), and refuses every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
@@ -115,11 +119,6 @@ def haveOf (j : Json) : Except String Have := do
   return { group := ← Replay.groupKey g, bits := ← nat b, offer := ← boolOf o, claimAll := ← boolOf ca,
            complete := ← boolOf c }
 
-/-- An ask with its flags: `[key, standing, hops, probe]`. -/
-def askV2Of (j : Json) : Except String AskV2 := do
-  let #[k, s, h, p] ← j.getArr? | throw s!"not an ask with its flags: {j.compress}"
-  return { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
-
 /-- A record of a node or a link: `families`, and `id` and `high` where it has them; no other field. -/
 def coverOf (j : Json) : Except String Cover := do
   let .ok kvs := j.getObj? | throw s!"not a record of a node: {j.compress}"
@@ -127,6 +126,81 @@ def coverOf (j : Json) : Except String Cover := do
     throw s!"not a field of a node's record: {f}"
   let some fs := field j "families" | throw s!"a node's record without its families: {j.compress}"
   return { id := ← (field j "id").mapM nat, families := ← famsOf fs, high := ← (field j "high").mapM boolOf }
+
+/-- A failure in reading type `t`'s parameter `name`, which its message then starts with. -/
+def inParam {α} (t : TypeId) (name : String) (x : Except String α) : Except String α :=
+  x.mapError (s!"types: {t}: {name}: " ++ ·)
+
+/-- A type parameter's float: its 64-bit word, finite, where `inf` lets the word of +∞ through, as a limit's
+none. -/
+def paramFloat (inf : Bool) (j : Json) : Except String Float := do
+  match inf, j.getNat? with
+  | true, .ok 9218868437227405312 => return Float.ofBits 9218868437227405312
+  | _, _ => return Float.ofBits (← bits64 j)
+
+def announceWidthOf : Json → Except String AnnounceWidth
+  | .str "ALL_JOINED" => pure .allJoined
+  | .str "SAMPLE" => pure .sample
+  | .str "NONE" => pure .none
+  | j => throw s!"not an announce width: {j.compress}"
+
+/-- One type's parameters in a nodes entry's `types` map, `{NAME: value, ...}` (`TypeParams`). A natural number is
+not negative, and `M` is not 0. A boolean is JSON's. A float is its 64-bit word and finite, and `SERVE_LIMIT` and
+`FORWARD_LIMIT` may be +∞. `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"` and `"NONE"`. `EVIDENCE` is present
+only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`. A parameter the type does not have is left out, and
+its read is the toy's `AttributeError`; a missing member and `null` differ. -/
+def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
+  let .ok kvs := j.getObj? | throw s!"types: {t}: not a map of parameters: {j.compress}"
+  let mut p : TypeParams := {}
+  for name in kvs.keys do
+    let some v := field j name | throw s!"types: {t}: {name}: no value"
+    let n : Except String Nat := inParam t name (nat v)
+    let b : Except String Bool := inParam t name (boolOf v)
+    let x (inf : Bool) : Except String Float := inParam t name (paramFloat inf v)
+    match name with
+    | "M" =>
+      let m ← n
+      if m == 0 then throw s!"types: {t}: M: 0, where a type has at least one chunk"
+      p := { p with M := some m }
+    | "F_LO" => p := { p with F_LO := some (← n) }
+    | "F_HI" => p := { p with F_HI := some (← n) }
+    | "D_OUT" => p := { p with D_OUT := some (← n) }
+    | "D_OUT_FAST" => p := { p with D_OUT_FAST := some (← n) }
+    | "D_OUT_MAX" => p := { p with D_OUT_MAX := some (← n) }
+    | "SAMPLE_OUTSTANDING" => p := { p with SAMPLE_OUTSTANDING := some (← n) }
+    | "SAMPLE_COVER" => p := { p with SAMPLE_COVER := some (← n) }
+    | "COVER_HIGH" => p := { p with COVER_HIGH := some (← n) }
+    | "ROUTE_HOPS" => p := { p with ROUTE_HOPS := some (← n) }
+    | "SYMMETRIC" => p := { p with SYMMETRIC := some (← b) }
+    | "EAGER" => p := { p with EAGER := some (← b) }
+    | "REPAIR_BUDGET" => p := { p with REPAIR_BUDGET := some (← b) }
+    | "REPAIR_REASK" => p := { p with REPAIR_REASK := some (← b) }
+    | "PRUNE_BACKOFF" => p := { p with PRUNE_BACKOFF := some (← x false) }
+    | "START_DELAY" => p := { p with START_DELAY := some (← x false) }
+    | "SAMPLE_RETRY" => p := { p with SAMPLE_RETRY := some (← x false) }
+    | "SAMPLE_RETRY2" => p := { p with SAMPLE_RETRY2 := some (← x false) }
+    | "DEFER_WINDOW" => p := { p with DEFER_WINDOW := some (← x false) }
+    | "SAMPLE_WAIT" => p := { p with SAMPLE_WAIT := some (← x false) }
+    | "SERVE_LIMIT" => p := { p with SERVE_LIMIT := some (← x true) }
+    | "FORWARD_LIMIT" => p := { p with FORWARD_LIMIT := some (← x true) }
+    | "ANNOUNCE_EXTRA" => p := { p with ANNOUNCE_EXTRA := some (← inParam t name (announceWidthOf v)) }
+    | "EVIDENCE" =>
+      if v != .null then throw s!"types: {t}: EVIDENCE: present only as null in this version: {v.compress}"
+      p := { p with EVIDENCE := some none }
+    | "REPAIR_SAMPLE" =>
+      p := { p with REPAIR_SAMPLE := some (← inParam t name (optOf (pairs "repair step" nat nat) v)) }
+    | _ => throw s!"types: {t}: not a type parameter: {name}"
+  return p
+
+/-- A nodes entry's `types` map, `{T: {NAME: value, ...}, ...}`: the parameters of each type that
+`type_of_group` can answer at the node, the payload's always. -/
+def typesOf (j : Json) : Except String (List (TypeId × TypeParams)) := do
+  let .ok kvs := j.getObj? | throw s!"types: not a map of types: {j.compress}"
+  let l ← kvs.keys.mapM fun t => do
+    let some v := field j t | throw s!"types: {t}: no value"
+    return (← typeId (.str t), ← typeParamsOf t v)
+  if !l.any (·.1 == "payload") then throw s!"types: no payload type: {j.compress}"
+  return l
 
 def repairVerdictOf : Json → Except String RepairVerdict
   | .str "REPAIRED" => pure .repaired
@@ -213,7 +287,7 @@ def raisesKeyV2 (j : Json) : Except String String :=
   | j => do return toString (← intOf j)
 
 /-- How a record of a trace under protocol-v2.md is read. -/
-def docV2 : Doc := { entry := entryV2, raisesKey := raisesKeyV2 }
+def docV2 : Doc := { entry := entryV2, raisesKey := raisesKeyV2, form := .v2 }
 
 /-! ## Answering v2's questions from the tape -/
 
@@ -387,9 +461,10 @@ def keptV2 : List String :=
    "owe", "parked", "promise_due", "rarest", "retry_offer", "segment_length", "tie", "tie_room", "tied_to_root",
    "untried", "valid_descriptor", "validate_chunk", "held"]
 
-/-- The functions of `protocol.md` that a record under v2 may name and that call a name v2 redefines: the replay
-serves them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`. -/
-def keptFormsV2 : List String := ["on_pace_tick", "on_block_installed"]
+/-- The functions of `protocol.md` that a record under v2 may name and that take another form under v2: the two
+that call a name v2 redefines, and `respond`, whose IWANT a record under v2 writes in v2's form. The replay serves
+them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`, also where `keptV2` names them. -/
+def keptFormsV2 : List String := ["on_pace_tick", "on_block_installed", "respond"]
 
 set_option maxHeartbeats 1600000 in
 /-- What one replayed record of a trace under protocol-v2.md gives: the branches it took and how many of the
@@ -398,7 +473,7 @@ Python's reads the twin did not make, or the first difference. `params` are the 
 def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (replaced traced : List String)
     (r : Record) (rowReads : List String := []) : Except String (Array String × Nat) := do
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
-  if keptV2.contains r.fn then return ← run c replaced traced r rowReads
+  if keptV2.contains r.fn && !keptFormsV2.contains r.fn then return ← run c replaced traced r rowReads .v2
   let ctx : Ctx2 := { base := { c, now := Float.ofBits r.t, replaced }, c2, params }
   let rs0 : RSt := { tape := r.tape, twin := ← load r, rowReads }
   let exec {α} (x : M2 R α) (ok : α → Except String Bool) : Except String (Except String (State × Bool) × RSt) := do
@@ -473,7 +548,7 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "decode_group", #[g] => do exec (decodeGroup (← Replay.groupKey g)) none_
     | "claims_close", #[p] => do exec (claimsClose (← nat p)) none_
     | "note_claim", #[p, g] => do exec (noteClaim (← nat p) (← Replay.groupKey g)) none_
-    | "filter_entry", #[p, e] => do exec (filterEntry (← nat p) (← qentry e)) (retIs r.ret (optOf qentry))
+    | "filter_entry", #[p, e] => do exec (filterEntry (← nat p) (← qentry e .v2)) (retIs r.ret (optOf (qentry · .v2)))
     -- forward, §4.2's chunk, §4.3's holding and offer
     | "forward", #[f, p] => do exec (forward (← chunkF f) (← nat p) none) none_
     | "forward", #[f, p, axes] => do exec (forward (← chunkF f) (← nat p) (← optOf giList axes)) none_
@@ -484,7 +559,7 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "on_offer", #[p, h] => do exec (onOffer (← nat p) (← haveOf h)) fun v => do return v == (← (← arr r.ret).mapM key)
     -- §4.10, §4.12, §4.13
     | "ask_scale", #[] => do exec askScale fun v => do return v.toBits == (← bits64 r.ret)
-    | "own_chunk", #[e] => do exec (ownChunk (← qentry e)) (retIs r.ret boolOf)
+    | "own_chunk", #[e] => do exec (ownChunk (← qentry e .v2)) (retIs r.ret boolOf)
     | "pick", #[q, ks] => do exec (pick (← nat q) (← natList ks)) (retIs r.ret nat)
     | "choose", #[q] => do exec (choose (← nat q)) (retIs r.ret nat)
     | "ask_sample", #[g, i] => do exec (askSample (← Replay.groupKey g) (← nat i) false) none_
@@ -495,6 +570,8 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     -- protocol.md's two that call v2's functions, in their v2 forms
     | "on_pace_tick", #[] => do exec onPaceTick none_
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_
+    | "respond", #[p, asks, answers, prunes] => do
+      exec (V2.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkF) (← nat prunes)) none_
     | f, _ => throw s!"not a function of the twin under protocol-v2.md, or not its arguments: {f}"
   judge traced r res rs
 

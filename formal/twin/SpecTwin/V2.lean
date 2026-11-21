@@ -11,6 +11,7 @@ import SpecTwin.V2.Kept
 import SpecTwin.V2.Replay
 import SpecTwin.V2.ReplayKnown
 import SpecTwin.V2.KeptKnown
+import SpecTwin.V2.FormsKnown
 
 /-! # The twin of protocol-v2.md: its modules
 

@@ -181,36 +181,11 @@ def laneName (j : Json) : Except String Lane :=
   | .str "normal" => pure .normal
   | _ => throw s!"not a lane: {j.compress}"
 
-/-- A control message of a queue entry: `[kind, ids]`. A PRUNE has no ids in the toy's runs; a GRAFT, a JOIN, a PRUNE
-with ids, or another kind is not one the record can hold. -/
-def ctl (j : Json) : Except String Ctl := do
-  match ← j.getArr? with
-  | #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
-  | #[.str "ihave", ids] => return .ihave (← (← arr ids).mapM ihaveEntry)
-  | #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM ihaveEntry)
-  | #[.str "prune", .arr #[]] => return .prune
-  | _ => throw s!"not a control message of a queue entry: {j.compress}"
-
-/-- A queue entry: `[chunk or null, control or null, solicited]`. -/
-def qentry (j : Json) : Except String QEntry := do
-  let #[c, ctrl, .bool sol] ← j.getArr? | throw s!"not a queue entry: {j.compress}"
-  let chunk ← if c == .null then pure none else some <$> chunkF c
-  let control ← if ctrl == .null then pure none else some <$> (← arr ctrl).mapM ctl
-  return { chunk, control, solicited := sol }
-
-/-- A lane's value: its entries, in order. -/
-def laneEntries (j : Json) : Except String (List QEntry) := do (← arr j).mapM qentry
-
 /-- A root's waiting copies (`pending[root]`): `[[peer, chunk], ...]`, in order. -/
 def waitList (j : Json) : Except String (List (Peer × ChunkF)) := do
   (← arr j).mapM fun e => do
     let #[p, f] ← e.getArr? | throw s!"not a waiting copy: {e.compress}"
     return (← nat p, ← chunkF f)
-
-/-- An entry of `peer_has` (§4.3): `[bits, ttl]`. -/
-def haveEntry (j : Json) : Except String HaveEntry := do
-  let #[b, t] ← j.getArr? | throw s!"not an entry of peer_has: {j.compress}"
-  return { bits := ← nat b, ttl := ← nat t }
 
 /-- An entry of `pushed` (§5.2): `[bits, the first push's time as its 64 bits or null, ttl]`. -/
 def pushEntry (j : Json) : Except String PushEntry := do
@@ -334,5 +309,73 @@ def jobList (j : Json) : Except String (List Job) := do
     return { q := ← nat q, ids, at_ := ← bits64 t }
 
 def sortBy {α} (f : α → α → Bool) (l : List α) : List α := (l.toArray.qsort f).toList
+
+/-! ### Values whose form is the document's: a peer's holding (`peer_has`) and a lane's controls (`queue`) -/
+
+/-- The document whose forms a record's values take: `protocol.md`'s or protocol-v2.md's. Under each, the other's
+forms are refused, as any form the reader does not know is. -/
+inductive Form where
+  | v1
+  | v2
+  deriving BEq, Repr, Inhabited
+
+/-- An ask with its flags: `[key, standing, hops, probe]`. -/
+def askV2Of (j : Json) : Except String AskV2 := do
+  let #[k, s, h, p] ← j.getArr? | throw s!"not an ask with its flags: {j.compress}"
+  return { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
+
+/-- An entry of an IDONTWANT under protocol-v2.md: an id, as an IHAVE's entry is, or a holding,
+`["holding", group, bits, claim_all, complete]`. A bitmap without its claims is refused. -/
+def idontwantV2 (j : Json) : Except String IhaveEntry := do
+  match j with
+  | .arr #[.str "holding", g, b, ca, c] => return .holding (← groupKey g) (← nat b) (← boolOf ca) (← boolOf c)
+  | .arr #[.str "bits", _, _] => throw s!"under protocol-v2.md an IDONTWANT's bitmap is a holding: {j.compress}"
+  | j => ihaveEntry j
+
+/-- A control message of a queue entry.
+- Under `protocol.md`: `[kind, ids]`. A PRUNE has no ids in the toy's runs; a GRAFT, a JOIN, a PRUNE with ids, or
+  another kind is not one the record can hold.
+- Under protocol-v2.md: an IWANT is `["iwant", [ask, ...], want]`, each ask with its flags, whatever its mark and
+  flags. An IHAVE is as under `protocol.md`. An IDONTWANT's bitmaps are holdings. A JOIN, a GRAFT or a PRUNE of
+  v2 is `[kind, [message]]`, with one message, of that kind. gossipsub's PRUNE stays `["prune", []]`. -/
+def ctl (j : Json) (f : Form := .v1) : Except String Ctl := do
+  match f, ← j.getArr? with
+  | .v1, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
+  | .v2, #[.str "iwant", asks, w] => return .iwantV2 (← boolOf w) (← (← arr asks).mapM askV2Of)
+  | .v2, #[.str "iwant", _] => throw s!"under protocol-v2.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
+  | _, #[.str "ihave", ids] => return .ihave (← (← arr ids).mapM ihaveEntry)
+  | .v1, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM ihaveEntry)
+  | .v2, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM idontwantV2)
+  | _, #[.str "prune", .arr #[]] => return .prune
+  | .v2, #[.str k, .arr ms] =>
+    if !["join", "graft", "prune"].contains k then throw s!"not a control message of a queue entry: {j.compress}"
+    let #[m] := ms | throw s!"a relation control holds one message: {j.compress}"
+    let r ← relation m
+    let kind := match r with | .join _ => "join" | .graft _ => "graft" | .prune _ => "prune"
+    if kind != k then throw s!"a relation control's message is of another kind: {j.compress}"
+    return .relation r
+  | _, _ => throw s!"not a control message of a queue entry: {j.compress}"
+
+/-- A queue entry: `[chunk or null, control or null, solicited]`, its controls in the document's forms. -/
+def qentry (j : Json) (f : Form := .v1) : Except String QEntry := do
+  let #[c, ctrl, .bool sol] ← j.getArr? | throw s!"not a queue entry: {j.compress}"
+  let chunk ← if c == .null then pure none else some <$> chunkF c
+  let control ← if ctrl == .null then pure none else some <$> (← arr ctrl).mapM (ctl · f)
+  return { chunk, control, solicited := sol }
+
+/-- A lane's value: its entries, in order. -/
+def laneEntries (j : Json) (f : Form := .v1) : Except String (List QEntry) := do (← arr j).mapM (qentry · f)
+
+/-- An entry of `peer_has` (§4.3): `[bits, ttl]` under `protocol.md`, and `[bits, ttl, claim_all, complete]` under
+protocol-v2.md, with §1.5's two claims of a holding as JSON booleans. -/
+def haveEntry (j : Json) (f : Form := .v1) : Except String HaveEntry := do
+  match f with
+  | .v1 =>
+    let #[b, t] ← j.getArr? | throw s!"not an entry of peer_has: {j.compress}"
+    return { bits := ← nat b, ttl := ← nat t }
+  | .v2 =>
+    let #[b, t, .bool ca, .bool c] ← j.getArr?
+      | throw s!"not an entry of peer_has under protocol-v2.md, [bits, ttl, claim_all, complete]: {j.compress}"
+    return { bits := ← nat b, ttl := ← nat t, claimAll := ca, complete := c }
 
 end SpecTwin.Replay

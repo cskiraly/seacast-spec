@@ -5,7 +5,8 @@ named differences alone.
 Under protocol-v2.md the Python runs `on_pace_tick` and `on_block_installed` as protocol.md writes them, and they
 call v2's `send_gossip` and `on_validated`, since the Python binds a name when it calls it. The twin binds a name
 when the function is defined, so `V2/Kept.lean` holds a copy of each, written in v2's monad and calling v2's
-functions. This check keeps each copy from drifting from its original.
+functions. It also holds a copy of `respond`, whose IWANT a record under v2 writes in v2's form, so that the copy
+builds v2's constructor. This check keeps each copy from drifting from its original.
 
     python3 keptcopy.py [--twin DIR]     the check: one line per function, then a closing line; exit 0 or 1
     python3 keptcopy.py --self-test      its own cases: each must give the verdict it states
@@ -27,6 +28,7 @@ COPY = "SpecTwin/V2/Kept.lean"
 M2 = "the monad: M2"
 V1 = "a function of protocol.md's Lean, through v1"
 LATE = "a call the Python binds late: v2's function"
+IWANT = "the IWANT it builds: v2's, unmarked, its asks plain"
 
 # the no-bid branch of on_block_installed: today's, never reached under protocol.md, and v2's, which enters ledger
 NOBID_OLD = """\
@@ -64,6 +66,15 @@ FUNCTIONS = {
         (V1, "← ledger g0", "← v1 (ledger g0)", 1),
         (V1, "      retryOffer a\n", "      v1 (retryOffer a)\n", 1),
         ("the no-bid branch: ledger entered", NOBID_OLD, NOBID_NEW, 1),
+    ]),
+    "respond": ("SpecTwin/Sec41.lean", [
+        (M2, "def respond (p : Peer) (asks : List Key) (answers : List ChunkF) (prunes : Nat) : M m Unit",
+         "def respond (p : Peer) (asks : List Key) (answers : List ChunkF) (prunes : Nat) : M2 m Unit", 1),
+        (IWANT,
+         "  let control : Option (List Ctl) := if !asks.isEmpty || prunes > 0 then some [.iwant asks, .prune] else none\n",
+         "  let control : Option (List Ctl) :=\n"
+         "    if !asks.isEmpty || prunes > 0 then some [.iwantV2 false (asks.map fun k => { key := k }), .prune] else none\n",
+         1),
     ]),
 }
 
@@ -126,7 +137,7 @@ def self_test():
         return t
 
     cases = [
-        ("the tree as it is", texts, True, "keptcopy: 3 copies as their originals"),
+        ("the tree as it is", texts, True, "keptcopy: 4 copies as their originals"),
         ("a copy changed in one more place", planted(COPY, 'branch "on_block_installed: a tie released"',
                                                      'branch "on_block_installed: a tie let go"'),
          False, "keptcopy: onBlockInstalled: the copy differs"),

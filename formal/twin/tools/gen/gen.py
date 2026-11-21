@@ -475,14 +475,14 @@ def replay():
         elif kind in ("pbits", "obits"):            # there and empty is 0: a value
             out.append(f"  | {pats} => return some (.bits (← nat j))")
         elif kind == "lane":                        # there and empty is []: a value
-            out.append(f"  | {pats} => return some (.lane (← {v['parse']} j))")
+            out.append(f"  | {pats} => return some (.lane (← {v['parse']} j f))")
         elif kind == "waits":                       # an empty list of waits is no value
             out += [f"  | {pats} =>", f"    let l ← {v['parse']} j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
                     "    return some (.waits l)"]
         elif kind == "slot":
             out.append(f"  | {pats} => return some (.slot (← nat j))")
         elif kind == "have":                        # an entry there with no bit is a value
-            out.append(f"  | {pats} => return some (.have (← {v['parse']} j))")
+            out.append(f"  | {pats} => return some (.have (← {v['parse']} j f))")
         elif kind == "push":                        # an entry there with no bit is a value
             out.append(f"  | {pats} => return some (.push (← {v['parse']} j))")
         elif kind == "desc":                        # a group's descriptor
@@ -826,8 +826,9 @@ def replay_tables_file():
         *r["cell"],
         '  | _, _ => throw s!"not an entry of §6.1\'s tables: {table}{path.compress}"',
         "",
-        "/-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. -/",
-        "def val (c : Cell) (j : Json) : Except String (Option Val) := do",
+        "/-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the",
+        "document whose forms a lane and a peer's holding take (`laneEntries`, `haveEntry`). -/",
+        "def val (c : Cell) (j : Json) (f : Form := .v1) : Except String (Option Val) := do",
         "  if j == .null then return none",
         "  match c with",
         *r["val"],

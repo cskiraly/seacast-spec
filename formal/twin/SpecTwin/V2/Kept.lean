@@ -1,15 +1,18 @@
 import SpecTwin.V2.Announce
 import SpecTwin.V2.Receive
+import SpecTwin.Sec41
 import SpecTwin.Sec42
 import SpecTwin.Sec61
 import SpecTwin.Sec64
 
-/-! # protocol.md's functions that v2 keeps and that call a name v2 redefines
+/-! # protocol.md's functions that v2 keeps, in the forms they take under v2
 
 The Python binds a name when it calls it, so under protocol-v2.md `on_pace_tick` sends v2's gossip and
 `on_block_installed` validates with v2's `on_validated`. The twin binds a name when the function is defined, so
-each of the two has a copy here, in `M2`, that calls v2's. Each copy is its original's text (`Sec64.lean`'s
-`paceTurns` and `onPaceTick`, `Sec42.lean`'s `onBlockInstalled`) with these differences alone, to which
+each of the two has a copy here, in `M2`, that calls v2's. `respond` calls nothing v2 redefines, but the IWANT it
+builds is one a record under v2 writes in v2's form: the toy has one IWANT class, and a lane's IWANT under v2 is
+`.iwantV2`, so its copy builds that constructor. Each copy is its original's text (`Sec64.lean`'s `paceTurns` and
+`onPaceTick`, `Sec42.lean`'s `onBlockInstalled`, `Sec41.lean`'s `respond`) with these differences alone, to which
 `tools/keptcopy.py` holds it:
 
 - The monad is `M2 m`, and `paceTurns` takes protocol.md's context as `(← read).base`.
@@ -19,7 +22,8 @@ each of the two has a copy here, in `M2`, that calls v2's. Each copy is its orig
 - The no-bid branch of `on_block_installed` is reached under v2, for a block of columns. There the Python calls
   `ledger(None)`: it enters `ledger`, asks the connected topic peers, and reads `offered[q][None]` for each,
   which the tracer does not write. No table holds a group of `None`, so the call returns no ask. The copy enters
-  `ledger` and asks the peers. -/
+  `ledger` and asks the peers.
+- `respond`'s IWANT is `.iwantV2 false`, its asks plain, where the original builds `.iwant`. -/
 
 namespace SpecTwin.V2
 
@@ -98,5 +102,26 @@ def onBlockInstalled (root : Root) : M2 m Unit := do
     let _ ← connectedTopicPeers                             --   reads `offered[q][None]`, which the tracer does
     branch "on_block_installed: no group committed"         --   not write; no table holds a group of None, so
                                                             --   it returns no ask
+
+/-- `respond(p, asks, answers, prunes)` under v2: protocol.md's, its IWANT in v2's form -/
+def respond (p : Peer) (asks : List Key) (answers : List ChunkF) (prunes : Nat) : M2 m Unit := do
+  enter "respond"
+  -- `control = IWANT(asks) + PRUNE(prunes) if asks or prunes else None`: an empty part is left out by the queue
+  let control : Option (List Ctl) :=
+    if !asks.isEmpty || prunes > 0 then some [.iwantV2 false (asks.map fun k => { key := k }), .prune] else none
+  if answers.isEmpty then
+    if control.isSome then
+      let _ ← enqueue p (.entry { chunk := none, control, solicited := false }) false
+      branch "respond: control alone"
+    else branch "respond: nothing to ask, answer or prune"
+    return
+  let mut first := true
+  for f in answers do                                       -- one chunk per entry; the control rides on the first
+    let e : QEntry := { chunk := some f, control := if first then control else none, solicited := true }
+    first := false
+    if !(← enqueue p (.entry e) false) then                 -- refused by a full queue: owed, and queued once
+      setOwedAnswers p f.g ((← owedAnswerBits p f.g).set f.i)    --   there is room (§7.2)
+      branch "respond: an answer refused, owed"
+  branch "respond: answers"
 
 end SpecTwin.V2

@@ -131,27 +131,40 @@ structure Record where
 The parsers of keys and of values are `ReplayBase.lean`'s; of an entry, its value and a level, `ReplayTables.lean`'s. -/
 
 /-- A list of footprint entries, each `[table, path, value]`, no entry twice. -/
-def cells (what : String) (j : Json) : Except String (List (Cell × Option Val)) := do
+def cells (what : String) (j : Json) (f : Form := .v1) : Except String (List (Cell × Option Val)) := do
   let l ← (← arr j).mapM fun e => do
     let #[.str table, path, v] ← e.getArr? | throw s!"not an entry of {what}: {e.compress}"
     let c ← cell table path
-    return (c, ← val c v)
+    return (c, ← val c v f)
   nodup what (l.map (·.1))
   return l
 
-def msg (j : Json) : Except String Msg := do
+/-- What an `enqueue` holds, its controls in the document's forms (`f`). Under protocol-v2.md an IWANT enqueued on
+its own is `protocol.md`'s (`retry_offer`, `ask_parked`), since v2's own IWANTs go through `send`. It is written in
+v2's form, unmarked and with plain asks, and is read into `.iwant`, the one constructor in that place; a marked
+IWANT or a flagged ask there is refused. An IDONTWANT of one bitmap has no v2 form here: no function a record
+under v2 names enqueues one. -/
+def msg (j : Json) (f : Form := .v1) : Except String Msg := do
   match ← j.getArr? with
-  | #[.str "entry", q] => return .entry (← qentry q)       -- next_to_send's owed answer, a whole entry
+  | #[.str "entry", q] => return .entry (← qentry q f)     -- next_to_send's owed answer, a whole entry
   | #[.str "chunk", c] => return .chunk (← chunkF c)       -- push_rebuilt's chunk alone
-  | #[e] => match ← e.getArr? with
-    | #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
-    | #[.str "idontwant", .arr #[h]] => match ← ihaveEntry h with    -- one HAVE: a group's whole bitmap (§4.2)
+  | #[e] => match f, ← e.getArr? with
+    | .v1, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
+    | .v2, #[.str "iwant", asks, w] =>
+      if ← boolOf w then throw s!"an IWANT enqueued on its own is protocol.md's, unmarked: {j.compress}"
+      let asks ← (← arr asks).mapM askV2Of
+      if !asks.all fun a => !a.standing && a.hops == 0 && !a.probe then
+        throw s!"an IWANT enqueued on its own is protocol.md's, its asks plain: {j.compress}"
+      return .iwant (asks.map (·.key))
+    | .v2, #[.str "iwant", _] => throw s!"under protocol-v2.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
+    | _, #[.str "idontwant", .arr #[h]] =>                -- one HAVE: a group's whole bitmap (§4.2)
+      match ← (if f == .v1 then ihaveEntry h else idontwantV2 h) with
       | .bitmap g b => return .have g b
       | _ => throw s!"not an IDONTWANT of one bitmap: {j.compress}"
-    | #[.str "ihave", .arr #[h]] => match ← ihaveEntry h with        -- announce's offer, one bitmap (§5.2)
+    | _, #[.str "ihave", .arr #[h]] => match ← ihaveEntry h with      -- announce's offer, one bitmap (§5.2)
       | .bitmap g b => return .ihave g b
       | _ => throw s!"not an IHAVE of one bitmap: {j.compress}"
-    | _ => throw s!"not an IWANT, nor an IDONTWANT or an IHAVE of one bitmap: {j.compress}"
+    | _, _ => throw s!"not an IWANT, nor an IDONTWANT or an IHAVE of one bitmap: {j.compress}"
   | _ => throw s!"not one control message: {j.compress}"
 
 def verdict (j : Json) : Except String Verdict :=
@@ -276,10 +289,12 @@ passes its own (`V2/Replay.lean`).
 - `entry`: a reader of the document's own tape entries, asked first: `some` for an entry it reads, `none` to leave
   the entry to `entry`'s.
 - `raisesKey`: a `KeyError`'s key, as the twin's crash names it. Under `protocol.md` it is a peer, a natural
-  number. -/
+  number.
+- `form`: the forms of its values that depend on the document, a lane's controls and a peer's holding. -/
 structure Doc where
   entry : Json → Option (Except String Entry) := fun _ => none
   raisesKey : Json → Except String String := fun j => do return toString (← nat j)
+  form : Form := .v1
 
 def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
   if let some e := doc.entry j then return ← e
@@ -318,7 +333,7 @@ def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
     if !(xs.length == r.length && xs.all fun a => xs.count a == r.count a) then
       throw s!"shuffled's answer is not a permutation of its question: {j.compress}"
     return .shuffled xs r
-  | "enqueue", #[p, x, u] => return .enqueue (← nat p) (← msg x) (← u.getBool?) (← r.getBool?)
+  | "enqueue", #[p, x, u] => return .enqueue (← nat p) (← msg x doc.form) (← u.getBool?) (← r.getBool?)
   | "valid_have", #[e] => match ← ihaveEntry e with
     | .bitmap g b => return .validHave g b (← r.getBool?)
     | _ => throw s!"valid_have is asked of an IHAVE's bitmap: {j.compress}"
@@ -365,8 +380,8 @@ def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
     let some cw := field o "cw" | throw s!"a call's log without cw: {j.compress}"
     if let .ok kvs := o.getObj? then
       if kvs.size != 2 then throw s!"a call's log with more than cr and cw: {j.compress}"
-    let cr ← cells "cr" cr
-    let cw ← cells "cw" cw
+    let cr ← cells "cr" cr doc.form
+    let cw ← cells "cw" cw doc.form
     if cr.isEmpty && cw.isEmpty then throw s!"a call's log that is empty: {j.compress}"
     return (← entry (.arr a.pop) doc, some { cr, cw })
   | _ => return (← entry j doc, none)
@@ -424,15 +439,15 @@ def record (j : Json) (doc : Doc := {}) : Except String Record := do
   let args ← args.getArr?
   let scans ← (← arr scans).mapM level
   nodup "scans" scans
-  let reads ← cells "reads" reads
+  let reads ← cells "reads" reads doc.form
   -- the rest: entries the call did not read, each with its value before the call
   let some restJ := field j "rest" | throw "no rest"
-  let rest ← (← cells "rest" restJ).mapM fun (c, v) => match v with
+  let rest ← (← cells "rest" restJ doc.form).mapM fun (c, v) => match v with
     | some v => pure (c, v)
     | none => throw s!"an entry of the rest without a value: {reprStr c}"
   if let some (c, _) := rest.find? fun (c, _) => reads.any (·.1 == c) then
     throw s!"an entry both read and in the rest: {reprStr c}"
-  return { n := ← nat n, t := ← bits64 t, fn, args, reads, scans, writes := ← cells "writes" writes, rest,
+  return { n := ← nat n, t := ← bits64 t, fn, args, reads, scans, writes := ← cells "writes" writes doc.form, rest,
            tape := ← (← arr tape).mapM (tapeItem · doc), ret := ret?.getD .null, raises, raisesKey, reached, tables }
 
 /-- What a record's line says, at its very end, of the functions reached and the tables touched: the text after
@@ -935,9 +950,10 @@ def judge (traced : List String) (r : Record) (res : Except String (State × Boo
 
 set_option maxHeartbeats 400000 in
 /-- What one replayed record gives: the branches it took and how many of the Python's reads the twin did not
-make, or the first difference. -/
-def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : List String := []) :
-    Except String (Array String × Nat) := do
+make, or the first difference. `f`: the forms of the entries its arguments and return value hold, the record's
+document's. -/
+def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : List String := [])
+    (f : Form := .v1) : Except String (Array String × Nat) := do
   let ctx : Ctx := { c, now := Float.ofBits r.t, replaced }
   -- a node that runs something else under a traced name has no record of that function
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
@@ -1004,14 +1020,14 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
         let want : Next ← match r.ret with
           | .str "WAIT" => pure .wait
           | .null => pure .nothing
-          | j => .entry <$> qentry j
+          | j => .entry <$> qentry j f
         return v == want
     | "filter_entry", #[p, e] => do
-      exec (filterEntry (← nat p) (← qentry e)) fun v => do
-        return v == (← if r.ret == .null then pure none else some <$> qentry r.ret)
+      exec (filterEntry (← nat p) (← qentry e f)) fun v => do
+        return v == (← if r.ret == .null then pure none else some <$> qentry r.ret f)
     | "with_owed", #[p, e] => do
-      exec (withOwed (← nat p) (← qentry e)) fun v => do
-        return v == (← if r.ret == .null then pure none else some <$> qentry r.ret)
+      exec (withOwed (← nat p) (← qentry e f)) fun v => do
+        return v == (← if r.ret == .null then pure none else some <$> qentry r.ret f)
     | "projected", #[p, .str g'] => do exec (projected (← nat p) (← group g')) fun v => return v == (← r.ret.getBool?)
     | "rarest", #[p] => do exec (rarestOf (← nat p)) fun v => return v == (← retNat r.ret)   -- v2's choose calls it
     -- §1's seven. K and N take what the caller read of `desc`: a descriptor, or null
