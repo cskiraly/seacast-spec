@@ -11,8 +11,11 @@ A binding is any of the forms the toy uses to put a name in a node's namespace: 
 tuple target holding such subscripts, `ns.update(name=v)` (a keyword), `ns.update({name: v})` (a dict key),
 `ns.update({k: v for k, v in locals().items() if …})` (a `locals()` export, resolved to the enclosing function's
 functions made before it, less the comprehension's exclusions), `ns.setdefault(name, v)`, a subscript whose key is
-not a literal (a computed key), and an attribute set on a parameter object (an `Obj()` or a `.params`). A namespace
-is a name `ns`, or an attribute `.ns`.
+not a literal (a computed key), an attribute set on a parameter object (an `Obj()` or a `.params`), and the
+namespace's own making, `ns = {name: v, …}` (a namespace literal). A namespace is a name `ns`, or an attribute `.ns`.
+A bound value is read as a function where it names one: a local function or lambda, a function of the same module,
+one imported from another of the toy's modules (`from bits import popcount`, `wire as Wm` and `Wm.sha256`), or a
+method of the enclosing class (`self.m`, `node.m`).
 
 Each function bound has a class:
 - **observer**: it holds the earlier binding of its name (a closure variable assigned from `ns[name]` before it)
@@ -36,7 +39,7 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 FORMS = ("subscript", "tuple", "update-keyword", "update-dict", "locals-export", "setdefault", "computed-key",
-         "parameter-attribute")
+         "parameter-attribute", "namespace-literal")
 MUTATORS = {"add", "append", "appendleft", "extend", "extendleft", "insert", "pop", "popleft", "popitem", "remove",
             "discard", "clear", "update", "setdefault", "sort", "reverse", "__setitem__", "__delitem__", "set", "unset",
             "difference_update", "intersection_update", "symmetric_difference_update"}
@@ -104,6 +107,56 @@ class Scanner:
     def __init__(self, skip=()):
         self.skip = set(skip)       # forms whose reader is off (the self-test's control)
         self.rows, self.funcs, self.methods = [], [], {}
+        self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
+        self.imports = {}           # (file, local name) -> (module file, name), or (module file, None) for a module
+
+    def prepass(self, path):
+        """A module's own functions and methods, and its imports of the toy's other modules (path's siblings)."""
+        src = path.read_text()
+        tree = ast.parse(src)
+        mod = Scope(tree, "", None)
+        toy = {p.name for p in path.parent.glob("*.py")}
+        for st in tree.body:
+            if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                self.globals[(path.name, st.name)] = Func(st, st.name, mod, src, path)
+            elif isinstance(st, ast.ClassDef):
+                for m in st.body:
+                    if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        q = f"{st.name}.{m.name}"
+                        self.globals[(path.name, q)] = Func(m, q, Scope(st, st.name, mod), src, path)
+            elif isinstance(st, ast.ImportFrom) and not st.level and f"{st.module}.py" in toy:
+                for a in st.names:
+                    self.imports[(path.name, a.asname or a.name)] = (f"{st.module}.py", a.name)
+            elif isinstance(st, ast.Import):
+                for a in st.names:
+                    if f"{a.name}.py" in toy:
+                        self.imports[(path.name, a.asname or a.name)] = (f"{a.name}.py", None)
+
+    def resolve(self, value, scope):
+        """The function a bound value names, or None."""
+        if isinstance(value, ast.Lambda):
+            return Func(value, f"{scope.qual}.<locals>.<lambda>", scope, self.src, self.path)
+        here = self.path.name
+        if isinstance(value, ast.Name):
+            f = scope.lookup(value.id, "funcs")
+            if f is not None:
+                return f
+            f = self.globals.get((here, value.id))
+            if f is not None:
+                return f
+            imp = self.imports.get((here, value.id))
+            return self.globals.get(imp) if imp and imp[1] is not None else None
+        if isinstance(value, ast.Attribute) and isinstance(value.value, ast.Name):
+            imp = self.imports.get((here, value.value.id))
+            if imp and imp[1] is None:
+                return self.globals.get((imp[0], value.attr))
+            if value.value.id in ("self", "node"):
+                s = scope
+                while s is not None and not isinstance(s.node, ast.ClassDef):
+                    s = s.parent
+                if s is not None:
+                    return self.globals.get((here, f"{s.qual}.{value.attr}"))
+        return None
 
     # -- the walk ---------------------------------------------------------------------------------------------
     def scan_file(self, path):
@@ -250,7 +303,13 @@ class Scanner:
                     if ((isinstance(vv, ast.Call) and isinstance(vv.func, ast.Name) and vv.func.id == "Obj")
                             or (isinstance(vv, ast.Attribute) and vv.attr == "params")):
                         scope.params_objs.add(tt.id)
-        # the bindings
+        # the bindings: the namespace's own making (ns = {...}), then the targets
+        if "namespace-literal" not in self.skip and isinstance(value, ast.Dict):
+            for t in targets:
+                if isinstance(t, ast.Name) and t.id == "ns":
+                    for k, v in zip(value.keys, value.values):
+                        if isinstance(k, ast.Constant) and isinstance(k.value, str):
+                            self.row(st, "namespace-literal", k.value, v, scope)
         for t in targets:
             if isinstance(t, ast.Tuple):
                 vals = value.elts if isinstance(value, ast.Tuple) and len(value.elts) == len(t.elts) else [None] * len(t.elts)
@@ -275,11 +334,7 @@ class Scanner:
 
     # -- a row ------------------------------------------------------------------------------------------------
     def row(self, at, form, name, value, scope, via=None):
-        fn = None
-        if isinstance(value, ast.Lambda):
-            fn = Func(value, f"{scope.qual}.<locals>.<lambda>", scope, self.src, self.path)
-        elif isinstance(value, ast.Name):
-            fn = scope.lookup(value.id, "funcs")
+        fn = self.resolve(value, scope) if value is not None else None
         r = {"file": self.path.name, "line": at.lineno, "in": scope.qual, "form": form, "name": name}
         if via:
             r["via"] = via
@@ -288,7 +343,7 @@ class Scanner:
             r["value"] = ast.unparse(value)[:80] if value is not None else None
             r["class"] = "value"
         else:
-            r["value"] = {"qual": fn.qual, "line": fn.line, "sha256": fn.sha}
+            r["value"] = {"qual": fn.qual, "file": fn.path.name, "line": fn.line, "sha256": fn.sha}
             self.traced = TRACED_V2 if r["v2_only"] else TRACED     # the traced names where the binding runs
             held = self.held(fn, name)
             if held is None:
@@ -546,7 +601,10 @@ def load_names(toy):
 
 def scan(toy, skip=()):
     sc = Scanner(skip)
-    for f in sorted(Path(toy).glob("*.py")):
+    files = sorted(Path(toy).glob("*.py"))
+    for f in files:                     # every module's own functions and imports first, then the bindings
+        sc.prepass(f)
+    for f in files:
         sc.scan_file(f)
     return sc
 
@@ -625,10 +683,18 @@ class Node:
         ns[key] = 1
         P = Obj()
         P.verify = lambda f: True
+
+    def make(self):
+        ns = {"i": self.other}
+        return ns
+
+    def other(self):
+        pass
 '''
 WANT = {"subscript": ("a", 7, "observer"), "tuple": ("b", 8, "own"), "update-keyword": ("d", 9, "own"),
         "update-dict": ("e", 10, "value"), "locals-export": ("f", 14, "own"), "setdefault": ("g", 15, "value"),
-        "computed-key": ("<key>", 17, "value"), "parameter-attribute": ("P.verify", 19, "own")}
+        "computed-key": ("<key>", 17, "value"), "parameter-attribute": ("P.verify", 19, "own"),
+        "namespace-literal": ("i", 22, "own")}
 
 
 def self_test():

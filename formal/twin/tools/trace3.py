@@ -508,6 +508,13 @@ class Tracer3(Tracer):
         # node keeps its own state, as before
         self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0} if self.doc_v2 else None
         self.bare = Counter()
+        # under v2, the toy's functions a namespace may hold: those the scan of its bindings names (scan_bindings.py),
+        # by file, first line and qualified name; checked at each install (unscanned_check)
+        self.scanned = None
+        if self.doc_v2:
+            import scan_bindings                # noqa: E402: this directory's
+            self.scanned = {(r["value"]["file"], r["value"]["line"], r["value"]["qual"])
+                            for r in scan_bindings.scan(self.toy).rows if isinstance(r["value"], dict)}
         # the toy's command line (cli: this script's own main) is read as the toy's parser reads it (toy_args); a
         # directed set's arguments are no command line of the toy's, and are read by their words
         if (toy_reads_a_dump(argv) if cli else any(a.split("=")[0] in ("--xcheck", "--topology") for a in argv)):
@@ -723,6 +730,23 @@ class Tracer3(Tracer):
         if bytes(want) != bytes(r):
             raise SystemExit(f"trace3: node {nid}: message_id returned {bytes(r).hex()}, and the document's function "
                              f"gives {bytes(want).hex()} for that chunk: the id stored on it is not the document's")
+
+    def unscanned_check(self, nd, ns):
+        """Under v2, at the install: every namespace name bound to a function of the toy's (its code in the toy's
+        directory; a bound method by its function) is one the scan of the toy's bindings names. One it does not name
+        was bound by a form the scan does not read, and nothing classes it. The documents' functions, the tracer's and
+        a fixture's (in this directory) are not the toy's."""
+        for name, v in ns.items():
+            fn = getattr(v, "__func__", v)
+            code = getattr(fn, "__code__", None)
+            if (code is None or code.co_filename in (DOC_FILE, V2_FILE)     # the documents' (a relative name, so
+                    or not code.co_filename.endswith(".py")                 #   never resolved against the toy's
+                    or Path(code.co_filename).resolve().parent != self.toy):  #   directory, the working one)
+                continue
+            key = (Path(code.co_filename).name, code.co_firstlineno, getattr(fn, "__qualname__", "?"))
+            if key not in self.scanned:
+                raise SystemExit(f"trace3: node {nd.id}: {name} is bound to a function of the toy's that the scan of "
+                                 f"its bindings does not name: {key[2]} ({key[0]}:{key[1]})")
 
     def repoint_aliases(self, nd, ns):
         """Under v2, after the install at the end of construction: two names the toy bound to the raw
@@ -1536,6 +1560,8 @@ class Tracer3(Tracer):
         why = namespace_check(BLOCK, tr.traced, tr.v2_defs, ns, layers=tr.doc_v2)
         if why:
             raise SystemExit(f"trace3: node {nd.id}: {why}")
+        if tr.doc_v2:
+            tr.unscanned_check(nd, ns)
         # a traced name this node runs as something else: the node's, a call on the tape where the block's
         # code calls it (on_frame's on_iwant), with its log; never a record
         replaced_enc = {"forward": lambda r, f, p: [[tr.chunk(f), int(p)], tr.nothing(r)],

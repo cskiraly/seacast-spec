@@ -407,6 +407,26 @@ def raw_alias_v2():
     T.Tracer3.repoint_aliases = repoint_aliases
 
 
+def unscanned_layer_v2(toy):
+    """Under v2: a layer over `on_frame` that claims to be the toy's (its code compiled as node.py's, at a line where
+    no binding is) and holds the bound `on_frame` in a closure cell, so that the namespace check, which follows the
+    layers to v2's own function, passes it. Bound just before the install: the scan of the toy's bindings names no
+    such function, and the tracer must stop at the install."""
+    node_py = str(Path(toy).resolve() / "node.py")
+    g = {}
+    exec(compile("def make(doc):\n    def on_frame(p, frame):\n        return doc(p, frame)\n    return on_frame\n",
+                 node_py, "exec"), g)
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        ns["on_frame"] = g["make"](ns["on_frame"])
+        PLANTED[0] += 1
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+
+
 def other_node_v2():
     """Under v2: at the first table read inside a record at node a, outside any question, node c's traced `N` is
     called. The tracer must stop before the call runs (its argument, None, is never reached)."""
@@ -563,7 +583,7 @@ def suppressed_entry_v2(toy, off):
 FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "--pending-twice", "--alias-start",
           "--alias-message", "--defer-chain", "--replaced", "--false-wrapper", "--stale-id", "--level1-in-cell",
           "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
-          "--early-install-v2", "--raw-alias-v2", "--other-node-v2")
+          "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off")
@@ -584,6 +604,8 @@ def main(argv):
             raw_alias_v2()
         elif fault == "--other-node-v2":
             other_node_v2()
+        elif fault == "--unscanned-layer-v2":
+            unscanned_layer_v2(rest[0])
         elif fault.startswith("--bare-in-question-v2"):
             bare_in_question_v2(per_node=fault.endswith("-per-node"))
         else:

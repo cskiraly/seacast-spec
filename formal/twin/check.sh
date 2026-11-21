@@ -27,7 +27,7 @@
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders,
-#             keptcopy.py's and labcites.py's); and no line of the twin's sources (the build's copy), of its
+#             keptcopy.py's, labcites.py's and scan_bindings.py's); and no line of the twin's sources (the build's copy), of its
 #             tools or of the prose beside them (every *.md but out/'s and record/'s) cites the notes beside
 #             which they were developed (labcites.py), a citation planted in README.md's copy reported
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
@@ -286,10 +286,11 @@ trace3.py --self-test-v2 ^ok:
 gen/schema_v2.py --self-test ^ok: every case as it must be$
 keptcopy.py --self-test ^ok: every case as it must be$
 labcites.py --self-test ^labcites self-test, planted: (.*), must be \1$
+scan_bindings.py --self-test ^ok: every case as it must be$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 11 ] || no "not 11 tools' self-tests passed"
-  echo "  $n of 11 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 12 ] || no "not 12 tools' self-tests passed"
+  echo "  $n of 12 tools' own cases as they must be (selftests.txt)"
   # the twin's text: its sources as the build copied them, its tools, and the prose beside them (every *.md but
   # out/'s, record/'s and .lake/'s, which the copy leaves out; tools/' own are read with tools/): none cites the
   # notes beside which it was developed
@@ -725,8 +726,9 @@ s_tracercontrols() {
   else no "the tracer stopped on an unlogged assignment for another reason (c-unlogged.err)"; fi
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2; do
     case $f in
+      unscanned-layer-v2) want="^trace3: node [0-9]*: on_frame is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.on_frame \(node\.py:2\)" ;;
       early-install-v2) want="^trace3: node [0-9]*: promise_due was bound again after the tracer was installed, which under v2 must be the namespace's last binding: Node\._v2\.<locals>\.promise_due" ;;
       raw-alias-v2) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
       other-node-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs" ;;
@@ -753,8 +755,8 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 19 ] || no "not 19 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 19 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 20 ] || no "not 20 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 20 planted faults stop the tracer with their own words"
   # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
