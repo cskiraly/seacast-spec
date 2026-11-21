@@ -2932,11 +2932,13 @@ the column cells little at the median, at one seed (protocol-v2-figures.md, §4.
   before a control write from the line instead, once it has marked the write pending. The early call
   can queue an extra run even for a write that completes at once. Admission is unchanged: a writer
   takes room only while room is free, and never ahead of a writer in line that can write.
-  `toy/write_wait_known.py --doc v2` checks four cases on each of the three paths, with p the writer
+  `toy/write_wait_known.py --doc v2` checks five cases on each of the three paths, with p the writer
   that writes control and q the other writer in line: q has no run queued when `next_to_send`
-  returns p's control, q has one after p's write starts to wait, and q has none when p is not in
-  line or when the window is full. Where p is in line, it keeps its place at the head. `protocol.md`
-  has no such third path: its control-only entry goes through `release_unused_slot`, which gives
+  returns p's control; q has one after p's write starts to wait, and only after the control reached
+  the transport and `write_waits(p)` was called with the write pending; q has none when p is not in
+  line or when no room is free, the window full or above its cap; and a write that completes at once
+  calls no `write_waits`. Where p is in line, it keeps its place at the head. `protocol.md` has no
+  such third path: its control-only entry goes through `release_unused_slot`, which gives
   back the writer's slot and also takes the writer out of the line when it holds none, so there a
   control-only entry is never written from the line. `wake_front` is this document's own, since its
   room is counted in bytes (`W_BYTES`), where `protocol.md`'s counts slots.
