@@ -94,7 +94,7 @@ last says how the messages travel. Named mechanisms inside a part keep their own
 | completion and repair | the claims, completion per interest, decoding at K, rebuilt chunks, deferral, the probe, evidence | §1.5, §4.6 | |
 | informed scheduling *(local)* | what a node sends next and when: the window in bytes, the projection, the next entry, pacing, the ask window | §4.9, §4.11–4.13 | the byte window |
 | source distribution *(local)* | how a source releases a group: batch order, striping, its paced holding; any node holding chunks first is a source (§1.6) | §4.7 | striped publishing |
-| wire bindings | how the messages travel: the libp2p stream, Waggle, gossipsub and partial-messages bindings (`protocol-v2-bindings.md` §2 to §5) | §7; `protocol-v2-bindings.md` | |
+| wire bindings | how the messages travel: the libp2p stream, Waggle, gossipsub and partial-messages bindings (`protocol-v2-bindings.md` §2 to §5), and the native QUIC binding as a draft (§7 there) | §7; `protocol-v2-bindings.md` | |
 
 The heartbeat (§4.8) drives three of them: relation upkeep, announcement gossip and pacing.
 Outside the parts, and assumed above, are the object type's interface (§1.1: indices,
@@ -3430,24 +3430,28 @@ offer table's limits (`protocol.md` §8.2).
 
 The protocol is defined on its own messages (§2). A **binding** carries them between two nodes. The
 bindings, their bytes and the rules that hold on one binding only are in
-[`protocol-v2-bindings.md`](protocol-v2-bindings.md). It has four, one per carrier:
+[`protocol-v2-bindings.md`](protocol-v2-bindings.md). It has four, one per carrier, and a fifth as
+a draft:
 - the libp2p stream binding carries them on a libp2p stream of its own
   (`protocol-v2-bindings.md` §2);
 - the Waggle binding carries the same protocol in Waggle's framing (`protocol-v2-bindings.md` §3);
 - the gossipsub binding uses `protocol.md`'s wire (`protocol-v2-bindings.md` §4);
 - the partial-messages binding uses gossipsub with the Partial Messages Extension
-  (`protocol-v2-bindings.md` §5).
+  (`protocol-v2-bindings.md` §5);
+- the native QUIC binding, a draft, carries them directly on QUIC, with a stream per chunk
+  (`protocol-v2-bindings.md` §7).
 
-A native QUIC binding is being drafted. A node may speak more than one binding, and negotiates per
-link which one a peer takes. This section says what every binding provides, and what the rules do
-where a binding lacks a capability.
+A node may speak more than one binding, and negotiates per link which one a peer takes. This
+section says what every binding provides, and what the rules do where a binding lacks a capability.
 
 **What every binding provides:**
 - *Links:* a binding gives a link per connected peer, with its open and its close, which start and
   end §3's per-connection lifetimes.
 - *Whole messages, in order:* what a node writes to a peer arrives as whole messages, in the order
   written for each object type at least (Waggle's framing has a stream per type). How a binding
-  marks where each ends is its own: its frames.
+  marks where each ends is its own: its frames. The native QUIC binding, a draft, orders a chunk
+  with nothing, and which rules rely on the order is one of its Opens (`protocol-v2-bindings.md`
+  §7).
 - *The queue and the write:*
   - `send(p, msg, urgent)` puts a message into the per-peer queue (§3), or reports that a full queue
     refused it;
@@ -3472,18 +3476,21 @@ Rendezvous and discovery are outside the bindings (§0).
 
 **The capabilities the bindings differ in**, and what the rules do without each, are these:
 
-| capability | the libp2p stream and Waggle bindings | the partial-messages binding | the gossipsub binding | without it |
-|---|---|---|---|---|
-| interest without subscription: a JOIN per link, `DECLARED` interest told only to the peers asked (§1.2) | yes | for a sampler only | for a sampler only | a sampler subscribes to nothing, its WANTs are its interest, and their answers are admitted by their WANT (`protocol-v2-bindings.md` §6) |
-| relations per family and colour, with a direction and a floor per colour (§1.3, §4.1) | yes | `BOTH` only, a colour field, no floor per colour | stock: `BOTH`, one colour | the relation is the topic's mesh |
-| the answered GRAFT, and `PRUNE_BACKOFF` this document's (§4.1) | yes | no: accepted in silence, gossipsub's backoff | no (the toy runs it under `--upkeep on`) | a GRAFT's sender is in the relation from its GRAFT, and the ends' agreement rests on the backoff after a PRUNE (§4.1) |
-| a holding's claims; the WANT's `standing`, `hops` and `probe` (§2) | yes | in extension fields | in version 4 of the strings (`protocol-v2-bindings.md` §4), charged nothing in the toy | – (every binding carries them) |
-| EVIDENCE (§2) | its kind reserved | a full message on the rendezvous topic | reserved: a full message on the rendezvous topic | none in this version (`[D6]`) |
-| a frame of one message, or several (§4's `on_frame`) | one | several (gossipsub's frame) | several | the handling order of one frame is §4's; where a frame holds one message, the IHAVE limits (§4.3) count messages, and one answer per id per frame (§4.5) is one per message |
-| merging queued entries (`merge_waiting`, §4.2, permitted; §4.1's one GRAFT or PRUNE of a relation per frame) | the client's | the client's | the client's | – (a choice, not a capability) |
-| how a cell's header travels (§2), in the form the object type's definition fixes (`protocol-v2-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`protocol-v2-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`protocol-v2-bindings.md` §4); the toy charges no header there, as in (a) | – |
-| an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | the writer's urgent lane alone, as one stream per peer gives |
-| scoring on these messages (P7) | yes | gossipsub's | gossipsub's | gossipsub's scoring of its own messages |
+| capability | the libp2p stream and Waggle bindings | the partial-messages binding | the gossipsub binding | the native QUIC binding (a draft) | without it |
+|---|---|---|---|---|---|
+| interest without subscription: a JOIN per link, `DECLARED` interest told only to the peers asked (§1.2) | yes | for a sampler only | for a sampler only | yes | a sampler subscribes to nothing, its WANTs are its interest, and their answers are admitted by their WANT (`protocol-v2-bindings.md` §6) |
+| relations per family and colour, with a direction and a floor per colour (§1.3, §4.1) | yes | `BOTH` only, a colour field, no floor per colour | stock: `BOTH`, one colour | yes | the relation is the topic's mesh |
+| the answered GRAFT, and `PRUNE_BACKOFF` this document's (§4.1) | yes | no: accepted in silence, gossipsub's backoff | no (the toy runs it under `--upkeep on`) | yes | a GRAFT's sender is in the relation from its GRAFT, and the ends' agreement rests on the backoff after a PRUNE (§4.1) |
+| a holding's claims; the WANT's `standing`, `hops` and `probe` (§2) | yes | in extension fields | in version 4 of the strings (`protocol-v2-bindings.md` §4), charged nothing in the toy | yes | – (every binding carries them) |
+| EVIDENCE (§2) | its kind reserved | a full message on the rendezvous topic | reserved: a full message on the rendezvous topic | its kind reserved | none in this version (`[D6]`) |
+| a frame of one message, or several (§4's `on_frame`) | one | several (gossipsub's frame) | several | one; a chunk's frame is its stream | the handling order of one frame is §4's; where a frame holds one message, the IHAVE limits (§4.3) count messages, and one answer per id per frame (§4.5) is one per message |
+| merging queued entries (`merge_waiting`, §4.2, permitted; §4.1's one GRAFT or PRUNE of a relation per frame) | the client's | the client's | the client's | the client's | – (a choice, not a capability) |
+| how a cell's header travels (§2), in the form the object type's definition fixes (`protocol-v2-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`protocol-v2-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`protocol-v2-bindings.md` §4); the toy charges no header there, as in (a) | as on the libp2p stream binding; (c) on the control stream, before the group's first chunk stream (`protocol-v2-bindings.md` §7.2) | – |
+| an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | yes, where the implementation orders streams (`protocol-v2-bindings.md` §7.4) | the writer's urgent lane alone, as one stream per peer gives |
+| scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
+| a chunk ordered with the messages written after it | yes | yes | yes | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7) |
+| a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
+| a lost packet delays only its own chunk | no | no | no | yes | a lost packet delays every later frame on its stream until it is resent |
 
 **Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
 interest without subscription, a push relation per family and colour with a floor and a direction,
@@ -3502,7 +3509,7 @@ not a link. The sampler computes the custody of such a node from its node id.
 - *What the protocol needs:* it needs only the notion of such a fetch, a WANT answered by a CHUNK
   from a node that is not a link, and its privacy rule: one sample per node, as on links (§4.10).
   The serving limit and the second phase's cap apply as on a link.
-- *How it is carried* is the binding's (`protocol-v2-bindings.md` §7), so the protocol's rules
+- *How it is carried* is the binding's (`protocol-v2-bindings.md` §8), so the protocol's rules
   do not depend on it.
 
 ## 8. Decisions, and where they bite
