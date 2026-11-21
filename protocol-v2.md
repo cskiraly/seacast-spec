@@ -2581,7 +2581,7 @@ The window of `protocol.md` §7.1 is per node across every group of every object
 ### 4.9 The window's projection, per object type
 
 ```python
-def projected(p, g):                                           # [c12] protocol.md §7.1, read per object type
+def projected(p, g):                                           # [c12] protocol.md §7.2, read per object type
     T, h = type_of_group(g), hdr[g]
     if T.threshold(h) == T.index_count(h): return False         # no code: every index is needed, nothing is projected
     has, sent = peer_has[p][g].bits, sent_to[p][g]
@@ -3095,7 +3095,7 @@ loss): §6.3, `ASK_UPLINK`.
 | §6.4 `on_pace_tick` | §4.8 | |
 | §7.2 `filter_entry`, `rarest` | `send`, `enqueue`; §4.12 | `rarest` unchanged; the writer takes a source's own chunks first (§4.12); `filter_entry` is this document's (§4.6): v0.5's promise starts when an ask on an offer is written; an ask sent as a `Want` (`want`, §3), a sampler's, a routed request's or the repair sample's, starts none (§4.10), but a claim's probe starts one (§4.6), and under the alarm option the member's ask of the claimant too |
 | §7.1 the window, §7.2 `next_to_send` | §4.11 | one window per node over every object type, counted in bytes; the entry is chosen before the room is taken; JOINs, GRAFTs and PRUNEs a full queue refused are queued first, in order (§4.1); the line skips a writer mid-write, and a writer in line whose control write does not complete at once wakes the first writer in line that can write as it starts to wait, if room is free, as `protocol.md`'s do (`front`, `write_waits`; `wake_front` this document's own, in bytes; since 2026-11-20, the wake at the wait since v0.10.9) |
-| §7.1 `projected` | §4.9 | reads the type's K; off for a type without a code |
+| §7.2 `projected` | §4.9 | reads the type's K; off for a type without a code |
 | §8.2 limits | §6.3 | plus relations and groups per slot |
 
 **The versions carried.** Each later version of `protocol.md` is carried into this document; the list of
