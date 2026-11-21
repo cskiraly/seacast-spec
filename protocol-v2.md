@@ -517,8 +517,11 @@ whose answer is never written stays until then). A peer's claims go with its con
 connection closes. Relations live until PRUNE or disconnection; a GRAFT of ours lives until it is
 answered, until a PRUNE of either end ends it or until the connection closes; an owed JOIN, GRAFT
 or PRUNE (§4.1) lives until the writer queues it or the connection closes; and a backoff lives
-until it runs out or the connection closes. `forwarded` starts again at each slot. An expired
-group is not taken up again.
+until it runs out or the connection closes. A writer's place in the window's line (`waiters`,
+§4.11) is the node's state, not the connection's. The writer leaves the line when it takes room
+(`acquire_room`). It also leaves when it has nothing to send and when the connection closes:
+`leave_line` takes it out, and the first writer in line that can write then tries again if room is
+free (`wake_front`). `forwarded` starts again at each slot. An expired group is not taken up again.
 The receive and publish paths check it as `protocol.md`'s do, `fill` checks it on every axis a
 chunk projects onto, and the paths that act on a projected group (`forward`, `push_rebuilt`, the
 repair sample's `ask_custodian`) skip an expired axis; `check_completion` finds no state to act on.
