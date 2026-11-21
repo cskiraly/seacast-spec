@@ -23,10 +23,17 @@ does not, each of a different column:
 - (i) after the heartbeat, with one unit of the group's limit (`SERVE_LIMIT`) left, one frame with a plain ask and
   then p's probe of S's claim, for the same id, and one with the two the other way round: one answer each, the
   probe's exemption taken (`probe_answers`), and no budget spent, in both;
+- (j) with one unit of a group's limit left, one frame with a plain ask of index A, a plain ask of index B of the
+  same group, and p's probe of A: A answered, as the probe, and B refused at the limit, as without the probe; then
+  A's answer queued, p's holding of A arriving before the write, and the writer: A written all the same, as a
+  probe's answer is;
+- (k) one frame with a standing ask of an index S lacks in its custody, and p's probe of it, which does not pass as
+  one (S claims no such index): the standing request kept;
 - penalties: none.
 On the document before the budget, (a), (d) and (g) fail, and (b) and (c) have no record of S's offers; (h) fails if
 the budget is charged before the stock limit is read; (i) fails, in its first order, on the document before an id
-asked twice in a frame kept a probe among its asks.
+asked twice in a frame kept a probe among its asks; (j) and (k) fail on the document whose probe dropped a plain ask
+of its index before reading whether it passed.
 """
 import sys
 from pathlib import Path
@@ -138,6 +145,35 @@ def main():
         got.append((n, ns["probe_answers"][p][g].has(i), ns["served_hb"][p] - hb0))
     line("(i) one unit of the group's limit left: a plain ask and a probe of the same id in one frame, then the other "
          "order: answers, probe's exemption taken, budget spent", got, [(1, True, 0), (1, True, 0)])
+    ns["on_heartbeat"]()
+    def fresh(g, i):                                # an id p lacks and the cases above never asked
+        return (not ns["peer_has"][p][g].has(i) and (g, i) not in cells
+                and ns["serve_count"][p][ns["resolve"](Wm.WantIndex(g, i))] == 0)
+    g, a, b = next((g, *two) for g in sorted(ns["chunks"], key=str) if sim.gtype.get(g) == "column"
+                   and not ns["probe_served"][p][g]
+                   and len(two := [i for i in sorted(ns["chunks"][g]) if fresh(g, i)][:2]) == 2)
+    T = ns["type_of_group"](g)
+    spec_lim, T.params.SERVE_LIMIT = T.params.SERVE_LIMIT, ns["served"][p][g] + 1   # one unit left
+    out = ns["on_want"](p, [Wm.WantIndex(g, a), Wm.WantIndex(g, b), Wm.FlaggedWant(g, a, False, 0, True)])
+    T.params.SERVE_LIMIT = spec_lim
+    ns["sent_to"][p][g].clear(a)
+    ns["respond"](p, [], out, [])
+    ns["peer_has"][p][g].bits |= ns["bitmap"]({a})  # p's holding of A, from elsewhere, before the write
+    write_all()
+    line(f"(j) one unit of the group's limit left: plain A ({a}), plain B ({b}), probe A in one frame: indices "
+         f"answered; A written after p's holding of it, as a probe's answer is",
+         ([c.index for c in out], ns["sent_to"][p][g].has(a)), ([a], True))
+    g, i = next((g2, i) for g2 in sorted(ns["chunks"], key=str) if sim.gtype.get(g2) == "column" and g2 != g
+                for i in sorted(ns["chunks"][g2]) if fresh(g2, i) and ns["our_interest_for"](p, g2).has(i))
+    spec_chunk = ns["chunks"][g].pop(i)             # S lacks index i of a column in its custody
+    ns["mine"][g].clear(i)
+    ns["on_want"](p, [Wm.FlaggedWant(g, i, True, 0), Wm.FlaggedWant(g, i, False, 0, True)])
+    kept = p in ns["standing"][g].get(i, ())
+    ns["standing"][g].get(i, set()).discard(p)
+    ns["chunks"][g][i] = spec_chunk
+    ns["mine"][g].set(i)
+    line(f"(k) a standing ask of index {i}, which S lacks, and p's probe of it, which does not pass as one: the "
+         f"standing request kept", kept, True)
     line("penalties", pen, [])
 
 

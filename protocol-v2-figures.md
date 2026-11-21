@@ -1151,7 +1151,12 @@ moved the digests of `rr-stripe` and `push-deep` only. Read from both recordings
 26 ms later at the median, 27 ms later at the tail and 0.05 copies lighter (p50 814 against 788 ms,
 p99 894 against 867 ms, 1.65 against 1.70 copies). `late-block` is 6 ms later at the median and
 11 ms later at the tail. `ihave-limits` is 1 ms sooner at the median and at the tail, with 0.01
-copies more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies).
+copies more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies). Since
+then, the window's room freed at a holding's repeated bit (`protocol-v2.md` §4.3, 2026-11-21) moved
+this document's `without-a` (p50 432 to 429 ms, p99 517 to 518 ms, copies 3.99 to 3.97). That cell
+runs without cancel (card 8), so copies reach peers that hold them already, and their holdings
+repeat the bit. It stays within the last bullet's distances of `protocol.md`'s (p50 429 against
+427 ms, p99 518 against 528 ms, 3.97 copies each).
 
 - **v0.3's window and the window in bytes** (2026-10-07). With v0.3's window (slots of one payload
   chunk), eleven of the twelve cells reproduced v0.3's completion times and bytes exactly, and

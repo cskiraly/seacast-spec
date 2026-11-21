@@ -103,8 +103,8 @@ needs the acknowledgement to do nothing at `PUBLISH`: with `origin_acked` acting
 takes `publish` too: the draft's `SOURCE_OFFERS` (§4.7). The option's other values, `off` and
 `late`, act only on offers `publish` itself makes, so since v0.9's rule they change nothing.
 
-Forty scripts hold known answers for what a digest cannot show. Each is a check that can fail, and
-where one has a control that must come out the other way, it is named:
+The scripts below hold known answers for what a digest cannot show. Each is a check that can fail,
+and where one has a control that must come out the other way, it is named:
 - `own_order_known.py`: §6.1's reference order; its control, the rank read big-endian, must differ.
 - `ihave_id_known.py`: §4.4, an IHAVE id that is not a chunk's id; a valid id beside it must leave an
   offer. And an IHAVE bitmap of an index beyond the group's known count is ignored and penalised;
@@ -171,10 +171,14 @@ where one has a control that must come out the other way, it is named:
   PRUNE sets no backoff even with a backoff of five seconds, and a WANT for a row cell keeps no
   standing request; with the node's own JOIN owed to a second peer, that peer's GRAFT is ignored.
   The controls: a PRUNE for a joined column family sets its backoff, a GRAFT for one is answered,
-  and so is one when only the other type's JOIN is owed. A cell that names its column group, and a
-  holding of that group, are taken on a link that joined only rows and on one that joined neither,
-  since chunks and holdings are taken on any link. No penalty. It fails on the document before the
-  rule.
+  and so is one when only the other type's JOIN is owed. On a link that joined only rows, with the
+  document's own handlers: a cell that names its column group is verified, stored and acknowledged;
+  a holding frees the room of S's copy in flight, and so does the same holding again after the copy
+  is written again, its bit no longer new; a cell naming an index beyond its header's count is
+  rejected and counted against its sender, without an error. On a link that joined neither, a cell
+  is stored and a holding frees the room. A holding that claims a column whole is kept, but makes no
+  claimant on the rows-only link; the control, on a link that joined columns, does. No other
+  penalty. It fails on the document before the rule.
 - `serve_budget_known.py`: `protocol-v2.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
   budget set to two, of three asks for cells of distinct columns the node holds, not on its offers,
   two are answered and the third refused; an ask on an offer the writer wrote, sent or owed, is
@@ -183,8 +187,15 @@ where one has a control that must come out the other way, it is named:
   with one unit left, one at the stock limit of three answers is refused without spending it, and
   the next is answered with it; with one unit of the group's limit left, a plain ask and a probe of
   the same id in one frame, in either order, give one answer with the probe's exemption, and spend
-  no budget. No penalty. It fails on the document before the
-  budget.
+  no budget. With one unit of the group's limit left, plain asks of A and B and a probe of A in one
+  frame answer A as the probe and refuse B, and A is written after the asker's holding of it; a
+  standing ask beside a probe that does not pass as one keeps its standing request. No penalty. It
+  fails on the document before the budget.
+- `unknown_groups_known.py`: `protocol.md` §8.2's limit of unknown groups per peer, in both
+  documents. With the node's `admitted` refusing one group, a HAVE (a holding claiming the group
+  whole) and an offer of it leave nothing in `peer_has`, `holders`, `claims`, `offered` or `offers`;
+  the controls, for a group admitted, leave their state. No penalty. It fails on the documents
+  before the rule.
 - `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
   beyond the group's count keeps no standing request, nor one past the type's most before the count
   is known; a routed one kept before the count is dropped with its route mark when the group opens
@@ -233,6 +244,8 @@ where one has a control that must come out the other way, it is named:
     index is offered.
   - A sender with nothing left tied under the root loses its tie's slot; a peer still tied for
     another group keeps its slot.
+  - At the cell header, a peer tied on a link that has not joined columns is not an announcer of
+    the tied index; the control, a peer whose link joined columns, is.
   - A cell's level 1 rejects a copy whose slot is not its header's, for its column and its row; the
     copy as it came passes.
 - `close_known.py`: a connection's close under `protocol-v2.md` (`--churn`).

@@ -1261,8 +1261,12 @@ class Node:
             COL.name = COL.id = "column"
             COL.index_count = lambda h: h.count          # the blob count
             COL.threshold = lambda h: h.count            # K = N: no code within a column
-            COL.verify = lambda f, h: (REJECT if f.slot != sim.blocks[h.block].slot   # the copy's slot is its header's (§1)
-                                       else ACCEPT)      # the cell's KZG proof, assumed to check (honest chunks only, as v0.3's Merkle proof here)
+            def cell_ok(f, h):                           # level 1 here: the copy's header is its group's, its index within
+                gh = sim.ghdr.get(f.group)               #   the header's count, and its slot the header's (§1); the cell's
+                return (gh is not None and gh.root == h.root and f.index < h.count   # KZG proof, assumed to check
+                        and f.slot == sim.blocks[h.block].slot)   # (honest chunks only, as v0.3's Merkle proof here)
+
+            COL.verify = lambda f, h: ACCEPT if cell_ok(f, h) else REJECT
             COL.decode = lambda fr, h: dict(fr)          # the cells present, if all are; nothing rebuilt within a column
             COL.header_of = lambda f: f.descriptor       # the header rides with the chunk (P2)
             if keeps_rows:                               # (R4) a cell is index b of column c and index c of row b
@@ -1369,7 +1373,7 @@ class Node:
                   probe_answers=lazy2(LazyBits), probe_waiting=lazy(lazy_dict), rsample=lazy(LazyList), rsample_step=DefaultMap(0),
                   rsample_asked=lazy2(LazySet), rsample_final=DefaultMap(False),
                   sampled_from=lazy(LazySet), samples_in_flight=DefaultMap(0),
-                  held_samples=lazy(LazyList), forwarded=DefaultMap(0))   # [D12] §4.10's and §4.5's
+                  held_samples=lazy(LazyList), forwarded=lazy2(zero))   # [D12] §4.10's and §4.5's
         Ask = Wm.WantIndex
         chunk_id = ns["message_id"]
         spec_open_group = ns["open_group"]

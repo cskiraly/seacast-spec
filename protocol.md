@@ -678,6 +678,7 @@ releases at a node.
 def on_have(p, h: HaveBitmap):
     if expired(h.group): return                       # past its active lifetime (§8.1): ignored
     if not valid_have(h): return penalise(p)          # length, and indices within N once known (§8.2)
+    if not admitted(p, h): return                     # a group beyond the peer's unknown groups (§8.2): ignored
     e = peer_has[p][h.group]                          # created at p's first HAVE for the group
     newly = h.bits & ~e.bits
     e.bits |= h.bits
@@ -689,11 +690,12 @@ def on_have(p, h: HaveBitmap):
 ```
 
 A HAVE for an expired group is ignored (§8.1), and a malformed one counts against its sender (§8.2).
-Otherwise the node adds the HAVE's bits to what it knows the peer holds (`peer_has`), whose lifetime
-each HAVE for the group refreshes (`HAVE_TTL`). For each index the peer newly holds, the node counts
-the peer as a holder (card 9), frees the window slot of any copy it sent the peer at that index
-(card 14), and, for a group it publishes, takes it as the chunk's acknowledgement (`origin_acked`,
-§5.1), which does nothing at `SOURCE_OFFERS = PUBLISH`.
+A HAVE for a group beyond the peer's limit of unknown groups (`MAX_PENDING_GROUPS`, §8.2) is
+ignored, without penalty. Otherwise the node adds the HAVE's bits to what it knows the peer holds
+(`peer_has`), whose lifetime each HAVE for the group refreshes (`HAVE_TTL`). For each index the peer
+newly holds, the node counts the peer as a holder (card 9), frees the window slot of any copy it
+sent the peer at that index (card 14), and, for a group it publishes, takes it as the chunk's
+acknowledgement (`origin_acked`, §5.1), which does nothing at `SOURCE_OFFERS = PUBLISH`.
 
 `peer_has` is the one view of what each peer holds. Cancel and projection (§7.2), the push
 candidates and budget (§5.2), whom to push to (§5.3) and what to announce read it at the moment they
@@ -710,6 +712,7 @@ def on_ihave(p, ih):                                                  # returns 
             penalise(p); continue                                     #   limits: ignored, and counted (§8.2)
         for a in expand(entry):                                       # [c7]
             if held(a) or expired(group(a)): continue
+            if not admitted(p, a): continue                           # a group beyond the peer's unknown groups (§8.2)
             add_offer(a, p)                                           # [c5] offer table (§6.1)
             if gated(a) or not authenticable(group(a)): continue      # [c6] stop-pull; the block first (§3)
             if tied_to_root(p, a): continue                           # its copy waits (§4.2)
@@ -739,13 +742,13 @@ def expand(entry):                                                    # [c7]
 ```
 
 **What an IHAVE does** (`on_ihave`). Each entry is a HAVE bitmap or a chunk's id (below). Every chunk
-an entry names (`expand`) that the node does not hold, in a group not expired, is recorded as an
-offer from the sender (§6.1). The node then asks the sender for it, unless the group's pull has
-stopped (§6.2), no installed block's bid commits the group yet (§3), the sender's copy of the chunk
-waits for its block (§4.2), the sender is parked for the group (the last resort may then be armed,
-§6.1), or an ask of the chunk to the sender is outstanding (§6.1). The asks go in random order, each
-through `may_ask`, the one ask per chunk at a time of §6.1. Over gossipsub's IHAVE limits they wait
-for the next heartbeat (below).
+an entry names (`expand`) that the node does not hold, in a group not expired and within the
+sender's limit of unknown groups (§8.2), is recorded as an offer from the sender (§6.1). The node
+then asks the sender for it, unless the group's pull has stopped (§6.2), no installed block's bid
+commits the group yet (§3), the sender's copy of the chunk waits for its block (§4.2), the sender is
+parked for the group (the last resort may then be armed, §6.1), or an ask of the chunk to the sender
+is outstanding (§6.1). The asks go in random order, each through `may_ask`, the one ask per chunk at
+a time of §6.1. Over gossipsub's IHAVE limits they wait for the next heartbeat (below).
 
 **An IHAVE bitmap tells the node who can serve, not who holds.** It feeds the offer table only:
 never `peer_has`, `holders`, cancel or the window. Nothing is asked for a group no installed block's
@@ -2102,8 +2105,8 @@ This document decides at the moment of sending, so it needs the backlog to be in
   `HaveBitmap`'s MAGIC and VERSION and is long enough to hold the group after them (§2). A shorter
   string, such as a stock id of 20 bytes, is not one, whatever it opens with;
 - `valid_have`, `reserve`, `release`, `admitted` and `listed`: the checks and reservations of §8.2;
-  `admitted`: a chunk's group within the peer's limits; `listed`: how many ordered offer lists an
-  announcer is in;
+  `admitted`: the group a chunk, a HAVE or an offered id names, within the peer's limit of unknown
+  groups; `listed`: how many ordered offer lists an announcer is in;
 - `Entry`: a queue entry, at most one chunk plus control; `add_ihave` adds an IHAVE to its control;
 - `enqueue`: into the bounded per-peer queue of §7; true if the queue admitted the entry;
 - `has_room`: the queue would admit one now;

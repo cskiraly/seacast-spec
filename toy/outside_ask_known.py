@@ -147,12 +147,12 @@ def sampler_cases():
          f"kept, in p's interest, before the gate and after it", (before, after),
          ((passed, False), (passed, False)))
     gq = out_cols[2]
-    fwd = ns["forwarded"][p]
+    fwd = ns["forwarded"][p][ns["type_of_group"](gq)]
     ns["send"] = lambda q, m, urgent=False: False if type(m).__name__ == "Want" else spec_send(q, m, urgent)
     ns["on_want"](p, [Wm.FlaggedWant(gq, 0, True, 1)])
     ns["send"] = spec_send
     line(f"(i) the same for column {sim.gcol[gq]}, the next queue refusing S's WANT: kept, in p's interest, "
-         f"counted against FORWARD_LIMIT", (kept(ns, gq, 0, p), gq in wp and wp[gq].has(0), ns["forwarded"][p] > fwd),
+         f"counted against FORWARD_LIMIT", (kept(ns, gq, 0, p), gq in wp and wp[gq].has(0), ns["forwarded"][p][ns["type_of_group"](gq)] > fwd),
          (False, False, False))
     import copy
     gn, COL = out_cols[3], ns["type_of_group"](out_cols[3])

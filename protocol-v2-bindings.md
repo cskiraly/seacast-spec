@@ -90,8 +90,10 @@ SSZ, compressed for the two chunk kinds (§1.3). The same encoded message travel
 - **Unknown kinds.** A message of an unknown kind is skipped without penalty, so that a later
   version can add kinds. Its frame is held to the largest frame that a known kind allows (§1.4): a
   longer one is a violation.
-- **Types not joined.** A message naming an object type the link has not joined is ignored without
-  penalty (`protocol-v2.md` §2).
+- **Types not joined.** A JOIN naming an object type the node does not run, and a GRAFT, PRUNE,
+  offer or WANT naming one the link has not joined, is ignored without penalty (`protocol-v2.md`
+  §2). Chunks and holdings are taken on any link, since a cell's answer and its acknowledgement can
+  name the group of either of its types.
 - **Violations.** A body that does not decode, or one over its kind's bound (§1.4), is a violation:
   it is penalised, and the stream is closed.
 
@@ -155,8 +157,8 @@ class CellChunk(Container):            # 0x07
 - **The flags.** A flags byte's other bits are zero when sent and ignored when received, so that a
   later flag fits without breaking older readers.
 - **The enums.** For `Direction`, `InterestKind` or `Duty`, a value outside that type's list is a
-  violation. A `TypeId` a node does not know names a type the link has not joined, and is ignored
-  (§1.1).
+  violation. A `TypeId` a node does not know names a type it does not run, and its message is
+  ignored (§1.1).
 - **The payload's chunk (`0x06`)** is `protocol.md` §2's `Chunk`, unchanged: its proof is a
   `List[Bytes32, 14]`, and its header is the descriptor it carries under design A; under design B
   the bid carries the descriptor and the chunk does not, a choice `protocol.md` §1 leaves open. It
@@ -328,6 +330,10 @@ binding, as on a stream of its own; only the framing changes.
   it samples and disclose them to every peer (I6). A topic per type says only that the node takes
   part in the type. What it receives is said per link, in its JOIN and its WANTs, and the group
   tells one family's chunks from another's.
+  - *Open:* a cell asked for in its row can come back naming its column, and its holding can
+    name the column too (`protocol-v2.md` §2). Which topic's stream carries them, where the two
+    nodes share only the row type's topic, is left open; the libp2p stream binding carries every
+    type on its one stream.
 - **JOIN** is the first message the node sends that peer on the type's topic. Waggle sends to a peer
   only on the stream of its subscription, so a link forms once both ends have subscribed and each
   has sent its JOIN.

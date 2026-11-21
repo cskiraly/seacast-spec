@@ -20,13 +20,24 @@ handler as if p had sent it, and S's sends to p are recorded:
 - (f) a WANT for a cell of the row S serves, on the link of (b), which has not joined rows: ignored, no standing
   request, no error;
 - (g) the control: with only S's JOIN for rows owed to the second peer, its GRAFT for a column family: answered;
-- (h) a cell that names its column group, and a holding of that column group, from a third peer whose JOIN for
-  columns is taken back (the link has joined rows only), given to S's `on_frame`: both taken (`on_chunk`,
-  `on_holding`), since chunks and holdings are taken on any link (an answer to a row WANT, and its acknowledgement,
-  can name the cell's column); the same from a fourth peer with both JOINs taken back: taken too.
+- (h) from a third peer whose JOIN for columns is taken back (the link has joined rows only), given to S's
+  `on_frame` with the document's own handlers, since chunks and holdings are taken on any link (an answer to a row
+  WANT, and its acknowledgement, can name the cell's column):
+  - a cell that names its column group: verified, stored, and acknowledged to that peer with a holding;
+  - a copy S wrote to that peer (its room in flight), and the peer's holding of it: the room freed;
+  - the same copy written again, as a probe's answer is whatever the peer holds, and the same holding, whose bit
+    is no longer new: the room freed again;
+  - a copy of a column's cell naming an index beyond the header's count: rejected and counted against the sender,
+    without an error;
+  and from a fourth peer with both JOINs taken back: a cell stored, and its holding freeing the room;
+- (i) a holding of a column group that claims it whole (`claim_all`), from the third peer: kept in `peer_has` with
+  its claim, but the peer is not a claimant S would probe (`claims`), as the probe is a WANT that link ignores;
+  the control, the same from p, whose link joined columns: a claimant.
 On the document before the rule, (a), (b), (c), (e) and (f) fail; on the documents that tested chunks and holdings
-for the link's types, (h) fails.
+for the link's types, (h) fails; before a repeated bit freed the room, (h)'s third part fails; before the toy's
+level 1 checked a cell's index, (h)'s fourth part raises; before a claim needed a joined link, (i) fails.
 """
+import copy as C
 import sys
 from pathlib import Path
 
@@ -137,7 +148,8 @@ def main():
          f"or owed)", answered, True)
 
     src = sim.nodes[1].ns                           # the source holds every cell from its publish
-    cg = next(g for g in sorted(src["chunks"]) if sim.gtype.get(g) == "column" and src["chunks"][g])
+    cols = [g for g in sorted(src["chunks"], key=str) if sim.gtype.get(g) == "column" and src["chunks"][g]]
+    cg = cols[0]
     f = src["chunks"][cg][min(src["chunks"][cg])]
     both = [q for q in sorted(S.peers) if q not in (1, p, p2) and all(T in ns["join_recv"][q] and T in
             ns["join_sent"][q] for T in (COL, ROW))]
@@ -148,17 +160,76 @@ def main():
         del ns["join_recv"][p3][COL]
         del ns["join_recv"][p4][COL]
         del ns["join_recv"][p4][ROW]
-        took, held, spec_chunk, spec_hold = [], [], ns["on_chunk"], ns["on_holding"]
-        ns["on_chunk"] = lambda q, ch: took.append(q)
-        ns["on_holding"] = lambda q, h: held.append(q)
-        hv = Wm.IDONTWANT(Wm.HaveBitmap(group=cg, bits=ns["bitmap"]({f.index})))
-        for q in (p3, p4):
-            ns["on_frame"](q, Wm.Frame(Wm.Entry(chunk=f)))
-            ns["on_frame"](q, Wm.Frame(Wm.Entry(control=hv)))
-        ns["on_chunk"], ns["on_holding"] = spec_chunk, spec_hold
-        line(f"(h) a cell naming column {sim.gcol[cg]}, and a holding of it: from node {p3} (rows only joined), from "
-             f"node {p4} (neither): chunk taken, holding taken", ((p3 in took, p3 in held), (p4 in took, p4 in held)),
-             ((True, True), (True, True)))
+        to = []
+        ns["send"] = lambda q, m, urgent=False: (to.append((q, m)), spec_send(q, m, urgent))[1]
+        bitmap = ns["bitmap"]
+
+        def holding(g, i, claim=False):
+            hb = Wm.HaveBitmap(group=g, bits=bitmap({i}))
+            hb.claim_all = claim
+            return Wm.Frame(Wm.Entry(control=Wm.IDONTWANT(hb)))
+
+        def stored(g, i):
+            return ns["received"][g].has(i)
+
+        def acked(q, g):
+            return any(r == q and type(m).__name__ == "Have" and m.group == g and not m.offer for r, m in to)
+
+        def written(q, ch):                         # S's writer took room for ch and wrote it to q
+            ns["in_flight"] += 1
+            ns["track_in_flight"](q, ch, 1)
+
+        def room(q, ch):
+            return (q, ch.group, ch.index) in ns["sent"]
+
+        try:
+            ns["on_frame"](p3, Wm.Frame(Wm.Entry(chunk=f)))
+            got = (stored(cg, f.index), acked(p3, cg))
+        except Exception as e:
+            got = f"{type(e).__name__}: {e}"
+        line(f"(h) node {p3}, rows only joined: a cell naming column {sim.gcol[cg]}: stored, acknowledged to it",
+             got, (True, True))
+        g2 = cols[1]
+        f2 = src["chunks"][g2][min(src["chunks"][g2])]
+        written(p3, f2)
+        before = (room(p3, f2), ns["in_flight"])
+        ns["on_frame"](p3, holding(g2, f2.index))
+        line(f"(h) node {p3}: S's copy of a cell of column {sim.gcol[g2]} in flight, then the peer's holding of it: "
+             f"room held before, held after, in flight back", (before[0], room(p3, f2), ns["in_flight"] == before[1] - 1),
+             (True, False, True))
+        written(p3, f2)
+        before = (room(p3, f2), ns["in_flight"])
+        ns["on_frame"](p3, holding(g2, f2.index))
+        line(f"(h) node {p3}: the same copy written again, the same holding, its bit not new: room held before, "
+             f"held after, in flight back", (before[0], room(p3, f2), ns["in_flight"] == before[1] - 1),
+             (True, False, True))
+        g3 = cols[2]
+        f3 = src["chunks"][g3][min(src["chunks"][g3])]
+        bad_cell = C.copy(f3)
+        bad_cell.index = sim.ghdr[g3].count          # an index the column's header does not have
+        n_pen = len(pen)
+        try:
+            ns["on_frame"](p3, Wm.Frame(Wm.Entry(chunk=bad_cell)))
+            got = (stored(g3, bad_cell.index), pen[n_pen:])
+        except Exception as e:
+            got = f"{type(e).__name__}: {e}"
+        del pen[n_pen:]
+        line(f"(h) node {p3}: a copy of a cell of column {sim.gcol[g3]} naming index {bad_cell.index}, beyond the "
+             f"header's count: stored, penalties", got, (False, [p3]))
+        g4 = cols[3]
+        f4 = src["chunks"][g4][min(src["chunks"][g4])]
+        ns["on_frame"](p4, Wm.Frame(Wm.Entry(chunk=f4)))
+        written(p4, f2)
+        ns["on_frame"](p4, holding(g2, f2.index))
+        line(f"(h) node {p4}, neither type joined: a cell of column {sim.gcol[g4]} stored; S's copy in flight to it "
+             f"freed by its holding", (stored(g4, f4.index), room(p4, f2)), (True, False))
+        g5 = cols[4]
+        ns["on_frame"](p3, holding(g5, 0, claim=True))
+        ns["on_frame"](p, holding(g5, 0, claim=True))
+        line(f"(i) a holding of column {sim.gcol[g5]} claiming it whole: from node {p3} (rows only): its claim kept, "
+             f"a claimant; from p (columns joined): a claimant",
+             ((ns["peer_has"][p3][g5].claim_all, p3 in ns["claims"].get(g5, ())), p in ns["claims"].get(g5, ())),
+             ((True, False), True))
     line("penalties", pen, [])
 
 
