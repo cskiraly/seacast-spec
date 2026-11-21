@@ -22,14 +22,33 @@ that tier 4 measured carries over unchanged where §5 says so. Every design deci
 `[D1]` … `[D12]`, and [`protocol-v2-decisions.md`](protocol-v2-decisions.md) records where each bites
 and what was decided (§8). The toy runs this document on top of `protocol.md`'s
 (`toy/run.py --doc v2`): `protocol.md`'s blocks are loaded first, this document's after them, and
-the tier 4 setting is checked against `protocol.md`'s recorded cells (v0.9's rules since 2026-11-12,
-re-recorded on 2026-11-15 with the toy's transport keeping §7.3's rule). Draft 0
-(2026-10-06) was written without running; draft 1 is what executing it changed.*
+the tier 4 setting is checked against its own recorded cells, which §6.1 compares with
+`protocol.md`'s. Draft 0 (2026-10-06) was written without running; draft 1 is what executing it
+changed.*
 
 *[`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind this draft's reasons,
 each with its conditions.*
 
 ## 0. How to read this
+
+**How it is organized.**
+- §1 to §3 define the notions (§1), the messages (§2) and the state a node keeps (§3).
+- §4 defines what a node does at each event: joining and keeping its relations, the arrival of each
+  message, forwarding, completion and repair, publishing, the heartbeat, sampling and sending.
+- §5 maps what carries over from `protocol.md` unchanged.
+- §6 gives the settings: `protocol.md` as one, the five designs, and the parameters, limits and
+  constants.
+- §7 says what every binding provides, and what the bindings differ in.
+- §8 points to the record of the decisions.
+- The glossary, after §8, defines the document's terms and its labels.
+
+**Three companion documents** go with this one:
+- [`protocol-v2-bindings.md`](protocol-v2-bindings.md) defines the bindings: how each carries the
+  messages, and the standalone binding's bytes.
+- [`protocol-v2-decisions.md`](protocol-v2-decisions.md) records each decision: when it was taken,
+  what was not taken and why, and the runs behind it.
+- [`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind the reasons, the toy's
+  and a few of the research harness's, each with its conditions.
 
 Gossipsub bundles its notions: a *topic* is the namespace, the unit of subscription, the unit of
 the mesh, the scope of scoring and the rendezvous; a *subscription* means "everything here", is
@@ -92,28 +111,8 @@ necessarily a custody group.
 wherever the object is the same (`peer_has`, `pushed`, `holders`, `mine`, `received`); the header
 of a group is `protocol.md`'s `desc`, read here as `hdr`. New helpers are listed in §3.
 
-**Requirement labels.** The draft was written against a list of requirements; the labels it cites
-are these ([P4] is v0.4's tag, its §5.1: the source's holding names only the chunks it has sent;
-since v0.9, the chunks acknowledged so far, §4.7).
-
-| label | requirement |
-|---|---|
-| I3 | pushes, announcements and gossip go into interest only |
-| I6 | a sample is disclosed only to the peers asked for it |
-| I7 | level 1 verifies a chunk alone, level 2 checks the consistency of a set; both per object type |
-| I8 | a node may hold chunks it did not receive through the protocol |
-| P2 | a chunk is held until its header is validated, and the header travels once |
-| P7 | scoring reads interest |
-| R2 | a row member's interest is K of 128 cells, a decoder's is all |
-| R3 | reconstruction duty is designated and phased |
-| R4 | a chunk may belong to two groups, and a verified cell fills both |
-| R5 | a claim defers others' reconstruction, and silence after it re-arms them |
-| R6 | what a peer may pull is bounded by what it may want |
-| R7 | rows must not cost the column path traffic |
-| X2 | the protocol is its own, where that gains over an extension of gossipsub |
-| X3 | one window and one duty rule over every group |
-| X6 | limits before state, for every object type |
-| X8 | the source is a role, not a node |
+**Requirement labels.** The requirement labels the text cites, such as I3 or R5, and the tag [P4]
+are defined in the glossary.
 
 **Numbers.** The figures measured for this draft, each with its conditions, are in
 [`protocol-v2-figures.md`](protocol-v2-figures.md), grouped by the section that cites them.
@@ -3225,9 +3224,9 @@ fixed both.
 the toy checks for every setting (`toy/invariants.py`) are these: every node completes its interest
 given a source; nothing is pushed outside interest; upload within the duty bounds; a claim whose
 probe goes unanswered is detected; one cell fills both groups;
-the tier 4 setting reproduces `protocol.md`'s
-cells. All six are checked: the first three on every run, the claim and cross-fill ones under the
-row setting, the last by `check.py --doc v2 --golden golden.txt`.
+the tier 4 setting reproduces its own recorded cells (§6.1).
+All six are checked: the first three on every run, the claim and cross-fill ones under the
+row setting, the last by `check.py --doc v2`.
 
 #### Rationale
 
@@ -3510,3 +3509,193 @@ The design decisions `[D1]` to `[D12]`, and the others this draft took, are reco
 [`protocol-v2-decisions.md`](protocol-v2-decisions.md): for each, the rule decided and where it bites
 here, when it was decided, what was not taken and why, and the runs behind it. The code's comments cite
 the labels where each decision bites.
+
+## Glossary
+
+The document's own terms, each with the section that defines it. The terms it uses as `protocol.md`
+does, such as announcer, budget, card and tier, expired, last resort, park, promise, stop-pull and
+tie, are in [`protocol.md`](protocol.md)'s glossary.
+
+- **acknowledgement**: the holding a node sends the peer a chunk came from (§1.5, §4.2). It frees
+  the room the copy took in the sender's window (§4.3, §4.11). At a source, a chunk is acknowledged
+  at the first holding naming it from any peer, or else at the first window timeout of a copy of it
+  (§4.7).
+- **announce relation**: the peers a node tells what it holds: every peer that can push to it, every
+  peer it pushes to, and beyond them a width that `ANNOUNCE_EXTRA` sets (§1.3, `[D5]`).
+- **ask**: a request for one index of a group, keyed `Ask(g, i)` (`protocol.md`'s `WantIndex`; §3)
+  and carried in a WANT (§2). Asks on offers follow `protocol.md` §6.1's pull discipline (§4.3).
+- **ask window**: `protocol.md`'s `IWANT_WINDOW`, how long one ask of a chunk is in flight before
+  the retry. It stretches as the node's uplink falls below `ASK_UPLINK` (§4.13).
+- **backoff**: after a PRUNE it receives, the time during which a node does not graft that peer
+  again for the relation the PRUNE named (`PRUNE_BACKOFF`, §4.1).
+- **chunk**: one index of a group, with the proof that verifies it alone. A payload chunk fills one
+  (group, index) pair, and a cell two, in its column and in its row (`project`, §1.1, R4).
+- **claim**: either of the two flags a holding carries besides its bitmap (§1.5, `[D3]`).
+  `claim_all`: the sender holds or can produce every index, `protocol.md`'s decode claim, made at K
+  before the decode. `complete`: the sender's interest in the group is satisfied. Both are
+  unverified; a probe verifies a `claim_all` that defers a decode (§4.6).
+- **colour**: one of `M` values that partition a group's indices (`colour_of`, §1.4, `[D10]`). A
+  chunk is pushed eagerly only on links whose push relation for its family holds its colour. A
+  colour is not a subnet (§0).
+- **completion**: the point at which a node's interest in a group is satisfied: K distinct chunks
+  for interest `ALL`, every index of its column for a custodian, K cells for a row member, and its
+  declared indices for a sampler (§1.5).
+- **coverage floor**: at least `SAMPLE_COVER` links serving each family, which a node keeps for a
+  type it samples; a peer of high custody counts for at most `COVER_HIGH` families (§1.3, §4.1,
+  `[D12]`).
+- **custodian**: a node whose interest in a column is derived from its node id and custody count;
+  on the column it is `(DERIVED, FORWARD)` (§1.2).
+- **deferral**: two things. A copy of a group whose gate has not opened is deferred: kept in a
+  bounded per-peer store until the gate opens, or refused, and either way it ties its sender (§4.2).
+  A peer's `claim_all` defers a node's armed later decode of the group once, by at least
+  `DEFER_WINDOW`, while a probe verifies the claim (§4.6, R5).
+- **duty**: what a node does for others, declared per link at JOIN. With `FORWARD` it holds push and
+  announce relations and forwards what it receives into others' interest; with `NONE` it receives
+  only (§1.2).
+- **evidence**: an object a node can publish about a group it found inconsistent at level 2, where
+  the object type defines one. This document carries it and does not define it, and no object type
+  defines one in this version (§1.5, `[D6]`).
+- **family**: the key on which relations are formed: one for the payload, the column index for a
+  column, the row's subnet for a row (`family`, §1.1). It is not necessarily a custody group (§0).
+- **floor**: the rule that a node keeps, per family it has duty in and per colour, at least `F_LO`
+  and at most `F_HI` peers in its in-relation (§1.4, `[D10]`). `keep_floor` keeps the links it forms
+  on (§4.1). The coverage floor, `REPAIR_FLOOR` and `SOURCE_FLOOR` are floors on links (§1.3, §4.6,
+  §4.7).
+- **forwarding node**: any node with duty `FORWARD` (§1.6). §4.4 says whom it pushes and offers a
+  chunk to.
+- **frame**: a binding's unit on the wire, which can carry several messages (§4,
+  `protocol-v2-bindings.md` §0).
+- **gate**: the event after which a group's chunks can be verified and asked for: the installed
+  block for the payload, a validated header for cells (`authenticable`, §4.2).
+- **GRAFT**, **PRUNE**: the messages that form and end a relation for one family and colour, with a
+  direction, `OUT`, `IN` or `BOTH` (§2). A GRAFT is answered, by a GRAFT marked as the yes
+  (`answer`) or by a PRUNE, except on gossipsub's wires; a PRUNE ends the relation at both ends
+  (§4.1).
+- **group**: one instance of an object type, such as one column of one block. Its id is computable
+  before any chunk of it exists (§1.1).
+- **HAVE**: the message that carries a bitmap of one group's chunks, as a holding or as an offer by
+  its `offer` flag, with the two claims on a holding (§2).
+- **header**: what the verifier needs for a group, arriving through the gate of its object type: the
+  descriptor for the payload, the `PartialDataColumnHeader` for cells (`header_of`, §1.1). It is
+  `protocol.md`'s `desc`, read here as `hdr` (§0).
+- **high custody**: a custody count above the base one, or interest `ALL` (§1.3). A peer of high
+  custody counts for at most `COVER_HIGH` families in the coverage floor.
+- **holding**: a HAVE saying that its sender holds these chunks, verified (`offer` unset), as
+  `protocol.md`'s IDONTWANT with a bitmap (§2). It goes to the suppression scope: it suppresses
+  pushes, acknowledges the chunk just received, and counts its sender as a holder (§1.5, §4.3).
+- **interest**: what a node is to receive of a group, declared per link and object type at JOIN, in
+  three kinds: `ALL`, the whole object; `DERIVED`, computed by both ends from the node id and
+  custody count; `DECLARED`, told per group and per peer in a WANT (§1.2).
+- **JOIN**: the message each end of a connection sends once per object type, with its interest,
+  custody count, duty and number of colours (§2, `[D11]`). On gossipsub's wires it is a subscription
+  (§4.1).
+- **K, N**: per object type, the chunks from which the whole object follows (`threshold`) and the
+  indices of a group (`index_count`). A column has no code, so its K is its N (§1.1).
+- **level 1, level 2**: per object type, the check of one chunk alone (`verify`) and the check of a
+  set's consistency, by decoding, re-encoding and comparing (`decode`) (§1.1). Level 3 is the
+  application (§5).
+- **link**: a connection on which both ends have exchanged a JOIN for an object type (§1.3). A node
+  counts a peer as a link once the peer's JOIN has arrived and its own is queued (`links`, §3).
+- **object type** (`T`): the consensus side's contribution: an index space, how one chunk is
+  verified alone, how a set is checked and rebuilt, how a receiver learns the header, and how a
+  chunk maps onto groups (§1.1). §1.1's table gives the payload, the column and the row.
+- **offer**: a HAVE saying that its sender can be asked for these chunks (`offer` set), as
+  `protocol.md`'s IHAVE with a bitmap (§2). It goes to a peer the sender chose not to push a chunk
+  to, or to a peer outside the relation, and feeds that peer's offer table and nothing else (§1.5,
+  §4.3).
+- **owed**: as in `protocol.md`, and also a JOIN, GRAFT or PRUNE that a full queue refused, queued
+  in order once there is room (§4.1), and a push to a fallback link that a full queue refused
+  (§4.7).
+- **phase**: two different things. A sampler's first phase declares every sample at once and waits
+  `SAMPLE_RETRY`; its second declares each sample still missing to another peer (§4.10, `[D12]`).
+  EIP-8371's three phases rebuild a row: a row reconstructor at K, then, if the row is still short,
+  a supernode, and later any member of its subnet (§4.6, `[D4]`).
+- **probe**: the one ask that verifies a peer's `claim_all`, of one claimant for one index the asker
+  lacks, both drawn at random. The WANT's `probe` field marks it, and the claimant answers it
+  whatever the asker's holdings say, once per asker and group (§2, §4.6, R5).
+- **pull-only type**: an object type whose chunks are not pushed, only told in holdings and offers,
+  at the source too (`EAGER` off): the rows (§1.1, §4.7).
+- **push relation**: per link, object type and family, the colours for which a node pushes chunks
+  to the peer (`push_out`) and those for which the peer pushes to it (`push_in`). GRAFT and PRUNE
+  negotiate it with a direction, so it is not necessarily symmetric (§1.3, §4.1).
+- **reconstructor**: a node whose repair rule says it decodes a group or a block that it does not
+  need whole for itself (§1.6, §4.6).
+- **relation**: either of the two a node keeps per link, object type and family: the push relation
+  and the announce relation (§1.3).
+- **rendezvous**: where a node finds peers that share an object type and a family: gossipsub topics
+  where they exist, the ENR's `cgc` and node ids. It is assumed, not defined here (§0, `[D11]`).
+- **repair**: sending the chunks a node rebuilt to the peers that `REPAIR_TO` names, group by group,
+  into every group each chunk fills (§4.6, `[D4]`).
+- **routed sample request**: a sampler's WANT with `hops` above zero, sent where no link serves the
+  sample to a link with duty `FORWARD`. Each node on the way answers from what it holds and passes
+  it one step on, and the cell comes back the way the request went (§4.5, §4.10, `[D12]`).
+- **routing neighbours**: an option of the rendezvous: for each node with duty `FORWARD`,
+  `ROUTE_FLOOR` links to custodians of families at structured distances from its own, toward which
+  a routed request steps (§1.3, `[D12]`).
+- **row member**: a node that takes part in a row's family: the row of its own subnet
+  (`wants_family`, §4.6). It completes at K cells (§1.5).
+- **sampler**: a node with interest `DECLARED` and duty `NONE`. It declares each sample to one peer,
+  and asks each peer for at most one sample of a block (§1.2, §4.10).
+- **sampling-only link**: a link opened where a node's other links leave its coverage floor short,
+  joined as `(DECLARED, NONE)`; it carries no relation, no push and no offer (§1.3).
+- **serving**: answering an ask from what a node holds, received or rebuilt, within `SERVE_LIMIT`
+  chunks per peer and group (§4.5, R6). It does not depend on duty (§1.2).
+- **source**: any node that holds chunks of a group before its peers do, such as the builder, or a
+  node that built columns from its mempool. The role is read from holdings, not announced (§1.6,
+  X8). §4.7 gives its rules.
+- **source pool**: the peers a source offers a chunk to and, below `STRIPE_UPLINK`, pushes it to:
+  its push relation for the chunk's colour or, with none for that colour in the family, the links
+  whose interest holds the chunk, its fallback links (`source_pool`, §4.7).
+- **standing request**: a WANT that the peer answers from what it holds and, for the rest, when the
+  chunks arrive, within the group's lifetime (`standing`; §2, §4.5). A sampler's WANT on a
+  `DECLARED` link is always one (§2).
+- **subnet's view**: what a row member holds of a row, together with what the holdings of its
+  relation peers show; no claim counts in it (`known_in_scope`, §4.6).
+- **supernode**: a custodian of every column. It keeps every row with interest `ALL` declared on no
+  link, and rebuilds a row still short at EIP-8371's second phase (§1.2, §4.6).
+- **suppression scope**: the peers that can push a group to a node; its holdings go to them (§1.3,
+  §1.5).
+- **WANT**: the message that asks one peer for chunks of a group, by bitmap: what the sender asks
+  that peer for, not what it lacks (§2, `[D2]`). Its fields make it a standing request, a routed
+  sample request or a probe.
+- **window**: `protocol.md` §7.1's sending window, one per node over every group of every object
+  type, counted in bytes (`W_BYTES`): a chunk takes its size on the wire (`wire_size`), and control
+  takes none (§4.8, §4.11, X3). The ask window is another (§4.13).
+
+**Requirement labels.** The draft was written against a list of requirements; the labels it cites
+are these ([P4] is v0.4's tag, its §5.1: the source's holding names only the chunks it has sent;
+since v0.9, the chunks acknowledged so far, §4.7).
+
+| label | requirement |
+|---|---|
+| I3 | pushes, announcements and gossip go into interest only |
+| I6 | a sample is disclosed only to the peers asked for it |
+| I7 | level 1 verifies a chunk alone, level 2 checks the consistency of a set; both per object type |
+| I8 | a node may hold chunks it did not receive through the protocol |
+| P2 | a chunk is held until its header is validated, and the header travels once |
+| P7 | scoring reads interest |
+| R2 | a row member's interest is K of 128 cells, a decoder's is all |
+| R3 | reconstruction duty is designated and phased |
+| R4 | a chunk may belong to two groups, and a verified cell fills both |
+| R5 | a claim defers others' reconstruction, and silence after it re-arms them |
+| R6 | what a peer may pull is bounded by what it may want |
+| R7 | rows must not cost the column path traffic |
+| X2 | the protocol is its own, where that gains over an extension of gossipsub |
+| X3 | one window and one duty rule over every group |
+| X6 | limits before state, for every object type |
+| X8 | the source is a role, not a node |
+
+**Decision labels.** Each label names one of the design decisions that
+[`protocol-v2-decisions.md`](protocol-v2-decisions.md) records (§8):
+- `[D1]` identity and bindings
+- `[D2]` two bitmaps, WANT per recipient, no need bitmap
+- `[D3]` two claims
+- `[D4]` repair's parameters
+- `[D5]` the announce relation's width
+- `[D6]` the payload's consistency route
+- `[D7]` groups per column and per row, cross-fill
+- `[D8]` the row pull delay
+- `[D9]` one document or a sibling
+- `[D10]` colours
+- `[D11]` join = (interest, duty); topics as rendezvous
+- `[D12]` a sampler's reach

@@ -29,7 +29,7 @@ names how SEACAST diffuses.
   that a proposer of many groups must send its own chunks before its offers and answers (its
   §4.12), that a row member needs a custodian link for every column, to gather its row and to
   repair the columns (its §4.6: the repair floor, which EIP-8371's fanout presumes), and that a
-  rebuilt cell must complete the groups it fills (its §4.6).
+  rebuilt cell must complete the groups it fills (its §4.6). Its glossary defines its terms.
 - [`protocol-v2-bindings.md`](protocol-v2-bindings.md): the next version's bindings, a companion of
   `protocol-v2.md`, whose §7 says what every binding provides. The standalone binding, SEACAST's own
   protocol (`/seacast/2.0.0`), is defined to the byte, on a stream of its own or in Waggle's framing.
