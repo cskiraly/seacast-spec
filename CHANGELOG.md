@@ -13,6 +13,104 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
+## After v0.10.11 — not yet released
+
+The next version bounds more of what a peer can make a node keep or serve: asks outside what it
+serves, a WANT's index and group, the relations on a link, the answers to one peer in a heartbeat
+and the routed requests it passes on.
+
+### Rules
+- `protocol-v2.md` §4.5: once a group's gate is open, an ask outside what the node serves is ignored
+  without penalty (`outside`): an index the node does not hold, outside its interest as declared to
+  the asker, in a group it has not claimed whole, unless it is a routed request to a node whose duty
+  towards the asker is `FORWARD`. An ask that came before the gate is tested when it opens
+  (`drop_outside`). An ask for an index the asker itself claimed is penalised as before.
+- `protocol-v2.md` §4.5, §6.3: a forwarder keeps a routed request standing outside its own interest
+  only if it passed the request on, and adds no bit to a `DECLARED` asker's interest for it. A
+  request counts against `FORWARD_LIMIT` once the next peer's queue admits it; the count is per
+  object type (`forwarded`), and §6.3's floor also counts requests that converge on one link.
+- `protocol-v2.md` §4.5: a WANT's index at or past the group's count, or, before the count is known,
+  at or past the type's `MAX_INDICES`, is ignored without penalty. When the group opens, what was
+  kept before the count loses the indices past it (`drop_wants_beyond`).
+- `protocol-v2.md` §3, §4.5: a group the node has not opened takes one of the asker's
+  `MAX_PENDING_GROUPS` places for unknown groups in WANTs (`admitted_group`), counted apart from
+  HAVEs and offers and taken after the outside test. A place frees when the group resolves, when its
+  lifetime passes (with the asker's standing requests, route marks and interest bits for the group)
+  or at the close; the node frees places at each heartbeat at the latest and before a group opens.
+  An ask beyond the limit is ignored.
+- `protocol-v2.md` §2, §4.1, `protocol-v2-bindings.md` §1.1: chunks and holdings are taken on any
+  link. A JOIN for an object type the node does not run, and a GRAFT, PRUNE, offer or WANT for a
+  type the link has not joined (`joined`), are ignored without penalty. On gossipsub, a sampler
+  subscribed to none of the type's topics counts as joined at the serving end
+  (`protocol-v2-bindings.md` §6).
+- `protocol-v2.md` §4.2, §4.3, §4.6: a claim of a whole group on a link that has not joined its type
+  goes into `peer_has` with its bits and `claim_all`; the peer becomes a claimant only by such a
+  holding on a joined link. A tie on a link not joined is no offer at the header, and the custodian
+  alarm asks only row members on links that joined the row type.
+- `protocol-v2.md` §4.1, §6.3: a link has at most `MAX_RELATIONS` pairs of family and colour of a
+  type, in any state (`relation_room`). At the limit, a GRAFT for a new pair is ignored with no
+  answer, a PRUNE for one sets no backoff, and the node's own upkeep grafts none.
+- `protocol-v2.md` §4.5, §6.3: a node answers one peer at most `SERVE_BUDGET` chunks a heartbeat
+  across groups (`served_hb`), each counted in the heartbeat the node decides to give it. Answers to
+  asks on its own offers, recorded as its writer writes them (`offers_in`), and to a claim's probe
+  are not counted; an ask over the budget is refused without penalty.
+- `protocol-v2.md` §4.5: an id asked twice in one frame is counted once against the budget, the
+  stock limit and `[R6]`'s. A plain ask of an index the frame also probes in the same group is that
+  probe, if the probe would pass; a cell asked through both its types in one frame is one id,
+  charged to the ask that gives the answer.
+- `protocol-v2.md` §4.7: the source's publish answers the standing requests waiting for its chunks.
+
+### Added
+- `protocol-v2.md` §1.1: `TypeParams` gains `MAX_RELATIONS` and `MAX_INDICES`, and the repair's
+  `REPAIR_SAMPLE`, `SAMPLE_WAIT` and `REPAIR_REASK`, which §6.3 already listed.
+- `protocol-v2.md` §4.1, `protocol-v2-bindings.md` §3: two open items, whether an owed answer to a
+  repeated GRAFT is merged with a later one for the same pair, and which Waggle stream carries a
+  cell answered across its types, and its holding, where the two nodes share only the row type's
+  topic.
+- `protocol-v2.md` §6.1: two more differences from `protocol.md` that no recorded cell exercises,
+  an id asked twice in a frame and a link not joined.
+- `protocol-v2-figures.md` §4.5: the count of asks outside what a node serves, in the toy before the
+  rule.
+- `toy/outside_ask_known.py`, `toy/want_bounds_known.py`, `toy/unknown_groups_known.py` (under both
+  documents), `toy/relation_types_known.py`, `toy/relation_limit_known.py` and
+  `toy/serve_budget_known.py`: known answers for these rules; `toy/xcheck_observes_known.py`: one
+  for `--xcheck`.
+
+### Changed
+- `protocol-v2-bindings.md` §7.2, §7.3, §7.9: on the native QUIC binding, a cell's chunk stream is
+  read on a link that carries either of the cell's two types, and a stopped copy's room comes back
+  at a holding that reports its index even if the bit repeats.
+- `toy/golden-v2.txt`: `without-a` moves (p50 432 → 429 ms, p99 517 → 518 ms, 3.99 → 3.97 copies)
+  with the window's room freed at a repeated bit, under Fixed. `protocol-v2.md` §6.1 names it as
+  the difference a recorded cell shows; `protocol-v2-figures.md` §6.1 records it under "The
+  distance to the recordings, by date".
+- `toy/write_wait_known.py`: five cases. The control reaches the transport, then `write_waits` is
+  called with the write pending, then the next writer's run is queued; a write that completes at
+  once calls no `write_waits`; under `protocol-v2.md`, one case also runs with the window above its
+  cap. `protocol.md` §7.1's and `protocol-v2.md` §4.11's Rationales give the cases.
+- `toy/node.py`: `MAX_RELATIONS` and `SERVE_BUDGET` unbounded by default, `MAX_INDICES` per type,
+  the places for unknown groups in WANTs, `links(T)` per type in both upkeep modes, and `forwarded`
+  per type;
+  `toy/graft_check.py` takes `joined` and `relation_room`; `toy/alarm_member_known.py` and
+  `toy/v2_carried_known.py` cover links not joined.
+- `toy/README.md`: entries for the new known answers, and what the widened ones check.
+
+### Fixed
+- `protocol.md` §4.3, §4.4: `on_have` and `on_ihave` ignore a group beyond the peer's limit of
+  unknown groups (`admitted`), as §8.2 has said since v0.4.
+- `protocol-v2.md` §4.3: `on_holding` and `on_offer` ignore such a group too; `on_holding` had no
+  check since v0.6.
+- `protocol-v2.md` §4.3: a holding that repeats a bit frees the window's room of a copy written
+  since, as card 14 says. A probe's answer, exempt from cancel since v0.10, kept its room until the
+  timeout.
+- `protocol-v2.md` §3: a group with no entry in `interest` defaults to the node's own interest in
+  it, from what it declared: every index under `ALL`, its derived interest under `DERIVED`, the
+  cells it drew under `DECLARED`, and for a supernode every row too.
+- `toy/node.py`: the cell verifier checks the cell's header against its group's and its index
+  against that header's count, not only the slot; the payload type's `derived_interest` takes
+  `protocol-v2.md` §1.1's four arguments.
+- `toy/xcheck.py`: under `--doc v2`, `--xcheck` no longer stops at the first chunk written.
+
 ## v0.10.11 — 2026-11-21
 
 The next version gives a cell group's header three forms, moves its decisions and its figures to
