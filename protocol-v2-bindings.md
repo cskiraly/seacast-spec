@@ -24,6 +24,8 @@ differ in.*
 3. **the gossipsub binding** (§4): `protocol.md`'s wire, which the toy runs;
 4. **the partial-messages binding** (§5): gossipsub with the Partial Messages Extension.
 
+A native QUIC binding is being drafted.
+
 §6 has the rules on both of gossipsub's wires, and §7 the transports of a fetch outside the links.
 A node may speak more than one binding, and negotiates per link which one a peer takes.
 
