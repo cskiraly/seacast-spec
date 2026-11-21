@@ -1,8 +1,8 @@
 # SEACAST's next version (draft): its bindings
 
 > **DRAFT.** A companion of [`protocol-v2.md`](protocol-v2.md), released with it. The standalone
-> binding is defined to the byte (§1); the two bindings onto gossipsub's wires are defined to the
-> field (§2, §3). Checked in the toy only: no client speaks these bytes yet.
+> binding is defined to the byte (§1 to §3); the two bindings onto gossipsub's wires are defined to the
+> field (§4, §5). Checked in the toy only: no client speaks these bytes yet.
 
 *Written 2026-11-17 from `protocol-v2.md`'s §7 of that date, which it takes over whole, and the
 standalone binding's bytes, decided the same day. `protocol-v2.md` §7 now says what every binding
@@ -17,19 +17,19 @@ provides and which capabilities the bindings differ in.*
 - the standalone binding's bytes.
 
 The three bindings:
-1. **the standalone binding** (§1): a protocol of its own, on a libp2p stream of its own or in Waggle's
-   framing (§1.8);
-2. **v0.3's wire** (§3), `protocol.md`'s, which the toy runs.
-3. **gossipsub with the Partial Messages Extension** (§2);
+1. **the standalone binding** (§1 to §3): a protocol of its own, on a libp2p stream of its own or in Waggle's
+   framing (§3);
+2. **v0.3's wire** (§4), `protocol.md`'s, which the toy runs.
+3. **gossipsub with the Partial Messages Extension** (§5);
 
-§4 has the rules on both of gossipsub's wires, and §5 the transports of a fetch outside the links.
+§6 has the rules on both of gossipsub's wires, and §7 the transports of a fetch outside the links.
 A node may speak more than one binding, and negotiates per link which one a peer takes.
 
 **Terms.**
 - A **message** is one of `protocol-v2.md` §2's.
 - A **frame** is the unit a binding writes on the wire, and what it is depends on the binding:
-  - on the standalone binding's stream, a length prefix and one encoded message (§1.5);
-  - in Waggle's framing, one `ObjectPieces`, which Waggle length-prefixes itself (§1.8);
+  - on the standalone binding's stream, a length prefix and one encoded message (§2.2);
+  - in Waggle's framing, one `ObjectPieces`, which Waggle length-prefixes itself (§3);
   - on gossipsub's wires, gossipsub's protobuf `RPC`, which can carry several messages.
 
   It is not a frame of the layers below (QUIC's, or a stream multiplexer's), which carry these frames
@@ -37,21 +37,21 @@ A node may speak more than one binding, and negotiates per link which one a peer
   binding's are its own.
 
 **What is normative:**
-- §1, the standalone binding, to the byte;
-- §2 and §3, the bindings onto gossipsub's wires, to the field;
-- §4, the rules on gossipsub's wires.
+- §1 to §3, the standalone binding, to the byte;
+- §4 and §5, the bindings onto gossipsub's wires, to the field;
+- §6, the rules on gossipsub's wires.
 
-The sizes in §1.7 are informative.
+The sizes in §1.5 are informative.
 
 **At a glance**, message by message:
 
-| message | standalone (§1) | v0.3's wire (§3) | onto gossipsub with the Partial Messages Extension (§2) |
+| message | standalone (§1 to §3) | v0.3's wire (§4) | onto gossipsub with the Partial Messages Extension (§5) |
 |---|---|---|---|
-| JOIN | kind `0x01`, the first message per object type on a link | subscription; a sampler's is none (§4) | `SubOpts(topic, requestsPartial, supportsSendingPartial)` plus an extension field for duty and `M`; a sampler's `(DECLARED, NONE)` is no subscription (§4) |
+| JOIN | kind `0x01`, the first message per object type on a link | subscription; a sampler's is none (§6) | `SubOpts(topic, requestsPartial, supportsSendingPartial)` plus an extension field for duty and `M`; a sampler's `(DECLARED, NONE)` is no subscription (§6) |
 | GRAFT, PRUNE with colour and direction | kinds `0x02`, `0x03`: an accepted GRAFT is answered by one marked `answer`, and a GRAFT for a relation the receiver holds by a yes again; `PRUNE_BACKOFF` `protocol-v2.md`'s (§4.1 there) | stock, accepted in silence as on the extension binding; under `--upkeep on` the toy runs `protocol-v2.md` §4.1's answered exchange instead, `answer` carried beside the GRAFT, with `PRUNE_BACKOFF` from `--prune-backoff` | gossipsub's GRAFT/PRUNE with an extension field for the colour; direction `BOTH` only; no floor per colour; accepted in silence, as gossipsub's: the sender is in the relation from its GRAFT, and the backoff after a PRUNE keeps the ends together (`protocol-v2.md` §4.1) |
 | HAVE, holding | kind `0x04`, flag bit 0 clear | IDONTWANT `HaveBitmap`; `claim_all` and `complete` read from a full bitmap, or carried beside it (the toy's extension, needed for a row member complete at 64; the toy charges no bytes for them, the research harness's Go path a flags byte after the root, under version 4) | `partsMetadata.available` plus two flag bits |
 | HAVE, offer | kind `0x04`, flag bit 0 set | IHAVE `HaveBitmap` | `partsMetadata.available` to a peer not being pushed |
-| WANT | kind `0x05`: `standing` and `probe` in one flags byte, `hops` a byte | IWANT `WantIndex`; `standing`, `hops` and `probe` carried beside the index, as a holding's claims (the toy charges no bytes for them, the research harness's Go path a flags byte and a hops byte, 43 bytes in all, where `probe` would be a second bit of the flags byte) | `partsMetadata.requests`; `standing`, `hops` and `probe` need an extension field, which also asks for the part where the asker has not subscribed (§4) |
+| WANT | kind `0x05`: `standing` and `probe` in one flags byte, `hops` a byte | IWANT `WantIndex`; `standing`, `hops` and `probe` carried beside the index, as a holding's claims (the toy charges no bytes for them, the research harness's Go path a flags byte and a hops byte, 43 bytes in all, where `probe` would be a second bit of the flags byte) | `partsMetadata.requests`; `standing`, `hops` and `probe` need an extension field, which also asks for the part where the asker has not subscribed (§6) |
 | CHUNK | kind `0x06` for the payload, `0x07` for a cell | a gossipsub message per chunk | `partialMessage` |
 | EVIDENCE | kind `0x08`, reserved: none in this version (`[D6]`) | – | a full message on the rendezvous topic |
 | rendezvous | gossipsub topics per family, with the ENR beside them `[D11]` | the topic | the topics |
@@ -61,10 +61,10 @@ The sizes in §1.7 are informative.
 ### 1.1 The message encoding
 
 An **encoded message** is `kind || body`: one byte naming the message's kind, then the message's SSZ,
-compressed for the two chunk kinds (§1.4). The same encoded message travels on the stream (§1.5), in
-Waggle's framing (§1.8) and in a fetch outside the links (§5).
+compressed for the two chunk kinds (§1.3). The same encoded message travels on the stream (§2.2), in
+Waggle's framing (§3) and in a fetch outside the links (§7).
 
-| kind | message | body (§1.3) |
+| kind | message | body (§1.2) |
 |---|---|---|
 | `0x01` | JOIN | `JoinMsg` |
 | `0x02` | GRAFT | `GraftMsg` |
@@ -76,10 +76,10 @@ Waggle's framing (§1.8) and in a fetch outside the links (§5).
 | `0x08` | EVIDENCE | reserved: none in this version (`[D6]`) |
 
 - **Unknown kinds.** A message of an unknown kind is skipped without penalty, so that a later version
-  can add kinds. Its frame is held to the largest known kind's (§1.6): a longer one is a violation.
+  can add kinds. Its frame is held to the largest known kind's (§1.4): a longer one is a violation.
 - **Types not joined.** A message naming an object type the link has not joined is ignored without
   penalty (`protocol-v2.md` §2).
-- **Violations.** A body that does not decode, or one over its kind's bound (§1.6), is a violation: it
+- **Violations.** A body that does not decode, or one over its kind's bound (§1.4), is a violation: it
   is penalised, and the stream closed.
 
 ### 1.2 The types
@@ -142,7 +142,7 @@ class CellChunk(Container):            # 0x07
 - **The flags.** A flags byte's other bits are zero when sent and ignored when received, so that a
   later flag fits without breaking older readers.
 - **The enums.** A value outside `Direction`'s, `InterestKind`'s or `Duty`'s list is a violation. A
-  `TypeId` a node does not know names a type the link has not joined, and is ignored (§1.2).
+  `TypeId` a node does not know names a type the link has not joined, and is ignored (§1.1).
 - **The payload's chunk (`0x06`)** is `protocol.md` §2's `Chunk`, unchanged: its proof a
   `List[Bytes32, 14]`, its header the descriptor it carries under design A; under design B the bid
   carries the descriptor and the chunk does not, a choice `protocol.md` §1 leaves open. It is the
@@ -178,7 +178,7 @@ class CellChunk(Container):            # 0x07
   - *a cell:* one id whichever group carries it, so that a copy through the other axis, or one with a
     header, is the same chunk to `seen`. It is its column's `GroupId`, its row as the index, and the
     first 20 bytes of SHA-256 over the cell and its proof.
-- **A chunk's size** (`wire_size(p, entry)`, `protocol-v2.md` §3) is its frame's on the stream (§1.5),
+- **A chunk's size** (`wire_size(p, entry)`, `protocol-v2.md` §3) is its frame's on the stream (§2.2),
   with the header when its write carries one, so that the window counts what the link carries.
 
 ### 1.3 Compression
@@ -186,7 +186,7 @@ class CellChunk(Container):            # 0x07
 - **The two chunk kinds** (`0x06`, `0x07`) carry their SSZ compressed with snappy's block format, as
   gossip carries chunks and data columns. A partly filled blob's cells are mostly zeros.
 - **The decompressed length,** which a snappy block states first, is checked against the kind's bound
-  (§1.6) before decompressing.
+  (§1.4) before decompressing.
 - **The other kinds** carry their SSZ as it is: a few dozen bytes, mostly a key and a bitmap, which
   snappy would lengthen.
 
@@ -236,7 +236,7 @@ GRAFT, and scoring on these messages (`protocol-v2.md` §7's capabilities, all o
 
 - **The protocol id is `/seacast/2.0.0`.** An incompatible change of these bytes or of the rules moves
   the major version. A compatible addition moves the minor, such as a kind that older readers skip
-  (§1.2). A node negotiates per link which binding, and which version, a peer takes.
+  (§1.1). A node negotiates per link which binding, and which version, a peer takes.
 - **One outbound stream per peer.** Each node opens one stream to each peer with the protocol id, and
   writes its frames there. It reads the peer's frames on the stream the peer opened.
 - **The writer's order.** Frames go in the order the writer chooses them (`protocol-v2.md` §4.12),
@@ -252,7 +252,7 @@ On the standalone binding's stream, a frame is one encoded message after its len
     frame := uvarint(len(kind || body)) || kind || body
 
 - The length is libp2p's unsigned varint.
-- Every frame §1.6 allows fits in at most 3 bytes of it.
+- Every frame §1.4 allows fits in at most 3 bytes of it.
 
 ## 3. In Waggle's framing
 
@@ -273,7 +273,7 @@ the framing changes.
 - **JOIN** is the first message the node sends that peer on the type's topic. Waggle sends to a peer
   only on the stream of its subscription, so a link forms once both ends have subscribed and each has
   sent its JOIN.
-- **Every message is one `ObjectPieces`, carrying one encoded message (§1.2):**
+- **Every message is one `ObjectPieces`, carrying one encoded message (§1.1):**
   - `objectID`: the `GroupId`'s 35 bytes, or for JOIN, GRAFT and PRUNE, which name no group, the one
     byte `0x00`;
   - `piecesMetadata`: the encoded message, for every message but a chunk; for a chunk, its kind byte
@@ -281,7 +281,7 @@ the framing changes.
   - `pieces`: a chunk's body, compressed as on the stream; empty otherwise.
 
   Waggle length-prefixes each `ObjectPieces` itself, so the encoded message carries no length. The
-  bounds of §1.6 are checked once Waggle has read the `ObjectPieces`.
+  bounds of §1.4 are checked once Waggle has read the `ObjectPieces`.
 - **Whom a node pushes, tells and asks is `protocol-v2.md` §4's.** SEACAST's rules take the place of
   the draft's dissemination prose (a new piece to the peers whose metadata shows it missing, metadata
   to some others), which lets the application choose the peers ("latency or other
@@ -293,7 +293,7 @@ the framing changes.
 - **What it does not give:**
   - scoring, which the draft leaves to the application and the standalone binding has on its own
     messages (P7);
-  - the fetch outside the links, whose transports are §5's.
+  - the fetch outside the links, whose transports are §7's.
 
 Waggle's `ObjectPieces` has the shape of the extension binding's partial message: a group id, the
 parts' metadata and the parts. So a client can move between the two changing mostly where the topic
@@ -305,9 +305,9 @@ lives.
 message-id strings inside existing control fields. Nothing here adds a protobuf field or a gossipsub
 message type. The toy runs `protocol-v2.md` on it.
 
-- **What it gives up** (`protocol-v2.md` §7's capabilities): the same as the extension binding (§2),
+- **What it gives up** (`protocol-v2.md` §7's capabilities): the same as the extension binding (§5),
   and EVIDENCE.
-- **The two ends of a relation** agree through gossipsub's backoff, as on the extension binding (§2).
+- **The two ends of a relation** agree through gossipsub's backoff, as on the extension binding (§5).
 - **The fork** is in the topic's name.
 - **A chunk's id** is `protocol.md` §2's structured `message_id`.
 - **An IDONTWANT's entries** are read as `protocol.md` §4.1 reads them. An IDONTWANT names no topic, so
@@ -327,7 +327,7 @@ message type. The toy runs `protocol-v2.md` on it.
   hops byte for the WANT (43 bytes), under version 4 of the strings.
 - **Gossipsub's IHAVE limits:** offers are IHAVEs, so a stock gossipsub client applies its own
   (`protocol-v2.md` §4.3).
-- **The mapping** is §0's table, right column.
+- **The mapping** is §0's table, middle column.
 
 ## 5. Onto gossipsub with the Partial Messages Extension
 
@@ -335,7 +335,7 @@ The binding for columns while the extension is the deployed path. It keeps the r
 existing topics.
 
 - **What it gives up** (`protocol-v2.md` §7's capabilities):
-  - interest without subscription, but for a sampler's (§4);
+  - interest without subscription, but for a sampler's (§6);
   - the push relation's floor and direction;
   - the answered GRAFT: it is accepted in silence;
   - scoring on SEACAST's own messages: gossipsub's applies.
@@ -362,12 +362,12 @@ existing topics.
   - the JOIN's duty and `M`, beside the subscription;
   - a GRAFT's colour;
   - the WANT's `standing`, `hops` and `probe`, which also ask for the part where the asker has not
-    subscribed (§4).
+    subscribed (§6).
 
   Their bytes are the extension's to define, beside its own fields.
 - **Gossipsub's IHAVE limits:** offers travel as `partsMetadata`, not as IHAVEs. Whether the extension
   limits them is not checked here (`protocol-v2.md` §4.3).
-- **The mapping** is §0's table, middle column.
+- **The mapping** is §0's table, right column.
 
 ## 6. A sampler on gossipsub's wires
 
@@ -416,5 +416,5 @@ considered:
 - a discv5 request in a handshake of two round trips (FullDAS's "new primitive outside of the libp2p
   framework", implemented in its simulator).
 
-Over a datagram, the standalone binding's encoded message (§1.2) needs no length prefix: the
+Over a datagram, the standalone binding's encoded message (§1.1) needs no length prefix: the
 datagram's boundary marks it.
