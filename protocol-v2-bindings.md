@@ -333,8 +333,9 @@ binding, as on a stream of its own; only the framing changes.
 
   Waggle length-prefixes each `ObjectPieces` itself, so the encoded message carries no length. The
   bounds of §1.4 are checked once Waggle has read the `ObjectPieces`.
-- **A cell group's header** (§1.6) travels as on the libp2p stream binding (§2.3), in the cell's
-  `CellChunk`.
+- **A cell group's header** (§1.6) travels as on the libp2p stream binding (§2.3):
+  `CellChunk.header` is empty under form (a) and carries the header under form (b), and form (c)
+  needs a message of its own, which this version does not define.
 - **Whom a node pushes, tells and asks is `protocol-v2.md` §4's.** SEACAST's rules take the place of
   the draft's dissemination prose (a new piece to the peers whose metadata shows it missing,
   metadata to some others), which lets the application choose the peers ("latency or other
@@ -397,10 +398,15 @@ protobuf field or a gossipsub message type. The toy runs `protocol-v2.md` on it.
   - *An entry with a reserved bit set,* a WANT of the wrong length, or a WANT whose `hops` is over
     its type's `ROUTE_HOPS` (`protocol-v2.md` §6.3) is ignored without penalty. For an IDONTWANT
     entry, ignored means not read as a holding: the entry stays an opaque id, as above.
-- **Open: the strings for cell groups, and the versions written.** Three points are left for a
-  later release: the 32 bytes that name a column's or a row's group; which version a node writes
-  when it has no flag to carry, since a `protocol.md` node reads version 1 only; and whether every
-  binding ignores a WANT whose `hops` is over `ROUTE_HOPS`, as this one does.
+- **Open: the strings for cell groups, and the versions written.** Five points are left for a later
+  release:
+  - the 32 bytes that name a column's or a row's group;
+  - a cell's id on this binding: `protocol.md` §2's `message_id` names a 32-byte group key, and a
+    cell travels on its column's topic and on its row's, where §1.2 gives it one id;
+  - which version a node writes when every extra field has its default value, since a `protocol.md`
+    node reads version 1 only;
+  - how a node under `protocol-v2.md` reads a version 1 `WantIndex`;
+  - whether every binding ignores a WANT whose `hops` is over `ROUTE_HOPS`, as this one does.
 - **EVIDENCE** would travel as a full gossipsub message on the family's rendezvous topic, as on the
   partial-messages binding (§0's table). None is defined in this version (`[D6]`), so this carrier
   is reserved, as SEACAST's message encoding reserves its kind `0x08` (§1.1).
