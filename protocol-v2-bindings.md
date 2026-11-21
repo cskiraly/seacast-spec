@@ -247,8 +247,11 @@ the libp2p stream binding and the gossipsub binding, and each binding says how i
   (§1.4), deduplication, cells held while their header is in flight, and a guard against headers
   with no cells after them. This version defines no bytes for it.
 
-The toy runs form (b) on the libp2p stream binding, where it charges the header on the first eager
-push of each group and link. On the gossipsub binding it runs form (a) and charges no header.
+In the toy a cell's header is available from its first cell on both wires (`protocol-v2.md` §4.2),
+so no cell waits for its block. The libp2p stream binding's wire charges the header on the first
+eager push of each group and link, form (b). The gossipsub binding's wire charges no header: that is
+form (a) for a node that holds the block before the cells, and the toy does not model a block that
+comes after its cells.
 
 ## 2. The libp2p stream binding
 
