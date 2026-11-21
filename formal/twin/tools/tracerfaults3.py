@@ -522,15 +522,19 @@ def watch_records(inside):
     T.Tracer3.write = write
 
 
-def bare_in_question_v2(per_node):
+def bare_in_question_v2(per_node, callee="N"):
     """Under v2: a question at node a (`peer_id_bytes`, its function replaced before the install by a layer of this
-    tool's own, which the tracer then wraps as the question) calls node c's traced `N` with one of node c's
-    descriptors, once. The tracer-wide depth makes that call bare at node c: no record there, a count `"c N"` in the
-    run's bare counts, and the trace's body that of the run without the plant. With `per_node`, each install gets a
-    depth state of its own (today's per-node depth, the planted fault): a record of `N` at node c starts inside node
-    a's question."""
+    tool's own, which the tracer then wraps as the question) calls a name at node c, once. The tracer-wide depth makes
+    that call bare at node c: no record there, and the trace's body that of the run without the plant.
+    - `N` (traced): with one of node c's descriptors; a count `"c N"` in the run's bare counts. With `per_node`, each
+      install gets a depth state of its own (today's per-node depth, the planted fault): a record of `N` at node c
+      starts inside node a's question.
+    - `on_iwant` (hand5-own's arguments): node c the node whose `on_iwant` is replaced (the silent node's, which
+      answers nothing); a traced name replaced there, counted `"c on_iwant"` as a traced one is.
+    - `after` (a tape question, a timer): node c's `after(0, a no-op)`; bare, on no tape, so the body is the plain
+      run's (taped on node a's question, it would differ); not counted (no traced name)."""
     tracer_instance()
-    nss, at = {}, [None]
+    nss, at, replaced_at = {}, [None], set()
     watch_records(lambda: at[0])
     _install = T.Tracer3.install
 
@@ -540,25 +544,66 @@ def bare_in_question_v2(per_node):
             self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0}
         st, a = self.vst, int(nd.id)
         nss[a] = ns
+        if getattr(getattr(ns["on_iwant"], "__code__", None), "co_filename", None) != T.DOC_FILE:
+            replaced_at.add(a)          # the node's own on_iwant (the silent node's), before the tracer wraps it
         doc = ns["peer_id_bytes"]
 
         def peer_id_bytes(p):
             if not PLANTED[0] and st["depth"] and st["ext"]:
-                c = next((i for i in sorted(nss) if i != a and F.unwrap(nss[i]["desc"])), None)
+                if callee == "on_iwant":
+                    c = next((i for i in sorted(replaced_at) if i != a), None)
+                else:
+                    c = next((i for i in sorted(nss) if i != a and F.unwrap(nss[i]["desc"])), None)
                 if c is not None:
                     PLANTED[0] += 1
                     SEEN["node a, node c"] = f"{a}, {c}"
-                    at[0] = (c, "N")
+                    at[0] = (c, callee)
                     try:
-                        nss[c]["N"](next(iter(F.unwrap(nss[c]["desc"]).values())))
+                        if callee == "N":
+                            nss[c]["N"](next(iter(F.unwrap(nss[c]["desc"]).values())))
+                        elif callee == "on_iwant":
+                            nss[c]["on_iwant"](a, None)
+                        else:
+                            nss[c]["after"](0, lambda: None)
                     finally:
                         at[0] = None
-                    SEEN["bare c N"] = TR[0].bare.get(f"{c} N", 0)
+                    if callee != "after":
+                        SEEN[f"bare c {callee}"] = TR[0].bare.get(f"{c} {callee}", 0)
             return doc(p)
         ns["peer_id_bytes"] = peer_id_bytes
         return _install(self, nd, ns)
 
     T.Tracer3.install = install
+
+
+def other_node_tape_v2():
+    """Under v2: at the first table read inside a record at node a, outside any question, node c's tape question
+    `peer_id_bytes` is called (a tape name, not a traced one). The tracer must stop before the call runs, as it does for
+    a traced name (the rule kept stricter than "a traced call")."""
+    tracer_instance()
+    nss = {}
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        r = _install(self, nd, ns)
+        nss[int(nd.id)] = ns
+        return r
+
+    T.Tracer3.install = install
+    _read = F.Recorder.read
+
+    @functools.wraps(_read)
+    def read(self, t, p):
+        st = TR[0].vst if TR else None
+        if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"]:
+            c = next((i for i in sorted(nss) if i != st["node"]), None)
+            if c is not None:
+                PLANTED[0] += 1
+                nss[c]["peer_id_bytes"](None)
+        return _read(self, t, p)
+
+    F.Recorder.read = read
 
 
 class Planted(Exception):
@@ -589,7 +634,7 @@ def suppressed_entry_v2(toy, off):
 
             def on_iwant(*a, **kw):
                 if live[0]:
-                    live[0] = False
+                    mode, live[0] = live[0], False
                     d = next(iter(F.unwrap(ns["desc"]).values()))
                     at[0] = (s, "N")
                     try:
@@ -603,7 +648,9 @@ def suppressed_entry_v2(toy, off):
                             ns["N"](d)
                     finally:
                         at[0] = None
-                    raise Planted()
+                    if mode == "raise":
+                        raise Planted()
+                    return []
                 return fn(*a, **kw)
             ns["on_iwant"] = on_iwant
         return _install(self, nd, ns)
@@ -611,18 +658,19 @@ def suppressed_entry_v2(toy, off):
     T.Tracer3.install = install
     _w = N.Node._write
 
-    def _write(self, p):
+    def _write(self, p):            # two entries: the first returns, the second raises (the state restored on both)
         st = TR[0].vst if TR else None
-        if (not PLANTED[0] and int(self.id) in silent and st and not st["depth"] and not st["supp"]
+        if (PLANTED[0] < 2 and int(self.id) in silent and st and not st["depth"] and not st["supp"]
                 and F.unwrap(self.ns["desc"])):
             PLANTED[0] += 1
-            live[0] = True
+            mode = "return" if PLANTED[0] == 1 else "raise"
+            live[0] = mode
             try:
                 self.ns["on_iwant"](p, None)
             except Planted:
                 pass
             SEEN["node s"] = int(self.id)
-            SEEN["supp after the raise"] = st["supp"]
+            SEEN[f"supp after the {mode}"] = st["supp"]
             SEEN["bare s N"] = TR[0].bare.get(f"{int(self.id)} N", 0)
         return _w(self, p)
 
@@ -633,10 +681,10 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
           "--alias-message", "--defer-chain", "--replaced", "--false-wrapper", "--stale-id", "--level1-in-cell",
           "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
           "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2", "--raw-chunk-id-v2",
-          "--hdr-other-v2", "--alias-missing-v2")
+          "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
-          "--suppressed-entry-v2-off")
+          "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2")
 HAND5 = ["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -664,9 +712,15 @@ def main(argv):
             alias_missing_v2()
         elif fault.startswith("--bare-in-question-v2"):
             bare_in_question_v2(per_node=fault.endswith("-per-node"))
+        elif fault == "--bare-replaced-v2":
+            bare_in_question_v2(per_node=False, callee="on_iwant")
+        elif fault == "--bare-timer-v2":
+            bare_in_question_v2(per_node=False, callee="after")
+        elif fault == "--other-node-tape-v2":
+            other_node_tape_v2()
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
-        args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") else HAND5
+        args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault == "--bare-replaced-v2" else HAND5
         try:                            # the arguments as check.sh's v2/hand5 and v2/hand5-own have them
             T.main([rest[0], rest[1], *args, "--doc", "v2", "--digest"])
         finally:

@@ -1418,12 +1418,15 @@ class Tracer3(Tracer):
             @functools.wraps(fn)
             def w(*args, **kw):
                 if tr.doc_v2:
-                    if st["depth"] and st["node"] != int(nd.id):    # another node's record is open
-                        if st["ext"] or st["supp"]:                 #   inside a question there: bare
-                            return fn(*args, **kw)
+                    foreign = st["depth"] and st["node"] != int(nd.id)     # another node's record is open
+                    if foreign and not (st["ext"] or st["supp"]):          #   and no question runs: a tape name
                         raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record "
-                                         f"is open and no question runs")
-                    if not st["depth"] and not st["supp"] and name in replaced:     # a replaced name entered
+                                         f"is open and no question runs")  #   stops as a traced one does
+                    if foreign or st["supp"]:       # bare: inside a question at another node, or inside a replaced
+                        if name in tr.traced:       #   name entered outside a record; a traced name (replaced here)
+                            tr.bare[f"{nd.id} {name}"] += 1     # counted as sec61 counts its own; a tape name's
+                        return fn(*args, **kw)                  #   call goes on no tape
+                    if not st["depth"] and name in replaced:    # a replaced name entered
                         st["supp"] += 1                                             #   outside any record:
                         try:                                                        #   nothing inside it is a
                             return fn(*args, **kw)                                  #   record
