@@ -266,6 +266,8 @@ and where one has a control that must come out the other way, it is named:
   before the alarm, before the write or after it penalise nobody, and the member rebuilds; a
   close before the write also takes the ask out of the stop-pull exemption. Controls: a silent
   connected claimant is penalised once, and a claimant's own copy leaves no penalty and no rebuild.
+  A custodian's WANT on a link that has not joined rows is ignored, and a custodian asks only
+  members whose links joined rows.
 - `late_drain_known.py`: the `late-block` cell with a leak put in by hand must fail, and so must
   the cell with a node that gets no chunk; as it is, it must pass.
 - `late_draw_known.py`: `--late-block`'s draw and its argument.

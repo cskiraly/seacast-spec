@@ -313,7 +313,8 @@ class Node:
                     if len(tried) >= c["ALARM_MAX"]:
                         continue                        # every member it may ask was asked
                     ms = [q for q in node.peers if q not in tried   # a member: its node id's subnet, and a row JOIN
-                          and sim.nodes[q].row_subnet == sim.gsub[rg]]   #   (none for the proposer, a sampler)
+                          and sim.nodes[q].row_subnet == sim.gsub[rg]   #   (none for the proposer, a sampler) on
+                          and ns["joined"](q, ROW)]     #   a link that joined rows, as another ignores the WANT (§2)
                     if not ms:
                         node.alarm["no member left"] += 1
                         continue
@@ -403,7 +404,8 @@ class Node:
             for a in asks:
                 gi = ns["group_index"](a)
                 if (gi is None or not gi.standing or gi.group not in sim.gsub or sim.gsub[gi.group] != node.row_subnet
-                        or ns["expired"](gi.group) or ns["join_recv"][p][ROW].interest == "DECLARED"
+                        or not ns["joined"](p, ROW)     # §2: a WANT on a link that has not joined rows: the document's
+                        or ns["expired"](gi.group) or ns["join_recv"][p][ROW].interest == "DECLARED"   # handler ignores it
                         or ns["peer_has"][p][gi.group].has(gi.index)):
                     continue
                 if ns["resolve"](a) is not None:

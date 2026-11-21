@@ -1331,10 +1331,12 @@ produce every index (`claim_all`, card 10), and its interest in the group is sat
 more need be pushed or offered to it (`complete`). A claim of the whole group can defer one of the
 node's own decode duties (`note_claim`, §4.6), if the link has joined the group's type: the probe
 that checks the claim is a WANT, which a link that has not joined the type ignores (§2). On a link
-that has not, the claim is kept as a plain holding: its bits count in `peer_has`, as any holding's
-do, and the peer is no claimant (`claims`), so the subnet's view of the row and the repair sample's
-draw read it as they read a member that holds those cells, until a holding of the group from the
-peer comes on a link that has joined the type. For each index the peer newly holds, the node
+that has not, the claim is kept as a plain holding: its bits and its `claim_all` go into `peer_has`,
+as any holding's do (so the peer may be asked for any index, `may_be_asked`), and the peer is no
+claimant (`claims`). The subnet's view of the row then counts its bits if it is in the suppression
+scope (`known_in_scope`), and the repair sample may draw it under the sample's own conditions
+(`ask_custodian`). The peer becomes a claimant only at a holding that claims the group whole and
+comes on a link that has joined the type. For each index the peer newly holds, the node
 counts the peer as a holder (card 9), frees the window's room taken by any copy it sent the peer at
 that index (card 14, §4.11), and, for a group it publishes, takes it as the chunk's acknowledgement
 (`origin_acked`, §4.7), which acts once per chunk and does nothing at `SOURCE_OFFERS = PUBLISH`. An
@@ -1954,8 +1956,9 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   once complete. The probe's promise is the deferral window itself, not `protocol.md`'s `PROMISE`
   of 400 ms. A claim counts for nothing in the subnet's view of the row (`known_in_scope`),
   verified or not; a verified claim ends a member's duty through the deferral instead. A claim that
-  came on a link that has not joined the row type makes no claimant: it counts as a plain holding
-  until the peer's next holding on a joined link (§4.3). The probe is an ask past completion, so
+  came on a link that has not joined the row type makes no claimant: it counts as a plain holding,
+  until a holding from the peer that claims the row whole comes on a link that has joined the row
+  type (§4.3). The probe is an ask past completion, so
   until it is settled it is exempt from stop-pull (card 6) and from the one-ask-per-index window;
   and it counts against the claimant's serving limit like any answer: the draw of the claimant does
   not look at the limit, so a member that has already pulled `SERVE_LIMIT`
@@ -3834,9 +3837,10 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   `claim_all`: the sender holds or can produce every index, `protocol.md`'s decode claim, made at K
   before the decode. `complete`: the sender's interest in the group is satisfied. Both are
   unverified; a probe verifies a `claim_all` that defers a decode (§4.6).
-- **claimant**: a peer whose `claim_all` for a group has arrived (`claims`). A claim can defer a
-  decode duty the node has armed, at most once per group, and the node's probe then asks one
-  connected claimant, drawn at random, for one index to verify it (§4.6, R5).
+- **claimant**: a peer whose `claim_all` for a group has arrived on a link that has joined the
+  group's type (`claims`; on another link a claim is kept as a plain holding, §4.3). A claim can
+  defer a decode duty the node has armed, at most once per group, and the node's probe then asks
+  one connected claimant, drawn at random, for one index to verify it (§4.6, R5).
 - **colour**: one of `M` values that partition a group's indices (`colour_of`, §1.4, `[D10]`). A
   chunk is pushed eagerly only on links whose push relation for its family holds its colour. A
   colour is not a subnet (§0).

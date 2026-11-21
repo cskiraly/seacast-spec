@@ -595,13 +595,15 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   then the rest of the stream waits unread, and the stream credit the receiver granted caps how much
   of it can arrive (§7.1). This binding's rule is narrower than §1.1's, which takes a chunk on any
   link: an honest node sends a chunk only on a link that carries one of its types, as a push, an
-  answer or a probe's answer, or on a connection opened for a fetch, so the rule stops no honest
-  chunk, and a chunk from a link that never joins one of its types waits and is stopped. A
-  receiver keeps such streams waiting up to a limit of its own, and stops the others
-  (`STOP_SENDING`) without penalty. Two things are open here (§7.9): when a stream still
-  waiting is discarded, and how much of the connection's receive credit a receiver keeps for the
-  control stream, so that the JOIN can still arrive while chunk streams wait. On a connection opened
-  for a fetch, the client reads the answer without a JOIN. The server opens its control stream first
+  answer or a probe's answer, or on a connection opened for a fetch, so the rule refuses no honest
+  chunk for its type. A chunk stream can still arrive before its link's JOIN, since streams are
+  not ordered with the control stream: it waits, honest or not, and a chunk from a link that never
+  joins one of its types waits until it is stopped. A receiver keeps such streams waiting up to a
+  limit of its own, and stops the others (`STOP_SENDING`) without penalty, honest ones included.
+  Two things are open here (§7.9): when a stream still waiting is discarded, and how much of the
+  connection's receive credit a receiver keeps for the control stream, so that the JOIN can still
+  arrive while chunk streams wait. On a connection opened for a fetch, the client reads the answer
+  without a JOIN. The server opens its control stream first
   there too, so that the client does not take the answer's stream for the control stream (§7.6).
 - **The order.** Messages on the control stream arrive in the order written. A chunk stream is not
   ordered with any other stream: a chunk can arrive ahead of a control message written before it,
