@@ -322,7 +322,30 @@ def own_code(name, fn):
     return "replaced", where
 
 
-def namespace_check(names, traced, v2_defs, ns, replaceable=None):
+def innermost(name, fn):
+    """The function a name's layers lead to: from fn, the closure cell holding a function of the same name, until
+    none does. A layer holds the next as a closure cell (node.py's `doc_on_frame`). Raises ValueError where a layer
+    holds two such functions (no layer is guessed) or the chain loops."""
+    seen = set()
+    while id(fn) not in seen:
+        seen.add(id(fn))
+        nxt = []
+        for cell in getattr(fn, "__closure__", None) or ():
+            try:
+                inner = cell.cell_contents
+            except ValueError:
+                continue
+            if inner is not fn and getattr(getattr(inner, "__code__", None), "co_name", None) == name:
+                nxt.append(inner)
+        if not nxt:
+            return fn
+        if len(nxt) > 1:
+            raise ValueError(f"a layer of {name} holds {len(nxt)} functions of that name")
+        fn = nxt[0]
+    raise ValueError(f"the layers of {name} loop")
+
+
+def namespace_check(names, traced, v2_defs, ns, replaceable=None, layers=False):
     """The namespace against the documents' source: no traced function is v2's, and every name of `names` that
     protocol-v2.md defines (`v2_defs`) is v2's here. Two derivations of the set, each checking the other. The reason
     the namespace is refused, or None.
@@ -331,10 +354,21 @@ def namespace_check(names, traced, v2_defs, ns, replaceable=None):
     variants of push_rebuilt (--rebuilt none, hold, announce, capped; a silent node's), a silent node's forward.
     Such a name is not traced under v2 (v2 defines it), and nothing of the check depends on which of the two it is.
     protocol.md's own function under a name v2 defines is still refused: v2's block was not run over it. (Without
-    the exception, a v2 cell whose nodes run their own push_rebuilt could not be traced.)"""
+    the exception, a v2 cell whose nodes run their own push_rebuilt could not be traced.)
+
+    With `layers` (under --doc v2, where the tracer installs at the end of the node's construction, after the toy's
+    layers over v2's functions, node.py's `_v2`), both conditions read the function the name's layers lead to
+    (`innermost`), not the layer bound under the name. Until the v2 path's kept list and its rule for layers, this
+    keeps the check's two derivations under the late install."""
     replaceable = REPLACEABLE if replaceable is None else replaceable
     for name in names:
-        file = getattr(getattr(ns.get(name), "__code__", None), "co_filename", None)
+        fn = ns.get(name)
+        if layers:
+            try:
+                fn = innermost(name, fn)
+            except ValueError as e:
+                return str(e)
+        file = getattr(getattr(fn, "__code__", None), "co_filename", None)
         v2_here = file == V2_FILE
         if name in traced and v2_here:
             return f"{name} is traced, but its function here is protocol-v2.md's"
@@ -396,6 +430,37 @@ def v2_kept_self_test():
         ("d replaceable and left in the traced list, v2's here: refused as before",
          namespace_check(names, kept + ("d",), {"d"}, ns, replaceable=("d",)),
          "d is traced, but its function here is protocol-v2.md's"),
+    ]
+    # under the late install (--doc v2): toy layers as node.py's _v2 makes them, each holding the next in a cell
+
+    def layer(inner, other=None):
+        g = {}
+        exec(compile("def make(doc, other):\n    def d(*a):\n        if other:\n            other(*a)\n"
+                     "        return doc(*a)\n    return d\n", "node.py", "exec"), g)
+        return g["make"](inner, other)
+    doc_d, v2_e = {}, {}
+    exec(compile("def d():\n    pass\n", DOC_FILE, "exec"), doc_d)       # protocol.md's function under the name
+    exec(compile("def e2():\n    pass\n", V2_FILE, "exec"), v2_e)         # v2's function of another name
+    ncases += [
+        ("d bound to a toy layer over v2's d, under v2: passes",
+         namespace_check(names, kept, {"d"}, {**ns, "d": layer(ns["d"])}, layers=True), None),
+        ("the same without the chain (protocol.md's reading): refused",
+         namespace_check(names, kept, {"d"}, {**ns, "d": layer(ns["d"])}),
+         "protocol-v2.md defines d, but its function here is not v2's"),
+        ("d bound to two toy layers over v2's d, under v2: passes",
+         namespace_check(names, kept, {"d"}, {**ns, "d": layer(layer(ns["d"]))}, layers=True), None),
+        ("d bound to a toy layer over protocol.md's d, replaceable, under v2: refused",
+         namespace_check(names, kept, {"d"}, {**ns, "d": layer(doc_d["d"])}, replaceable=("d",), layers=True),
+         "protocol-v2.md defines d, but its function here is not v2's"),
+        ("d left in the traced list, bound to a toy layer over v2's d, under v2: refused",
+         namespace_check(names, kept + ("d",), {"d"}, {**ns, "d": layer(ns["d"])}, layers=True),
+         "d is traced, but its function here is protocol-v2.md's"),
+        ("d bound to a toy layer over v2's e2 (another name), under v2: refused",
+         namespace_check(names, kept, {"d"}, {**ns, "d": layer(v2_e["e2"])}, layers=True),
+         "protocol-v2.md defines d, but its function here is not v2's"),
+        ("d bound to a toy layer holding two functions named d, under v2: refused",
+         namespace_check(names, kept, {"d"}, {**ns, "d": layer(ns["d"], own["d"])}, layers=True),
+         "a layer of d holds 2 functions of that name"),
     ]
     for what, got, want in ncases:
         ok = got == want
@@ -1454,7 +1519,7 @@ class Tracer3(Tracer):
         # name of the block that v2 defines is v2's here (two derivations of the set, each checking the other)
         if set(enc) != set(TAPE):
             raise SystemExit(f"trace3: the tape's calls are not TAPE's: {sorted(set(enc) ^ set(TAPE))}")
-        why = namespace_check(BLOCK, tr.traced, tr.v2_defs, ns)
+        why = namespace_check(BLOCK, tr.traced, tr.v2_defs, ns, layers=tr.doc_v2)
         if why:
             raise SystemExit(f"trace3: node {nd.id}: {why}")
         # a traced name this node runs as something else: the node's, a call on the tape where the block's
