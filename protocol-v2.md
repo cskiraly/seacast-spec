@@ -70,11 +70,13 @@ assumed: the payload's descriptor committed in the bid and its Merkle tree over 
 partial-columns spec), and RowDAS's rows (EIP-8371). Rendezvous and discovery are assumed: how a
 node finds peers that share an object type and a family (gossipsub topics where they exist, the
 ENR's `cgc` and node ids); this document assumes a set of connected peers per object type and
-defines what happens on those connections. The libp2p connection and its framing are assumed.
-Gossipsub itself is *not* assumed: what it provided, the pusher set, suppression, announcements and
-pulls, is defined here, and the bindings (§7, `protocol-v2-bindings.md`) say how the result is
-carried on gossipsub's wire where that is the deployed path. `protocol.md`'s code is assumed where
-§5 says a function carries over: this document redefines what changes and names what it keeps.
+defines what happens on those connections. On the bindings that run on libp2p, the libp2p
+connection and its framing are assumed. The native QUIC binding, a draft, runs on a QUIC connection
+of its own, with framing of its own (`protocol-v2-bindings.md` §7). Gossipsub itself is *not*
+assumed: what it provided, the pusher set, suppression, announcements and pulls, is defined here,
+and the bindings (§7, `protocol-v2-bindings.md`) say how the result is carried on gossipsub's wire
+where that is the deployed path. `protocol.md`'s code is assumed where §5 says a function carries
+over: this document redefines what changes and names what it keeps.
 
 **What is normative.** Sections 1 to 3, the notions, the messages and the state, are what both ends
 of a link must agree on. Section 4 combines each node's local scheduling with the meaning of the
@@ -3447,12 +3449,8 @@ section says what every binding provides, and what the rules do where a binding 
 **What every binding provides:**
 - *Links:* a binding gives a link per connected peer, with its open and its close, which start and
   end §3's per-connection lifetimes.
-- *Whole messages, in order:* what a node writes to a peer arrives as whole messages, in the order
-  written for each object type at least (Waggle's framing has a stream per type). How a binding
-  marks where each ends is its own: its frames. This holds on every binding but the native QUIC
-  binding, a draft, which does not order a chunk with any other message. Which rules rely on that
-  order is one of its open questions (`protocol-v2-bindings.md` §7.9); the source's holding just
-  ahead of its first push (§4.7) is one of them.
+- *Whole messages:* what a node writes to a peer arrives as whole messages. How a binding marks
+  where each ends is its own: its frames.
 - *The queue and the write:*
   - `send(p, msg, urgent)` puts a message into the per-peer queue (§3), or reports that a full queue
     refused it;
@@ -3473,6 +3471,12 @@ section says what every binding provides, and what the rules do where a binding 
 - *A chunk's id and size:* a binding gives `chunk_id(f)`, and `wire_size(p, entry)`, the bytes its
   write to `p` will take, a header included (§3).
 
+**The order, on every binding but the native QUIC binding.** What a node writes to a peer arrives
+in the order written, for each object type at least (Waggle's framing has a stream per type). The
+native QUIC binding, a draft, does not order a chunk with any other message. Which rules rely on
+that order is one of its open questions (`protocol-v2-bindings.md` §7.9). The source's holding just
+ahead of its first push (§4.7) is one of them.
+
 Rendezvous and discovery are outside the bindings (§0).
 
 **The capabilities the bindings differ in**, and what the rules do without each, are these:
@@ -3491,7 +3495,7 @@ Rendezvous and discovery are outside the bindings (§0).
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
 | a chunk ordered with the messages written before and after it | yes (on Waggle, within its type) | yes, between frames | yes, between frames | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
-| a chunk's lost packet leaves no gap in the delivery of the peer's other messages | no on the libp2p stream binding; on Waggle over QUIC, only the chunk's type waits | no | no | yes: the other chunks and the control stream do not wait for it | a lost packet holds up every later frame on its stream until it is resent, and on TCP every later frame on the connection; on every binding, loss also slows the connection's sending (congestion control) |
+| a chunk's lost bytes leave a gap only in that chunk's delivery | no: on the libp2p stream binding, every later frame on the stream waits; on Waggle over QUIC, the later messages of the chunk's type wait | no | no | yes: lost bytes leave a gap only on their own stream | lost bytes hold up every later frame on their stream until they are resent, and on TCP every later byte on the connection; on every binding, loss can also slow the connection's sending (congestion control) |
 
 **Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
 interest without subscription, a push relation per family and colour with a floor and a direction,

@@ -44,7 +44,9 @@ plain sentences.
 - `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
 - `protocol-v2-bindings.md` §7: the native QUIC binding, a draft section, not normative, with a
   control stream and a stream per chunk; `protocol-v2.md` §7 lists it, with its column and three
-  new rows in the capability table.
+  new rows in the capability table. Its open questions are listed in its §7.9, among them whether
+  it runs beside libp2p or alone, when a chunk stream waiting for a JOIN is discarded, and what a
+  receiver sends for a copy it stopped.
 - `protocol-v2-bindings.md` §1.6, §4: two open items, a cell before its block under form (a), and
   the strings for cell groups and the versions written.
 
