@@ -211,6 +211,15 @@ class NodeV2 (m : Type → Type) where
   /-- the order in which a proxied set of peers iterates at a place of v2's code (design §3.1): a permutation of
   the members the twin computed -/
   order : String → List Peer → m (List Peer)
+  /-- the order in which `probe_waiting[g]`'s keys iterate (`probe_waiting[g].items()` in `serve_waiting_probe`,
+  design §3.2's `keys` entry): a permutation of the keys the twin holds -/
+  probeWaitingOrder : Group → List Peer → m (List Peer)
+  /-- the order in which `claims`' keys iterate (`claims.items()` in `claims_close`, design §3.2's `keys`
+  entry): a permutation of the keys the twin holds -/
+  claimsOrder : List Group → m (List Group)
+  /-- `own_interest(g)`: `interest[g]`'s default, read where the table has no entry for g, which stores nothing
+  (design §1's fourth point, §4.4) -/
+  ownInterest : Group → m IBits
 
 /-- The functions of the 89 left out of this cycle that the 71 call (design §8). Until each is transcribed, its
 instance is a question on the tape. -/
@@ -267,6 +276,9 @@ abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α
   shuffledPairs a := f (shuffledPairs a)
   sampleCovers a b := f (sampleCovers a b)
   order a b := f (order a b)
+  probeWaitingOrder a b := f (probeWaitingOrder a b)
+  claimsOrder a := f (claimsOrder a)
+  ownInterest a := f (ownInterest a)
 
 instance {m : Type → Type} {σ : Type} [Monad m] [NodeV2 m] : NodeV2 (StateT σ m) :=
   lift (m := m) (n := StateT σ m) fun x => monadLift x
