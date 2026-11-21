@@ -25,8 +25,9 @@
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders,
-#             keptcopy.py's and labcites.py's); and no line of the twin's sources (the build's copy) or of its
-#             tools cites the notes beside which they were developed (labcites.py)
+#             keptcopy.py's and labcites.py's); and no line of the twin's sources (the build's copy), of its
+#             tools or of the prose beside them (every *.md but out/'s and record/'s) cites the notes beside
+#             which they were developed (labcites.py), a citation planted in README.md's copy reported
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
 #             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
 #             (footprint_test.py)
@@ -266,10 +267,26 @@ EOF_SELF
   rm -f "$OUT/selftest.out"
   [ "$n" = 11 ] || no "not 11 tools' self-tests passed"
   echo "  $n of 11 tools' own cases as they must be (selftests.txt)"
-  # the twin's sources, as the build copied them, and its tools: none cites the notes beside which it was developed
-  { $PY "$T/labcites.py" "$OUT/twin" && $PY "$T/labcites.py" "$T"; } > "$OUT/labcites.txt" 2>&1 \
-    || no "a file of the twin or of its tools cites the notes beside which it was developed (labcites.txt)"
+  # the twin's text: its sources as the build copied them, its tools, and the prose beside them (every *.md but
+  # out/'s, record/'s and .lake/'s, which the copy leaves out; tools/' own are read with tools/): none cites the
+  # notes beside which it was developed
+  local md lc=$OUT/labcites-control n
+  md=$(cd "$HERE" && find . \( -path ./out -o -path ./record -o -path ./tools -o -name .lake \) -prune \
+    -o -name '*.md' -type f -print | LC_ALL=C sort | sed "s#^\./#$HERE/#")
+  # shellcheck disable=SC2086
+  $PY "$T/labcites.py" "$OUT/twin" "$T" $md > "$OUT/labcites.txt" 2>&1 \
+    || no "a file of the twin, of its tools or beside them cites the notes beside which it was developed (labcites.txt)"
   tail -n 1 "$OUT/labcites.txt" | sed 's/^/  /'
+  # its control: a lab citation planted in README.md's copy is reported, on that line (the line is built from parts,
+  # since the guard reads this script)
+  mkdir -p "$lc"
+  { cat "$HERE/README.md"; printf '%s §9, planted\n' "design"; } > "$lc/README.md"
+  n=$(wc -l < "$lc/README.md")
+  if ! $PY "$T/labcites.py" "$lc/README.md" > "$lc/labcites.txt" 2>&1 \
+     && [ "$(tail -n 1 "$lc/labcites.txt")" = "labcites: 1 lines in 1 files" ] \
+     && head -n 1 "$lc/labcites.txt" | grep -q -F -e "$lc/README.md:$n: "; then
+    echo "  control, a lab citation planted in README.md's copy: reported, as it must be"
+  else no "the guard did not report a lab citation planted in README.md's copy ($lc/labcites.txt)"; fi
 }
 s_tables() {
   { $PY "$T/gen/gen.py" --check "$OUT/twin" && $PY "$T/gen/makers.py" --check "$OUT/twin"; } > "$OUT/tables.txt" 2>&1 \
