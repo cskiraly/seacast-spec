@@ -3474,8 +3474,8 @@ section says what every binding provides, and what the rules do where a binding 
 **The order, on every binding but the native QUIC binding.** What a node writes to a peer arrives
 in the order written, for each object type at least (Waggle's framing has a stream per type). The
 native QUIC binding, a draft, does not order a chunk with any other message. Which rules rely on
-that order is one of its open questions (`protocol-v2-bindings.md` §7.9). The source's holding just
-ahead of its first push (§4.7) is one of them.
+that order is one of its open questions (`protocol-v2-bindings.md` §7.9). The rule that the source
+sends a holding just ahead of its first push (§4.7) relies on that order.
 
 Rendezvous and discovery are outside the bindings (§0).
 

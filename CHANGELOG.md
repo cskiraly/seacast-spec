@@ -44,16 +44,16 @@ plain sentences.
 - `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
 - `protocol-v2-bindings.md` §7: the native QUIC binding, a draft section, not normative, with a
   control stream and a stream per chunk; `protocol-v2.md` §7 lists it, with its column and three
-  new rows in the capability table. Its open questions are listed in its §7.9, among them whether
-  it runs beside libp2p or alone, when a chunk stream waiting for a JOIN is discarded, and what a
-  receiver sends for a copy it stopped.
+  new rows in the capability table. §7.9 lists its open questions, among them whether it runs
+  beside libp2p or alone, when a chunk stream waiting for a JOIN is discarded, and what a receiver
+  sends for a copy it stopped.
 - `protocol-v2-bindings.md` §1.6, §4: two open items, a cell before its block under form (a), and
   the strings for cell groups and the versions written.
 
 ### Changed
 - `protocol-v2.md` and its bindings, decisions and figures: the titles no longer say draft, and the
   opening notes of `protocol-v2.md` and its bindings no longer open with "DRAFT"; the bindings' note
-  names the two bindings the toy runs.
+  names the two bindings the toy models.
 - `protocol-v2-bindings.md`: the bindings are named by their carriers (libp2p stream, Waggle,
   gossipsub, partial messages), each in a section of its own; `protocol-v2.md` cites them so.
 - `protocol-v2-bindings.md` §4: EVIDENCE is reserved on the gossipsub binding.
