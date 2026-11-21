@@ -1,6 +1,6 @@
 # The record of the Lean twin
 
-This file describes the record of the Lean twin that the spec carries from version 0.10.9. It says what
+This file describes the record of the Lean twin that the spec carries from version 0.10.11. It says what
 ran, what the runs show, and what they do not show. The other files in this directory, but for `FILES.sha256`,
 are the outputs of the runs: the manifest of the traces, the reports of the replays, the matrix of mutants, and
 the reports of the controls, with the log of the script that started the quick check. Each is as the runs wrote
@@ -24,16 +24,16 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 
 ## What ran
 
-- **One commit supplied everything.** Every run below started from a fresh clone of the spec at commit `69b5952`,
-  with nothing added to it. That commit is in the published history of the spec, before the commit that adds this
-  record. It holds the two documents (`protocol.md` and `protocol-v2.md`), the toy, the twin in `formal/twin`, and
-  the twin's tools. Its toy is this release's, and its documents differ from this release's only outside their
-  code.
+- **One commit supplied the record.** The record's run and the quick check started from a fresh clone of the spec
+  at commit `229631c`, with nothing added to it. That commit is in the published history of the spec, before the
+  commit that adds this record. It holds the two documents (`protocol.md` and `protocol-v2.md`), the toy, the twin
+  in `formal/twin`, and the twin's tools. Its toy is this release's, and its documents differ from this release's
+  only outside their code. The matrix is v0.10.9's, carried (below).
 - **The content line and the list of the sources of the twin tie the record to what ran**
   (`manifest/content.line`, the first line of every trace, and `manifest/twin-sources.txt`; the content line is
   described below). Both are made from the files of a tree, and a reader can make both on any tree:
   `tools/content.py` makes the content line, and the build step of `check.sh` writes the list of the sources of
-  the twin, each with its SHA-256 hash. This release holds the same `toy/` and `formal/twin/` as `69b5952`, file
+  the twin, each with its SHA-256 hash. This release holds the same `toy/` and `formal/twin/` as `229631c`, file
   for file, apart from `formal/twin/record/`. Run on the tree of this release, `tools/content.py` gives the line
   in `manifest/content.line`. The sources of the twin there, by path and hash, are those that
   `manifest/twin-sources.txt` lists.
@@ -47,7 +47,7 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 - **The record's run was one run of `record.sh`,** with all its steps. `record.sh` runs `check.sh --record`, which
   traces and replays every cell of `toy/check.py` under both documents, and adds the controls that only the record
   runs. The run passed: the last line of its output is "check.sh: PASS (the record's run)" (`controls/check.txt`).
-- **The quick check passed too.** `check.sh` alone passed in a run of its own from a fresh clone of `69b5952`
+- **The quick check passed too.** `check.sh` alone passed in a run of its own from a fresh clone of `229631c`
   (`quick-check/check.txt`, and `quick-check/run.log`, the log of the script that started that run).
 
 ## What it shows
@@ -67,8 +67,8 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
   directories named `__pycache__`, are not in the line. Every other file under the toy and the tools is in it,
   committed or not, and a link among them is refused. So a change to a document outside its code, or to a README,
   leaves the content line as it was, and a change to the code changes it. The manifest also gives the SHA-256 of
-  the bytes of each document, in its `documents` line. Those hashes are of the documents at `69b5952`. If a
-  document of this release differs from its counterpart at `69b5952` only outside its code, the SHA-256 of its
+  the bytes of each document, in its `documents` line. Those hashes are of the documents at `229631c`. If a
+  document of this release differs from its counterpart at `229631c` only outside its code, the SHA-256 of its
   bytes is not the one in the `documents` line, and the SHA-256 of its code is still the one in the content line.
   The `documents` line is for information: `tools/against.py`, which compares a new run with this record, reports
   a difference in it and decides nothing by it.
@@ -138,17 +138,32 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 
 ## How the matrix is tied to this record
 
-The matrix ran in five parts, each from a fresh clone of `69b5952`, and the outputs of the five were merged into
-one (`matrix/PARTS`). The parts ran under the same Lean as the record, and under Python 3.13.5 (parts 1, 2 and 5)
-and 3.12.3 (parts 3 and 4); the logs that show the clones and the toolchains are not among these files. Four facts
-in these files tie the matrix to this record:
-- It has the content line of this record (`matrix/content.line` and `manifest/content.line`).
-- Its 39 traces have the same hashes as in the manifest, of the body and of the whole trace
-  (`matrix/traces.sha256` and `matrix/directed.sha256`).
+**The matrix is v0.10.9's, carried into this record unchanged.** It ran in five parts, each from a fresh clone of
+`69b5952`, the commit of v0.10.9's record, and the outputs of the five were merged into one (`matrix/PARTS`). The
+parts ran under the same Lean as the record, and under Python 3.13.5 (parts 1, 2 and 5) and 3.12.3 (parts 3 and
+4); the logs that show the clones and the toolchains are not among these files.
+
+Between `69b5952` and `229631c`, the files that the content line names changed only outside the code that runs. In
+`protocol-v2.md`, comments in its code blocks changed. In eight files of the toy (`idontwant_id_known.py`,
+`node.py`, `run.py`, `sim.py`, `standalone_charge_known.py`, `standalone_wire_known.py`, `want_promise_known.py`
+and `wire.py`), comments, docstrings, help text and printed strings changed, and so did the three section
+headings that `standalone_wire_known.py` looks up in the bindings document, with their end markers. Those lookups
+find the same text under the headings' new numbers. The twin, its tools and the replay did not change. So the
+content line moved, and nothing that the matrix replays did. Three facts in these files tie the matrix to this
+record:
+- Its 39 traces have the same bodies as in the manifest (`matrix/traces.sha256` and `matrix/directed.sha256`, the
+  hash of each body). Their hashes of the whole trace differ from the manifest's: a trace's first line is its
+  content line, and the matrix's (`matrix/content.line`) is v0.10.9's, not this record's
+  (`manifest/content.line`).
 - Its replay has the same SHA-256 as the replay of this record (`matrix/replay.sha256`).
 - Its 562 mutants have the same names as the mutants of this record, in the same order (`matrix/mutants.sha256`;
   the manifest's `mutants` line is the SHA-256 of those names, one to a line, with no line end after the last).
   Its sources of the twin are the same files (`matrix/twin-sources.txt` and `manifest/twin-sources.txt`).
+
+A mutant's verdict depends on the trace bodies, the replay and the mutant's own build, and on nothing else of a
+trace: the replay checks a trace's first line against the content line of the run that replays it, and reads no
+more of that line. So a matrix run from `229631c` would replay the same mutants on the same bodies with the same
+replay, and give the same verdicts.
 
 ## What it does not show
 
