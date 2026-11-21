@@ -1889,9 +1889,9 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
 
 **Deferral on a claim, verified by one ask.**
 - *The probe's promise* is the window, not `PROMISE`: a reconstructor that has just decoded is
-  pushing a row's worth of rebuilt cells through its window, and in the toy its answer to a probe
-  left 450 ms after it was decided, so with the shorter promise honest claimants were parked and
-  penalised.
+  pushing a row's worth of rebuilt cells through its window. In the toy its answer to a probe left
+  later than `PROMISE` after the probe was decided, so with the shorter promise honest claimants
+  were parked and penalised (protocol-v2-figures.md, §4.6, "The deferral").
 - *A claim outside the subnet's view.* Executing the toy's liar fault showed that a false claim
   counted there made the row look whole to every member of its subnet and suppressed the third
   phase, the suppression the RowDAS design warned of.
@@ -1918,188 +1918,181 @@ write, a claimant still decoding and a claimant that leaves since 2026-11-16; `p
   whose decode outlasts the probe's round trip would be penalised. An honest member sends one probe
   per group; before, a faulty asker's second marked ask, of a stored cell, took the exemption, and
   the kept one went unanswered.
-- *Measured* in the toy's rows (60 nodes, three blocks, seeds 7 to 9, `--send-buffer 0`), in five
-  cells: honest; a fifth of the nodes lying (`--fault claim20`); the same with 16 subnets and half
-  the columns withheld; a fifth hoarding (`--fault hoard20`) with 16 subnets and half withheld;
-  and the liars' withheld cell with 5 % supernodes (three of 60), on this section's rules as they
-  stand (2026-11-18). None of 1 281 verdicts on honest or hoarding claimants failed, and every
-  probe got a verdict and was written: none was still unwritten when its window ran out, and no
-  probe reached a claimant still decoding (the toy's queues refuse nothing, and these cells close
-  no connection). Liars passed their probe 1, 0 and 65 times in the three liar cells, over the
-  three seeds, each time on a copy the liar pushed (a toy liar answers no ask). The mark cost 5
-  duplicate cells in 2 417 probes: exempt answers written over a holding the asker had sent. A
-  probe was written when it was decided, at the median; the longest wait was 163 ms, against a
-  `DEFER_WINDOW` of 1 s. One run, the 16-subnet liars' cell at seed 9, delivers no block to 58 of
-  its 60 nodes, as it did before, and decides no probe; the figures include it. Against the runs
-  with the rules of 2026-11-16 (below), every run changed its events; copies stayed within 0.03 in
-  11 of 15 runs and moved in four, not traced: the hoarders' cell by −0.04 at seed 9 and +0.03 at
-  seed 7, the supernodes' cell by +0.04 at seed 7 and +0.09 at seed 9.
-- *Measured with the rules of 2026-11-16*, before four later fixes (a probe settled while queued,
-  a kept probe answered once, the duty's own time, a settled probe's promise) and the later
-  changes to the draft, in the same cells: none of 1 298 verdicts on honest or hoarding
-  claimants failed; liars passed 3, 1 and 61 times; the mark cost 9 duplicate cells in 2 428
-  probes; one probe, in the supernodes' cell at seed 8, passed before it was written, on a copy
-  the liar pushed; the 16-subnet liars' cell at seed 9 decided 3 probes; the longest wait from
-  decision to write was 101 ms.
+- *Measured* in five cells of the toy's rows, honest and under liars or hoarders, on this section's
+  rules as they stood on 2026-11-18 (protocol-v2-figures.md, §4.6, "The probe"). No verdict on an
+  honest or hoarding claimant failed. Every probe got a verdict and was written: none was still
+  unwritten when its window ran out, and no probe reached a claimant still decoding (the toy's
+  queues refuse nothing, and these cells close no connection). Liars almost never passed their probe
+  in two of the three liar cells, and passed more often in the one with supernodes, each time on a
+  copy the liar pushed (a toy liar answers no ask). The mark cost a few duplicate cells: exempt
+  answers written over a holding the asker had sent. At the median a probe was written when it was
+  decided, and its longest wait was far shorter than `DEFER_WINDOW`. One run of the liars' 16-subnet
+  cell delivers no block to almost all of its nodes, as it did before, and decides no probe; the
+  figures include it. Against the runs with the rules of 2026-11-16 (below), every run changed its
+  events, and the copies of a few runs moved, not traced.
+- *Measured with the rules of 2026-11-16*, before four later fixes (a probe settled while queued, a
+  kept probe answered once, the duty's own time, a settled probe's promise) and the later changes to
+  the draft, in the same cells: no verdict on an honest or hoarding claimant failed; liars almost
+  never passed in two of the liar cells, and passed more often in the one with supernodes; the mark
+  cost a few duplicate cells; one probe, in the supernodes' cell, passed before it was written, on
+  the claimant's own copy; the run that delivers no block decided a few probes; and the longest
+  wait from decision to write was a small part of the window (protocol-v2-figures.md, §4.6,
+  "The probe").
 - *Measured before 2026-11-16*, and before v0.10's order of the announcers beyond the list
-  (`protocol.md` §6.1), which moves the supernodes' cell at seed 8 and, bracketed but not run at
-  that change, at seed 9, in the same five cells: judged by the claimant's own copy without the mark
-  and the kept WANT, 3 of 1 289 verdicts on honest or hoarding claimants failed, all three honest
-  ones in the hoarders' cell; with them, none of 1 299 did. When any peer's copy passed the
-  claimant, liars passed at least 57, 115 and 558 times. Against the earlier rule's runs (the lowest
-  index, any peer's copy passing), copies stayed within 0.03 in 12 of 15 runs; they were 0.03 to
-  0.04 lighter in the hoarders' cell at seed 8, and 0.08 lighter at two seeds of the supernodes'
-  cell, almost all of it data, not traced further.
+  (`protocol.md` §6.1), which moves a run of the supernodes' cell and, bracketed but not run at that
+  change, another, in the same five cells. Judged by the claimant's own copy without the mark and
+  the kept WANT, a few verdicts on honest claimants failed, all in the hoarders' cell; with them,
+  none did. When any peer's copy passed the claimant, liars passed far more often in every liar
+  cell, by a count that is a lower bound. Against the earlier rule's runs (the lowest index, any
+  peer's copy passing), the copies stayed close in most runs and were lighter in one run of the
+  hoarders' cell and in two of the supernodes' cell, almost all of it data, not traced further
+  (protocol-v2-figures.md, §4.6, "The probe").
 - *The random index's cost, and what is not measured.* Against the lowest index, measured before
-  2026-11-16, the random one let liars pass a little more often (3, 1 and 61 against 0, 0 and
-  49). In six traced runs, which hold all 65 such passes, the liar had by then already sent the
-  member the lowest lacked cell in 45 and held it unsent in 20; in none had it neither. The
-  excess fits the draw choosing a cell already on its way, but that is not proven. The toy's
-  liars do not aim at the cell they expect to be asked, so these runs measure the draw's side
-  effects, not its purpose; nor does any fault send marked asks, which the cap bounds to one
+  2026-11-16, the random one let liars pass a little more often. In the traced runs, which hold all
+  such passes, the liar had by then already sent the member the lowest lacked cell in most of them
+  and held it unsent in the rest; in none had it neither (protocol-v2-figures.md, §4.6,
+  "The probe"). The excess fits the draw choosing a cell already on its way, but that is not proven.
+  The toy's liars do not aim at the cell they expect to be asked, so these runs measure the draw's
+  side effects, not its purpose; nor does any fault send marked asks, which the cap bounds to one
   exempt answer per asker and group.
-- Figures in this section measured before 2026-11-15 ran with the lowest index, without the mark
-  and the kept WANT, and with any peer's copy passing the claimant, unless they say otherwise.
+- The figures file gives the rules and the transport that each figure in this section ran with
+  (protocol-v2-figures.md, §4.6).
 
 **The verdict, by what the node can see** (decided 2026-10-10). Draft 1 ended a row member's duty on
 a verified claim; the rule above keeps that, subject to the member check.
 - *The wording.* An earlier wording told the two apart by a non-empty suppression scope (some peer
-  pushes the row to the node); a member that no peer pushed its row to then counted as keeping the
-  row on no link and rebuilt after a verified claim, which with 32 subnets (about two members each
-  at 60 nodes) added about 4 member decodes per run (20 against draft 1's 16, the median over seeds
-  7 to 19) and none with 16. With this wording the row cells with supernodes (honest, and half the
-  columns withheld with 16 and with 32 subnets) and the withheld custody cell with a fifth of the
-  nodes hoarding run as under draft 1, event for event on all 13 seeds, and so do 48 of the 52
-  seed-cells of the row cells with supernodes and a fifth or half hoarding.
+  pushes the row to the node). A member that no peer pushed its row to then counted as keeping the
+  row on no link and rebuilt after a verified claim. In the toy that added member decodes with 32
+  subnets, where a subnet has few members, and none with 16. With this wording the row cells with
+  supernodes (honest, and half the columns withheld with 16 and with 32 subnets) and the withheld
+  custody cell with a fifth of the nodes hoarding run as under draft 1, event for event on every
+  seed, and so do almost all seed-cells of the row cells with supernodes and a fifth or half
+  hoarding (protocol-v2-figures.md, §4.6, "The verdict").
 - *Draft 1, and a first version.* Draft 1 ended both on the probed cell; when the toy's rebuilders
   stopped pushing to supernodes (an exploration), supernodes deferred on a claim that came in an
   acknowledgement, received the probed cell, and ended one cell short of a column. A first version
   of this rule counted a verified claim only from a peer in the node's view, and row members decoded
-  two to four times as many rows (with 16 subnets, 31 against 9 per run, the median over seeds 7
-  to 19) for no change in time or bytes: their claimants were mostly supernodes rebuilding the row
-  in the second phase, which have no relation on it, so their claims reach a member in the
-  acknowledgement of a column chunk (§4.2, `fill`).
+  several times as many rows for no change in time or bytes (protocol-v2-figures.md, §4.6,
+  "The verdict"): their claimants were mostly supernodes rebuilding the row in the second phase,
+  which have no relation on it, so their claims reach a member in the acknowledgement of a column
+  chunk (§4.2, `fill`).
 - *What it leaves to the member check.* A claimant that rebuilds a row, answers the probe and pushes
   nothing (the toy's `--fault hoard`) passes the probe and ends the members' duties. Where an honest
   supernode keeps the row, its second phase repairs the row, under this rule and under draft 1's
-  alike: in three traced runs no supernode ended its duty on a verified claim, presumably because a
+  alike: in the runs traced, no supernode ended its duty on a verified claim, presumably because a
   claim on a row reaches a supernode outside the subnet only in the acknowledgement of a cell the
   supernode sent, which a hoarder sends while still short. Where none does, the row is lost: without
-  supernodes, a fifth of the nodes hoarding left custodians short in every run over seeds 7 to 19
-  (16 subnets, half the columns withheld), each time a subnet whose honest members had deferred to a
-  hoarding reconstructor; the member check (above) closed this in those runs wherever the subnet had
-  an honest member, against a claimant that repairs nothing.
+  supernodes, a fifth of the nodes hoarding left custodians short in every run of the toy's withheld
+  row cell, each time a subnet whose honest members had deferred to a hoarding reconstructor
+  (protocol-v2-figures.md, §4.6, "The verdict"); the member check (above) closed this in those runs
+  wherever the subnet had an honest member, against a claimant that repairs nothing.
 
-**The member check** (decided 2026-10-09). Measured in the toy over seeds 7 to 19 at 60 nodes, 16
-subnets, half the columns withheld (`toy/README.md`):
+**The member check** (decided 2026-10-09). Measured in the toy's withheld row cell
+(protocol-v2-figures.md, §4.6, "The member check"):
 - *What it addresses: a claimant that rebuilds, passes the probe and repairs nothing* (the toy's
-  `--fault hoard`). Without supernodes, with a fifth of the nodes hoarding, custodians were left
-  short on every seed without the check and on 3 of 13 with it; with half hoarding, on 13 and on
-  10. Every seed on which each subnet has an honest member completes.
-- *And a false claim the cell's arrival let through.* For the duty, the claim holds when the
-  probed cell arrives, from anyone; a claimant that never answers ends the duty when another peer
-  brings the cell in time, though it is itself penalised (above). Among the toy's liars (`--fault
-  claim`, which claim their row and answer no ask) without supernodes, this happened 1 to 3 times
-  per run on 5 of 13 seeds, and each time the member check sent the member to rebuild instead of
-  trusting the liar (all five seeds traced; measured when that cell also passed the claimant). The
-  few (node, row) pairs left short on those seeds, with and without the check, are the liars' own
-  rows, which the toy's liars never rebuild: the check moved their count by one or two, on three
-  seeds.
-- *What it does not address.* A subnet whose members all misbehave (seeds 14, 17 and 18 at a
-  fifth): nobody honest is there to check. A member whose custody columns are all among the
-  published ones holds its cells whatever the claimant does (0.3 % of members with 8 of 128
-  columns and half withheld), so the check passes for it, though its subnet's other members still
-  check. A claimant that pushes each member exactly its custody cells of the row and withholds the
-  rest passes the check (the toy's `--fault hoardm`: without supernodes, a fifth of the nodes
-  doing so left custodians short on all 13 seeds); sampling the repair samples for it. Where an
-  honest supernode keeps the row, its second phase already repairs what a hoarder withholds,
-  and the check never fired there.
-- *What it costs.* Where nobody misbehaves, nothing: in five cells (rows honest with and without
-  supernodes, withheld with 16 subnets with and without, withheld with 32 with supernodes) it never
-  fired and every event is the same. A rescued block completes later, 3.25 / 3.44 s (p50 / p99)
-  against 2.44 / 2.71 s without hoarders, since the member rebuilds at the third phase after a
-  deferral; its bytes are not higher (2.33 copies against 2.36), since hoarders push nothing. In ten
-  traced runs with hoarders or liars all 162 firings were on a misbehaving claimant's claim: a
-  needless rebuild, an honest claimant's repair still on its way when the window ends, was not seen
-  at 60 nodes. It is the case to watch at larger scale, where repair travels further.
+  `--fault hoard`). Without supernodes, with a fifth or half of the nodes hoarding, custodians were
+  left short on every seed without the check, and with it on a few seeds at a fifth and on most at
+  half. Every seed on which each subnet has an honest member completes.
+- *And a false claim the cell's arrival let through.* For the duty, the claim holds when the probed
+  cell arrives, from anyone; a claimant that never answers ends the duty when another peer brings
+  the cell in time, though it is itself penalised (above). Among the toy's liars (`--fault claim`,
+  which claim their row and answer no ask) without supernodes, this happened a few times per run on
+  some seeds, and each time the member check sent the member to rebuild instead of trusting the liar
+  (traced on some of those seeds; measured when that cell also passed the claimant). In the traces,
+  the few (node, row) pairs left short, with and without the check, are the liars' own rows, which
+  the toy's liars never rebuild: the check moved their count only slightly (protocol-v2-figures.md,
+  §4.6, "The member check").
+- *What it does not address.* A subnet whose members all misbehave: nobody honest is there to check.
+  A member whose custody columns are all among the published ones holds its cells whatever the
+  claimant does (a small share of members where half the columns are withheld), so the check passes
+  for it, though its subnet's other members still check. A claimant that pushes each member exactly
+  its custody cells of the row and withholds the rest passes the check (the toy's `--fault hoardm`:
+  without supernodes, a fifth of the nodes doing so left custodians short on every seed); sampling
+  the repair samples for it. Where an honest supernode keeps the row, its second phase already
+  repairs what a hoarder withholds, and the check never fired there (protocol-v2-figures.md, §4.6,
+  "The member check").
+- *What it costs.* Where nobody misbehaves, nothing: in each cell run without a fault (rows honest
+  with and without supernodes, withheld with 16 subnets with and without, withheld with 32 with
+  supernodes) it never fired and every event is the same. A rescued block completes later than a
+  block without hoarders, since the member rebuilds at the third phase after a deferral; its bytes
+  are not higher, since hoarders push nothing. In the traced runs with hoarders or liars every
+  firing was on a misbehaving claimant's claim: a needless rebuild, an honest claimant's repair
+  still on its way when the window ends, was not seen at 60 nodes. It is the case to watch at larger
+  scale, where repair travels further (protocol-v2-figures.md, §4.6, "The member check").
 
 **Sampling the repair.** Extended, never redrawn, since the larger sample could have been drawn at
 once ("toss a coin until you like the result" is the alternative the post rules out); allowing
 losses is LossyDAS's answer to a custodian that has not yet received a repaired cell when asked.
-Measured over seeds 7 to 19 at 60 nodes, 16 subnets, half the columns withheld (`toy/README.md`):
+Measured in the toy's withheld row cell (protocol-v2-figures.md, §4.6, "Sampling the repair"):
 - *Against a claimant that repairs only the members' cells* (a fifth of the nodes, without
-  supernodes): short on 13 seeds with the member check alone, 5 with `(3, 1), (6, 2)`, 3 with
-  `(4, 0), (8, 1)` or `(6, 0), (12, 1)`, the seeds on which a subnet has no honest member. In a
-  traced run every failed sample was on a hoarder's claim. The lenient form passed partial repairs:
-  the hoarding members' own pushes had filled some columns, and 4 of 6 cells came. A rescued block
-  completes at 4.2 s (p50) against 2.4 s without the fault, the rebuild waiting out the deferral and
-  two sample steps; the member check alone catches a claimant that repairs nothing at 3.25 s.
+  supernodes): the member check alone left custodians short on every seed. The lenient form,
+  `(3, 1), (6, 2)`, left fewer short, and the strict forms, `(4, 0), (8, 1)` and `(6, 0), (12, 1)`,
+  left short only the seeds on which a subnet has no honest member. In a traced run every failed
+  sample was on a hoarder's claim. The lenient form passed partial repairs: the hoarding members'
+  own pushes had filled some columns, and most of the sampled cells came. A rescued block completes
+  later than a block without the fault, the rebuild waiting out the deferral and two sample steps,
+  and later than a block the member check alone rescues from a claimant that repairs nothing
+  (protocol-v2-figures.md, §4.6, "Sampling the repair").
 - *Where nobody misbehaves* no sample failed in any form, with or without supernodes, and the times
-  and bytes are within the seeds' spread; the cost is the sampled cells, at `(4, 0), (8, 1)` without
-  supernodes 532 per run, 4.4 per node and block averaged over all nodes. With supernodes every cell
-  completed in every form.
+  and bytes are within the seeds' spread; the cost is the sampled cells, a few per node and block
+  (protocol-v2-figures.md, §4.6, "Sampling the repair"). With supernodes every cell completed in
+  every form.
 - *Where custodians do not answer.* The toy's liars answer no ask, so a sample cell asked of one is
-  lost: with a fifth of the nodes lying, `(4, 0), (8, 1)` failed on honest claimants in 18 of 41
-  verdicts at seed 7 and in 46 of 48 at seed 8 with supernodes, where a liar is a supernode and so
-  a custodian of every column, and the strict forms had members rebuild 21 to 26 rows per run
-  more, without changing completion.
+  lost: with a fifth of the nodes lying, `(4, 0), (8, 1)` failed on honest claimants in many
+  verdicts, and in almost all of them in a run with supernodes, where a liar is a supernode and so a
+  custodian of every column. The strict forms had members rebuild more rows per run, without
+  changing completion (protocol-v2-figures.md, §4.6, "Sampling the repair").
 - *Re-asking a lost cell* (`REPAIR_REASK`), over the same seeds. Among liars the strict forms'
-  failed samples fell from 15 to 27 per run (median) to none at the median, at most 22 in one run,
-  and members rebuilt as many rows as with the member check alone (74 against 80 without supernodes,
-  46 against 45 with them, at `(4, 0), (8, 1)`). Where no cell was lost (no fault, and a claimant
-  that repairs nothing) the runs are the same event for event. Against a claimant that repairs only
-  the members' cells, `(4, 0), (8, 1)` and `(6, 0), (12, 1)` still leave short only the seeds
-  without an honest member, and a rescued block completes half a second later, at 4.7 s, for the one
-  more wait; `(3, 1), (6, 2)` stays lenient (short on 4).
-- *At 500 nodes* (32 subnets, half the columns withheld, seeds 7 to 9, `(4, 0), (8, 1)` with
-  re-ask against the member check alone): where nobody misbehaves, with and without 25
-  supernodes, the member check never fired, no sample failed, and times and bytes are similar
-  (2 312 to 2 360 ms at the median without supernodes, 1 170 to 1 178 ms with them); the sample
-  asked 2.7 cells per node and block without supernodes, about a tenth of that with them, since
-  a supernode's second phase makes most rows whole in the members' view first. A fifth of the
-  nodes repairing only the members' cells left nobody short at this size even with the member
-  check alone (2 354 to 2 388 ms). With the sample, two seeds are similar and on the third (seed
-  7) all nine failed samples were on one row the hoarder had not repaired; its members rebuilt it
-  after the deferral, two sample steps and the re-ask's wait, and the block's last custody cells
-  came 2.3 s later than in the run with the member check alone, where an honest node had rebuilt
-  that row earlier (the runs diverge from the first block; which node is not traced). The rescue
-  path's length, `DEFER_WINDOW` plus two `SAMPLE_WAIT` and the re-ask's, is the cost to cut; a
-  shorter wait was not measured.
+  failed samples fell to none at the median, though not in every run, and members rebuilt about as
+  many rows as with the member check alone. Where no cell was lost (no fault, and a claimant that
+  repairs nothing) the runs are the same event for event. Against a claimant that repairs only the
+  members' cells, `(4, 0), (8, 1)` and `(6, 0), (12, 1)` still leave short only the seeds without an
+  honest member, and a rescued block completes later, by about the one more wait; `(3, 1), (6, 2)`
+  stays lenient (protocol-v2-figures.md, §4.6, "Sampling the repair").
+- *At 500 nodes* (`(4, 0), (8, 1)` with re-ask against the member check alone): where nobody
+  misbehaves, with and without supernodes, the member check never fired, no sample failed, and times
+  and bytes are similar. The sample asked a few cells per node and block without supernodes, and far
+  fewer with them, since a supernode's second phase makes most rows whole in the members' view
+  first. A fifth of the nodes repairing only the members' cells left nobody short at this size even
+  with the member check alone. With the sample, two seeds are similar, and on the third every failed
+  sample was on one row the hoarder had not repaired. Its members rebuilt it after the deferral, two
+  sample steps and the re-ask's wait, and the block's last custody cells came seconds later than in
+  the run with the member check alone, where an honest node had rebuilt that row earlier (the runs
+  diverge from the first block; which node is not traced). The rescue path's length, `DEFER_WINDOW`
+  plus two `SAMPLE_WAIT` and the re-ask's, is the cost to cut; a shorter wait was not measured
+  (protocol-v2-figures.md, §4.6, "Sampling the repair").
 
 **Rebuilt cells marked seen** (kept as an option, 2026-11-01).
-- *It needs the sample.* The forwarded copies also repair by accident: two hoarding
-  reconstructors that forward each other's rebuilt cells fill columns that neither repairs on
-  purpose. Marked seen, such hoarders leave more columns unrepaired. At seed 11 of the toy's
-  500-node rows it was 34 columns instead of 5, in a network model that the runs matched. The
-  member check, which looks only at the member's own columns, misses them, and the sample catches
-  them. With the member check alone, the option left more custodians short at three seeds, so it is
-  never on without the sample.
-- *Measured at ten seeds* in the toy's 500-node rows: seeds 7 to 16, 32 subnets, half the columns
-  withheld, no supernodes, a fifth of the nodes repairing only the members' cells, the sample
-  `(4, 0), (8, 1)` with re-ask. The member check alone left 5 of 20 blocks short, the sample 1, and
-  the sample with rebuilt cells marked seen none. In honest cells the two together cost about 0.5 %
-  more copies (0.01 a block) and 0.004 more of control, against neither, with no direction in time.
+- *It needs the sample.* The forwarded copies also repair by accident: two hoarding reconstructors
+  that forward each other's rebuilt cells fill columns that neither repairs on purpose. Marked seen,
+  such hoarders leave more columns unrepaired: in one network of the toy's 500-node rows, several
+  times as many, in a network model that the runs matched (protocol-v2-figures.md, §4.6,
+  "Rebuilt cells marked seen"). The member check, which looks only at the member's own columns,
+  misses them, and the sample catches them. With the member check alone, the option left more
+  custodians short in the runs that measured it, so it is never on without the sample.
+- *Measured at ten seeds* in the toy's 500-node rows, without supernodes, against a fifth of the
+  nodes repairing only the members' cells: the member check alone left blocks short, the sample
+  fewer, and the sample with rebuilt cells marked seen none. In honest cells the two together cost
+  slightly more copies and control, against neither, with no direction in time
+  (protocol-v2-figures.md, §4.6, "Rebuilt cells marked seen").
 
 **A custodian's alarm** (kept on 2026-11-01 for networks without an honest supernode).
-- *Its wait, in the toy.* In the toy's 500-node rows without a fault, no custodian completed later
-  than 2.944 s over seeds 7 to 16. The measurements use 3.5 s, with `ALARM_NEXT` 1.5 s and
-  `ALARM_MAX` 3. The member's ask starts its promise at its write in the toy since 2026-11-17, at the
-  decision before; and since 2026-11-17 a member that rebuilds the row answers the alarm from
-  `decode_group`.
-- *Measured again on the rules as they stand* (2026-11-18), in the 500-node cells of the one-column
-  hoarder at seeds 11, 12 and 16, with writes completing at once as before. Without the alarm 2 of 6
-  blocks were short (108 custodians): the same blocks as before but seed 16's first, which now
-  completes. With it none was, for 61 alarms and 10 rebuilds, as before. In honest cells and under
-  false claims (seeds 7 to 9, rebuilt cells not marked seen) no alarm fired. The figures below were
-  not measured again.
-- *Measured at ten seeds*, before the member's changes of 2026-11-17 above, as above, with the
-  sample and rebuilt cells marked seen. A fifth of the nodes repaired all but one withheld column
-  per subnet, with no supernodes. Without the alarm, 3 of 20 blocks were short (165 custodians);
-  with it, none, for 61 alarms and 10 rebuilds, all at the two short seeds. With 5 % supernodes none
-  was short without it, since a supernode's second phase rebuilds the row: the alarm is for networks
-  without one. In honest cells, with the builder at 1 Gbps or at home, no alarm fired; the latest
-  custodian completed at 2.6 and 2.8 s. Under false claims by a fifth of the nodes, 2 alarms fired
-  and no rebuild followed.
+- *Its wait, in the toy.* The measurements set the wait above the latest custodian's completion in
+  the toy's 500-node rows without a fault (protocol-v2-figures.md, §4.6, "A custodian's alarm", with
+  the settings and the rules each run had).
+- *Measured again on the rules as they stood* (2026-11-18), in the 500-node cells of the one-column
+  hoarder (protocol-v2-figures.md, §4.6, "A custodian's alarm"). Without the alarm some blocks were
+  short: the same blocks as before but one, which now completes. With it none was, for as many
+  alarms and rebuilds as before. In honest cells and under false claims (rebuilt cells not marked
+  seen) no alarm fired. The figures of the ten-seed runs below were not measured again.
+- *Measured at ten seeds*, before the member's changes of 2026-11-17, with the sample and rebuilt
+  cells marked seen. A fifth of the nodes repaired all but one withheld column per subnet, with no
+  supernodes. Without the alarm some blocks were short; with it, none, and every alarm and rebuild
+  came at the short seeds. With supernodes none was short without it, since a supernode's second
+  phase rebuilds the row: the alarm is for networks without one. In honest cells, with the builder
+  at 1 Gbps or at home, no alarm fired, and the latest custodian completed before the alarm's wait.
+  Under false claims by a fifth of the nodes, a few alarms fired and no rebuild followed
+  (protocol-v2-figures.md, §4.6, "A custodian's alarm").
 - *Not measured:* the wait on thinner links, where the honest tail is longer; and the alarm since
   the probed cell is drawn at random. These runs probed the lowest index a member lacked, which
   was never the hidden column; drawn at random, the probe can ask for it, and a claimant that
@@ -2109,55 +2102,52 @@ Measured over seeds 7 to 19 at 60 nodes, 16 subnets, half the columns withheld (
 
 **A rebuilt chunk completes the groups it fills.** Draft 1 filled the column without the check, so
 the member never completed it: it neither stopped pulling it nor told its peers, and the toy counted
-it short (in one run of the repair floor's measurement below, before the fix).
+it short (in a run of the repair floor's measurement below, before the fix; protocol-v2-figures.md,
+§4.6, "The repair floor").
 
-**Every member keeps a link to each column.** In the toy's withheld row cell over seeds 7 to 19 at
-60 nodes, without the floor five runs left custodians short, and each was a missing link. In four, a
-column with two custodians missed a cell because neither was linked to the only member that rebuilt
-the row; the deferral on a claim, which cancels a second decode once the first is verified, makes a
-single rebuilder common. In the fifth, a subnet had two members, linked only to each other among
-members, and each gathered 63 cells of its rows from the columns' custodians, one short: neither was
-linked to the only custodian of one published column, so neither row was ever rebuilt. With
-`REPAIR_FLOOR = 1` all thirteen runs completed, at 1 to 30 added links per run, with completion
-times and bytes within the seeds' spread (§6.2, `toy/README.md`).
+**Every member keeps a link to each column.** In the toy's withheld row cell, without the floor
+several runs left custodians short, and each was a missing link. In all but one of them, a column
+with two custodians missed a cell because neither was linked to the only member that rebuilt the
+row; the deferral on a claim, which cancels a second decode once the first is verified, makes a
+single rebuilder common. In the other, a subnet had two members, linked only to each other among
+members, and each gathered its rows from the columns' custodians one cell short: neither was linked
+to the only custodian of one published column, so neither row was ever rebuilt. With
+`REPAIR_FLOOR = 1` every run completed, and the links it added left completion times and bytes
+within the seeds' spread (§6.2; protocol-v2-figures.md, §4.6, "The repair floor").
 
-**A supernode keeps every row.** In the toy at 60 nodes, three supernodes (5 %) on datacenter links
-complete every custodian on all thirteen seeds of the custody cell whose proposer withholds half the
-columns, which nothing else recovers, in 1.20 s at the median and 1.25 s at the tail (the medians
-over the seeds); they complete the 32-subnet withheld row cell, which its subnets without members
-left short, in 1.20 and 1.83 s, and they take the 16-subnet cell from 2.44 / 2.71 s to
-1.20 / 1.76 s. The cost is bytes: 3.3 copies of a node's custody in the withheld row cells against
-2.4 without supernodes, and 3.8 in the custody cell (§6.2, `toy/README.md`), most of it duplicate
-pushes of the fast class: with a budget of `R` for cells it is 2.6 to 2.8 copies, with the tails 0.1
-to 0.15 s shorter (§6.3, `R_NODE`, for later study).
+**A supernode keeps every row.** In the toy, a few supernodes on datacenter links complete every
+custodian on every seed of the custody cell whose proposer withholds half the columns, which nothing
+else recovers. They complete the withheld row cell with 32 subnets, which its subnets without
+members left short, and they complete the cell with 16 subnets much sooner. The cost is bytes, most
+of it duplicate pushes of the fast class: with a budget of `R` for cells the copies are fewer and
+the tails shorter (§6.2; §6.3, `R_NODE`, for later study; protocol-v2-figures.md, §4.6,
+"Supernodes").
 
-**A row held on the columns is on its way.** Without the wait, on home links, three supernodes in
-the toy's honest row cell rebuilt 186 rows that nobody had withheld, and the cell's tail went from
-1.09 to 1.49 s (seed 7). With the wait, no supernode rebuilt a row in any of the thirteen honest
-custody or row runs. In the withheld cells the three supernodes still rebuild most rows more than
-once (131 to 167 of the 192 row decodes that three supernodes and two blocks of 32 rows allow); a
-jitter longer than a rebuilt row's trip to the other supernodes would cancel more of them, not
-measured. For a member it changed no event of the seed-7 row cells without supernodes.
+**A row held on the columns is on its way.** Without the wait, on home links, supernodes in the
+toy's honest row cell rebuilt many rows that nobody had withheld, and the cell's tail grew. With the
+wait, no supernode rebuilt a row in any honest custody or row run. In the withheld cells the
+supernodes still rebuild most rows more than once; a jitter longer than a rebuilt row's trip to the
+other supernodes would cancel more of them, not measured. For a member it changed no event of the
+row cells without supernodes that were checked (protocol-v2-figures.md, §4.6, "Supernodes").
 
 **A rebuilder pushes as a source.** Without supernodes, in the withheld 16-subnet row cell, where
-members on home links rebuild, it is better on every count over the thirteen seeds: 12 900 repair
-pushes against 36 900, 2.19 copies against 2.36, the tail 2.62 s against 2.71 (the median over the
-seeds) and 2.68 against 2.82 at the worst seed. With supernodes on datacenter links, whose budget is
-the fast class's six, it saves 0.15 copies and costs 0.21 to 0.25 s at the tail (2.00 against 1.76 s
-with 16 subnets, 2.04 against 1.83 with 32), and in the custody cell 0.05 copies for 53 ms. With the
-fast class's budget off for cells (§6.3, `R_NODE`) it saves 0.41 copies in the 16-subnet cell for
-0.1 s at the median and the tail (seeds 7 to 9).
+members on home links rebuild, it is better on every count: fewer repair pushes, fewer copies, and a
+shorter tail, at the median over the seeds and at the worst seed. With supernodes on datacenter
+links, whose budget is the fast class's six, it saves copies and costs time at the tail, and in the
+custody cell both the saving and the cost are small. With the fast class's budget off for cells
+(§6.3, `R_NODE`) it saves more copies in the 16-subnet cell, for a later median and tail
+(protocol-v2-figures.md, §4.6, "A rebuilder pushes as a source").
 
 **Whom rebuilt cells go to.** A supernode keeps every row, so a rebuilder's push into a column
 reaches it too, and where several nodes rebuild a row their pushes cross in flight: at 500 nodes
-(seed 7) 88 % of the rebuilt cells pushed in the withheld custody cell arrived as duplicates, the
-whole of that cell's extra cost over the honest one (3.76 against 2.83 copies). The duplicates are
-bounded by what a node's own peers push it, so no estimate of the network's size is needed to bound
-them. Measured over seeds 7 to 19 at 60 nodes with three supernodes (the toy README): offering the
-cells to the nodes that keep every row instead of pushing them saves 0.17 to 0.33 copies at no cost
-in time; offering every rebuilt cell, as a row's are, saves 0.5 to 0.7 copies and costs 60 to 110 ms
-at the median; leaving the keepers out saves as much as offering to them, but costs the custody cell
-a 2.3 s tail, since a supernode left out has only its own rebuild, after a deferral.
+most of the rebuilt cells pushed in the withheld custody cell arrived as duplicates, the whole of
+that cell's extra cost over the honest one. The duplicates are bounded by what a node's own peers
+push it, so no estimate of the network's size is needed to bound them. In the toy with supernodes,
+offering the cells to the nodes that keep every row instead of pushing them saves copies at no cost
+in time; offering every rebuilt cell, as a row's are, saves more and costs time at the median;
+leaving the keepers out saves as much as offering to them, but lengthens the custody cell's tail,
+since a supernode left out has only its own rebuild, after a deferral (protocol-v2-figures.md, §4.6,
+"Whom rebuilt cells go to").
 
 ### 4.7 The source
 

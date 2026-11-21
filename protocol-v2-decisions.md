@@ -166,27 +166,26 @@ copy of the probed cell only, an answer or a push. Three rules make that fair to
 and hard to meet for a dishonest one: the probe's WANT is marked (`probe`, §2), and the claimant
 answers it whatever the asker's holdings say, once per asker and group, the exemption taken by the
 answer and spent when it is written; the asker's queue keeps its marked WANT while the probe waits;
-and the probed cell is drawn at random among those the member lacks. In the toy's rows (60 nodes,
-three blocks, `--send-buffer 0`), over five cells and three seeds, no honest or hoarding claimant
-failed its probe (none of 1 281 verdicts with the rules as they stand, none of 1 298 with those of
-2026-11-16; before them, 3 of 1 289 failed without the mark and the kept WANT), and liars passed 1,
-0 and 65 times in the three liar cells. Since 2026-11-16, the probe's wait starts at its write, a probe not written when the duty
-next fires gets no verdict unless the claimant's own copy came first, and is not written later, a
-claimant still decoding keeps the first probe per asker and group and answers it once when the cell
-is stored, and a claimant that leaves before the verdict gets none; without a verdict, the member's
-own repair is reconsidered at the duty's own time, at once if that has passed; and once the probe
-is settled, a promise under its key is a plain ask's, which any copy closes. Not taken: any peer's
-copy passing the claimant, which let liars pass whenever another peer brought the cell (at least 57,
-115 and 558 times in the same cells, measured before 2026-11-16); hiding the probed cell from the
-claimant in the asker's holdings while the probe waits, which changes what a node announces and
-cannot hide a cell already named before the probe; and the lowest lacked index, which a claimant can
-read from the member's holdings. The random index's purpose, against a claimant that keeps only the
-cell it expects to be asked, is not measured: the toy's liars do not aim. The standalone binding
-carries `standing` and `probe` in one `Bitvector[8]`, its other bits zero when sent and ignored when
-received, so that a later flag fits without breaking older readers (`protocol-v2-bindings.md` §1.3).
-Not taken there: a byte of
-its own for the mark, which every WANT would pay, and a message of its own for the probe, which
-every binding would have to carry.
+and the probed cell is drawn at random among those the member lacks. In the toy's rows, over five
+cells, no honest or hoarding claimant failed its probe, with the rules of 2026-11-18 or with those
+of 2026-11-16; before them, a few failed without the mark and the kept WANT. Liars almost never
+passed in two of the three liar cells, and passed more often in the one with supernodes
+(protocol-v2-figures.md, §4.6, "The probe"). Since 2026-11-16, the probe's wait starts at its write,
+a probe not written when the duty next fires gets no verdict unless the claimant's own copy came
+first, and is not written later, a claimant still decoding keeps the first probe per asker and group
+and answers it once when the cell is stored, and a claimant that leaves before the verdict gets
+none; without a verdict, the member's own repair is reconsidered at the duty's own time, at once if
+that has passed; and once the probe is settled, a promise under its key is a plain ask's, which any
+copy closes. Not taken: any peer's copy passing the claimant, which let liars pass whenever another
+peer brought the cell (far more often in the same cells, measured before 2026-11-16); hiding the
+probed cell from the claimant in the asker's holdings while the probe waits, which changes what a
+node announces and cannot hide a cell already named before the probe; and the lowest lacked index,
+which a claimant can read from the member's holdings. The random index's purpose, against a claimant
+that keeps only the cell it expects to be asked, is not measured: the toy's liars do not aim. The
+standalone binding carries `standing` and `probe` in one `Bitvector[8]`, its other bits zero when
+sent and ignored when received, so that a later flag fits without breaking older readers
+(`protocol-v2-bindings.md` §1.3). Not taken there: a byte of its own for the mark, which every WANT
+would pay, and a message of its own for the probe, which every binding would have to carry.
 
 **The repair's options** `[D4]` (decided 2026-11-01). The repair sample and rebuilt cells marked
 seen stay options. They are on together where a node defends against hoarding claimants, and the
@@ -195,14 +194,15 @@ honest supernode.
 
 **Dropped: biasing the repair sample** toward the columns the member check cannot vouch for, those
 that no member of the row's subnet custodies, by drawing half of each step's new cells from them.
-- *What the node knows.* It knows only the members it is linked to. From those, 38 to 50 of the
-  about 60 cells a member lacks look uncovered, so the bias barely narrows the draw.
-- *The odds.* In a network model of the toy's 500-node rows, seed 11's hoarders repair the members'
-  cells and leave 5 columns unrepaired. The chance that every honest member of the subnet passes,
-  so that the row stays short, is 0.52 with the uniform sample and 0.38 with the bias over linked
-  members. It is 0.06 only with every member known, a view the node does not have.
-- *Where hoarders mark their rebuilt cells seen,* the uniform sample already catches them: below
-  0.001 in the model. Beside that option, three seeds showed nothing from the bias.
+- *What the node knows.* It knows only the members it is linked to. From those, most of the cells a
+  member lacks look uncovered, so the bias barely narrows the draw.
+- *The odds.* In a network model of the toy's 500-node rows, in one network whose hoarders repair
+  the members' cells and leave a few columns unrepaired, the bias over linked members makes it only
+  somewhat less likely that every honest member of the subnet passes, so that the row stays short.
+  It makes that unlikely only with every member known, a view the node does not have.
+- *Where hoarders mark their rebuilt cells seen,* the uniform sample already catches them in the
+  model. Beside that option, the runs, a toy check, showed nothing from the bias
+  (protocol-v2-figures.md, §4.6, "Biasing the repair sample").
 
 **A sampler's reach** `[D12]`, decided (2026-11-03). The steady state is a coverage floor built
 for diversity (§1.3). Its size is `SAMPLE_COVER`, a parameter of the object type with a bound of at

@@ -160,6 +160,415 @@ they were not run again.
 - Under the rows setting, the busiest peer reached 1 254 frames and 178 asks [857 to 1 254 frames
   and 78 to 178 asks over the three seeds].
 
+## §4.6 Completion, the claims, decoding and repair
+
+**Conditions.** Every figure below comes from the toy (`toy/run.py --doc v2`) in the rows setting
+(`--setting rows`: RowDAS's row on top of PeerDAS custody, 128 columns, rows of 128 cells with K =
+64) or under custody alone (`--setting custody`), as each sub-entry says. "Half the columns
+withheld" is `--withhold 64`: the proposer keeps the last 64 columns, which only reconstruction
+fills. A cell's median and tail are the 50th and 99th percentiles of its custodians' completion
+times. "Seeds 7 to 19" are thirteen seeds; a figure over them is the median over the seeds unless
+the sub-entry says otherwise. A figure from fewer than ten seeds is a toy check of a mechanism, not
+a measurement. Every figure in this entry ran with every write taken at once (`--send-buffer 0`):
+the figures first written before 2026-11-15 because that was the toy's only transport then, and the
+probe's runs of 2026-11-16 and 2026-11-18 and the alarm's of 2026-11-18 because their command lines
+set it (named in each sub-entry). The toy's default since 2026-11-15 is `--send-buffer 1`. Figures
+from runs made before 2026-11-15 ran with the probe asking the lowest index the member lacked,
+without the mark and the kept WANT, and with any peer's copy passing the claimant, unless they say
+otherwise. The 60-node rows runs of 2026-10-07 to 2026-10-10 had degree 30, a 1 Gbps proposer and 6
+row reconstructors (`--reconstructors 10`, percent), as the README states (README 947, 1030); the
+probe's runs of November name their own command line. "README" below is `toy/README.md` at
+`9f300cf`, with its line numbers. Each sub-entry gives the date on which its figures were first
+written, and in brackets the commit of the main line that first carried them.
+
+**Rules changed since the October runs** (the sub-entries dated 2026-10-07 to 2026-10-10). Those
+runs predate every version of `protocol.md` after v0.3 that the draft carried
+(`protocol-v2-decisions.md`, "The versions of `protocol.md` carried"), among them v0.5's fixes to
+§4.6's `decode_group` and the repair (2026-10-21), v0.8's rebuilt chunk naming its sources' block
+(2026-10-26), v0.9's source holding at the acknowledgement (2026-11-10) and v0.10's rules (carried
+2026-11-15 and 2026-11-16). They also predate §4.6's own later rules: the probe marked and its cell
+drawn at random (2026-11-15); its wait from the write, a claimant still decoding and a claimant that
+leaves (2026-11-16); `probe_of_claim` and `note_push` under every group a chunk fills (2026-11-17).
+Whether any of these moves a figure is not traced.
+
+### The deferral
+
+**Conditions.** First written on 2026-10-07 (03:59) [`08fbc3d`, 2026-10-21]. The record is the toy's
+README of that commit and README 977–979. The runs: the 60-node rows cells without liars (honest
+with 32 subnets; half the columns withheld with 16 and with 32 subnets), degree 30, a 1 Gbps
+proposer, 6 reconstructors, one seed (7). They ran under v0.3's slot window (a window counted in 12
+KB slots), before the window in bytes (§4.11, 2026-10-07 04:40), and with v0.3's `PROMISE` of 400 ms
+as the probe's promise, the rule this figure changed. The record gives one figure, not its
+statistic: whether it is one probe or typical is not stated.
+- A reconstructor's answer to a probe left 450 ms after the probe was decided, behind its burst of
+  rebuilt cells. The deferred duties re-armed against honest claimants were 1 in the honest cell and
+  8 in the 16-subnet withheld cell (the toy's README of 2026-10-07, 03:59).
+
+### The probe
+
+**Conditions common to its runs.** The toy's rows at 60 nodes, degree 30, three blocks (`--msgs 3`),
+seeds 7, 8 and 9, `--send-buffer 0`, the toy's default net (home), in five cells: C0 honest (`--seed
+S`, 32 row subnets); C1 a fifth of the nodes lying (`--fault claim20`); C2 the same with 16 subnets
+and half the columns withheld (`--row-subnets 16 --withhold 64 --fault claim20`); C3 the same with a
+fifth hoarding (`--fault hoard20`) in place of the liars; C4 is C2 with 5 % supernodes
+(`--supernodes 5`, three of 60). The runs before 2026-11-16 called `run.py` itself, with the
+variant's text loaded through `TOY_DOC2`; those of 2026-11-16 and 2026-11-18 went through a counting
+wrapper of the toy's run, which prints the probe's counts. `DEFER_WINDOW` was 1 s in every run (the
+toy's default). A toy liar answers no ask, so it passes a probe only on a copy it pushed. The toy's
+queues refuse nothing, and these cells close no connection. C2 at seed 9 never completes: a
+published column's custodians are all liars (README 1132–1137).
+
+**On the rules of 2026-11-18.** First written on 2026-11-18 (08:11) [`0edbdc7`, 2026-11-18]. The
+runs: `--nodes 60 --degree 30 --msgs 3 --doc v2 --digest --setting rows --send-buffer 0`, through
+the counting wrapper, on the toy of 2026-11-18, from 07:30 CET that day. Baseline: the runs with the
+rules of 2026-11-16 (below). Rules changed since, not run with these figures: v0.10.5's `accepted`
+(2026-11-19: a later copy of a copy that level 1 rejected no longer passes the probe) and v0.10.7's
+and v0.10.9's wake in the window's line (2026-11-20 and 2026-11-21, §4.11); v0.10.3 and v0.10.4 were
+carried after these runs too (`protocol-v2-decisions.md`, "The versions of `protocol.md` carried").
+- No verdict on an honest or hoarding claimant failed: none of 1 281 verdicts, and none was left
+  without a verdict.
+- Every probe got a verdict and was written; none was still unwritten when its window ran out, and
+  no probe reached a claimant still decoding.
+- Liars passed their probe 1, 0 and 65 times in C1, C2 and C4, over the three seeds (C4's liar
+  verdicts: 65 passed, 704 failed).
+- The mark cost 5 duplicate cells in 2 417 probes decided: exempt answers written over a holding the
+  asker had sent.
+- At the median a probe was written when it was decided (the text's figure; the record gives the
+  longest only). The longest wait from decision to write was 163 ms (162.6 ms, C3 at seed 9),
+  against a `DEFER_WINDOW` of 1 s.
+- C2 at seed 9 delivers no block to 58 of its 60 nodes, as it did before, and decides no probe; the
+  figures include it.
+- Against the runs with the rules of 2026-11-16: every run changed its events (all 15 rows digests
+  moved; custody's did not). The warm copies stayed within 0.03 in 11 of 15 runs and moved in four,
+  not traced: C3 by −0.04 at seed 9 and +0.03 at seed 7, C4 by +0.04 at seed 7 and +0.09 at seed 9.
+
+**With the rules of 2026-11-16.** First written on 2026-11-16 (11:43) [`62a8179`, 2026-11-16]. The
+runs: the same command line, on the draft of 2026-11-16 with the probe's wait from its write, from
+01:25 GMT that day. Changed since, as the text names them: four fixes (a probe settled while queued,
+a kept probe answered once, the duty's own time, a settled probe's promise; the commits that made
+them are not traced here) and the later changes to the draft, among them those named for the runs of
+2026-11-18.
+- None of 1 298 verdicts on honest or hoarding claimants failed, and none was left without one.
+- Liars passed 3, 1 and 61 times in C1, C2 and C4.
+- The mark cost 9 duplicate cells in 2 428 probes decided.
+- One probe, in C4 at seed 8, passed before it was written (307 decided, 306 written, 307 verdicts),
+  on the claimant's own copy. The record does not count whether that claimant was honest or a liar;
+  its counts suggest a liar's push but do not show it.
+- C2 at seed 9 decided 3 probes.
+- The wait from decision to write was 0 ms at the median in every run; the longest was 101 ms (101.2
+  ms, C3), against 62.2 ms in C2 and 60.7 ms in C4.
+- These runs' C4 at seeds 8 and 9 carry v0.10's order of the announcers beyond the list
+  (`protocol.md` §6.1, spec `512efe6`), found by a bisection.
+
+**Before 2026-11-16.** First written in `0d968d8` (2026-11-14). The runs: the toy's experiment build
+of 2026-11-14 with each variant's patch, and the probe text's own runs on its draft of 2026-11-15,
+before v0.10's order of the announcers (`512efe6`), which moves C4 at seed 8 and, bracketed but not
+run at that change, at seed 9.
+- Judged by the claimant's own copy alone, with the lowest index and without the mark and the kept
+  WANT (a variant run on 2026-11-14): 3 of 1 289 verdicts on honest or hoarding claimants failed,
+  all three honest claimants in C3.
+- With the mark and the kept WANT (the probe text's own runs of 2026-11-15): none of 1 299 failed; 9
+  duplicate cells in 2 434 probes.
+- When any peer's copy passed the claimant (a variant run on 2026-11-14): liars passed at least 57,
+  115 and 558 times in C1, C2 and C4. These are lower bounds: the passes of the variant judged by
+  the claimant's own copy, plus that variant's failures with the cell held.
+- Against the runs where any peer's copy passed the claimant (with the lowest index), the warm
+  copies stayed within 0.03 in 12 of 15 runs. C3 at seed 8 was 0.03 to 0.04 lighter (2.15425 against
+  2.19, rounded), and C4 0.083 lighter at seed 7 and 0.077 at seed 9 (the runs with the random index
+  of 2026-11-15, whose digests the text's runs share), almost all of it data (data 2.408 against
+  2.490 and 2.438 against 2.514); not traced further.
+
+**The random index against the lowest.** First written in `0d968d8` (the counts) and on 2026-11-16
+(the trace's figures) [`62a8179`]. The runs: on 2026-11-15, 11:39 to 11:59, the random index against
+the lowest, both with the mark, and a trace of the runs with the random index.
+- Liars passed 3, 1 and 61 times with the random index, against 0, 0 and 49 with the lowest (C1, C2,
+  C4).
+- Six traced runs with the random index (C1 at seeds 7 and 9, C2 at seed 7, C4 at seeds 7 to 9) hold
+  all 65 such passes. In 45 the liar had already sent the member the lowest lacked cell by then; in
+  20 it held that cell unsent; in none had it neither.
+
+### The verdict
+
+**Conditions.** Rows and custody cells at 60 nodes (degree 30, a 1 Gbps proposer, 6 row
+reconstructors), seeds 7 to 19, as each figure names them, with three supernodes on datacenter links
+where the figure says so. Record: the toy's README of 2026-10-09 (01:54), and README 1112–1130 (and
+1146–1189 for the member check). The rules: the probe as before 2026-11-15; the window in bytes; the
+repair floor at 1. The figures on the wording ran with the member check on (README 1125–1128).
+- *The earlier wording* (a member told by a non-empty suppression scope), first written on
+  2026-10-09 (16:01) [`08fbc3d`]: with 32 subnets, members decoded 20 rows per run against draft 1's
+  16, about 4 more, the median over seeds 7 to 19; with 16 subnets, 9 as under draft 1, so none
+  more. With 32 subnets a subnet has about two members at 60 nodes. The record does not name the
+  cells.
+- *This wording*, first written the same day [`08fbc3d`]: the row cells with supernodes (honest, and
+  half the columns withheld with 16 and with 32 subnets) and the withheld custody cell with a fifth
+  of the nodes hoarding run as under draft 1, event for event, on all 13 seeds; so do 48 of the 52
+  seed-cells of the row cells with supernodes and a fifth or half hoarding (16 and 32 subnets, 13
+  seeds each).
+- *The first version* (a verified claim only from a peer in the node's view), first written the same
+  day [`08fbc3d`; recorded in the toy's README of 2026-10-09, 01:54]: members decoded 31 rows per
+  run against draft 1's 9 with 16 subnets, and 38 against 16 with 32, the medians over seeds 7 to
+  19; two to four times as many, for no change in time or bytes. Traced in three runs. The record
+  does not name the cells.
+- *Supernodes and hoarders*, first written the same day [`08fbc3d`]: in three traced runs no
+  supernode ended its duty on a verified claim (README 1173–1175).
+- *Without supernodes*, first written the same day [`08fbc3d`]: a fifth of the nodes hoarding (16
+  subnets, half withheld) left custodians short in every run over seeds 7 to 19, under draft 1 and
+  under the wording before the member check (371 to 810 pairs; README 1163). The record traces seed
+  7: its four short rows were all of one subnet, rebuilt only by a hoarding row reconstructor to
+  which 15 duties had deferred.
+
+### The member check
+
+**Conditions.** First written on 2026-10-09 (12:42) [`08fbc3d`, 2026-10-21] unless a figure says
+otherwise. Record: README 1146–1189, first recorded on 2026-10-09. The runs: 60 nodes, degree 30, a
+1 Gbps proposer, 6 row reconstructors, 16 row subnets, half the columns withheld, seeds 7 to 19,
+without supernodes unless the figure says so; `--member-check on` against `off`; faults `--fault
+hoard20`, `hoard50`, `claim20`. The rules: the probe as before 2026-11-15 (the liars' figure says so
+itself), the window in bytes, the repair floor at 1, and R5's wording before its fix of 2026-10-09
+(16:01), which changed no cell without supernodes (README 1171–1172).
+- A fifth of the nodes hoarding: custodians left short on every seed without the check (371 to 810
+  pairs), and on 3 of 13 with it (seeds 14, 17 and 18, one subnet each without an honest member).
+- Half hoarding: short on 13 of 13 without the check, and on 10 of 13 with it (the seeds with one to
+  four subnets without an honest member).
+- The liars' cell without supernodes: the check fired 1 to 3 times per run on 5 of 13 seeds, each
+  time on a liar's claim that passed because another peer brought the probed cell (measured when
+  that copy also passed the claimant). The firings were traced at seeds 8, 11 and 12 (README
+  1183–1184). The check moved the short pairs on three seeds by one or two (4 to 5, 0 to 1, 3 to 5),
+  and in the three traces every short pair, with and without the check, was a liar's own row.
+- A member whose 8 custody columns of 128 are all among the 64 published holds its cells whatever
+  the claimant does: 0.3 % of members. This is arithmetic, not a run: C(64, 8) / C(128, 8) ≈ 0.31 %.
+- A claimant that pushes each member exactly its custody cells (`--fault hoardm20`, without
+  supernodes): custodians short on all 13 seeds with the member check alone. First written on
+  2026-10-10 [`08fbc3d`]; record README 1202–1208.
+- Without a fault, in the five cells run (rows honest with and without supernodes; withheld with 16
+  subnets with and without; withheld with 32 with supernodes), the check never fired and every event
+  is the same.
+- A rescued block (a fifth hoarding, without supernodes) completes at 3.25 / 3.44 s (p50 / p99;
+  3 254 / 3 438 ms in the README) against 2.44 / 2.71 s without hoarders, at 2.33 copies against
+  2.36.
+- In ten traced runs with hoarders or liars, all 162 firings were on a misbehaving claimant's claim.
+  This figure is in the text only (2026-10-09); the README does not give it.
+
+### Sampling the repair
+
+**Conditions.** The 60-node figures were first written on 2026-10-10 (02:32), those on re-ask the
+same day (10:47) and those at 500 nodes later that day (13:46), all [`08fbc3d`, 2026-10-21]. Record:
+README 1191–1257. The 60-node runs: degree 30, a 1 Gbps proposer, 6 row reconstructors, 16 row
+subnets, half the columns withheld, seeds 7 to 19, the member check on throughout, `--sample-wait
+0.5` (s), the forms `--repair-sample 3:1,6:2`, `4:0,8:1` and `6:0,12:1`, without supernodes or with
+three; faults `hoard20`, `hoardm20`, `claim20`. The 500-node runs: degree 70, 32 row subnets, half
+withheld, seeds 7, 8 and 9, without supernodes or with 25 (5 %), `4:0,8:1` with re-ask against the
+member check alone, 47 to 105 minutes a run (README 1241). Blocks per run are not stated for the
+60-node runs; the per-run and per-node-and-block counts below imply two. The rules: the probe as
+before 2026-11-15, the window in bytes, the repair floor at 1.
+- Against `hoardm20` without supernodes: short on 13 seeds with the member check alone, 5 with `(3,
+  1), (6, 2)`, and 3 with `(4, 0), (8, 1)` or `(6, 0), (12, 1)`: seeds 14, 17 and 18, on which a
+  subnet has no honest member.
+- In the run traced at seed 7 (`4:0,8:1`), all 14 failed samples were on hoarders' claims, and all
+  112 verdicts on honest claimants passed.
+- `(3, 1), (6, 2)` passed partial repairs: at seed 7 the one honest member of a subnet got 4 of 6
+  cells, which the hoarding members' own pushes had brought into some columns.
+- A rescued block completes at 4.2 s at the median (4 184 to 4 231 ms over the three forms) against
+  2.4 s without the fault; the member check alone rescues a claimant that repairs nothing
+  (`hoard20`) at 3.25 s.
+- Without a fault, no sample failed in any form, with or without supernodes; the copies moved by at
+  most 0.02. At `(4, 0), (8, 1)` without supernodes the sample asked 532 cells per run (median), 4.4
+  per node and block averaged over all nodes (532 / (60 × 2)).
+- Among liars, a sample cell asked of a liar is lost: at `(4, 0), (8, 1)`, 18 of 41 verdicts on
+  honest claimants failed at seed 7, and 46 of 48 at seed 8 with supernodes. Members rebuilt 21 to
+  26 more rows per run in the strict forms.
+- With re-ask (`--repair-reask on`), among liars, the strict forms' failed samples per run (median)
+  fell from 15 and 17 (`4:0,8:1`, without and with supernodes) and from 20 and 27 (`6:0,12:1`) to 0,
+  and to at most 22 in one run (the text's figure; the README does not give it). Member decodes per
+  run at `4:0,8:1`: 74 against the member check alone's 80 without supernodes, 46 against 45 with
+  them.
+- With re-ask against `hoardm20`: `4:0,8:1` and `6:0,12:1` leave short seeds 14, 17 and 18; the
+  rescued blocks complete at 4 714 / 4 876 ms and 4 688 / 4 915 ms (p50 / p99), about 0.5 s later
+  (one more `SAMPLE_WAIT` of 0.5 s); `(3, 1), (6, 2)` is short on 4 seeds.
+- At 500 nodes without a fault: the member check never fired and no sample failed. The medians were
+  2 309 to 2 360 ms without supernodes and 1 170 to 1 178 ms with them (README 1247–1248; the text
+  had 2 312 to 2 360 ms, which leaves out the member check alone at seed 9). The sample asked 2 687
+  to 2 788 cells per run without supernodes, 2.7 per node and block over two blocks, and 172 to 258
+  with them.
+- At 500 nodes against `hoardm20`: nobody short with the member check alone (2 354 to 2 388 ms at
+  the median). With the sample, seeds 8 and 9 are similar (2 410 and 2 389 ms); at seed 7 nine
+  samples failed, all on one subnet's row of the second block, which its members rebuilt at 19.5 s.
+  In the trace, the block's last custody cells came at 19.65 s at the median, against 17.37 s in the
+  run with the member check alone: 2.3 s later.
+
+### Rebuilt cells marked seen
+
+**Conditions.** First written on 2026-11-10 [`0d968d8`]. The option was kept on 2026-11-01. The
+figures come from four records, on four trees, all at 500 nodes, degree 70, rows, 32 row subnets,
+half the columns withheld, no supernodes, two blocks, `--send-buffer 0`:
+1. a network model of the hoarders' accidental repair (no run), and the runs of the option on the
+   toy of 2026-10-26 (2026-10-26 and 27; seeds 11, 12 and 16 under `hoardm20`, 7 to 9 honest; three
+   seeds, a toy check);
+2. the stage runs of 2026-10-22 to 2026-10-24, on the toy of 2026-10-23 for seeds 8 to 16 and of
+   `b3b64d7` for seed 7's rerun; `--net bld`; the member check alone, and the sample `4:0,8:1` with
+   re-ask;
+3. the alarm's runs at ten seeds, on the toy of 2026-11-01 (2026-11-01 17:00 to 2026-11-02 06:17
+   CET), alarm off;
+4. the same campaign's off arm (the sample and rebuilt-seen off) for the honest cost.
+- *Accidental repair:* at seed 11, hoarders that mark their rebuilt cells seen leave 34 columns
+  unrepaired instead of 5 in the model, and the run matched it: 456 custodians short in each block,
+  against 168 (record 1).
+- *The member check alone with the option* left more custodians short over seeds 11, 12 and 16: 5 of
+  6 blocks short either way, 2 311 custodians against 1 735; only seed 11 moved (record 1).
+- *Ten seeds* (seeds 7 to 16, 20 blocks), against `hoardm20`: the member check alone left 5 of 20
+  blocks short and the sample 1 (record 2, the stage runs); the sample with rebuilt cells marked
+  seen left none (record 3, on a later tree).
+- *The honest cost* of the two together against neither, alarm off, 20 block pairs per network
+  (builder at 1 Gbps, `bld`, and at home): copies +0.01 a block at the median, about +0.5 % of the
+  off arm's 2.28; control +0.004, higher in all 40 pairs; the paired difference of the tail (p99),
+  at the median, 0 ms (`bld`, 10 pairs higher and 10 lower) and +0.5 ms (home) (record 4).
+
+### Biasing the repair sample
+
+The decision record's "Dropped: biasing the repair sample" points here.
+
+**Conditions.** First written on 2026-11-10 [`0d968d8`]. Two records. The first is a network model
+of 2026-10-26, not a run: each seed's network as the toy builds it at 500 nodes, the columns left
+unrepaired as the model of the hoarders' accidental repair gives them, and `repair_verdict`'s two
+steps at `4:0,8:1` simulated 50 000 times a member. The second is runs on the toy of 2026-10-27, 500
+nodes, degree 70, 32 row subnets, half withheld, no supernodes, `--repair-bias 0.5`, the sample
+`4:0,8:1` with re-ask; `hoardm20` at seeds 11, 12 and 16 with rebuilt cells marked seen on and off,
+honest at seeds 7, 8 and 9; three seeds, a toy check.
+- *What the node knows:* a member is linked to 4 to 6 of its subnet's 8 to 11 other members that are
+  not claimants it heard; each custodies about 4 of the 64 withheld columns. So 38 to 50 of the
+  about 60 cells a member lacks look uncovered.
+- *The odds,* at seed 11 (subnet 5), whose hoarders repair the members' cells and leave 5 columns
+  unrepaired: the chance that every honest member of the subnet passes, so that the row stays short,
+  is 0.52 with the uniform sample, 0.38 with the bias over linked members, and 0.06 with every
+  member known.
+- *Hoarders that mark their rebuilt cells seen* (34 columns unrepaired at seed 11; 33 at seed 12, 43
+  at seed 16): below 0.001 with every form of the sample.
+- *The runs beside that option:* all six `hoardm20` cells with rebuilt cells marked seen complete,
+  biased or not, and the honest cells have no "not repaired" verdict.
+
+### A custodian's alarm
+
+**Conditions.** The settings of every alarm run: `--alarm-wait 3.5` (s), `--alarm-next 1.5` (s),
+`--alarm-max 3`, `--alarm-jitter` 0.2 s. The cells: rows at 500 nodes, degree 70, 32 row subnets,
+half the columns withheld, two blocks, `--send-buffer 0`. `hoardcol20` is a fifth of the nodes
+repairing every withheld column of their row but one per subnet, run with rebuilt cells marked seen.
+In the toy, the member's ask of its claimant starts its promise at its write since 2026-11-17 (at
+the decision before), and a member that rebuilds the row answers the alarm from `decode_group` since
+2026-11-17. The ten-seed runs probed the lowest index a member lacked; the runs of 2026-11-18 ran
+after the probed index became random (2026-11-15), and their record does not count probes at a
+hidden index.
+
+**The bound on its wait.** First written on 2026-11-10 [`0d968d8`]. Record: the stage runs of
+2026-10-22 to 2026-10-24 (as for rebuilt cells marked seen, record 2).
+- Without a fault, no custodian completed later than 2 944 ms over seeds 7 to 16 and both blocks:
+  the latest was in the honest cell with 5 % supernodes and the sample (2 910 ms with the member
+  check alone; 2 634 and 2 621 ms without supernodes). The clock runs from the block's publish;
+  `known_at` is later, so the margin to the alarm is larger.
+
+**On the rules of 2026-11-18.** First written on 2026-11-18 (11:53) [`0edbdc7`, 2026-11-18]. The
+runs: every cell `--send-buffer 0`, on the toy of 2026-11-18, from 09:24 CET that day. The figures
+restated from them are the six `hoardcol20` cells' (the sample `4:0,8:1` with re-ask, alarm off and
+at 3.5 s, seeds 11, 12 and 16). Rules changed since: those named for the probe's runs of 2026-11-18.
+- Without the alarm, 2 of 6 blocks were short, 108 custodians (seed 12's first block, 53; seed 16's
+  second, 55). Before, 3 of 6 and 165: seed 16's first block now completes. Each block's prediction
+  still equals its count.
+- With the alarm, none was short, for 61 alarms and 10 rebuilds, as before (seed 16: 31 cells
+  alarmed, against 32 before).
+- Honest and `claim20` cells (seeds 7 to 9, the sample with re-ask, rebuilt cells not marked seen,
+  alarm off and on): nothing short, and no alarm.
+
+**At ten seeds.** First written on 2026-11-10 [`0d968d8`]. The runs: 130 cells, seeds 7 to 16, on
+the toy of 2026-11-01, from 2026-11-01 17:00 to 2026-11-02 06:17 CET, all with the sample `4:0,8:1`,
+re-ask and rebuilt cells marked seen (but for the honest cost's off arm), alarm off or at 3.5 s.
+These ran before the member's changes of 2026-11-17.
+- `hoardcol20` without supernodes: without the alarm, 3 of 20 blocks short, 165 custodians (seed
+  12's first block and both of seed 16's); with it, none, for 61 alarms and 10 rebuilds, all at
+  those two seeds (seed 12: 41 alarms and 5 rebuilds; seed 16: 20 and 5).
+- `hoardcol20` with 5 % supernodes (25), alarm off: none short.
+- Honest cells, builder at 1 Gbps (`bld`) or at home: no alarm; the latest custodians completed at
+  2.60 s and 2.77 s (the text rounds them to 2.6 and 2.8 s).
+- `claim20`: 2 alarms (seed 13, the second block), no rebuild.
+
+### The repair floor
+
+**Conditions.** First written on 2026-10-07 (14:21) [`08fbc3d`, 2026-10-21]. Record: README
+999–1018, first recorded the same day. The runs: the withheld row cell at 60 nodes, degree 30, a 1
+Gbps proposer, 6 row reconstructors, 16 row subnets, half the columns withheld, seeds 7 to 19,
+`--repair-floor 0` against 1; the window in bytes; no member check (decided 2026-10-09) and no
+supernodes (2026-10-08) yet; the probe as before 2026-11-15.
+- Without the floor, 5 of 13 runs left custodians short, each by a missing link. In four (seeds 10,
+  12, 16 and 18) a withheld column with two custodians missed one or two cells: the only member that
+  rebuilt the row was linked to neither. In the fifth (seed 15) a subnet had two members, each of
+  which gathered 63 of the 64 cells of its rows: neither was linked to the only custodian of
+  published column 24.
+- With `REPAIR_FLOOR = 1` all thirteen runs completed. The floor adds 1 to 30 links per run (2 to 8
+  in the honest cell). On the eight seeds that complete either way, it moves the median by −54 to
+  +34 ms, the tail by −65 to +129 ms and the copies by at most 0.07, within the seeds' spread.
+- *A rebuilt chunk completes the groups it fills:* with the floor, the run at seed 7 found a node
+  that held every cell of a custody column and never completed it, before `decode_group` checked the
+  completion of the groups it filled. Without the floor the fix changes one event in one of the
+  thirteen runs and no result.
+
+### Supernodes
+
+**Conditions.** First written on 2026-10-08 (01:14) [`08fbc3d`, 2026-10-21], and the fast class's
+budget later that night (01:31). Record: README 1020–1072. The runs: 60 nodes, degree 30, a 1 Gbps
+proposer, 6 row reconstructors where there are rows, three supernodes (5 %) on datacenter links
+(`--supernode-link dc`) unless the figure says home links, `--phase2` 1 s with `--phase2-jitter` 0.2
+s, seeds 7 to 19; the medians over the seeds, and the tail's worst seed where named. The rules: the
+window in bytes, the repair floor at 1, the probe as before 2026-11-15, before the member check
+(which changes no event without a fault).
+- The custody cell with half the columns withheld: none complete without supernodes (58 of 59
+  custodians short at seed 7); with them, every custodian on all thirteen seeds, at 1 196 ms at the
+  median and 1 251 ms at the tail (medians over the seeds; the text rounds them to 1.20 and 1.25 s).
+- The 32-subnet withheld row cell: short without supernodes (3 subnets without members at seed 7);
+  with them, 1 202 / 1 833 ms.
+- The 16-subnet withheld row cell: 2 442 / 2 709 ms without supernodes, 1 200 / 1 756 ms with them.
+- Copies of a node's custody: 3.33 and 3.32 in the withheld row cells (16 and 32 subnets) against
+  2.36 without supernodes; 3.76 in the withheld custody cell. Most of it is duplicate pushes of the
+  fast class (`R_FAST`, six peers).
+- With the fast class off (`--without 17`, a budget of `R` for cells): 2.60 copies in the withheld
+  custody cell, 2.76 and 2.66 in the withheld row cells. Their tails are 1 247, 1 642 and 1 685 ms,
+  against 1 251, 1 756 and 1 833 ms with it: 4 ms shorter in the custody cell, and 0.1 to 0.15 s in
+  the row cells (the text gave 0.1 to 0.15 s for all three).
+- *A row held on the columns,* without the wait (`known_across`), on home links: three supernodes
+  rebuilt 186 rows of the honest row cell at seed 7, and its tail went from 1.09 to 1.49 s.
+- With the wait, on datacenter links: 0 rows rebuilt by a supernode in any of the 13 honest custody
+  or row runs. In the withheld cells the supernodes made 131 to 167 of the 192 row decodes that
+  three supernodes and two blocks of 32 rows allow (143 to 167 custody, 131 to 153 rows with 16
+  subnets, 144 to 165 with 32).
+- For a member the wait changed no event: every cell without supernodes kept its digest at seed 7.
+
+### A rebuilder pushes as a source
+
+**Conditions.** First written on 2026-10-08 (01:14) [`08fbc3d`, 2026-10-21]. Record: README
+1033–1072 (`--repair-budget on` against off). The runs: as for supernodes above; members on home
+links; seeds 7 to 19 unless the figure says 7 to 9.
+- Without supernodes, in the withheld 16-subnet row cell: 12 900 repair pushes against 36 900 (the
+  text's figures; the README gives no push counts); 2.19 copies against 2.36; the tail 2 623 against
+  2 709 ms (the median over the seeds) and 2 677 against 2 816 ms at the worst seed.
+- With three supernodes, whose budget is the fast class's: 3.18 copies against 3.33 with 16 subnets,
+  the tail 2 002 against 1 756 ms; 3.15 against 3.32 with 32, the tail 2 041 against 1 833 ms. So it
+  saves 0.15 copies with 16 subnets and 0.17 with 32 (the text gave 0.15 for both). In the withheld
+  custody cell: 3.71 against 3.76 copies, the tail 1 304 against 1 251 ms (53 ms).
+- With the fast class off (`--without 17`), seeds 7 to 9: 2.37 copies, 1 305 / 1 728 ms, which the
+  record reads as 0.41 copies saved for 0.1 s at the median and the tail.
+
+### Whom rebuilt cells go to
+
+**Conditions.** First written on 2026-10-09 (01:54) [`08fbc3d`, 2026-10-21]. Record: README
+1088–1110, "explored on 2026-10-08". The 60-node runs: three supernodes, seeds 7 to 19, the medians
+over the seeds; the arms `--repair-keepers offer`, `--repair-keepers skip` and `--repair-push offer`
+against the push. The 500-node figure: seed 7. The rules: those of the supernodes' runs.
+- At 500 nodes (seed 7), 88 % of the rebuilt cells pushed in the withheld custody cell arrived as
+  duplicates, the whole of that cell's extra cost over the honest one: 3.76 against 2.83 copies.
+- Offering to the nodes that keep every row: 0.17 to 0.33 copies fewer in the withheld cells, at no
+  cost in time (custody 3.43 against 3.76 copies; rows 3.16 and 3.17 against 3.34).
+- Offering every rebuilt cell: 0.5 to 0.7 copies fewer (3.04, 2.80, 2.70), and 60 to 110 ms later at
+  the median (1 264 against 1 196 ms; 1 313 against 1 203; 1 304 against 1 208).
+- Leaving the keepers out: copies as with offering to them (3.38, 3.16, 3.16), but a 2.3 s tail in
+  the custody cell (2 309 ms against 1 251).
+
 ## §4.10 A sampler pulls
 
 **Conditions.** The toy's graphs of §1.3's entry, built by `toy/sampler_graph.py c`: 500 nodes,
