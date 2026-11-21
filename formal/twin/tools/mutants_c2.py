@@ -438,7 +438,7 @@ KEEP = ("    | .id a => setUnwanted p ((← unwantedOf p).insert a.idHex)      -
         "    | .other raw => setUnwanted p ((← unwantedOf p).insert raw)\n")
 PARTB = [
     ("frame-id-not-kept", "on_frame: an IDONTWANT's id not kept", SEC41,
-     KEEP, "    | _ => pure ()\n",
+     KEEP, "    | .id _ => pure ()\n    | .other _ => pure ()\n",
      "yes", "no", "no",
      "the peer goes on being sent what it said it does not want (stock's IDONTWANT, §4.1)",
      "directed41, an on_frame record whose IDONTWANT has an id the peer had not said: the writes (unwanted) and the "

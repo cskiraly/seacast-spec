@@ -255,7 +255,7 @@ SLICE1 = {      # name -> (what it changes, file, old, new): §4.4 and §6.2
                                "  for entry in ids do\n", "  for entry in ids.reverse do\n"),
     "ihave-expand-one-by-one": ("on_ihave: a bitmap expanded index by index as its asks are handled, not whole before the first",
                                 SEC44, "    for a in ← expand entry do                              -- [c7]\n",
-                                "    for one in (match entry with | .id a => [IhaveEntry.id a] | .other r => [IhaveEntry.other r] | .bitmap g bits => bits.toList.map fun i => IhaveEntry.bitmap g ((0 : Bits).set i)) do\n"
+                                "    for one in (match entry with | .id a => [IhaveEntry.id a] | .other r => [IhaveEntry.other r] | .bitmap g bits => bits.toList.map fun i => IhaveEntry.bitmap g ((0 : Bits).set i) | .holding .. => [entry]) do\n"
                                 "    for a in ← expand one do\n"),
     "ihave-held-back-and-asked": ("on_ihave: an ask over the limits is held back and asked all the same", SEC44,
                                   "    else if ← mayAsk a p then\n", "    if ← mayAsk a p then\n"),
@@ -354,7 +354,7 @@ V010 = {
     "ihave-ids-checked-as-bitmaps": ("on_ihave: an id is held to valid_have too, as a bitmap of its index", SEC44,
                                      "    if let .bitmap g bits := entry then                     -- `if is_have_bitmap(entry) and not valid_have(entry):`\n",
                                      # (an id of an index below 8192 only: 2**32 - 1 as a bitmap would be 4 Gbit)
-                                     "    if let some (g, bits) := (match entry with | .bitmap g b => some (g, b) | .id a => (if a.index < 8192 then some (a.group, (0 : Bits).set a.index) else none) | .other _ => none) then\n"),
+                                     "    if let some (g, bits) := (match entry with | .bitmap g b => some (g, b) | .id a => (if a.index < 8192 then some (a.group, (0 : Bits).set a.index) else none) | .other _ => none | .holding .. => none) then\n"),
 }
 # §4.2: the six functions, the two readers, and the new tables' operations
 SEC42 = "SpecTwin/Sec42.lean"
