@@ -90,8 +90,8 @@ class Shard:
 
 class HaveBitmap:
     """One group's bitmap, as a message-id string (§2). Under protocol-v2.md the two claims of a
-    holding travel in version 4 of the strings (protocol-v2-bindings.md §4), charged no bytes here; v0.3 reads them
-    from a full bitmap."""
+    holding travel in a flags byte in version 4 of the strings (protocol-v2-bindings.md §4). The toy charges no
+    bytes for it, and its v2 receive path also reads both claims from a full bitmap (node.py's on_frame)."""
     __slots__ = ("group", "bits", "claim_all", "complete")
 
     def __init__(self, group, bits):
@@ -126,8 +126,8 @@ class WantIndex:
 
 class FlaggedWant(WantIndex):
     """An ask from a WANT with protocol-v2.md §2's `standing` and `hops` ([D12]) or `probe` (R5), carried
-    in version 4 of the strings (protocol-v2-bindings.md §4) and charged no bytes here: the same key as the plain ask, the
-    same bytes on the wire."""
+    in version 4 of the strings (protocol-v2-bindings.md §4). The toy charges it as a plain ask, with the same key
+    and the same bytes, where version 4's string is two bytes longer than a plain WantIndex."""
     __slots__ = ("standing", "hops", "probe")
 
     def __init__(self, group, index, standing, hops, probe=False):

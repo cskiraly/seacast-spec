@@ -1579,10 +1579,10 @@ class Node:
         def wire_size(p, e):                            # §4.11: the entry's chunk's bytes on the wire to p, as the links
             return node.sim.chunk_bytes(node, p, e)     #   will charge them
 
-        def send(p, msg, urgent=False):                 # the v0.3-wire binding (protocol-v2.md §7); true if the
+        def send(p, msg, urgent=False):                 # the gossipsub binding (protocol-v2-bindings.md §4); true if the
             if isinstance(msg, Have):                   #   queue admitted it, as v0.5's enqueue
                 hb = Wm.HaveBitmap(msg.group, msg.bits)
-                if not msg.offer:                       # the two claims ride in the version byte (bindings §3)
+                if not msg.offer:                       # the two claims: version 4's flags byte (bindings §4)
                     hb.claim_all, hb.complete = msg.claim_all, msg.complete
                 return ns["enqueue"](p, (Wm.IHAVE if msg.offer else Wm.IDONTWANT)(hb), urgent)
             elif isinstance(msg, Want):
