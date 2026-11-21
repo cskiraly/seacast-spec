@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """A known answer for protocol-v2.md §2's rule on object types a link has not joined, in §4.1's code (`runs_type`,
-`joined_on`): a JOIN for an object type the node does not run, and a GRAFT or a PRUNE for one the link has not joined,
+`joined`): a JOIN for an object type the node does not run, and a GRAFT or a PRUNE for one the link has not joined,
 leave no state, draw no answer and no penalty.
 
     python3 relation_types_known.py
@@ -18,8 +18,12 @@ handler as if p had sent it, and S's sends to p are recorded:
   ignored, as the link is not yet one of `links(T)`;
 - (f) a WANT for a cell of the row S serves, on the link of (b), which has not joined rows: ignored, no standing
   request, no error;
-- (g) the control: with only S's JOIN for rows owed to the second peer, its GRAFT for a column family: answered.
-On the document before the rule, (a), (b), (c), (e) and (f) fail.
+- (g) the control: with only S's JOIN for rows owed to the second peer, its GRAFT for a column family: answered;
+- (h) a cell that names its column group, from a third peer whose JOIN for columns is taken back (the link has joined
+  rows only), given to S's `on_frame`: taken (`on_chunk`), since the cell is in a row group too, as an answer to a
+  row WANT is; the control, a fourth peer with both JOINs taken back: ignored.
+On the document before the rule, (a), (b), (c), (e) and (f) fail; on the document before chunks were read through
+every group they belong to, (h) fails.
 """
 import sys
 from pathlib import Path
@@ -122,6 +126,26 @@ def main():
     ns["owed_relations"][p2].clear()                #   the JOIN, as every later relation message is (§4.1)
     line(f"(g) control: S's JOIN for rows owed to node {p2}, its GRAFT for column family {cfam}: answered (sent "
          f"or owed)", answered, True)
+
+    src = sim.nodes[1].ns                           # the source holds every cell from its publish
+    cg = next(g for g in sorted(src["chunks"]) if sim.gtype.get(g) == "column" and src["chunks"][g])
+    f = src["chunks"][cg][min(src["chunks"][cg])]
+    both = [q for q in sorted(S.peers) if q not in (1, p, p2) and all(T in ns["join_recv"][q] and T in
+            ns["join_sent"][q] for T in (COL, ROW))]
+    if len(both) < 2:
+        line("(h) two more peers with both types joined", len(both), ">= 2")
+    else:
+        p3, p4 = both[:2]
+        del ns["join_recv"][p3][COL]
+        del ns["join_recv"][p4][COL]
+        del ns["join_recv"][p4][ROW]
+        took, spec_chunk = [], ns["on_chunk"]
+        ns["on_chunk"] = lambda q, ch: took.append(q)
+        ns["on_frame"](p3, Wm.Frame(Wm.Entry(chunk=f)))
+        ns["on_frame"](p4, Wm.Frame(Wm.Entry(chunk=f)))
+        ns["on_chunk"] = spec_chunk
+        line(f"(h) a cell naming column {sim.gcol[cg]}: from node {p3} (rows only joined), from node {p4} (neither): "
+             f"taken", (p3 in took, p4 in took), (True, False))
     line("penalties", pen, [])
 
 

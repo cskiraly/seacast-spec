@@ -18,10 +18,14 @@ does not, each of a different column:
 - (e) the same heartbeat, p's kept probe of S's claim (`serve_waiting_probe`): answered;
 - (f) after the heartbeat (`on_heartbeat`), two of (a)'s asks again: both answered;
 - (g) one frame asking an id twice: one answer, the budget, the stock count and `served` charged once;
-- (h) an id at the stock limit of three answers: refused without spending the budget, and the next eligible ask is
-  answered;
+- (h) with one unit of the budget left, an id not on an offer at the stock limit of three answers: refused without
+  spending the budget; the next ask, for another id not on an offer, is answered with that unit;
+- (i) after the heartbeat, one frame with a plain ask and then p's probe of S's claim, for the same id, and one with
+  the two the other way round: one answer each, and the probe's exemption taken (`probe_answers`) in both;
 - penalties: none.
-On the document before the budget, (a), (d), (g) and (h) fail, and (b) and (c) have no record of S's offers.
+On the document before the budget, (a), (d) and (g) fail, and (b) and (c) have no record of S's offers; (h) fails if
+the budget is charged before the stock limit is read; (i) fails, in its first order, on the document before an id
+asked twice in a frame kept a probe among its asks.
 """
 import sys
 from pathlib import Path
@@ -112,12 +116,23 @@ def main():
     got = len(ns["on_want"](p, [Wm.WantIndex(g, i), Wm.WantIndex(g, i)]))
     line("(g) one frame asking an id twice: answers; budget, stock count, served charged",
          (got, ns["served_hb"][p] - hb0, ns["serve_count"][p][mid] - sc0, ns["served"][p][g] - sv0), (1, 1, 1, 1))
-    g, i = cells[3]
+    g, i = cells[0]                                 # (g) spent one unit: one is left
     mid = ns["resolve"](Wm.WantIndex(g, i))
     ns["serve_count"][p][mid] = ns["GOSSIP_RETRANSMISSION"]
     hb0 = ns["served_hb"][p]
-    got = (answered(cells[3]), ns["served_hb"][p] - hb0, answered(cells[4]))
-    line("(h) an id at the stock limit: answered, budget spent; then an eligible ask: answered", got, (0, 0, 1))
+    got = (ns["SERVE_BUDGET"] - hb0, answered(cells[0]), ns["served_hb"][p] - hb0, answered(cells[1]),
+           ns["served_hb"][p] - hb0)
+    line("(h) one unit left: an id at the stock limit: answered, budget spent; then another id: answered, budget "
+         "spent", got, (1, 0, 0, 1, 1))
+    ns["on_heartbeat"]()
+    got = []
+    for c, first_probe in ((cells[2], False), (cells[5], True)):   # no probe of these groups yet
+        g, i = c
+        plain, probe = Wm.WantIndex(g, i), Wm.FlaggedWant(g, i, False, 0, True)
+        n = len(ns["on_want"](p, [probe, plain] if first_probe else [plain, probe]))
+        got.append((n, ns["probe_answers"][p][g].has(i)))
+    line("(i) a plain ask and a probe of the same id in one frame, then the other order: answers, probe's exemption "
+         "taken", got, [(1, True), (1, True)])
     line("penalties", pen, [])
 
 

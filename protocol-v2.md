@@ -371,7 +371,10 @@ rule (§4.6) says it decodes a group or a block it does not need whole for itsel
 
 The messages are abstract; the bindings carry them on wires (§7, `protocol-v2-bindings.md`). Every
 message names its object type or group, and a receiver ignores, without penalty, a message for an
-object type it has not joined on that link.
+object type it has not joined on that link. A chunk is for the type of every group it belongs to
+(`project`): a cell stored from its column and asked for in its row comes back naming its column,
+and is taken on a link that joined only rows. A fetch outside the links (§7) has no JOIN: its WANT
+is answered, and its answer taken, without one.
 
 ```python
 class Join(Container):                   # per link and object type, sent by both ends   [D11]
@@ -587,8 +590,11 @@ blocks), `wire_size(p, entry)` (§4.11: the bytes the entry's chunk takes on the
 binding's: with a header where its write carries one), `cell_groups(root)` (the column and row
 groups of a block, from their ids alone), `admitted_group(p, g)` (§4.5: a group named in `p`'s
 WANT is within `p`'s own limit of unknown groups named in WANTs, `MAX_PENDING_GROUPS`; a group the
-node holds state for always is; a place frees as §4.5 says) and `offers_in(e)` (the offers a queue
-entry carries, each as a group and its bitmap, whichever path queued them).
+node holds state for always is; a place frees as §4.5 says), `release_wanted_groups()` (§4.5:
+frees each such place whose group has resolved or whose lifetime has passed, and for the latter
+drops the asker's standing requests, route marks and interest bits for the group, removing the
+entries it empties) and `offers_in(e)` (the offers a queue entry carries, each as a group and its
+bitmap, whichever path queued them).
 
 ## 4. Events
 
@@ -600,9 +606,10 @@ GRAFT and PRUNE, then holdings, then the response.
 ```python
 def on_frame(p, frame):
     ok = lambda g: joined(p, type_of_group(g))                        # §2: a message for a type the link has not
-    for f in frame.chunks:                                            #   joined is ignored, without penalty; the
-        if ok(f.group): on_chunk(p, f)                                #   asks, GRAFTs and PRUNEs check it in their
-    offers = [h for h in frame.haves if h.offer and ok(h.group)]      #   handlers (§4.2, §4.3)
+    for f in frame.chunks:                                            #   joined is ignored, without penalty; a chunk
+        if any(ok(g) for (g, i) in type_of_group(f.group).project(f)):   #   is for the type of every group it fills;
+            on_chunk(p, f)                                            #   the asks, GRAFTs and PRUNEs check it in
+    offers = [h for h in frame.haves if h.offer and ok(h.group)]      #   their handlers (§4.2, §4.3)
     if offers: ihave_frames[p] += 1                                   # offer-bearing frames, for §4.3's limits
     asks = [a for h in offers for a in on_offer(p, h)]                # §4.3
     answers = on_want(p, frame.asks)                                  # §4.5
@@ -727,7 +734,8 @@ def on_graft(p, gr: Graft):                            # each direction answered
 
 def relation_room(p, T, fam, c) -> bool:               # §6.3, X6: the link has (fam, c) in some state already, or
     held = {(f, k) for m in (push_in, push_out, grafted_in, grafted_out)   #   fewer pairs of T than MAX_RELATIONS:
-            for f, ks in m[p][T].items() for k in ks}  #   relations, our GRAFTs not yet answered, and backoffs
+            for f, ks in m[p][T].items() for k in ks}  #   relations, our GRAFTs not yet answered, backoffs not yet
+                                                       #   run out, and our GRAFTs and PRUNEs still owed
     held |= {(f, k) for f, bo in backoff[p][T].items() for (k, d), until in bo.items() if until > now}
     held |= {(m.family, m.colour) for m in owed_relations[p]   # a GRAFT or PRUNE of ours still owed to p
              if not isinstance(m, Join) and m.object_type == T.id}
@@ -744,15 +752,17 @@ def join_push(p, T, fam, c):                           # p joins our push relati
 def on_prune(p, pr: Prune):                            # p's no, or p's end of the relation: ours ends too
     if not runs_type(pr.object_type) or not joined(p, type_of(pr.object_type)): return   # §2: no backoff, no penalty
     T = type_of(pr.object_type); fam, c = pr.family, pr.colour
+    for bo in backoff[p][T].values():                  # §3: a backoff lives until it runs out, and no longer
+        for k in [k for k, until in bo.items() if until <= now]: del bo[k]
     if not relation_room(p, T, fam, c): return         # §6.3: a new pair over the link's limit: no backoff
     d = BOTH if T.params.SYMMETRIC else pr.direction   # a symmetric relation ends both ways
     until = now + T.params.PRUNE_BACKOFF               # and is not grafted again before then
     if d in (OUT, BOTH):                               # "I stop pushing you", "I will not push you"
         push_in[p][T][fam].discard(c); grafted_in[p][T][fam].discard(c)
-        backoff[p][T][fam][(c, IN)] = until            #   our "push me" waits
+        if until > now: backoff[p][T][fam][(c, IN)] = until   # our "push me" waits; none when the backoff is 0
     if d in (IN, BOTH):                                # "stop pushing me"
         push_out[p][T][fam].discard(c); grafted_out[p][T][fam].discard(c)
-        backoff[p][T][fam][(c, OUT)] = until           #   our "I will push you" waits
+        if until > now: backoff[p][T][fam][(c, OUT)] = until   # our "I will push you" waits
 
 def send_relation(p, m):                               # a JOIN, GRAFT or PRUNE is never lost to a full queue: one
     if owed_relations[p] or not send(p, m, urgent=isinstance(m, Join)):   #   refused, and every later one, is
@@ -862,7 +872,9 @@ and a peer offered it wants it only then.
 names, from the receiver's side: the peer, type, family, colour and direction. Until the backoff
 runs out, `candidates` passes that peer over for that relation. A GRAFT the peer sends meanwhile is
 decided as any other. `PRUNE_BACKOFF` is stated by its bounds (§6.3). A PRUNE for a pair new to a
-link at its limit of relations starts no backoff (below).
+link at its limit of relations starts no backoff (below). A backoff that has run out is dropped, at
+the latest when the peer's next PRUNE is handled (`on_prune`), and a `PRUNE_BACKOFF` of zero keeps
+none.
 - **Its bounds.** The backoff lasts at least a round trip, so that a peer that refused is not asked
   again before its refusal could change. It lasts at most as long as a node may stay below its
   floor once its candidates have refused: a deficit lasts until a GRAFT after the backoff is
@@ -896,13 +908,18 @@ that peer.
 **A link has at most `MAX_RELATIONS` pairs of family and colour of a type** (§6.3), counting every
 state a pair can be in at the node: a relation either way, a GRAFT of its own not yet answered, a
 backoff not yet run out, and a GRAFT or PRUNE of its own still owed to the peer (`relation_room`).
-Once the link is at the limit, a GRAFT for a pair new to it is ignored, with no answer, so that no
-refusal can pile up among the owed messages; a PRUNE for a new pair sets no backoff; and the node's
-own upkeep grafts none: it passes over a candidate whose link has no room (`maintain_relations`,
-`graft`). None is penalised. A pair
-the link already has is handled as before. The bound is at least the families of the node's own
-interest times `M`, so it never refuses what an honest peer asks, since an honest peer grafts only
-a family the other end's interest holds.
+Once the link is at the limit, a GRAFT for a pair new to it is ignored, with no answer, so that
+refusals for new pairs cannot pile up among the owed messages; a PRUNE for a new pair sets no
+backoff; and the node's own upkeep grafts none: it passes over a candidate whose link has no room
+(`maintain_relations`, `graft`). None is penalised. A pair the link already has is handled as
+before. The bound is at least the families of the node's own interest times `M`, so it never
+refuses what an honest peer asks, since an honest peer grafts only a family the other end's
+interest holds.
+
+**Open: the answers owed for one pair.** A GRAFT repeated for a pair the link already has is
+answered each time, and while the writer is blocked each answer is owed, so one pair can account
+for many owed messages. Merging an owed answer with a later one for the same pair, keeping the
+exchange's order, is left to a later version.
 
 **A peer that joins a push relation is announced what the node holds.**
 - **What is announced** (`join_push`) is what the node stores of each live group of the relation's
@@ -1410,11 +1427,13 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
         if gi and not joined(p, type_of_group(gi.group)): continue   # §2: a type the link has not joined
         if gi and expired(gi.group): continue          # past its active lifetime: ignored, no penalty
         if gi and gi.index >= index_bound(gi.group): continue   # §4.5: an index the group cannot have: ignored
-        if (gi and outside(p, gi.group, gi.index, gi.hops > 0)   # §4.5: not ours to serve p: ignored, with no
+        hops = gi.hops if gi and join_sent[p][type_of_group(gi.group)].duty == FORWARD else 0   # §4.5: routed
+                                                       #   only through a forwarding node; to any other, no hops
+        if (gi and outside(p, gi.group, gi.index, hops > 0)   # §4.5: not ours to serve p: ignored, with no
                 and not peer_has[p][gi.group].has(gi.index)): continue   #   penalty and no state (p's claim: below)
         if gi and not admitted_group(p, gi.group): continue   # §4.5: beyond p's unknown groups named in WANTs
         declared = gi and join_recv[p][type_of_group(gi.group)].interest == DECLARED
-        if declared and not (gi.hops > 0 and not our_interest_for(p, gi.group).has(gi.index)):
+        if declared and not (hops > 0 and not our_interest_for(p, gi.group).has(gi.index)):
             want_p[p][gi.group] = want_p[p].get(gi.group, EMPTY) | bitmap({gi.index})   # its WANT is its
                                                        #   interest (§1.2), but for a routed one outside ours
         flagged = probe_of_claim(p, gi)                # (R5) p's probe of our claim: answered whatever p holds
@@ -1425,17 +1444,19 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
             continue                                   # (R6) refused without penalty
         mid = resolve(a)                               # [c7] our chunk at that index: received or rebuilt
         if mid is None:                                # gi carries its WANT's fields (§2)
-            passed = gi and gi.hops > 0 and route_want(p, gi.group, gi.index, gi.hops)   # §4.10: one step on
+            passed = gi and hops > 0 and route_want(p, gi.group, gi.index, hops)   # §4.10: one step on
             if flagged and p not in probe_waiting[gi.group]:   # (R5) claimed, not stored: we are decoding; the
                 probe_waiting[gi.group][p] = gi.index  #   first per asker and group is answered when it is (§4.6),
                 standing[gi.group][gi.index].discard(p)   #   once: in place of p's standing WANT of that index,
                 routed_standing[gi.group][gi.index].discard(p)   #   whether it came before the probe or after it
             elif (gi and (declared or gi.standing) and probe_waiting[gi.group].get(p) != gi.index
-                  and (gi.hops == 0 or passed or our_interest_for(p, gi.group).has(gi.index))):
+                  and (hops == 0 or passed or our_interest_for(p, gi.group).has(gi.index))):
                 standing[gi.group][gi.index].add(p)    # §4.10: answered when the chunk arrives; a routed one
-                if gi.hops > 0: routed_standing[gi.group][gi.index].add(p)   #   outside our interest only if passed on
+                if hops > 0: routed_standing[gi.group][gi.index].add(p)   #   outside our interest only if passed on
             continue
-        if mid in answers: continue                    # §4.5: an id is answered once a frame, and counted once
+        if mid in answers:                             # §4.5: an id is answered once a frame, and counted once;
+            if flagged: serve_probe(p, gi.group, answers[mid])   #   a probe of it among the asks keeps the
+            continue                                   #   probe's exemption (R5), whichever came first
         if mid in unwanted[p] and not flagged: continue    # (R5) nor does a receipt of p's stop the probe's answer
         if serve_count[p][mid] >= GOSSIP_RETRANSMISSION: continue   # stock: 3 answers per id per peer
         counted = not flagged and not (gi and offered_to[p][gi.group].has(gi.index))   # §4.5: the budget counts
@@ -1564,15 +1585,17 @@ and offers.
   before the count is known, an index at or past the most a group of the type has
   (`TypeParams.MAX_INDICES`, `index_bound`) is. When the count becomes known, as the group opens,
   the standing requests, their route marks and the `DECLARED` peers' interest bits kept before it
-  lose the indices past it (`drop_wants_beyond`, from `fill`).
+  lose the indices past it (`drop_wants_beyond`, from `fill` and from `publish`).
 - *Its group.* A group the node holds no state for counts against the asker's limit of unknown
   groups named in WANTs (`admitted_group`): `MAX_PENDING_GROUPS` of them, counted apart from the
   unknown groups of the asker's HAVEs and offers (`protocol.md` §8.2). An ask takes a place only
   once it has passed the test of what the node serves. A group frees its place when it resolves,
   when the connection closes, or when its lifetime would have passed (`GROUP_TTL` after it was first
-  named), and then the asker's standing requests and interest bits for it go too. An ask beyond the
-  limit is ignored. The limit is at least the column and row groups of the blocks in the node's live
-  window, which an honest sampler or forwarder asks for before their headers.
+  named), and then the asker's standing requests and interest bits for it go too. The node frees
+  places at each heartbeat (`release_wanted_groups`), at the latest. An ask beyond the limit is
+  ignored. The limit is at least the column and row groups that an honest sampler or forwarder asks
+  for before their headers within a place's lifetime: those of the blocks in the node's live window,
+  and more where `GROUP_TTL` outlasts the window.
 
 Neither is penalised, and neither keeps a standing request or a bit of a `DECLARED` peer's interest.
 Without them, a WANT for an index that does not exist kept a standing request that nothing could
@@ -2379,6 +2402,7 @@ def publish(block, d, shards):                         # the payload's builder; 
         store(g, s.index, f); mark_seen(chunk_id(f))
         gossip_history.put(f)                          # heartbeat gossip may offer it (§4.8)
     mine[g] = all_bits(N(d)); state[g] = COMPLETE; stop_pull[g] = True
+    for s in shards: serve_standing(g, s.index)        # §4.10: WANTs that came before the chunks are answered now
     if not T.params.EAGER: return offer_at_publish(g, d)   # a pull-only type: nothing pushed (§4.7)
     origin[g] = bitmap(set())                          # [P4] our holding names the chunks acknowledged so far (§4.7): none yet
     plan = []
@@ -2743,6 +2767,7 @@ def on_heartbeat():
     for a in held_back.values(): retry_offer(a)               #   retry runs for what they held back,
     held_back.clear()                                         #   which they do not count
     served_hb.clear()                                         # §4.5's serving budget starts again
+    release_wanted_groups()                                   # §4.5: the places of unknown groups named in WANTs
     drop_stale_waits()                                        # protocol.md §4.2: copies and ties past their window
     ids = gossip_history.gossip_ids()                         # stock: ids of the last 3 heartbeats
     for T in joined_types(): keep_floor(T)                    # §4.1, links for the floor per family
@@ -3497,12 +3522,12 @@ nobody withheld.
 | `COVER_HIGH` | object type | families a peer of high custody counts for in the coverage floor (§1.3, §4.1) | `[D12]`; 1, decided, as in the measurements |
 | `ROUTE_FLOOR` | object type | links a node with duty `FORWARD` keeps to custodians at the routing neighbours' distances (§1.3) | `[D12]`; an option, off |
 | `ROUTE_HOPS` | object type | forwarding steps a sampler's routed request may take (§4.10) | `[D12]`; 1, decided (FullDAS's two hops), and at least 1. More is an option where one step does not reach a custodian |
-| `FORWARD_LIMIT` | object type | routed requests a node passes on per peer and slot (§4.5, §4.10) | `[D12]`; X6: a bound, each node's within it (`protocol.md` §8.3's kinds), decided, stated: at least one per block whose samples an asking peer may still be hunting in the slot, since under `ROUTE_HOPS` 1 and one sample per peer a sampler routes at most one request per first hop and block |
+| `FORWARD_LIMIT` | object type | routed requests a node passes on per peer and slot (§4.5, §4.10) | `[D12]`; X6: a bound, each node's within it (`protocol.md` §8.3's kinds), decided, stated: at least one per block whose samples an asking peer may still be hunting in the slot, since under `ROUTE_HOPS` 1 and one sample per peer a sampler routes at most one request per first hop and block; under `ROUTE_HOPS` above 1, at least one per block for each sampler whose requests the asking peer passes on, since it passes them all through the same link |
 | `EVIDENCE` | object type | the fraud-proof object, if any | `[D6]`: none in this version (decided); the hook stays |
 | `ANSWERS_FIRST` | node | queued answers by rarity before pushes, after a source's own chunks (§4.12) | an option, off in every setting; a wash in three-seed toy checks |
 | `SOURCE_OFFERS` | node | when a source offers each chunk to the peers of its pool (§4.7) it did not choose to push it to: `ACK`, at the chunk's acknowledgement; `PUBLISH`, at publish, its holding growing at each chunk's first write (§4.7) | a default, `ACK`, `protocol.md` §5.1's rule; `PUBLISH` is the source's own choice: sooner for a fast source, later for a slow one, and it names the source (§4.7); decided |
 | groups tracked per slot | node | state for groups we hold or peers want, beyond our interest | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the groups the chunks a node holds or rebuilds project onto (R4, §3), which for a row member or a reconstructor is up to every column of the block, for each block in its live window. The value is the client's; no limit in the measurements |
-| `MAX_RELATIONS`, relations per link | object type, per link | pairs of family and colour a link may have at the node in any state: a relation, a GRAFT of the node's own not yet answered, a backoff; over it, a GRAFT for a new pair is ignored without an answer, a PRUNE for one sets no backoff, and the node's upkeep grafts none, without penalty (`relation_room`, §4.1) | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the families of the node's own interest times `M`, per object type, since an honest peer grafts a relation only for a family the other end's interest holds (`candidates`, §4.1). The value is the client's; no limit in the measurements |
+| `MAX_RELATIONS`, relations per link | object type, per link | pairs of family and colour a link may have at the node in any state: a relation, a GRAFT of the node's own not yet answered, a backoff not yet run out, a GRAFT or PRUNE of the node's own still owed; over it, a GRAFT for a new pair is ignored without an answer, a PRUNE for one sets no backoff, and the node's upkeep grafts none, without penalty (`relation_room`, §4.1) | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the families of the node's own interest times `M`, per object type, since an honest peer grafts a relation only for a family the other end's interest holds (`candidates`, §4.1). The value is the client's; no limit in the measurements |
 | `MAX_INDICES` | object type | the most indices a group of the type has, which bounds a WANT's index before the group's count is known (§4.5) | a limit: the payload's `MAX_PLAIN_CHUNKS` (`protocol.md` §8.3), a column's the most blobs a block commits, a row's `NUMBER_OF_COLUMNS` (128) |
 | sampling-only links accepted | node | inbound links joined `(DECLARED, NONE)` that a node accepts (§1.3) | `[D12]`; X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: high enough that the network's samplers each keep `SAMPLE_COVER` links per family they sample. The value is the client's; no limit in the measurements, and the serving load not measured |
 | `ASK_UPLINK` | node | the uplink at and above which `IWANT_WINDOW` keeps `protocol.md`'s value; below it the window scales by `ASK_UPLINK / UPLINK` (§4.13); 50 Mbps | scaling by the asked peer's link is open (below) |

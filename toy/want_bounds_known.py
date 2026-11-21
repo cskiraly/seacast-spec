@@ -15,12 +15,17 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
 - the limit of unknown groups' places, with the limit one: (e) once (b)'s first column resolves (its header known),
   its place frees and another unknown column is kept; (f) when a place's lifetime passes (`GROUP_TTL`, made short
   here), the next admission frees it and drops the asker's standing request for that column; (g) at the close
-  (`drop_peer`), the asker's places go;
+  (`drop_peer`), the asker's places go; (h) a second peer's place past its lifetime, with no WANT after it: the
+  heartbeat (`release_wanted_groups`) frees it and drops its standing request, leaving no empty entry;
 - (d) with the type's most raised past the count, a routed standing WANT for a column S knows nothing of, at an index
   past its count: kept, with its route mark; then the block runs until S stores the column's cells, and the group's
   opening (`fill`, `drop_wants_beyond`) drops both;
+- (i) at the source, a standing WANT of a peer's for index 0 of a column, kept before the block is published: the
+  publish answers it (`serve_standing`), so the request is gone and the answer counted in `served`;
 - penalties: none.
-On the document before the bounds, (a) to (g) fail.
+On the document before the bounds, (a) to (d) and (f) fail. (e) and (g) read the limit's places, which that document
+does not have, so they pass there; they fail on a version of the limit that never freed a place. (h) fails on the
+document before the heartbeat freed places, and (i) on the document before the publish answered standing requests.
 """
 import sys
 from pathlib import Path
@@ -99,8 +104,19 @@ def main():
          (kept(ns, gc, 0, p), kept(ns, gh, 0, p)), (False, True))
     S.drop_peer(p)
     line("(g) at the close: p's places kept", p in getattr(S, "want_unknown", {}), False)
-    ns["MAX_PENDING_GROUPS"] = float("inf")
     q = next(x for x in sorted(S.peers) if x not in (1, p))
+    gx = cols[7]
+    ns["on_want"](q, [Wm.FlaggedWant(gx, 0, True, 0)])
+    before = kept(ns, gx, 0, q)
+    ns["GROUP_TTL"] = 0.001
+    ns["now"] += 0.01                               # S's clock, past the short lifetime
+    ns["on_heartbeat"]()
+    del ns["GROUP_TTL"]
+    line(f"(h) node {q}'s place for column {sim.gcol[gx]}: kept; past its lifetime, after the heartbeat: kept, an "
+         f"entry left, the place held", (before, (kept(ns, gx, 0, q), gx in ns["standing"],
+                                                  gx in getattr(S, "want_unknown", {}).get(q, {}))),
+         (True, (False, False, False)))
+    ns["MAX_PENDING_GROUPS"] = float("inf")
     if "drop_wants_beyond" not in ns:
         line("(d) the sweep as the group opens (drop_wants_beyond)", "not in the document", "present")
     else:
@@ -115,9 +131,39 @@ def main():
     line("penalties", pen, [])
 
 
+def source_standing():
+    import run as R
+    import sim as SM
+    got, spec_run = {}, R.run
+    R.run = lambda cfg, out=None: got.setdefault("sim", SM.Sim(cfg))
+    try:
+        R.main(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    finally:
+        R.run = spec_run
+    sim = got["sim"]
+    sim.run(sim.cfg["first"])
+    src = sim.nodes[1]
+    ns = src.ns
+    q = min(src.peers)
+    first, spec_pub = [], ns["publish"]
+
+    def publish(block, d, shards):                  # the first column: q's standing WANT for index 0 came first
+        if not first:
+            first.append(ns["group_of"](block, d))
+            ns["standing"][first[0]][0].add(q)
+        return spec_pub(block, d, shards)
+    ns["publish"] = publish
+    sim.publish(1)
+    ns["publish"] = spec_pub
+    g = first[0]
+    line(f"(i) at the source, node {q}'s standing WANT for index 0 of column {sim.gcol[g]}, before the publish: kept "
+         f"after it, answers counted", (q in ns["standing"].get(g, {}).get(0, ()), ns["served"][q][g]), (False, 1))
+
+
 if __name__ == "__main__":
     if sys.argv[1:]:
         sys.exit("usage: want_bounds_known.py")
     main()
+    source_standing()
     print("ok" if not bad else "FAIL")
     sys.exit(1 if bad else 0)

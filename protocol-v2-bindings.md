@@ -478,9 +478,10 @@ A sampler subscribes to nothing for the families it only samples, and these rule
   which it has received a subscription to one of the type's topics. A peer that has subscribed to
   none of a type's topics is read as `(DECLARED, NONE)` for that type: its WANTs are its interest
   and stand (`protocol-v2.md` §4.5), and nothing is pushed or offered to it; it receives only the
-  answers to its WANTs. A node that subscribes to some of the type's topics, a custodian, samples
-  another family through the WANT's `standing` flag, which every sampler sets (`protocol-v2.md`
-  §4.10).
+  answers to its WANTs. At the serving end such a peer counts as joined for the type (`joined`), as
+  if its JOIN had been received. A node that subscribes to some of the type's topics, a custodian,
+  samples another family through the WANT's `standing` flag, which every sampler sets
+  (`protocol-v2.md` §4.10).
 - **Answers admitted by their WANT.** A node accepts a chunk on a topic it has not subscribed to
   only as the answer to a WANT it sent: the group's chunk at that index, from the peer the WANT
   went to, until the group expires. Nothing else on such a topic is accepted, no other index and no

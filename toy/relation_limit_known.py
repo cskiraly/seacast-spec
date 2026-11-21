@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """A known answer for protocol-v2.md §6.3's limit on the relations one link may carry, in §4.1's `on_graft`
 (`relation_room`, `MAX_RELATIONS`): the pairs of family and colour a link has in any state (relations, the node's own
-GRAFTs not yet answered, backoffs) stay at most at the limit. Over it, a GRAFT for a new pair is ignored without an
-answer and without penalty, a PRUNE for one sets no backoff, and the node's own upkeep sends no GRAFT for one; a pair the
-link already has is handled as before.
+GRAFTs not yet answered, backoffs not yet run out, and its GRAFTs and PRUNEs still owed) stay at most at the limit.
+Over it, a GRAFT for a new pair is ignored without an answer and without penalty, a PRUNE for one sets no backoff, and
+the node's own upkeep sends no GRAFT for one; a pair the link already has is handled as before.
 
     python3 relation_limit_known.py
 
@@ -17,8 +17,15 @@ and S's answers to p are recorded:
 - (c) the control: with no limit, the GRAFT of (a): answered yes, and the relation made;
 - (f) what counts toward the limit, read from `relation_room` with the limit one above what the link has: a backoff
   not yet run out counts, one run out does not, and a PRUNE of S's still owed to p counts;
+- (g) with no limit and (f)'s run-out backoff still stored, p's PRUNE for another family: the run-out backoff is gone,
+  and with the toy's `PRUNE_BACKOFF` of zero the PRUNE stores none; the control, the same with a `PRUNE_BACKOFF` of
+  five seconds: its backoff is stored;
+- (h) S's upkeep (`maintain_relations`) with p offered as the only candidate for every family and colour: with the
+  limit at the pairs the link has, no GRAFT to p for a pair new to the link; the control, with no limit: such
+  GRAFTs to p;
 - penalties: none.
-On the document before the limit, (a), (d), (e) and (f) fail.
+On the document before the limit, (a), (d), (e), (f) and (h) fail; (g) fails on the document before run-out backoffs
+were dropped.
 """
 import math
 import sys
@@ -108,6 +115,36 @@ def main():
         COL.params.MAX_RELATIONS = math.inf
         line("(f) one place left: room; with a backoff running; with it run out; with a PRUNE of S's owed",
              (r0, r1, r2, r3), (True, False, True, False))
+        z, w = new[5], new[6]
+        ns["on_prune"](p, ns["Prune"](object_type="column", family=z, colour=0, direction="IN"))
+        gone = (0, "IN") not in ns["backoff"][p][COL][x]
+        none = not any(ns["backoff"][p][COL][z].values())
+        spec_bo, COL.params.PRUNE_BACKOFF = COL.params.PRUNE_BACKOFF, 5.0
+        ns["on_prune"](p, ns["Prune"](object_type="column", family=w, colour=0, direction="IN"))
+        COL.params.PRUNE_BACKOFF = spec_bo
+        stored = ns["backoff"][p][COL][w].get((0, "OUT"), 0.0) > ns["now"]
+        line(f"(g) p's PRUNE for family {z}: family {x}'s run-out backoff gone, none stored at a backoff of 0; at 5 s, "
+             f"family {w}'s stored", (gone, none, stored), (True, True, True))
+        spec_cand = ns["candidates"]
+        ns["candidates"] = lambda T, fam, c, d: [p]     # p, for every family and colour the upkeep looks at
+        held = {(f, k) for m in ("push_in", "push_out", "grafted_in", "grafted_out")
+                for f, ks in ns[m][p][COL].items() for k in ks}
+        held |= {(f, k) for f, bo in ns["backoff"][p][COL].items() for (k, dd), t in bo.items() if t > ns["now"]}
+        counts, grafts = [], []
+        ns["send"] = lambda q, m, urgent=False: (grafts.append((m.family, m.colour)) if q == p and
+                                                  type(m).__name__ == "Graft" else None, spec_send(q, m, urgent))[1]
+        for lim in (len(held), math.inf):
+            COL.params.MAX_RELATIONS = lim
+            grafts.clear()
+            ns["maintain_relations"](COL)
+            counts.append(len([g for g in grafts if g not in held]))   # GRAFTs for pairs new to the link
+            for m in ("grafted_in", "grafted_out"):     # undo the GRAFTs pending, for the next pass
+                for f in list(ns[m][p][COL]):
+                    ns[m][p][COL][f] = {k for k in ns[m][p][COL][f] if (f, k) in held}
+        ns["candidates"] = spec_cand
+        COL.params.MAX_RELATIONS = math.inf
+        line(f"(h) the upkeep with p the only candidate: GRAFTs to p for pairs new to the link, at the limit "
+             f"{len(held)} and with no limit", (counts[0], counts[1] > 0), (0, True))
     else:
         line("(f) relation_room", "not in the document", "present")
     line("penalties", pen, [])

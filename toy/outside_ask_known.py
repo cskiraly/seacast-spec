@@ -23,11 +23,15 @@ its peers p, each ask given to S's `on_want` as a WANT that p sent:
   custody: kept standing if S passed it on (read from S's own sends), and no interest bit, as it is outside S's
   interest; the same once the gate opens (`on_header_validated`);
 - (i) the same, with the next peer's queue refusing S's WANT: not kept, no interest bit, and not counted against
-  `FORWARD_LIMIT`.
+  `FORWARD_LIMIT`;
+- (j) with S's duty toward the sampler set to `NONE` and S's gate held closed, the sampler's routed WANT (hops 1) for a
+  column S does not custody: read as a WANT without hops, so kept standing, unmarked, with its interest bit; once the
+  gate opens, removed with its bit.
 Then (g): honest runs drop nothing: in a custody run with samplers and routed requests (12 nodes, 25 % samplers, two
 blocks) and in a rows run (8 nodes, one block), `on_want` ignores no ask as outside.
 (g) prints how many asks reached the test, and how many of them were routed, and fails if the custody run met no
-routed request. On the document before the rule, (a), (c), (e), (f), (h) and (i) fail.
+routed request. On the document before the rule, (a), (c), (e), (f), (h) and (i) fail; (j) fails on the document
+before hops were read through S's duty.
 """
 import sys
 from pathlib import Path
@@ -150,6 +154,23 @@ def sampler_cases():
     line(f"(i) the same for column {sim.gcol[gq]}, the next queue refusing S's WANT: kept, in p's interest, "
          f"counted against FORWARD_LIMIT", (kept(ns, gq, 0, p), gq in wp and wp[gq].has(0), ns["forwarded"][p] > fwd),
          (False, False, False))
+    import copy
+    gn, COL = out_cols[3], ns["type_of_group"](out_cols[3])
+    spec_join = ns["join_sent"][p][COL]
+    j = copy.copy(spec_join)
+    j.duty = "NONE"
+    ns["join_sent"][p][COL] = j
+    ns["authenticable"] = lambda g: False if g == gn else spec_auth(g)
+    ns["on_want"](p, [Wm.FlaggedWant(gn, 0, True, 1)])
+    marked = p in ns["routed_standing"].get(gn, {}).get(0, ())
+    before = (kept(ns, gn, 0, p), marked, gn in wp and wp[gn].has(0))
+    ns["authenticable"] = spec_auth
+    ns["on_header_validated"](sim.ghdr[gn].block)
+    after = (kept(ns, gn, 0, p), gn in wp and wp[gn].has(0))
+    ns["join_sent"][p][COL] = spec_join
+    line(f"(j) S's duty toward p NONE, gate closed: p's routed WANT (hops 1), column {sim.gcol[gn]} outside S's "
+         f"custody: kept, marked routed, in p's interest; after the gate: kept, in p's interest", (before, after),
+         ((True, False, True), (False, False)))
 
 
 def honest_runs():

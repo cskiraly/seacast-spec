@@ -1417,19 +1417,33 @@ class Node:
 
         node.want_unknown = {}                          # per peer: the unknown groups its WANTs named, and when
 
+        def release_places(p):                          # one asker's places: one that resolved, or whose lifetime
+            seen = node.want_unknown.get(p, {})         #   would have passed, frees its place; at the lifetime, the
+            for h, t in list(seen.items()):             #   asker's standing requests, route marks and interest bits
+                if h in ns["hdr"]:                      #   for it go too, and the entries they empty (§4.5)
+                    del seen[h]
+                elif ns["now"] - t > ns.get("GROUP_TTL", math.inf):
+                    del seen[h]
+                    for tab in ("standing", "routed_standing"):
+                        rows = ns[tab].get(h)
+                        for i in list(rows or ()):
+                            rows[i].discard(p)
+                            if not rows[i]:
+                                del rows[i]
+                        if rows is not None and not rows:
+                            del ns[tab][h]
+                    if h in ns["want_p"].get(p, {}):
+                        del ns["want_p"][p][h]
+
+        def release_wanted_groups():                    # protocol-v2.md §3's helper, at each heartbeat
+            for p in list(node.want_unknown):
+                release_places(p)
+
         def admitted_group(p, g):                       # protocol-v2.md §3's helper: a WANT's group within p's own
             if g in ns["hdr"] or g in ns["T_of"]:       #   limit of unknown groups named in WANTs; the toy sets no
                 return True                             #   limit unless MAX_PENDING_GROUPS is given
+            release_places(p)
             seen = node.want_unknown.setdefault(p, {})
-            for h, t in list(seen.items()):             # one that resolved, or whose lifetime would have passed,
-                if h in ns["hdr"]:                      #   frees its place; at the lifetime, the asker's standing
-                    del seen[h]                         #   requests and interest bits for it go too (§4.5)
-                elif ns["now"] - t > ns.get("GROUP_TTL", math.inf):
-                    del seen[h]
-                    for i in list(ns["standing"].get(h, {})):
-                        ns["standing"][h][i].discard(p); ns["routed_standing"][h][i].discard(p)
-                    if h in ns["want_p"][p]:
-                        del ns["want_p"][p][h]
             if g in seen:
                 return True
             if len(seen) >= ns["MAX_PENDING_GROUPS"]:
