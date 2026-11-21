@@ -95,6 +95,169 @@ structure TypeParams where
   REPAIR_REASK : Option Bool := none
   deriving Repr, Inhabited
 
+/-! ## What v2's code asks of the rest of the node
+
+notes/spec-lean/v2-layer/design.md §1.2, §5 and §5.1. A type is its id; its methods and its three parameters that
+are functions are questions with the id first. The helpers the document does not write out are questions too,
+and what they read and write of the twin's tables are their `cr` and `cw` notes on the tape. -/
+
+/-- A chunk's place: a group and an index. -/
+abbrev GI := Group × Nat
+
+/-- `BlockId` (§3): the block a cell group belongs to, as the tracer writes it, or the group itself for a type
+without blocks (`block_of`). -/
+abbrev BlockId := String
+
+/-- A record of a node that could be linked, or of a link: `cover_candidates`' and `floor_candidates`' records
+and `link_cover`'s answer (design §5.1). Each has the fields its helper gives it, and a read of one it lacks
+crashes as the toy's `AttributeError`: `link_cover`'s has no id, `floor_candidates`' no flag. -/
+structure Cover where
+  id : Option Peer := none
+  families : List Fam
+  high : Option Bool := none
+  deriving BEq, Repr, Inhabited
+
+/-- v2's timers (§4.6, §4.10), asked through `afterV2`. `promise_due`, which v2's `filter_entry` arms, stays on
+`protocol.md`'s `after`. -/
+inductive TimerV2 where
+  | reconsider (g : Group) (at_ : Float)
+  | askSample (g : Group) (i : Nat)
+  | resample (g : Group) (i : Nat) (q : Peer) (first : Bool)
+  deriving BEq, Repr
+
+class NodeV2 (m : Type → Type) where
+  /-- `type_of_group(g)` (§3): the group's type, as its id -/
+  typeOfGroup : Group → m TypeId
+  /-- `type_of(tid)` (§3): the type of that id at this node -/
+  typeOf : TypeId → m TypeId
+  /-- `T.index_count(h)` -/
+  indexCount : TypeId → Option Descriptor → m Nat
+  /-- `T.threshold(h)` -/
+  threshold : TypeId → Option Descriptor → m Nat
+  /-- `T.verify(f, h)` -/
+  verify : TypeId → ChunkF → Option Descriptor → m Verdict
+  /-- `T.decode(chunks, h)`: the node's store of the group's chunks; the decoded chunks in the answer's order,
+  each with the index it is stored under -/
+  decode : TypeId → Group → Option Descriptor → m (Option (List (Nat × ChunkF)))
+  /-- `T.header_of(f)` -/
+  headerOf : TypeId → ChunkF → m (Option Descriptor)
+  /-- `T.project(f)`: the places a chunk fills, one per axis -/
+  project : TypeId → ChunkF → m (List GI)
+  /-- `T.cross(g, i)`: the place's other coordinates -/
+  cross : TypeId → Group → Nat → m (List GI)
+  /-- `T.family(g)` -/
+  family : TypeId → Group → m Fam
+  /-- `T.derived_interest(g, h, nid, j)` -/
+  derivedInterest : TypeId → Group → Option Descriptor → Hex → Join → m IBits
+  /-- `T.params.DECODE_AT_K(g)` -/
+  decodeAtK : TypeId → Group → m Bool
+  /-- `T.params.DECODE_LATER(g)`: a delay, or none -/
+  decodeLater : TypeId → Group → m (Option Float)
+  /-- `T.params.REPAIR_TO(g)`: peers, in the order the set iterates -/
+  repairTo : TypeId → Group → m (List Peer)
+  /-- `send(p, msg, urgent)` (§7): whether it went or was queued -/
+  send : Peer → MsgV2 → Bool → m Bool
+  /-- `after(delay, fn, …)` for v2's timers -/
+  afterV2 : Float → TimerV2 → m Unit
+  /-- `links(T)`: the peers linked for the type -/
+  links : TypeId → m (List Peer)
+  /-- `link_cover(q, T)`: the families q serves and whether its custody is high; no id -/
+  linkCover : Peer → TypeId → m Cover
+  /-- `cover_candidates(T)`: nodes not linked, each with its id, families and flag -/
+  coverCandidates : TypeId → m (List Cover)
+  /-- `floor_candidates(T)`: nodes not linked, each with its id and families, no flag -/
+  floorCandidates : TypeId → m (List Cover)
+  /-- `floor_links(T, fam)`: the peers whose custody holds `fam`, joined or not -/
+  floorLinks : TypeId → Fam → m (List Peer)
+  /-- `high_custody(q, T)` -/
+  highCustody : Peer → TypeId → m Bool
+  /-- `families(T)` -/
+  families : TypeId → m (List Fam)
+  /-- `families_with_duty(T)` -/
+  familiesWithDuty : TypeId → m (List Fam)
+  /-- `wants_family(T, fam)` -/
+  wantsFamily : TypeId → Fam → m Bool
+  /-- `duty_for(g)` -/
+  dutyFor : Group → m Duty
+  /-- `route_next(T, fam, qs)`: of the links `qs`, those nearest `fam` -/
+  routeNext : TypeId → Fam → List Peer → m (List Peer)
+  /-- `block_of(g)` -/
+  blockOf : Group → m BlockId
+  /-- `group_of(block, h)`: the group a header names in a block -/
+  groupOf : Block → Descriptor → m Group
+  /-- `node_id(p)`: the peer's node id, as the hex of its bytes -/
+  nodeId : Peer → m Hex
+  /-- `interest_satisfied(g)` -/
+  interestSatisfied : Group → m Bool
+  /-- `valid_have(h)` for a whole `Have` (§8.2's limits) -/
+  validHaveV2 : Have → m Bool
+  /-- `merge_waiting(p, h)`: whether a holding of h's group to p merged into one waiting -/
+  mergeWaiting : Peer → Have → m Bool
+  /-- `deferred_offers(p, h)`: offers recorded now, asked when the start delay has run; its answer, `[]` -/
+  deferredOffers : Peer → Have → m (List Key)
+  /-- `open_group_source(g, d)` -/
+  openGroupSource : Group → Descriptor → m Unit
+  /-- `open_link(r, T)` -/
+  openLink : Cover → TypeId → m Unit
+  /-- `open_sampling_link(r, T)` -/
+  openSamplingLink : Cover → TypeId → m Unit
+  /-- `choice(xs)` of peers: a draw, answered with a member -/
+  choicePeer : List Peer → m Peer
+  /-- `choice(list(s))` of a set of peers: the replay compares the argument as a set (design §3.1) -/
+  choiceOfSet : List Peer → m Peer
+  /-- `choice(xs)` of indices -/
+  choiceNat : List Nat → m Nat
+  /-- `choice(xs)` of records -/
+  choiceCover : List Cover → m Cover
+  /-- `shuffled(xs)` of peers -/
+  shuffledPeers : List Peer → m (List Peer)
+  /-- `shuffled(xs)` of pairs of an index and a chunk (`push_rebuilt`'s `lacks`) -/
+  shuffledPairs : List (Nat × ChunkF) → m (List (Nat × ChunkF))
+  /-- `sample_without_replacement(xs, k)` of records -/
+  sampleCovers : List Cover → Nat → m (List Cover)
+  /-- the order in which a proxied set of peers iterates at a place of v2's code (design §3.1): a permutation of
+  the members the twin computed -/
+  order : String → List Peer → m (List Peer)
+
+/-- The functions of the 89 left out of this cycle that the 71 call (design §8). Until each is transcribed, its
+instance is a question on the tape. -/
+class V2Later (m : Type → Type) where
+  /-- `window_release(p, g, i)` (§4.11) -/
+  windowRelease : Peer → Group → Nat → m Unit
+
+/-- v2's node-wide constants this cycle reads (design §5). `IWANT_WINDOW` is the effective one, already scaled
+by `ask_scale()` at load time. -/
+structure ConstsV2 where
+  ANSWERS_FIRST : Bool
+  ASK_UPLINK : Bool
+  MERGE_HOLDINGS : Bool
+  SOURCE_OFFERS : Bool
+  IWANT_WINDOW : Float
+  deriving Repr, Inhabited
+
+/-- What a call of v2's code reads that does not change during it: `protocol.md`'s context, v2's constants, and
+the types' parameters at the node (none for an id the node has no type of). -/
+structure Ctx2 where
+  base : Ctx
+  c2 : ConstsV2
+  params : TypeId → Option TypeParams
+
+abbrev M2 (m : Type → Type) := ReaderT Ctx2 m
+
+/-- A call of `protocol.md`'s Lean from v2's: it reads the base context. -/
+def v1 {m : Type → Type} {α : Type} (x : M m α) : M2 m α := fun c => x c.base
+
+/-- `T.params.X`: the twin reads it from the context, with no question. A type the node has no parameters for,
+or a parameter the type does not have, crashes as the toy's `AttributeError`. -/
+def param {m : Type → Type} [Monad m] [Node61 m] {α : Type} [Inhabited α] (T : TypeId) (name : String)
+    (f : TypeParams → Option α) : M2 m α := do
+  match (← read).params T with
+  | none => Node61.crash s!"AttributeError: no parameters of type {T} at this node ({name})"
+  | some p =>
+    match f p with
+    | some v => pure v
+    | none => Node61.crash s!"AttributeError: 'TypeParams' object has no attribute '{name}' (type {T})"
+
 /-! ## Python's values -/
 
 -- and
