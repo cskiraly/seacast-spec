@@ -758,13 +758,13 @@ changes since are given there.
 entry above), at seeds 7 to 16. The counts are the chunks of a message that come back to its
 source, per message, with every write at once, and with §4.11's rule as `--send-buffer 1`.
 - In the three all-home payload cells (`push`, `--rebuilt none` and `sil30`), with writes at once,
-  2 to 6 of a payload's chunks come back a message at the median of the seeds, and at most 59 a
+  1⅚ to 6⅙ of a payload's chunks come back a message at the median of the seeds, and at most 59 a
   message on average at one seed: seed 9's `push` cell, with 65, 61 and 51 over its three messages.
-- In those cells with §4.11's rule, 0 to 2 come back at the median of the seeds, and at most 17 a
-  message on average at one seed (17.3): seed 14's `push` cell, with 17, 18 and 17 over its three
+- In those cells with §4.11's rule, 0 to 2⅓ come back at the median of the seeds, and at most 17⅓ a
+  message on average at one seed: seed 14's `push` cell, with 17, 18 and 17 over its three
   messages.
-- In the 1 Gbps builder's cell (`dcb20`) more come back: 7.3 a message at the median of the seeds
-  with writes at once and 6.2 with §4.11's rule, and at most 47.3 and 50.3 a message on average at
+- In the 1 Gbps builder's cell (`dcb20`) more come back: 7⅓ a message at the median of the seeds
+  with writes at once and 6⅙ with §4.11's rule, and at most 47⅓ and 50⅓ a message on average at
   one seed, both at seed 14 (47, 48 and 47; 50, 52 and 49).
 - The record's text gives no maximum; the runs' outputs give these counts.
 - No cell of a column comes back in custody. In the rows the counts are repair deliveries to the

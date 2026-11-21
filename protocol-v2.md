@@ -3543,9 +3543,9 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   `claim_all`: the sender holds or can produce every index, `protocol.md`'s decode claim, made at K
   before the decode. `complete`: the sender's interest in the group is satisfied. Both are
   unverified; a probe verifies a `claim_all` that defers a decode (§4.6).
-- **claimant**: a peer whose `claim_all` for a group has arrived (`claims`). A claim defers the
-  node's decode once, and the node's probe asks one claimant, drawn at random, for one index to
-  verify it (§4.6, R5).
+- **claimant**: a peer whose `claim_all` for a group has arrived (`claims`). A claim can defer a
+  decode duty the node has armed, at most once per group, and the node's probe then asks one
+  connected claimant, drawn at random, for one index to verify it (§4.6, R5).
 - **colour**: one of `M` values that partition a group's indices (`colour_of`, §1.4, `[D10]`). A
   chunk is pushed eagerly only on links whose push relation for its family holds its colour. A
   colour is not a subnet (§0).

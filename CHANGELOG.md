@@ -79,6 +79,10 @@ binding's extra fields to the byte; its files are rewritten in plain sentences.
   sizes under their new headings.
 - `toy/node.py`, `toy/wire.py`: comments and docstrings say what the toy charges for version 4's
   fields, and that its receive path under `protocol-v2.md` also reads the claims from a full bitmap.
+- `formal/twin/record/`: the twin's record made again, from `229631c`, for this release's content
+  line, which the toy's comments and strings and `protocol-v2.md`'s comments moved; the trace
+  bodies are v0.10.9's, and the matrix is v0.10.9's, carried on the grounds its `RECORD.md` gives.
+- `protocol-v2-decisions.md`: the versions carried gain v0.10.11.
 
 ### Fixed
 - `protocol.md` §8.1: the table names the window's line, which a writer leaves when it takes a
@@ -111,7 +115,7 @@ binding's extra fields to the byte; its files are rewritten in plain sentences.
   over both arms.
 - `protocol-v2.md` §4.7, `protocol-v2-figures.md` §4.7: the chunks that come back to the source are
   counted in the three all-home payload cells (`push`, `--rebuilt none`, `sil30`), as a seed's mean
-  a message: at most 59 at one seed, and at most 17 with §4.11's rule; the 1 Gbps builder's cell
+  a message: at most 59 at one seed, and at most 17⅓ with §4.11's rule; the 1 Gbps builder's cell
   (`dcb20`) is given apart.
 - `protocol-v2-figures.md` §4.7, §4.11: the figure on the columns that no node but the source
   custodies gives both cells that count it, and the window's sampling cell is given as its record
