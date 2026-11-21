@@ -393,9 +393,10 @@ protobuf field or a gossipsub message type. The toy runs `protocol-v2.md` on it.
   - *An offer* keeps version 1, which has no flags.
   - *The group* is 32 bytes: `protocol.md` §2's group key, which is the whole id of a payload group.
     A column's or a row's `GroupId` also has a type and an index (§1.2), and an IDONTWANT or an
-    IWANT names no topic, so these strings name such a group only as the Open below leaves it.
+    IWANT names no topic, so how these strings name such a group is left open (below).
   - *An entry with a reserved bit set,* a WANT of the wrong length, or a WANT whose `hops` is over
-    its type's `ROUTE_HOPS` (`protocol-v2.md` §6.3) is ignored without penalty.
+    its type's `ROUTE_HOPS` (`protocol-v2.md` §6.3) is ignored without penalty. For an IDONTWANT
+    entry, ignored means not read as a holding: the entry stays an opaque id, as above.
 - **Open: the strings for cell groups, and the versions written.** Three points are left for a
   later release: the 32 bytes that name a column's or a row's group; which version a node writes
   when it has no flag to carry, since a `protocol.md` node reads version 1 only; and whether every

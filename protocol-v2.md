@@ -1409,7 +1409,7 @@ a routed request and goes to a peer with duty `FORWARD` (below). A promise is ma
 a broken one parks the peer for the group (`protocol.md` §6.1). A `DECLARED` peer's WANT is also its
 interest: `want_p[p][g]` is set from it before the asks are answered, and what the peer does not
 hold yet is kept as a standing request (§4.10). An ask by derived interest makes no promise with a
-timer either: an ask made by `want` (§3), not on an offer, starts none, a claim's probe apart
+timer either: an ask made by `want` (§3), not on an offer, starts none, except a claim's probe
 (`filter_entry`, §4.6). The custodian answers from what it holds, and keeps the ask for later only
 as a standing request: a `DECLARED` peer's WANT, or one marked `standing`. A standing request is
 answered when the chunk is stored, received or rebuilt (`serve_standing`, from `fill` and
