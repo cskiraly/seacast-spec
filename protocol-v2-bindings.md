@@ -590,13 +590,14 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   peer and closes the connection. A stream that its sender resets is not (§7.3).
 - **Chunks before the JOIN.** A receiver reads the start of a chunk stream, as far as the chunk's
   kind and group (for a compressed kind, the start of the decompressed block), and reads the rest
-  only once the link carries the group's object type (§7.1). Until then the rest of the stream waits
-  unread, and the stream credit the receiver granted caps how much of it can arrive (§7.1). A
-  receiver keeps such streams waiting up to a limit of its own, and stops the others
-  (`STOP_SENDING`) without penalty. Two things are open here (§7.9): when a stream still waiting is
-  discarded, and how much of the connection's receive credit a receiver keeps for the control
-  stream, so that the JOIN can still arrive while chunk streams wait. On a connection opened for a
-  fetch, the client reads the answer without a JOIN. The server opens its control stream first
+  only once the link carries an object type of the chunk (§7.1): the group's, or for a cell either
+  of its two, since a cell answered in its row can name its column (`protocol-v2.md` §2). Until
+  then the rest of the stream waits unread, and the stream credit the receiver granted caps how much
+  of it can arrive (§7.1). A receiver keeps such streams waiting up to a limit of its own, and stops
+  the others (`STOP_SENDING`) without penalty. Two things are open here (§7.9): when a stream still
+  waiting is discarded, and how much of the connection's receive credit a receiver keeps for the
+  control stream, so that the JOIN can still arrive while chunk streams wait. On a connection opened
+  for a fetch, the client reads the answer without a JOIN. The server opens its control stream first
   there too, so that the client does not take the answer's stream for the control stream (§7.6).
 - **The order.** Messages on the control stream arrive in the order written. A chunk stream is not
   ordered with any other stream: a chunk can arrive ahead of a control message written before it,
@@ -633,8 +634,8 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   chunk id (§1.2), validates it or passes it to `on_chunk`, even if more of its bytes arrive at
   QUIC. It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read. What
   a receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes back
-  when a later valid holding from the receiver newly reports the chunk's index, or when the room
-  times out, as below.
+  when a later valid holding from the receiver reports the chunk's index, even one the receiver
+  reported before (`on_holding`, `protocol-v2.md` §4.3), or when the room times out, as below.
 - **The window.** A reset changes nothing in the window: the chunk's room comes back at the peer's
   holding, or when it times out, as for any chunk (`window_release`, `window_timeout`,
   `protocol-v2.md` §4.11).
@@ -724,11 +725,12 @@ The binding also adds three rows to that table. Its own answers are these:
 
 This draft leaves these questions open:
 - beside libp2p or alone (§7.1);
-- when a chunk stream still waiting for the link to carry its object type is discarded, and how
-  much of the connection's receive credit a receiver keeps for the control stream meanwhile (§7.2);
+- when a chunk stream still waiting for the link to carry an object type of its chunk is discarded,
+  and how much of the connection's receive credit a receiver keeps for the control stream meanwhile
+  (§7.2);
 - what a receiver sends for a copy it stopped (§7.3): a holding made from what it holds and has
   verified, or nothing, in which case the sender's room for the chunk comes back when a later valid
-  holding from the receiver newly reports the chunk's index, or when that room times out; and
+  holding from the receiver reports the chunk's index, or when that room times out; and
   whether a receiver may stop a stream that carries a header it has not yet validated;
 - which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written before
   and after it;
