@@ -725,8 +725,11 @@ s_tracercontrols() {
   else no "the tracer stopped on an unlogged assignment for another reason (c-unlogged.err)"; fi
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2; do
     case $f in
+      early-install-v2) want="^trace3: node [0-9]*: promise_due was bound again after the tracer was installed, which under v2 must be the namespace's last binding: Node\._v2\.<locals>\.promise_due" ;;
+      raw-alias-v2) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
+      other-node-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs" ;;
       made-rows-off) want="^trace3: the views' log does not account for the state" ;;
       alias) want="^trace3: node [0-9]*: one queue entry stands in two places" ;;
       alias-control) want="^trace3: node [0-9]*: one queue entry's control stands in two places" ;;
@@ -750,8 +753,38 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 16 ] || no "not 16 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 16 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 19 ] || no "not 19 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 19 planted faults stop the tracer with their own words"
+  # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
+  # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
+  # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
+  : > "$OUT/c-tracerplants.txt"; bad=0
+  local plain line same
+  for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off; do
+    case $f in
+      bare-in-question-v2) plain=v2/hand5; line="; node a, node c: [0-9]+, [0-9]+; bare c N: [1-9][0-9]*$" ;;
+      bare-in-question-v2-per-node) plain=v2/hand5; line="; node a, node c: [0-9]+, [0-9]+; records inside: [1-9][0-9]*; bare c N: 0$" ;;
+      suppressed-entry-v2) plain=v2/hand5-own; line="; node s: [0-9]+; supp after the raise: 0; bare s N: [1-9][0-9]*$" ;;
+      suppressed-entry-v2-off) plain=v2/hand5-own; line="; records inside: [1-9][0-9]*; node s: [0-9]+; supp after the raise: 0; bare s N: 0$" ;;
+    esac
+    if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$f" . "$OUT/c-tp-$f.jsonl.gz" > "$OUT/c-tp-$f.out" 2> "$OUT/c-tp-$f.err"); then
+      echo "$f: the run did not end with 0  <-- it must" >> "$OUT/c-tracerplants.txt"; bad=1; continue
+    fi
+    if ! has -E "^tracerfaults3: $f, planted 1 time$line" "$OUT/c-tp-$f.err"; then
+      echo "$f: its line is not as written  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
+    fi
+    if [ -s "$OUT/$plain.jsonl.gz" ] && cmp -s <(zcat "$OUT/c-tp-$f.jsonl.gz" | tail -n +2) <(zcat "$OUT/$plain.jsonl.gz" | tail -n +2); then
+      same=yes; else same=no; fi
+    case $f:$same in
+      *-per-node:no|*-off:no) echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-140); the body other than $plain's" >> "$OUT/c-tracerplants.txt" ;;
+      *-per-node:yes|*-off:yes) echo "$f: the body $plain's, with a record inside  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1 ;;
+      *:yes) echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-140); the body $plain's" >> "$OUT/c-tracerplants.txt" ;;
+      *) echo "$f: the body not $plain's  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1 ;;
+    esac
+  done
+  [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
+  [ "$(grep -c ': as it must: ' "$OUT/c-tracerplants.txt")" = 4 ] || no "not 4 plants under v2 as written (c-tracerplants.txt)"
+  echo "  $(grep -c ': as it must: ' "$OUT/c-tracerplants.txt") of 4 plants under v2 as written (two, and their controls)"
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool

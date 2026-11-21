@@ -589,8 +589,8 @@ def main(argv):
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
         args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") else HAND5
-        try:
-            T.main([rest[0], rest[1], *args, "--doc", "v2"])
+        try:                            # the arguments as check.sh's v2/hand5 and v2/hand5-own have them
+            T.main([rest[0], rest[1], *args, "--doc", "v2", "--digest"])
         finally:
             seen = "".join(f"; {k}: {v}" for k, v in SEEN.items())
             print(f"tracerfaults3: {fault[2:]}, planted {PLANTED[0]} time{'s' if PLANTED[0] != 1 else ''}{seen}",
