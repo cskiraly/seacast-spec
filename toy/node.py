@@ -1228,7 +1228,7 @@ class Node:
         P.project = lambda f: [(f.group, f.index)]
         P.cross = lambda g, i: []
         P.family = lambda g: 0
-        P.derived_interest = lambda h, nid, j: Bits(-1)
+        P.derived_interest = lambda g, h, nid, j: Bits(-1)   # protocol-v2.md §1.1: (g, header, node id, JOIN)
         prm = Obj()                                     # §6.1: the tier 4 setting
         prm.M, prm.F_LO, prm.F_HI, prm.D_OUT, prm.D_OUT_FAST, prm.D_OUT_MAX = 1, 6, 12, 8, 8, 12
         prm.SYMMETRIC = bool(c.get("upkeep")) and c.get("symmetric", "on") == "on"   # §6.1: v0.3's mesh, kept as
