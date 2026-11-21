@@ -38,6 +38,8 @@ names how SEACAST diffuses.
 - [`protocol-v2-decisions.md`](protocol-v2-decisions.md): the next version's decision record, a
   companion of `protocol-v2.md`: each design decision, when it was decided, what was not taken and
   the runs behind it, and the versions of `protocol.md` the draft has carried.
+- [`protocol-v2-figures.md`](protocol-v2-figures.md): the figures behind `protocol-v2.md`'s reasons,
+  each with its conditions.
 - [`toy/`](toy/): runs every `python` block of `protocol.md`, once per node, on a simulated
   network. It shows that the document is complete enough to run, and is a place to try a rule
   before implementing it. Its numbers are not measurements.

@@ -7,7 +7,8 @@ and why, and the runs behind it. It also lists the versions of [`protocol.md`](p
 decision bites.
 
 In this file, a section number (§) without a document's name is `protocol-v2.md`'s, and "this document" and "this
-draft" mean `protocol-v2.md`. The figures are the toy's, under the conditions `protocol-v2.md` §0 states.
+draft" mean `protocol-v2.md`. The figures behind this record are in
+[`protocol-v2-figures.md`](protocol-v2-figures.md), under the conditions its preamble states.
 
 ## The decisions, and where they bite
 
@@ -41,10 +42,10 @@ draft" mean `protocol-v2.md`. The figures are the toy's, under the conditions `p
   binding and the stock path, which a mixed network needs, is a deployment question no measurement
   here settles; it is outside this version.
 - **`[D4]` the repair floor.** A node that may rebuild keeps at least `REPAIR_FLOOR` links, at
-  least 1, to custodians of each column it does not custody (§4.6). Without it, five of thirteen
-  runs of the toy's withheld row cell left custodians short, each by a missing link; with 1, all
-  thirteen completed. Not taken: opening a link only when a rebuilt cell has nowhere to go (§4.6),
-  kept as an option.
+  least 1, to custodians of each column it does not custody (§4.6). Without it, some runs of the
+  toy's withheld row cell left custodians short, each by a missing link; with 1, every run completed
+  (protocol-v2-figures.md, §6.2). Not taken: opening a link only when a rebuilt cell has nowhere to
+  go (§4.6), kept as an option.
 - **`[D6]` the payload's consistency route.** None in this version: the payload's consistency is
   left to level 2 and the application, and `EVIDENCE` stays a hook that an object type may fill.
   Not taken here, each needing work outside this document: a fraud proof over the current code,
@@ -210,9 +211,9 @@ take what the floor misses, one forwarding step by default (§4.10, `ROUTE_HOPS`
 LiteDAS's two phases: one sample per peer, with peers of high custody as the second phase's
 fallback. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT` and
 `SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
-60-node cells and its 500-node cells at ten seeds (§6.3). Kept as options: one cover
-(`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours (`ROUTE_FLOOR`), and the
-fetch outside the links (§7). For later study:
+60-node cells and its 500-node cells at ten seeds (protocol-v2-figures.md, §6.3). Kept as options:
+one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours (`ROUTE_FLOOR`),
+and the fetch outside the links (§7). For later study:
 - *Why diversity, not the fewest links.* Three reasons. One node that holds a sampler's whole
   sample can release exactly those cells to it: Al-Bassam, Sonnino and Buterin's selective share
   disclosure ("If a block producer selectively releases shares as light clients ask for them, up to
@@ -220,50 +221,51 @@ fetch outside the links (§7). For later study:
   network would not be able to link different per-share sample requests to the same clients".
   Custody counts are self-declared, so a node that claims every column would attract every
   sampler's floor and samples. And the load would concentrate on the nodes of high custody. In the
-  toy's honest 60-node cell before this rule (floor and routed requests, degree 30, seed 7), the
-  proposer, which holds every column, was asked for 28 of 288 samples, up to 5 of one sampler's 8
-  in a block, where no other peer was asked for more than 2; with it, for none, and no peer for
-  more than one.
+  toy's honest 60-node cell before this rule (floor and routed requests, one seed), the proposer,
+  which holds every column, was asked for some of the samples, up to most of one sampler's samples
+  in a block, where no other peer was asked for as many; with it, for none, and no peer for more
+  than one (protocol-v2-figures.md, [D12]).
 - *The floor's size* (decided: `SAMPLE_COVER` set at 2, a parameter of the object type). On the
-  toy's graphs, eight samples find eight distinct serving links in 99.77 % or more of draws with
-  two covers, against 64 to 86 % at 16 links and 97 % at 70 with one (§6.3). In the toy's 500-node
-  cells (seeds 7 to 16, 2 000 sampler-blocks per network), two covers confirmed every sampler in
-  every block, honest and under 30 % withholders, at 70 links and at 16. One cover did as well at
-  70 links. At 16 it cost the honest tail (the samples' 99th percentile 2.2 s against 0.7 s), and
-  under withholders 7 sampler-blocks did not confirm. Two covers add 8 links on top of 70 and 29 on
-  top of 16; one cover adds 2 and 13. Three covers (99.99 %, and the floor that holds for sixteen
-  samples) would add 17 to 20 and 47 to 49. How many sampling-only links a custodian accepts is a
-  bound, each node's within it (§6.3); the serving load they bring it is not measured.
+  toy's graphs, eight samples find eight distinct serving links in nearly every draw with two
+  covers; with one, they fall well short of that at 16 links, and a little short at 70. In the
+  toy's 500-node cells, two covers confirmed every sampler in every block, honest and under 30 %
+  withholders, at 70 links and at 16. One cover did as well at 70 links. At 16 it cost the honest
+  tail, and under withholders some sampler-blocks did not confirm. Two covers add more links than
+  one, on top of 70 and on top of 16. Three covers, a floor nearer every draw and the one that holds
+  for sixteen samples, would add more again (protocol-v2-figures.md, §6.3). How many sampling-only
+  links a custodian accepts is a bound, each node's within it (§6.3); the serving load they bring
+  it is not measured.
 - *The floor's lifetime.* Kept across slots, chosen from custody alone; whether and how often it
   rotates, and what churn costs it (not measured).
 - *The route and its privacy.* Without routing neighbours a first hop is any link with duty
   `FORWARD`. Where custodians keep a floor per column of their own (§1.4, as PeerDAS's subnet
-  peering), one step on random links left 1.8 % of (sampler, column) pairs unreached at 16 links in
-  the toy's graphs, and 0.05 % at 70; without such a floor, 19 % at 16 links (§4.10). The routing
-  rules (§1.3, `ROUTE_FLOOR`) are for networks without it; the Kademlia-style rule is the cheaper,
-  and its 4.1 % of pairs at three hops is the case for `ROUTE_HOPS` above one. A first hop drawn at
-  random is not measured. What a forwarder learns, one sample of one sampler, is measured nowhere
-  yet, nor is a forwarder colluding with the proposer, nor the time a routed sample takes.
+  peering), one step on random links left few (sampler, column) pairs unreached at 16 links in the
+  toy's graphs, and almost none at 70; without such a floor, many more at 16 links (§4.10). The
+  routing rules (§1.3, `ROUTE_FLOOR`) are for networks without it; the Kademlia-style rule is the
+  cheaper, and the pairs it reaches only at three hops are the case for `ROUTE_HOPS` above one
+  (protocol-v2-figures.md, §4.10, [D12]). A first hop drawn at random is not measured. What a
+  forwarder learns, one sample of one sampler, is measured nowhere yet, nor is a forwarder
+  colluding with the proposer, nor the time a routed sample takes.
 - *The hunt's cost.* A sample nobody holds is asked of one fresh peer after another until none is
   left, each peer at most once per block, so the asks per block are bounded by the node's links.
-  With half the columns withheld (60 nodes, degree 30, seed 7): 1.3 to 1.7 asks per sample without
-  routed requests, 3.0 with them and 4.2 to 5.2 with the floor of one or two covers as well, 380 to
-  704 requests passed on over two blocks (11 to 12 asks per sample, 1 813 to 2 042 passed on, before
-  one sample per peer). A
-  bound on the first hops a sample tries, or the application's deadline ending the hunt, is open.
+  With half the columns withheld (60 nodes, one seed), a sample took a few asks, more with routed
+  requests and more again with the floor of one or two covers as well, and hundreds of requests
+  were passed on; before one sample per peer, a sample took more asks, and more requests were
+  passed on (protocol-v2-figures.md, [D12]). A bound on the first hops a sample tries, or the
+  application's deadline ending the hunt, is open.
 - *The cost of one sample per peer.* Under 30 % withholders (the toy, the floor with routed
-  requests, one cover, seed 8), every sample still arrived, at a median of 2.7 to 3.7 s and a 99th
-  percentile up to 7.7 s, against 2.2 to 2.7 s and 4.9 s when a peer could be asked again: the
-  second phase must find a fresh peer each time.
+  requests, one cover, one seed), every sample still arrived, later at the median and at the 99th
+  percentile than when a peer could be asked again: the second phase must find a fresh peer each
+  time (protocol-v2-figures.md, [D12]).
 - *Small networks.* The floor covers only the families some node other than a source custodies;
-  in the toy's 60-node cells seven of 128 columns had no custodian but the proposer, and routed
-  requests reached it for them.
+  in the toy's 60-node cells a few columns had no custodian but the proposer, and routed requests
+  reached it for them (protocol-v2-figures.md, [D12]).
 - *Rows as a second axis.* A row member holds a cell of its row once it has it, and serves it to
   anyone who asks; `serves` counts columns only. In the toy's graphs at 70 links
-  (`toy/sampler_graph.py e`), counting half rows (the draft's members stop at 64 of 128) takes the
-  samplers left with a sample no link serves from 17 % to 7.5 % with 32 row subnets and to 13.5 %
-  with 128; whole rows (FullDAS's two-dimensional code), to 3.2 % and 11.0 %. At 16 links rows
-  barely help.
+  (`toy/sampler_graph.py e`), counting half rows (the draft's members stop at 64 of 128) leaves
+  fewer samplers with a sample no link serves, more so with 32 row subnets than with 128; whole
+  rows (FullDAS's two-dimensional code) leave fewer still. At 16 links rows barely help
+  (protocol-v2-figures.md, [D12]).
 - *LiteDAS's slot start.* A group id names the block, so a WANT waits for the block's header; a
   request keyed by slot would let it go at slot start, as LiteDAS's does. Not proposed.
 - *LiteDAS's extensions.* A holdings list in the reply, and a NACK by which a custodian that lacks
@@ -309,7 +311,7 @@ carried into them, with the date each was carried where it came later than the v
     as written (§4.11).
 - v0.10 (2026-11-15):
   - The toy's default transport keeps `protocol.md` §7.3's rule, one entry at a time per
-    connection, and both recordings were made again (§0's "Numbers", §6.1).
+    connection, and both recordings were made again (`protocol-v2-figures.md`'s preamble, §6.1).
   - What waits for a gate is carried where this document uses `protocol.md`'s functions: `tie`,
     with `tie_room`'s limits, the limit of unknown groups and the slot it records (`tie_slot`);
     `close_promises`, now code, from `fill` and `tie`; and `on_block_installed`, which drops at

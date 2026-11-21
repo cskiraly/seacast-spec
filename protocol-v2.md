@@ -25,6 +25,9 @@ and what was decided (§8). The toy runs this document on top of v0.3's
 re-recorded on 2026-11-15 with the toy's transport keeping §7.3's rule). Draft 0
 (2026-10-06) was written without running; draft 1 is what executing it changed.*
 
+*[`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind this draft's reasons,
+each with its conditions.*
+
 ## 0. How to read this
 
 Gossipsub bundles its notions: a *topic* is the namespace, the unit of subscription, the unit of
@@ -107,13 +110,8 @@ since v0.9, the chunks acknowledged so far, §4.7).
 | X6 | limits before state, for every object type |
 | X8 | the source is a role, not a node |
 
-**Numbers.** Every figure in this draft comes from the toy (`toy/`, 60 nodes unless stated) unless
-it says otherwise. Since the toy took `protocol.md` §7.3's rule as its default (2026-11-15: one
-entry at a time per connection, `--send-buffer 1`; with `--uplink rr`, which has no send buffer,
-writes still go at once), figures and comparisons measured before that change ran with its earlier
-transport, which takes every write at once (`--send-buffer 0`), unless they name `--send-buffer 1`.
-A figure from fewer than ten seeds, a single seed unless stated, is a toy check of a mechanism, not
-a measurement; ranges over ten or more seeds say so.
+**Numbers.** The figures measured for this draft, each with its conditions, are in
+[`protocol-v2-figures.md`](protocol-v2-figures.md), grouped by the section that cites them.
 
 ## 1. Notions
 
@@ -290,15 +288,14 @@ count because a proposer holds every column of its own block only, and proposers
 were decided on 2026-11-03 (`[D12]`, §8).
 
 **What the floor buys, and what it costs, in the toy.** Without it, a sample of a column none of the
-node's links custodies is never served: in the toy's graphs at 500 nodes, nodes custodying 8 of 128
-columns and no supernodes (graph only, seeds 7 to 16), a sampler of eight cells has such a sample with
-probability 17 % at 70 links and 96 % at 16. With it, on the same graphs, one cover by the fewest
-links costs a median of 2 sampling-only links at 70 links and 13 at 16 (§6.3); the diversity floor of
-two covers adds 8 and 29 in the toy's 500-node cells (§6.3, §8).
+node's links custodies is never served. In the toy's 500-node graphs, some samplers of eight cells
+have such a sample at 70 links, and nearly all do at 16. With the floor, on the same graphs, one
+cover by the fewest links adds a few sampling-only links at 70 links and many more at 16 (§6.3);
+the diversity floor of two covers adds more again (§6.3, §8; protocol-v2-figures.md, §1.3).
 
 **One forwarding step usually reaches the family.** A custodian's floor per column (§1.4) makes it
-likely that one of a forwarding link's own links custodies the sample's family: it keeps about 57
-links at a degree of 16 in the toy's graphs.
+likely that one of a forwarding link's own links custodies the sample's family: in the toy's graphs
+the floor gives a custodian many more links than a degree of 16 (protocol-v2-figures.md, §1.3).
 
 ### 1.4 Colours and the floor
 
@@ -869,17 +866,17 @@ the GRAFT's direction, which undid the opposite relation at the grafter.
 - **Checked** (`toy/graft_check.py`): this section's functions as written, on two nodes, from the
   link's first JOIN, sent by either end or both, for one relation over an ordered connection with
   queues of one entry and other traffic taking their room, each end's upkeep grafting or pruning up
-  to three times and every GRAFT accepted or refused at will. In each of the 846 states of 2 367 518
-  with nothing queued, owed or on the wire (1 484 804 before the yes again, below), the two ends
-  agree and no GRAFT is unanswered, and every exchange ends. The check fails where it should: on the
-  text before this rule (`toy/controls/graft-unanswered.md`), where the GRAFT's sender recorded
-  nothing (the ends disagree in 324 of 724 such states at two upkeep steps), and on this rule
-  without the owing, with an owed message overtaken, without the yes, or with a PRUNE that leaves
-  the receiver's GRAFT standing. The toy's recorded cells keep their relations static and do not run
-  this; under `--upkeep on` it runs this section on the wire.
+  to three times and every GRAFT accepted or refused at will. In every state with nothing queued,
+  owed or on the wire, the two ends agree and no GRAFT is unanswered, and every exchange ends. The
+  check fails where it should: on the text before this rule (`toy/controls/graft-unanswered.md`),
+  where the GRAFT's sender recorded nothing (the ends disagree in nearly half of such states at two
+  upkeep steps), and on this rule without the owing, with an owed message overtaken, without the
+  yes, or with a PRUNE that leaves the receiver's GRAFT standing (protocol-v2-figures.md, §4.1).
+  The toy's recorded cells keep their relations static and do not run this; under `--upkeep on` it
+  runs this section on the wire.
 - **Compared** (`toy/graft_check.py --model`: one relation in the abstract, without queues, four
-  upkeep steps per end): counted at the GRAFT, 32 of 81 states at rest disagree without a backoff,
-  and none of 121 with a backoff longer than the round trip; answered, none of 49.
+  upkeep steps per end): counted at the GRAFT, many states at rest disagree without a backoff, and
+  none with a backoff longer than the round trip; answered, none do (protocol-v2-figures.md, §4.1).
 
 **A GRAFT for a relation already held is answered yes again** (decided 2026-11-09).
 - **Why.** From ends that agree, the rules keep them agreed (Checked, above). Where they diverge,
@@ -892,33 +889,33 @@ the GRAFT's direction, which undid the opposite relation at the grafter.
   one counts a pusher that does not push, or pushes a peer that does not count it; with `--both`,
   the two ends hold the relation in any way but whole at both or at neither. At three upkeep steps,
   every state at rest once an upkeep has acted agrees, with no GRAFT unanswered, and every exchange
-  ends: 1 175 922 states, and 4 647 412 with `--both`. The text before
-  (`toy/controls/held-graft-unanswered.md`) fails: a GRAFT for a relation the receiver holds goes
-  unanswered (18 of 117 states at rest, at two steps). Without the mark, the check finds an exchange
-  that never ends, at two steps. One end's PRUNE crosses the other's later GRAFT, the first end
-  accepts that GRAFT, the second decides its yes as a new GRAFT, and the two then answer each
-  other's yes for ever.
+  ends (protocol-v2-figures.md, §4.1). The text before (`toy/controls/held-graft-unanswered.md`)
+  fails: a GRAFT for a relation the receiver holds goes unanswered in some states at rest, at two
+  steps. Without the mark, the check finds an exchange that never ends, at two steps. One end's
+  PRUNE crosses the other's later GRAFT, the first end accepts that GRAFT, the second decides its
+  yes as a new GRAFT, and the two then answer each other's yes for ever.
 
 **A symmetric relation** (decided 2026-11-09).
 - **Why at `F_HI`.** Gossipsub's heartbeat prunes a mesh above `D_high` down to `D`, and a mesh gets
   there because, at `D_high`, gossipsub v1.1 refuses only a GRAFT from an inbound connection. Here
-  `on_graft` refuses at `F_HI` for every peer, so a prune that waited for more than `F_HI` would never run: the relations
-  would rest wherever the GRAFTs left them, near `F_HI`, and cost more bytes wherever every relation
-  is pushed (tier 1). In the toy (the payload at 60 nodes and degree 30, under `--upkeep on` with 20
-  links replaced per message gap, six messages, seed 7): with a prune only above `F_HI` no node was
-  ever pruned and nodes ended at 12, the relations averaging 8.5 per node. With the prune at `F_HI`,
-  24 PRUNEs left no node above 11, and the average was 7.9.
+  `on_graft` refuses at `F_HI` for every peer, so a prune that waited for more than `F_HI` would
+  never run: the relations would rest wherever the GRAFTs left them, near `F_HI`, and cost more
+  bytes wherever every relation is pushed (tier 1). In the toy (the payload at 60 nodes, under
+  `--upkeep on` with links replaced, one seed), with a prune only above `F_HI` no node was ever
+  pruned, and nodes ended at the cap, `F_HI`. With the prune at `F_HI`, no node ended at the cap,
+  and the relations per node averaged fewer (protocol-v2-figures.md, §4.1).
 - **Why at random.** A capped relation is first come, first served: a full node refuses later
   GRAFTs, and near peers' GRAFTs arrive first, so the relations lean on near peers. Gossipsub's prune
   keeps `D_score` peers by score and the rest at random; scoring is the client's, and the draw is
   this rule's.
-- **Checked** (`toy/graft_check.py --both`: both ends graft the relation below `F_LO` and prune it at
-  `F_HI`). At three upkeep steps, in each of the 846 states of 2 755 607 at rest, the ends agree in
-  both directions and each end holds both or neither, with no GRAFT unanswered, and every exchange
-  ends. In every state at rest of these runs and of `--both --diverged` (above), an end that holds
-  the relation one way acts on it with its count between its floor and its cap. The text without
-  that step fails there: in 108 states at rest, at three steps, an end holds the relation one way
-  and neither end's upkeep acts, the first where one end counts it and the other holds nothing.
+- **Checked** (`toy/graft_check.py --both`: both ends graft the relation below `F_LO` and prune it
+  at `F_HI`). At three upkeep steps, in every state at rest, the ends agree in both directions and
+  each end holds both or neither, with no GRAFT unanswered, and every exchange ends. In every state
+  at rest of these runs and of `--both --diverged` (above), an end that holds the relation one way
+  acts on it with its count between its floor and its cap. The text without that step fails there:
+  in some states at rest, at three steps, an end holds the relation one way and neither end's
+  upkeep acts, the first where one end counts it and the other holds nothing
+  (protocol-v2-figures.md, §4.1).
 
 **A candidate's interest holds the family** (decided 2026-11-09).
 - **Why.** Before, `candidates` took any joined peer with duty, so a column's relations could form with
@@ -942,9 +939,9 @@ the GRAFT's direction, which undid the opposite relation at the grafter.
 - **Checked** with the GRAFT (`toy/graft_check.py`, above): at rest, once either end has sent its
   JOIN, both ends hold each other's, and no GRAFT or PRUNE ever reaches a node that has no link for
   it. The check fails on the text before (`toy/controls/join-lost.md`), where a JOIN a full queue
-  refused was lost (in 40 of 508 states at rest, at two upkeep steps, a JOIN was sent and the link
-  did not form), and where `send_join` records its JOIN but does not owe it (a GRAFT then reaches a
-  node that has no link for it).
+  refused was lost (in some states at rest, at two upkeep steps, a JOIN was sent and the link did
+  not form; protocol-v2-figures.md, §4.1), and where `send_join` records its JOIN but does not owe
+  it (a GRAFT then reaches a node that has no link for it).
 
 **A peer that joins a push relation is announced what the node holds** (2026-10-26, from
 `protocol.md` §5.4's `on_mesh_join`).
@@ -969,18 +966,16 @@ load. A sampling-only link is not pruned for serving nothing, since its use is t
   links the node has, and only `keep_coverage` opened links, for a sampler's floor (§1.3). Yet the
   draft assumes it: the rendezvous is per family (§1.1), and §8's route leans on custodians keeping
   a floor per column.
-- **Measured** in the toy (500 nodes at degree 70, its custody setting with a fifth of the nodes
-  sampling, two blocks a run, 1 % and 5 % of the links replaced per message gap, seeds 7 to 16).
-  Without it, for 8 to 11 % of the nodes at the ends of a closed link, at every seed, the number of
-  their (family, colour) below `F_LO` had not come back by the run's end to what it was before the
-  close; with it, for 0.1 to 1.2 %. It also removed 84 to 91 % of churn's excess in the
-  share of (node, family, colour) below `F_LO`, the share averaged over the heartbeats from the
-  first block on, against the same cells without churn. Its cost per node and gap, paired by seed,
-  was 0.14 to 0.19 JOINs and 0.30 to 0.44 GRAFTs more at 1 %, and 0.69 to 0.88 and 1.53 to 1.92 at
-  5 %. Every node completed, and the warm block's 99th percentile moved within the toy's noise.
-  These runs predate 2026-11-16. Since then, the toy's close also drops the closed peer's offers,
-  tries, promises and ties, and keeps its park (§3's lifetimes, `protocol.md` §8.1). They were not
-  run again.
+- **Measured** in the toy, in its custody setting at 500 nodes with links replaced during the run
+  (protocol-v2-figures.md, §4.1). Without it, at every seed, some of the nodes at the ends of a
+  closed link had not come back by the run's end to the number of their (family, colour) below
+  `F_LO` that they had before the close; with it, far fewer. It also removed most of churn's excess
+  in the share of (node, family, colour) below `F_LO`, but not all of it, against the same cells
+  without churn. It cost more JOINs and GRAFTs per node and message gap, the more so the more links
+  were replaced. Every node completed, and the warm block's 99th percentile moved within the toy's
+  noise. These runs predate 2026-11-16. Since then, the toy's close also drops the closed peer's
+  offers, tries, promises and ties, and keeps its park (§3's lifetimes, `protocol.md` §8.1). They
+  were not run again.
 
 ### 4.2 A chunk arrives
 
@@ -1261,9 +1256,9 @@ index at a time).
 
 **The reference values hold no ask back in the toy.** At 4096 frames and 5000 ids, the toy's 60-node
 cells hold back no ask, under this draft's tier 4 setting, variant C (`c`) and custody, with and
-without samplers. The busiest peer reached at most 248 frames and 58 asks in a heartbeat (custody),
-and 42 and 11 (variant C). Under the rows setting (seeds 7 to 9, with and without half the columns
-withheld) none was held back either, the busiest peer at 1 254 frames and 178 asks.
+without samplers, nor under the rows setting, with and without half the columns withheld. The
+busiest peer stayed well below both values in a heartbeat, in every setting
+(protocol-v2-figures.md, §4.3).
 
 ### 4.4 A node forwards
 
@@ -2719,14 +2714,14 @@ the promise of §4.6.
 node can take one of it's peers according to Topic Routing, and send to it a forwardable query.
 We’ll get the sample in 2 hops").
 
-**How far one step reaches, in the toy's graphs** (500 nodes, graph only, seeds 7 to 16;
-`toy/sampler_graph.py c`): a sampler's own links serve 98 % of (sampler, column) pairs at 70 links
-and 58 % at 16, and a path of two hops exists for every other pair. One step to the link whose
-computed custody is nearest the column left 1.8 % of all pairs unreached at 16 links where
-custodians keep their floor per column, and 19 % without that floor; the second phase meets such a
-miss through another first hop, the routing rules by construction (§6.3, `ROUTE_FLOOR`). Beyond one
-step: without the floor, the Kademlia-style rule reached 95.9 % of the pairs within two hops and the
-other 4.1 % in three. A first hop drawn at random, as here without the rules, was not measured.
+**How far one step reaches, in the toy's graphs** (`toy/sampler_graph.py c`): a sampler's own links
+serve nearly every (sampler, column) pair at 70 links and little more than half at 16, and a path
+of two hops exists for every other pair. One step to the link whose computed custody is nearest the
+column left few pairs unreached at 16 links where custodians keep their floor per column, and many
+more without that floor; the second phase meets such a miss through another first hop, the routing
+rules by construction (§6.3, `ROUTE_FLOOR`). Beyond one step: without the floor, the
+Kademlia-style rule reached most pairs within two hops and the rest in three. A first hop drawn at
+random, as here without the rules, was not measured (protocol-v2-figures.md, §4.10).
 
 **Not taken: narrowing the draw** to the columns the node's links serve. A sample drawn among what a
 neighbourhood offers is a sample that neighbourhood steers, which breaks the independence the
@@ -3145,7 +3140,7 @@ versions, with what each brought and when it was carried, is in
   an offer, which can draw an ask under its §4.4's checks. No recorded cell names an id in an IHAVE.
 
 The differences the recorded cells do show are in the scheduling (§4.11 to §4.13), which moves
-times and copies by the amounts the Rationale measures.
+times and copies by measured amounts (protocol-v2-figures.md, §6.1).
 
 **The regression.** The toy's fifteen cells are the regression for this setting, recorded for this
 document in `toy/golden-v2.txt` (`toy/check.py --doc v2`) and compared against v0.3's own recording
@@ -3158,59 +3153,52 @@ runs its own `defer`), and `push-deep`, the `push` cell with the earlier transpo
 
 #### Rationale
 
-**The distance to the recordings, by date.**
-- Checked on 2026-10-07: with v0.3's window (slots of one payload chunk) eleven of the twelve cells
-  reproduced v0.3's completion times and bytes exactly and `rr-stripe` differed by 3 ms at the
+**The distance to the recordings, by date.** The figures file gives the amounts
+(protocol-v2-figures.md, §6.1).
+- Checked on 2026-10-07: with v0.3's window (slots of one payload chunk) every cell but `rr-stripe`
+  reproduced v0.3's completion times and bytes exactly, and `rr-stripe` differed by a few ms at the
   median, the residue being the order of same-instant sends (this document iterates the relation in
-  peer order where v0.3 iterated the mesh set). With the window in bytes (§4.11) the cells move by
-  at most 7 ms at the median, 15 ms at the tail and 0.04 copies either way (`announce`
-  p99 576 → 587 ms, `without-a` 578 → 565 ms, `loss-thin` 984 → 999 ms, `push` copies 2.41 → 2.43),
-  which is the two structural changes of §4.11 and not the unit: a control-only entry at the head of
-  a queue no longer waits for a chunk's slot, and the chunk is chosen before the room is taken. So
+  peer order where v0.3 iterated the mesh set). With the window in bytes (§4.11) the cells move
+  little, by milliseconds at the median and the tail and by hundredths of a copy, either way, which
+  is the two structural changes of §4.11 and not the unit: a control-only entry at the head of a
+  queue no longer waits for a chunk's slot, and the chunk is chosen before the room is taken. So
   this document contains v0.3 to within those amounts, and with v0.3's window exactly but for
-  `rr-stripe`'s 3 ms.
+  `rr-stripe`'s residue.
 - Since v0.4's P4 came in (2026-10-21, §4.7) the comparison is with v0.4's recording (`golden.txt`):
-  eleven cells within 3 ms at the median, 16 ms at the tail and 0.03 copies (`announce`
-  p99 568 → 584 ms, `rr-stripe` 521 → 505 ms), and `loss-thin`, at a 20 Mbps uplink, 8 ms later at
-  the median and 0.10 copies lighter, the one cell where §4.13's scaled ask window applies; without
-  P4 the medians had been up to 102 ms behind v0.4's (`silent` 678 against 576 ms).
+  eleven cells stay close to it, and `loss-thin`, at a 20 Mbps uplink, is a little later at the
+  median and lighter in copies, the one cell where §4.13's scaled ask window applies; without P4 the
+  medians had been well behind v0.4's.
 - With v0.5 merged (2026-10-21; every cell of both recordings moves) the comparison is with v0.5's:
-  eleven cells within 7 ms at the median, 15 ms at the tail and 0.03 copies (`rr-stripe`
-  p50 417 → 410 ms, `dcb20` p99 358 → 343 ms, `cap-wait` 740 → 754 ms), and `loss-thin` 1 ms later
-  at the median and 0.12 copies lighter, as before the merge (1.81 copies).
+  eleven cells stay close to it, and `loss-thin` is a little later at the median and lighter in
+  copies, as before the merge.
 - With the group's key (2026-10-23, v0.3 §1; both recordings move again, as under any renaming:
-  `toy/README.md`) eleven cells are within 6 ms at the median, 35 ms at the tail and 0.03 copies
-  (`without-a` p99 613 → 578 ms, `cap-wait` 815 → 797 ms), and `loss-thin` is 10 ms later at the
-  median and 0.11 copies lighter (1.81 copies).
+  `toy/README.md`) eleven cells stay close, and `loss-thin` is later at the median and lighter in
+  copies.
 - Since `protocol.md` §5.1 announces only to the mesh peers it did not choose for a chunk
   (2026-10-25), its `loss-thin` runs differently with the same medians and copies, so these
   distances stand.
 - With ties and no second ask of a peer at once (2026-10-26, `protocol.md` §4.2, §6.1; both
-  recordings move) eleven cells are within 8 ms at the median, 30 ms at the tail and 0.03 copies
-  (`silent` p50 641 → 649 ms, `without-a` p99 598 → 568 ms), and `loss-thin` is 8 ms later at the
-  median and 0.12 copies lighter (1.81 copies).
+  recordings move) eleven cells stay close, and `loss-thin` is a little later at the median and
+  lighter in copies.
 - Asks that go with their announcer's dropped offers (2026-10-28, `protocol.md` §6.1) change no
   event in any cell of either recording: nothing was tied in the toy then, and its offers expire
   only after their group has completed.
 - With v0.9's rules (2026-11-10, §4.7: the source's holding and its offers at the acknowledgement;
-  every cell of both recordings moves), eleven cells are within 13 ms at the median, 18 ms at the
-  tail and 0.06 copies of v0.9's own recording (`cap-wait` 630 → 643 ms, `without-a`
-  p99 551 → 533 ms), and `loss-thin` is 6 ms later at the median and 0.14 copies lighter (1.80
-  copies).
+  every cell of both recordings moves), eleven cells stay close to v0.9's own recording, and
+  `loss-thin` is a little later at the median and lighter in copies.
 - With the toy's transport keeping `protocol.md` §7.3's rule (2026-11-15, one entry at a time per
   connection; every cell of both recordings moves but `rr-stripe`, whose uplink has no send buffer),
-  eleven cells are within 8 ms at the median, 16 ms at the tail and 0.02 copies of `protocol.md`'s
-  recording (`cap-wait` 544 → 552 ms, p99 710 → 726 ms), and `loss-thin` is 18 ms later at the
-  median and 0.07 copies lighter (1.64 copies).
+  eleven cells stay close to `protocol.md`'s recording, and `loss-thin` is later at the median and
+  lighter in copies.
 
 **`ihave-limits` against `protocol.md`.**
-- Under v0.9's rules and the toy's transport since 2026-11-15, this document holds back 26 667 asks
-  to the next heartbeat, where `protocol.md` holds back 26 799. It is 2 ms sooner at the median and
-  1 ms later at the tail, with 0.02 copies more (p50 510 against 512 ms, p99 593 against 592 ms,
-  2.07 against 2.05 copies). With the earlier transport (`--send-buffer 0`) it held back 24 248
-  against 24 538, 3 ms sooner at the median and 7 ms sooner at the tail (p50 541 against 544 ms,
-  p99 621 against 628 ms, 2.41 against 2.40 copies).
-- Before §4.3 carried the limits, it held back none and ran as without them (p50 470 ms).
+- Under v0.9's rules and the toy's transport since 2026-11-15, in that day's recordings, this
+  document held back slightly fewer asks to the next heartbeat than `protocol.md` did. It was a
+  little sooner at the median and a little later at the tail, with a few hundredths of a copy more.
+  With the earlier transport
+  (`--send-buffer 0`) it held back slightly fewer too, and it was a little sooner at the median and
+  at the tail (protocol-v2-figures.md, §6.1).
+- Before §4.3 carried the limits, it held back none and ran as without them.
 
 **Draft 0** did not reproduce the cells at all: it filtered a forwarding node's push candidates by
 what it had already pushed, which v0.3 does not, and it shuffled the relation peers for repair in a
@@ -3247,8 +3235,8 @@ executing it found two things in the carried-over code: the window's line of wri
 slots were free (v0.3 §7.1, fixed there, since it is v0.3's window) and card 12's projection assumes
 a code (§4.9). With supernodes (`--supernodes`), custodians of every column that keep the rows and
 rebuild a row still short at the second phase's delay, the custody cell whose proposer withholds
-half the columns completes on all thirteen seeds, where without them 58 of 59 custodians stay short;
-this is PeerDAS's reconstruction, delayed (§4.6).
+half the columns completes on every seed run, where without them nearly every custodian stays
+short; this is PeerDAS's reconstruction, delayed (§4.6; protocol-v2-figures.md, §6.2).
 
 **The sampling setting** runs on top of custody (`--samplers`): a share of the nodes declare eight
 cells per block to one custodian each, and every reachable sample completes, a little before the
@@ -3260,11 +3248,11 @@ asked.
 **The row setting** runs EIP-8371's rows on top of custody: one designated subnet per node, rows
 pull-only, members complete at 64, reconstructors of 64 columns decoding at K, any member later, and
 a proposer that withholds half the columns, so that only the rows can fill them; at the recorded
-seed every custodian completes through the rows, and on all thirteen seeds from 7 to 19 with a
-custodian link per column for every member (§4.6's repair floor; without it five runs left
-custodians short, each for a missing link), every cell sits in both of its groups (R4), and a liar
-fault shows a false claim detected by the probe (R5). Executing it changed the document in eight
-places: a chunk a node rebuilt is filled into its other groups as rebuilt and acknowledged to
+seed every custodian completes through the rows, and on every seed run with a custodian link per
+column for every member (§4.6's repair floor; without it some runs left custodians short, each for
+a missing link), every cell sits in both of its groups (R4), and a liar fault shows a false claim
+detected by the probe (R5; protocol-v2-figures.md, §6.2). Executing it changed the document in
+eight places: a chunk a node rebuilt is filled into its other groups as rebuilt and acknowledged to
 nobody, and completes them (`decode_group` checks them as `on_chunk` does); repair respects `EAGER`,
 so rebuilt row cells are offered to row members and pushed only into the columns; the claim in a
 holding is "I hold or can produce every index", not "my interest is satisfied", since a member
@@ -3273,12 +3261,12 @@ its promise is the deferral window; an unverified claim counts for nothing in th
 a liar suppresses the third phase; and "still incomplete" is read in that view, or every member
 short of 128 rebuilds a row the network already has; and every member keeps a link to each column
 (`REPAIR_FLOOR`), or a row is neither gathered nor repaired where no member has one. With three
-supernodes the second phase completes the 32-subnet withheld cell on all thirteen seeds, a cell some
-of whose subnets have no member (short at seed 7 without them), and halves the withheld cells' time;
-it changed the document in two more places: a supernode keeps every row with interest declared on no
-link (§1.2), and a row whole on its columns' bitmaps but not in the node's holdings waits once
-before it is rebuilt (`known_across`), or a supernode still receiving its columns rebuilds rows
-nobody withheld.
+supernodes the second phase completes the 32-subnet withheld cell on every seed run, a cell some of
+whose subnets have no member (short without them at the recorded seed), and much shortens the
+withheld cells' time (protocol-v2-figures.md, §6.2); it changed the document in two more places: a
+supernode keeps every row with interest declared on no link (§1.2), and a row whole on its columns'
+bitmaps but not in the node's holdings waits once before it is rebuilt (`known_across`), or a
+supernode still receiving its columns rebuilds rows nobody withheld.
 
 ### 6.3 Parameters, limits and constants
 
@@ -3347,94 +3335,91 @@ nobody withheld.
 `START_DELAY`, and the bounds on groups tracked per slot, relations per link and sampling-only links
 accepted. On 2026-11-18: `SOURCE_OFFERS`.
 
-**`R_NODE`, `R` for cells, in the toy.** The toy's 60-node cells so far, over seeds 7 to 19:
-supernodes on datacenter links, in the fast class, pushed mostly duplicates into columns of about
-ten custodians (0.96 copies more per node in the honest custody cell; 0.72 copies and half a second
-of tail in the honest row cell); with cells at `R` the honest row cell is back at 1.13 s at the tail
-and 2.22 copies (1.14 s and 2.16 without supernodes), the withheld cells are as fast or faster at
-the tail (custody 1.25 s, 16 subnets 1.64 s, 32 subnets 1.69 s, against 1.25, 1.76 and 1.83) at 0.6
-to 1.2 copies fewer, and the honest custody cell gives up 31 ms at the median and 73 ms at the tail
-for 1.17 copies fewer.
+**`R_NODE`, `R` for cells, in the toy.** In the toy's 60-node cells so far, supernodes on datacenter
+links, in the fast class, pushed mostly duplicates into columns of few custodians: more copies per
+node in the honest custody and row cells, and a longer tail in the honest row cell. With cells at
+`R`, the honest row cell's tail and copies are back near those without supernodes, the withheld
+cells are as fast or faster at the tail for fewer copies, and the honest custody cell gives up a
+few tens of ms at the median and at the tail for fewer copies (protocol-v2-figures.md, §6.3).
 
-**`PROMISE`, in the toy.** The toy so far: in the honest row cell the 400 ms promise broke 3 321 to
-4 204 times per run and parked 804 to 1 039 honest (peer, group) pairs; nearly every broken promise
-was a column ask that the asked node answered later, 0.45 s after the ask at the median and 0.8 s at
-the 99th percentile, behind the rows' pulls on its uplink, and none was a refusal. At 0.8 s it broke
-1 to 3 times, with completion times and bytes unchanged (seeds 7 to 9), since the asker moves on
-after `IWANT_WINDOW` either way and the promise decides only whom it parks. For the payload,
-evaluated with §4.13 (2026-10-19): a promise stretched with the ask window on thin links lets
-withholders go unparked for the payload (30 % withholders at 10 Mbps: the tail 18.5 % longer in the
-research harness, three paired seeds; silent peers, who announce nothing and so are never asked,
-were not hurt in the toy), so the payload's promise stays at 400 ms.
+**`PROMISE`, in the toy.** The toy so far: in the honest row cell the 400 ms promise broke thousands
+of times per run and parked hundreds of honest (peer, group) pairs. Nearly every broken promise was
+a column ask that the asked node answered later, behind the rows' pulls on its uplink, and none was
+a refusal. At 0.8 s it broke only a few times, with completion times moving little and bytes
+unchanged, since the asker moves on after `IWANT_WINDOW` either way and the promise decides only
+whom it parks. For the payload, evaluated with §4.13 (2026-10-19): a promise stretched with the ask
+window on thin links lets withholders go unparked for the payload (with 30 % withholders at 10 Mbps
+it lengthened the tail in the research harness; silent peers, who announce nothing and so are never
+asked, were not hurt in the toy), so the payload's promise stays at 400 ms (protocol-v2-figures.md,
+§6.3).
 
-**`SAMPLE_RETRY`.** In the toy's 500-node cells the custodians' 99th percentile was 0.67 to 0.70 s.
-Under 30 % withholders the samplers' median follows `SAMPLE_RETRY`'s 2 s wait: 2.5 to 2.9 s at 500
-nodes.
+**`SAMPLE_RETRY`.** In the toy's 500-node cells the custodians' 99th percentile was well within
+`SAMPLE_RETRY`'s wait. Under 30 % withholders the samplers' median follows that wait
+(protocol-v2-figures.md, §6.3).
 
-**`SAMPLE_COVER`.** At least 1: without a floor a sampler of eight cells holds a sample no link
-serves with probability 17 % at 70 links and 96 % at 16 (§1.3). In the toy's 500-node cells
-(custody, seeds 7 to 16, a fifth of the nodes sampling, 2 000 sampler-blocks per network), two
-covers left no sampler short, honest or under 30 % withholders, at 70 links and at 16. One cover did
-as well at 70; at 16 it left 7 short under withholders and raised the honest samples' 99th
-percentile to 2.2 s (0.7 s with two). For the floor of the fewest links, high custody counted in
-full, in the toy's graphs (500 nodes, 8 of 128 columns a node, graph only, seeds 7 to 16, greedy
-cover; `toy/sampler_graph.py a`): once, a median of 2 added links on top of 70 (0 to 5) and 13 on
-top of 16 (9 to 18), 23 from none; twice, 8, 29 and 42; one link to a node custodying every column
-covers all; with 10 % of nodes custodying 64 columns, 0 on top of 70 and 3 on top of 16. For the
-diversity floor, covers counted by distinct links (graph only, the same graphs, 400 draws per
-sampler; `toy/sampler_match.py`), the share of eight-sample draws that find eight distinct serving
-links: two covers 99.77 % or more at 16 links (29 to 31 links added, median) and 99.92 % or more at
-70 (8 to 9); three covers 99.99 % or more at both (47 to 49, 17 to 20), and the one that holds for
-sixteen samples; one cover only 64 to 86 % at 16 and 97 % at 70.
+**`SAMPLE_COVER`.** At least 1: without a floor some samplers of eight cells hold a sample no link
+serves at 70 links, and nearly all do at 16 (§1.3). In the toy's 500-node cells, two covers left no
+sampler short, honest or under 30 % withholders, at 70 links and at 16. One cover did as well at
+70; at 16 it left some samplers short under withholders, and it raised the honest samples' 99th
+percentile well above that with two covers. For the floor of the fewest links, high custody counted
+in full, in the toy's graphs (`toy/sampler_graph.py a`): one cover adds a few links on top of 70
+and more on top of 16, two covers add more again, and one link to a node custodying every column
+covers all; where a tenth of the nodes custody 64 columns, the floor adds none on top of 70 and few
+on top of 16. For the diversity floor, covers counted by distinct links (`toy/sampler_match.py`),
+nearly every draw of eight samples finds eight distinct serving links with two covers, at 16 links
+and at 70; three covers do better still, and they are the floor that holds for sixteen samples; one
+cover falls well short of that at 16 links, and a little short at 70 (protocol-v2-figures.md,
+§6.3).
 
-**`COVER_HIGH`.** 0 is within 0.4 points of 1 with eight samples (1.7 with sixteen), at a link more;
-counted in full, one supernode link with no other rule finds eight distinct servers for 4.7 % of
-draws at 16 links.
+**`COVER_HIGH`.** At 0, the share of draws that find distinct servers is nearly that at 1, with
+eight samples and with sixteen, at a link more. Counted in full, one supernode link with no other
+rule rarely finds eight distinct servers at 16 links (protocol-v2-figures.md, §6.3).
 
 **`ROUTE_FLOOR`.** In the same graphs, without a per-column floor at 16 links: the hypercube rule
-brings every (sampler, column) pair within two hops for 17 added links per custodian, the
-Kademlia-style rule 95.9 % within two and 4.1 % in three for 6.4.
+brings every (sampler, column) pair within two hops, and the Kademlia-style rule brings most pairs
+within two and the rest in three, for fewer links added per custodian (protocol-v2-figures.md,
+§6.3).
 
-**`ROUTE_HOPS` above 1** serves where one step does not reach a custodian, as the Kademlia-style
-rule's 4.1 % in three hops; in a 60-node cell one request that took a second step brought its sample
-at 468 ms, where it had waited for the second phase.
+**`ROUTE_HOPS` above 1** serves where one step does not reach a custodian, as for the pairs that the
+Kademlia-style rule reaches only in three hops; in a 60-node cell one request that took a second
+step brought its sample early, where with one step it had waited for the second phase
+(protocol-v2-figures.md, §6.3).
 
-**`FORWARD_LIMIT`.** In the toy's 60-node cells (seed 7, two covers, routed requests on), a limit of
-1 changed no event, honest or under 30 % withholders; with half the columns withheld it refused 10
-of 1 048 forwards, and the same samples arrived.
+**`FORWARD_LIMIT`.** In the toy's 60-node cells (one seed, two covers, routed requests on), a limit
+of 1 changed no event, honest or under 30 % withholders; with half the columns withheld it refused
+a small share of the forwards, and the same samples arrived (protocol-v2-figures.md, §6.3).
 
 **Sampling-only links accepted.** On average the bound is the samplers' added links over the nodes
-that serve them: in the toy's graphs, with a fifth of 500 nodes sampling, two covers add 8 links per
-sampler at 70 links and 29 at 16 (`SAMPLE_COVER`, above), about 2 and 7 per other node, and a limit
-at the average would refuse some, as the draws are not even.
+that serve them: in the toy's graphs, with a fifth of 500 nodes sampling, that comes to a few links
+per other node, more at 16 links than at 70 (`SAMPLE_COVER`, above), and a limit at the average
+would refuse some, as the draws are not even (protocol-v2-figures.md, §6.3).
 
-**`ASK_UPLINK`.** The toy, in the research harness's setting, against v0.3's fixed window, seeds 7
-to 9: fewer copies in every cell, 0.16 to 0.33; the tail shorter in the all-home network at
-12.5 Mbps (0.7 to 3.0 %), with 30 % silent peers (2.4 to 4.4 %), in the mixed-bandwidth network at
-6 Mbps with a home builder (3.1 to 3.2 %) and with a datacenter builder (3.0 to 3.6 %), and within
-±1.6 % with 30 % withholders; with 10 % of chunks lost it is up to 3.2 % longer (a lost answer is
-waited for until the longer window closes).
+**`ASK_UPLINK`.** The toy, in the research harness's setting, against v0.3's fixed window: fewer
+copies in every cell; the tail a little shorter in the all-home network at 12.5 Mbps, with 30 %
+silent peers, and in the mixed-bandwidth network at 6 Mbps with a home builder and with a
+datacenter builder, and about the same with 30 % withholders; with 10 % of chunks lost it is a
+little longer (a lost answer is waited for until the longer window closes;
+protocol-v2-figures.md, §6.3).
 
-**`MERGE_HOLDINGS`.** The toy, seeds 7 to 16 (§4.7): for a 50 Mbps proposer of 128 column groups it
-takes back 10 of P4's 116 ms at the custody block's median with writes that complete at once, 16 of
-80 ms with one write per connection at a time; copies unchanged.
+**`MERGE_HOLDINGS`.** In the toy (§4.7), for a 50 Mbps proposer of 128 column groups, it takes back
+a small part of what P4 costs at the custody block's median, with writes that complete at once and
+with one write per connection at a time; the copies are unchanged (protocol-v2-figures.md, §6.3).
 
 **The IHAVE limits.** A low message limit trades latency for copies. Offers come chunk by chunk, so
 it holds back many asks. An ask held back is likely often never made, because by the heartbeat the
 chunk has come by push: a duplicate pull saved (not counted). In the toy's `ihave-limits` cell (60
-nodes, one seed, under v0.9's rules; `toy/run.py --doc v2 --ihave-limits M,5000`), against no limit
-(p50 461 ms, 2.49 copies): 10 frames cost 80 ms at the median and save 0.08 copies, 20 cost 31 ms
-and save 0.11, 40 cost 3 ms and save 0.01, and 100 change neither. The 5000 asks never bound. On the
-standalone binding, not gossipsub's 10, since in that cell 20 saves more copies for under half the
-delay. On v0.3's wire, batching a peer's offers into fewer frames avoids the delay, and with it the
-saving. At `protocol.md` §8.3's reference values (4096 frames, 5000 ids, per peer and heartbeat): no
-ask held back in the toy's 60-node cells under the tier 4 setting, variant C and custody (with and
-without samplers), each run as with no limit; the busiest peer reached 248 frames and 58 asks in a
-heartbeat. Under the rows setting (60 nodes, seeds 7 to 9, with and without half the columns
-withheld), no ask held back either, each run as with no limit; the busiest peer reached 1 254 frames
-and 178 asks. What the limits protect is mostly bounded already: one ask per index at a time (v0.3
-§6.1), asks only for groups an installed block commits (§4.2), and the offer table's limits
-(`protocol.md` §8.2).
+nodes, one seed, under v0.9's rules; `toy/run.py --doc v2 --ihave-limits M,5000`), against no
+limit, a limit of 10 frames costs the most time at the median for a small saving in copies, 20
+costs less time and saves the most, 40 costs and saves little, and 100 changes neither
+(protocol-v2-figures.md, §6.3). The 5000 asks never bound. On the standalone binding, not
+gossipsub's 10, since in that cell 20 saves more copies for less delay. On v0.3's wire, batching a
+peer's offers into fewer frames avoids the delay, and with it the saving. At `protocol.md` §8.3's
+reference values (4096 frames, 5000 ids, per peer and heartbeat), no ask was held back in the toy's
+60-node cells under the tier 4 setting, variant C and custody (with and without samplers), nor under
+the rows setting (with and without half the columns withheld), each run as with no limit; the
+busiest peer stayed well below both values (§4.3; protocol-v2-figures.md, §4.3). What the limits
+protect is mostly bounded already: one ask per index at a time (v0.3 §6.1), asks only for groups an
+installed block commits (§4.2), and the offer table's limits (`protocol.md` §8.2).
 
 ## 7. Bindings `[D1]`
 
@@ -3498,10 +3483,10 @@ double the bytes; it is outside this version (`[D1]`, §8).
 **A fetch outside the links** `[D12]` (possible, binding-dependent). A binding may offer one
 capability beyond its links: fetching a sample quickly from a node of the known node set, a node
 whose custody the sampler computes from its node id, that is not a link.
-- *What it gives:* it reaches a custodian directly where §4.10 would route. That is one hop instead of
-  two, nothing disclosed to a forwarder, and fewer links kept for the coverage floor, which matters
-  most where a node's connection budget is small (at 16 links the floor of the fewest links costs 13
-  more, §6.3).
+- *What it gives:* it reaches a custodian directly where §4.10 would route. That is one hop instead
+  of two, nothing disclosed to a forwarder, and fewer links kept for the coverage floor, which
+  matters most where a node's connection budget is small (at 16 links the floor of the fewest links
+  nearly doubles a node's links, §6.3; protocol-v2-figures.md, §1.3).
 - *What the protocol needs:* only the notion of such a fetch, a WANT answered by a CHUNK from a node
   that is not a link, and its privacy rule: one sample per node, as on links (§4.10). The serving
   limit and the second phase's cap apply as on a link.
