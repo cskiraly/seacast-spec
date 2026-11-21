@@ -161,8 +161,8 @@ class CellChunk(Container):            # 0x07
   name the same `fork_digest`, as their `colours` must match. At a fork a node sends its new JOIN.
   - *Open:* what a link's relations do from the fork until both ends' JOINs name the new digest. Also
     open is how the new JOIN sits with `send_join`'s once per link and type (`protocol-v2.md` §4.1).
-- **The header** (`CellChunk.header`) goes with the first eager push of a group on a link
-  (`protocol-v2.md` §2). It is validated apart from the cell, before the cell is handled
+- **The header** (`CellChunk.header`), in form (b) (§1.6), goes with the first eager push of a group
+  on a link (`protocol-v2.md` §2). It is validated apart from the cell, before the cell is handled
   (`protocol-v2.md` §7): a copy whose id is seen or waiting still brings it. A header that fails its
   checks is rejected, as consensus rejects one, and counts against its sender; one that cannot be
   judged yet, which consensus ignores (a slot ahead, a parent not yet seen), waits and counts against
@@ -231,6 +231,25 @@ A message's size on the stream: its body, then its kind and its length.
 
 A chunk's size is before compression.
 
+### 1.6 A cell group's header: three forms
+
+A cell group's header travels in one of three forms. The object type's definition fixes the form
+(`header_of`, `protocol-v2.md` §1.1), and no topic mixes two forms. The three forms are the same on
+the libp2p stream binding and the gossipsub binding, and each binding says how it carries them
+(§2.3, §3, §4, §5).
+- **(a) From the block.** No header travels on the wire. A cell waits in `defer` until its block's
+  header is validated (`on_header_validated`, `protocol-v2.md` §4.2).
+- **(b) In every cell message.** Each cell's message carries the header. A binding that can vary a
+  message per link carries it more cheaply, as the libp2p stream binding does once per group and
+  link (§2.3): a cell's id leaves the header out (§1.2), so a copy with the header and a copy
+  without it are the same chunk.
+- **(c) In a header message of its own,** one per group or one per block. It needs its own bound
+  (§1.4), deduplication, cells held while their header is in flight, and a guard against headers
+  with no cells after them. This version defines no bytes for it.
+
+The toy runs form (b) on the libp2p stream binding, where it charges the header on the first eager
+push of each group and link. On the gossipsub binding it runs form (a) and charges no header.
+
 ## 2. The libp2p stream binding
 
 A protocol of its own, carrying `protocol-v2.md` §2's messages with every rule of that document: interest
@@ -258,6 +277,13 @@ On this binding's stream, a frame is one encoded message after its length:
 
 - The length is libp2p's unsigned varint.
 - Every frame §1.4 allows fits in at most 3 bytes of it.
+
+### 2.3 A cell group's header
+
+This binding carries the three forms of §1.6 as follows:
+- **(a)** no cell carries the header: `CellChunk.header` is empty;
+- **(b)** `CellChunk.header` goes with the first eager push of a group on a link (§1.2);
+- **(c)** the header message needs a kind of its own, which this version does not define.
 
 ## 3. The Waggle binding
 
@@ -287,6 +313,8 @@ binding, as on a stream of its own; only the framing changes.
 
   Waggle length-prefixes each `ObjectPieces` itself, so the encoded message carries no length. The
   bounds of §1.4 are checked once Waggle has read the `ObjectPieces`.
+- **A cell group's header** (§1.6) travels as on the libp2p stream binding (§2.3), in the cell's
+  `CellChunk`.
 - **Whom a node pushes, tells and asks is `protocol-v2.md` §4's.** SEACAST's rules take the place of
   the draft's dissemination prose (a new piece to the peers whose metadata shows it missing, metadata
   to some others), which lets the application choose the peers ("latency or other
@@ -316,6 +344,12 @@ message type. The toy runs `protocol-v2.md` on it.
   binding (§5).
 - **The fork** is in the topic's name.
 - **A chunk's id** is `protocol.md` §2's structured `message_id`.
+- **A cell group's header** (§1.6). A router forwards a message as it was published, to every peer
+  alike, so a header cannot go to one link and not another:
+  - in form (a), no cell's message carries it;
+  - in form (b), every copy of each cell's message carries it;
+  - in form (c), the source publishes a header message of its own on each family's topic with the
+    group's first cells, and it is forwarded as any message. This version defines no bytes for it.
 - **An IDONTWANT's entries** are read as `protocol.md` §4.1 reads them. An IDONTWANT names no topic, so
   beside the `HaveBitmap`s its entries can be stock message ids, another topic's say. An entry that
   opens with `HaveBitmap`'s MAGIC and a version this binding writes (`protocol.md` §2's 1, which its
@@ -375,6 +409,8 @@ deployed path. It keeps the rollout inside existing topics.
   same name). The partial message's group id is theirs, a version byte `0x00` and the block root,
   with the column from the topic.
 - **The fork** is in the topic's name, as gossipsub's topics carry it.
+- **A cell group's header** (§1.6) travels by the partial columns' own rule, in the partial message
+  (§1.2): form (b), carried per link.
 - **The extension fields** it needs:
   - the JOIN's duty and `M`, beside the subscription;
   - a GRAFT's colour;
