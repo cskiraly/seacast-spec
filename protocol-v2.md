@@ -1651,10 +1651,13 @@ ask of an index that the same frame also probes is handled as that probe, if the
 one (§4.6's cap): the one answer, at the first of the two asks, is the probe's, with its exemptions,
 and the asks between them are handled in their order. A probe that would not pass leaves the plain
 ask as it is, its standing request included. A cell asked through both its types in one frame, a
-plain ask in one and a probe that would pass in the other, is one id: it is answered once, and the
-probe's exemption goes with that answer whichever of the two came first. The stock limit holds for
-the answers `on_want` gives; a standing request's answer and a kept probe's are given once each, as
-before. An ask over the
+plain ask in one and a probe that would pass in the other, is one id: it is answered once, and
+charged as the first of the two asks is, against its own group's `SERVE_LIMIT` and, for a plain ask,
+the budget. The probe's exemption goes with that answer whichever of the two came first, unless the
+probe's group has reached `SERVE_LIMIT` when the probe is read (an ask between the two can take the
+last answer): the probe is then refused at the limit, as any probe there is (§4.6). The stock limit
+holds for the answers `on_want` gives; a standing request's answer and a kept probe's are given once
+each, as before. An ask over the
 budget is refused, and a standing request's answer dropped, without penalty; the node does not retry
 a dropped answer, and the asker's wait moves it on (§4.10). The budget starts again at each
 heartbeat. Its bound (§6.3) covers what honest peers ask through one peer in a heartbeat other than
