@@ -354,7 +354,7 @@ FIXED = {"uint8": 1, "uint16": 2, "uint32": 4, "uint64": 8, "boolean": 1, "Bytes
 
 def doc_layout(text):
     """§1.3's python block: its aliases and its containers' fields, in order."""
-    sec = text[text.index("### 1.3 The types"):text.index("### 1.4")]
+    sec = text[text.index("### 1.2 The types"):text.index("### 1.3")]
     block = sec[sec.index("```python") + len("```python"):sec.index("```", sec.index("```python") + 9)]
     out, cur = {"aliases": {}}, None
     for ln in block.splitlines():
@@ -403,14 +403,14 @@ def num(s):
 def doc_tables():
     text = DOC.read_text()
     kinds = {int(k, 16): v for k, v in re.findall(r"^\| `(0x0[0-9])` \| ([A-Z]+)", text, re.M)}
-    lim = text[text.index("### 1.6 Limits"):text.index("### 1.7")]
+    lim = text[text.index("### 1.4 Limits"):text.index("### 1.5")]
     row = lambda name: re.search(r"^\| " + re.escape(name) + r" \| ([^|]+)\|", lim, re.M).group(1)
     nums = lambda s: [num(x) for x in re.findall(r"\d{1,3}(?: \d{3})*", s)]
     j, g, p = nums(row("JOIN, GRAFT, PRUNE"))[:3]
     h, w = nums(row("HAVE, WANT"))[:2]
     bounds = {0x01: j, 0x02: g, 0x03: p, 0x04: h, 0x05: w,
               0x06: nums(row("CHUNK of the payload"))[0], 0x07: nums(row("CHUNK of a cell"))[0]}
-    siz = text[text.index("### 1.7 Sizes"):text.index("### 1.8")]
+    siz = text[text.index("### 1.5 Sizes"):text.index("### 1.6")]
     srow = lambda name: re.search(r"^\| " + re.escape(name) + r" \|[^|]*\| ([^|]+)\|", siz, re.M).group(1).strip()
     sizes = {k: srow(k) for k in ("JOIN", "GRAFT", "PRUNE", "HAVE, holding or offer", "WANT, one index i",
                                  "CHUNK, a cell", "CHUNK, the payload")}
