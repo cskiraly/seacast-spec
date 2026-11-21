@@ -541,7 +541,8 @@ control, and priorities between streams.
   (quic-go behind Linux's `fq_codel`), two QUIC connections dialed from one UDP socket were one
   flow, and a connection dialed from a socket of its own was a flow of its own. In the toy, behind
   a fair queue, a flow of its own let the node's other messages wait less behind SEACAST's chunks,
-  at no measurable cost to SEACAST, and strict priority for either flow starved the other. Neither
+  at no measurable cost to SEACAST. Behind a strict priority queue, SEACAST's flow ranked over the
+  node's other traffic, or that traffic ranked over SEACAST's flow, starved the lower one. Neither
   finding chooses a model. In every model, the ALPN, the link's open and close, the stream credit
   and the streams (§7.2) are as this section gives them.
 
