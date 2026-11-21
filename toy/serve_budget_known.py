@@ -29,11 +29,16 @@ does not, each of a different column:
   probe's answer is;
 - (k) one frame with a standing ask of an index S lacks in its custody, and p's probe of it, which does not pass as
   one (S claims no such index): the standing request kept;
-- penalties: none.
+- penalties: none;
+- (l) on a rows network (8 nodes, seed 7) whose block has run two seconds, with the same S and p, a cell S holds in
+  its column and in a row it claims: one frame with a plain ask of the cell through its column and p's probe of it
+  through the row, and one frame the other way round, each for a cell of another row: one answer each, the probe's
+  exemption taken, and the answer written although p's holding of the cell arrives before the write; no penalty.
 On the document before the budget, (a), (d) and (g) fail, and (b) and (c) have no record of S's offers; (h) fails if
 the budget is charged before the stock limit is read; (i) fails, in its first order, on the document before an id
 asked twice in a frame kept a probe among its asks; (j) and (k) fail on the document whose probe dropped a plain ask
-of its index before reading whether it passed.
+of its index before reading whether it passed; (l), in its first order, fails on the document whose answer to an
+id already answered in the frame skipped the probe's exemption.
 """
 import sys
 from pathlib import Path
@@ -175,6 +180,64 @@ def main():
     line(f"(k) a standing ask of index {i}, which S lacks, and p's probe of it, which does not pass as one: the "
          f"standing request kept", kept, True)
     line("penalties", pen, [])
+    across_types(R, SM, Wm)
+
+
+def across_types(R, SM, Wm):                        # (l): a cell asked through its column and probed through its row
+    got, spec_run = {}, R.run
+    R.run = lambda cfg, out=None: got.setdefault("sim", SM.Sim(cfg))
+    try:
+        R.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    finally:
+        R.run = spec_run
+    sim = got["sim"]
+    sim.run(sim.cfg["first"])
+    sim.publish(1)
+    sim.run(sim.cfg["first"] + 2.0)
+    S = sim.nodes[2]
+    ns = S.ns
+    pen = []
+    spec_pen = ns["penalise"]
+    ns["penalise"] = lambda q: (pen.append(q), spec_pen(q))
+    p = min(q for q in S.peers if q != 1)
+    picked, rows = [], set()                        # cells S holds in a column and claims in a row, p neither
+    for G in sorted(ns["chunks"], key=str):
+        if sim.gtype.get(G) != "column":
+            continue
+        for b in sorted(ns["chunks"][G]):
+            row, c = sim.grow.get((sim.ghdr[G].block, b)), sim.gcol[G]
+            if (row is None or row in rows or c not in ns["chunks"].get(row, {}) or not ns["mine"][row].has(c)
+                    or ns["peer_has"][p][G].has(b) or ns["peer_has"][p][row].has(c)
+                    or ns["outside"](p, G, b, False) or ns["outside"](p, row, c, False)
+                    or ns["probe_served"][p][row]):
+                continue
+            picked.append((G, b, row, c))
+            rows.add(row)
+            break
+        if len(picked) == 2:
+            break
+    print(f"rows network, block run: S = node {S.id}, p = node {p}")
+    res = []
+    for (G, b, row, c), probe_first in zip(picked, (False, True)):
+        plain, probe = Wm.WantIndex(G, b), Wm.FlaggedWant(row, c, False, 0, True)
+        out = ns["on_want"](p, [probe, plain] if probe_first else [plain, probe])
+        f = out[0] if len(out) == 1 else None
+        if f is None:
+            res.append((len(out), None, None))
+            continue
+        exempt = ns["probe_answers"][p][f.group].has(f.index)
+        ns["sent_to"][p][f.group].clear(f.index)
+        ns["respond"](p, [], out, [])
+        ns["peer_has"][p][f.group].bits |= ns["bitmap"]({f.index})   # p's holding, from elsewhere, before the write
+        for _ in range(50):
+            e = ns["next_to_send"](p)
+            if e is None or e == ns.get("WAIT"):
+                break
+        res.append((len(out), exempt, ns["sent_to"][p][f.group].has(f.index)))
+    line("(l) one frame with a plain ask of a cell through its column and p's probe of it through S's row, then the "
+         "other order: answers, the probe's exemption taken, written after p's holding of it",
+         res, [(1, True, True), (1, True, True)])
+    line("(l) penalties", pen, [])
 
 
 if __name__ == "__main__":

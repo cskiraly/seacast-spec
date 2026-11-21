@@ -594,10 +594,11 @@ blocks), `wire_size(p, entry)` (§4.11: the bytes the entry's chunk takes on the
 binding's: with a header where its write carries one), `cell_groups(root)` (the column and row
 groups of a block, from their ids alone), `admitted_group(p, g)` (§4.5: a group named in `p`'s
 WANT is within `p`'s own limit of unknown groups named in WANTs, `MAX_PENDING_GROUPS`; a group the
-node holds state for always is; a place frees as §4.5 says), `release_wanted_groups()` (§4.5:
-frees each such place whose group has resolved or whose lifetime has passed, and for the latter
-drops the asker's standing requests, route marks and interest bits for the group, removing the
-entries it empties) and `offers_in(e)` (the offers a queue entry carries, each as a group and its
+node has opened, at its first valid chunk (`hdr`), always is; a place frees as §4.5 says),
+`release_wanted_groups()` (§4.5: frees each such place whose group has resolved or whose lifetime
+has passed, and for the latter drops the asker's standing requests, route marks and interest bits
+for the group, removing the entries it empties) and `offers_in(e)` (the offers a queue entry
+carries, each as a group and its
 bitmap, whichever path queued them).
 
 ## 4. Events
@@ -1329,13 +1330,17 @@ group refreshes (`HAVE_TTL`), and keeps the peer's two claims once set (§1.5): 
 produce every index (`claim_all`, card 10), and its interest in the group is satisfied, so nothing
 more need be pushed or offered to it (`complete`). A claim of the whole group can defer one of the
 node's own decode duties (`note_claim`, §4.6), if the link has joined the group's type: the probe
-that checks the claim is a WANT, which a link that has not joined the type ignores (§2). For each
-index the peer newly holds, the node counts the peer as a holder (card 9), frees the window's room
-taken by any copy it sent the peer at that index (card 14, §4.11), and, for a group it publishes,
-takes it as the chunk's acknowledgement (`origin_acked`, §4.7), which acts once per chunk and does
-nothing at `SOURCE_OFFERS = PUBLISH`. An index the peer held already frees the window's room too: a
-copy can be written to a peer that holds it (a probe's answer whatever the peer holds, §4.6, and any
-copy without cancel, card 8), and its acknowledgement repeats the bit.
+that checks the claim is a WANT, which a link that has not joined the type ignores (§2). On a link
+that has not, the claim is kept as a plain holding: its bits count in `peer_has`, as any holding's
+do, and the peer is no claimant (`claims`), so the subnet's view of the row and the repair sample's
+draw read it as they read a member that holds those cells, until a holding of the group from the
+peer comes on a link that has joined the type. For each index the peer newly holds, the node
+counts the peer as a holder (card 9), frees the window's room taken by any copy it sent the peer at
+that index (card 14, §4.11), and, for a group it publishes, takes it as the chunk's acknowledgement
+(`origin_acked`, §4.7), which acts once per chunk and does nothing at `SOURCE_OFFERS = PUBLISH`. An
+index the peer held already frees the window's room too: a copy can be written to a peer that holds
+it (a probe's answer whatever the peer holds, §4.6, and any copy without cancel, card 8), and its
+acknowledgement repeats the bit.
 
 **An offer** (`on_offer`) plays the role of `protocol.md` §4.4's IHAVE over one group's bitmap. An
 offer of an expired group is ignored, and one beyond a holding's limits is ignored and counts
@@ -1480,7 +1485,9 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
                 standing[gi.group][gi.index].add(p)    # §4.10: answered when the chunk arrives; a routed one
                 if hops > 0: routed_standing[gi.group][gi.index].add(p)   #   outside our interest only if passed on
             continue
-        if mid in answers: continue                    # §4.5: an id is answered once a frame, and counted once
+        if mid in answers:                             # §4.5: an id is answered once a frame, and counted once; a
+            if flagged: serve_probe(p, gi.group, answers[mid])   #   probe of the cell through its other type takes
+            continue                                   #   its exemption on the answer already chosen (R5)
         if mid in unwanted[p] and not flagged: continue    # (R5) nor does a receipt of p's stop the probe's answer
         if serve_count[p][mid] >= GOSSIP_RETRANSMISSION: continue   # stock: 3 answers per id per peer
         counted = not flagged and not (gi and offered_to[p][gi.group].has(gi.index))   # §4.5: the budget counts
@@ -1611,17 +1618,18 @@ and offers.
   (`TypeParams.MAX_INDICES`, `index_bound`) is. When the count becomes known, as the group opens,
   the standing requests, their route marks and the `DECLARED` peers' interest bits kept before it
   lose the indices past it (`drop_wants_beyond`, from `fill` and from `publish`).
-- *Its group.* A group the node holds no state for counts against the asker's limit of unknown
-  groups named in WANTs (`admitted_group`): `MAX_PENDING_GROUPS` of them, counted apart from the
-  unknown groups of the asker's HAVEs and offers (`protocol.md` §8.2). An ask takes a place only
-  once it has passed the test of what the node serves. A group frees its place when it resolves,
-  when the connection closes, or when its lifetime would have passed (`GROUP_TTL` after it was first
-  named), and then the asker's standing requests and interest bits for it go too. The node frees
+- *Its group.* A group the node has not opened (at its first valid chunk, `hdr`) counts against
+  the asker's limit of unknown groups named in WANTs (`admitted_group`), whatever else the node
+  keeps for it, another peer's standing request included: `MAX_PENDING_GROUPS` of them, counted
+  apart from the unknown groups of the asker's HAVEs and offers (`protocol.md` §8.2). An ask takes a
+  place only once it has passed the test of what the node serves. A group frees its place when it
+  resolves, when the connection closes, or when its lifetime would have passed (`GROUP_TTL` after it
+  was first named), and then the asker's standing requests and interest bits for it go too. The node frees
   places at each heartbeat at the latest, and before a group opens, so that a place that ran out is
   not answered when its group comes (`release_wanted_groups`). An ask beyond the limit is
   ignored. The limit is at least the column and row groups that an honest sampler or forwarder asks
-  for before their headers within a place's lifetime: those of the blocks in the node's live window,
-  and more where `GROUP_TTL` outlasts the window.
+  for before the groups open at the node within a place's lifetime: those of the blocks in the
+  node's live window, and more where `GROUP_TTL` outlasts the window.
 
 Neither is penalised, and neither keeps a standing request or a bit of a `DECLARED` peer's interest.
 Without them, a WANT for an index that does not exist kept a standing request that nothing could
@@ -1640,8 +1648,11 @@ frame is answered once, and counted once, against the budget, the stock limit an
 ask of an index that the same frame also probes is handled as that probe, if the probe would pass as
 one (§4.6's cap): the one answer, at the first of the two asks, is the probe's, with its exemptions,
 and the asks between them are handled in their order. A probe that would not pass leaves the plain
-ask as it is, its standing request included. The stock limit holds for the answers `on_want` gives;
-a standing request's answer and a kept probe's are given once each, as before. An ask over the
+ask as it is, its standing request included. A cell asked through both its types in one frame, a
+plain ask in one and a probe that would pass in the other, is one id: it is answered once, and the
+probe's exemption goes with that answer whichever of the two came first. The stock limit holds for
+the answers `on_want` gives; a standing request's answer and a kept probe's are given once each, as
+before. An ask over the
 budget is refused, and a standing request's answer dropped, without penalty; the node does not retry
 a dropped answer, and the asker's wait moves it on (§4.10). The budget starts again at each
 heartbeat. Its bound (§6.3) covers what honest peers ask through one peer in a heartbeat other than
@@ -1942,10 +1953,12 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   member pulls the probed cell from nobody after the verdict, as it pulls no other cell of the row
   once complete. The probe's promise is the deferral window itself, not `protocol.md`'s `PROMISE`
   of 400 ms. A claim counts for nothing in the subnet's view of the row (`known_in_scope`),
-  verified or not; a verified claim ends a member's duty through the deferral instead. The probe is
-  an ask past completion, so until it is settled it is exempt from stop-pull (card 6) and from the
-  one-ask-per-index window; and it counts against the claimant's serving limit like any answer: the
-  draw of the claimant does not look at the limit, so a member that has already pulled `SERVE_LIMIT`
+  verified or not; a verified claim ends a member's duty through the deferral instead. A claim that
+  came on a link that has not joined the row type makes no claimant: it counts as a plain holding
+  until the peer's next holding on a joined link (§4.3). The probe is an ask past completion, so
+  until it is settled it is exempt from stop-pull (card 6) and from the one-ask-per-index window;
+  and it counts against the claimant's serving limit like any answer: the draw of the claimant does
+  not look at the limit, so a member that has already pulled `SERVE_LIMIT`
   chunks from the claimant it draws has its probe refused, and that claimant is judged as one that
   does not answer: it is penalised, the probe having been written, unless its own push of the cell
   comes in time. A client may prefer a claimant it has pulled less from, or keep one ask in
@@ -2062,8 +2075,9 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   stay short. Only they see which cell is missing.
   - *The alarm.* At `ALARM_WAIT` after `known_at`, with a jitter, an honest custodian that still
     lacks a cell of a custody column, one that no peer's holding shows, sends a standing WANT for
-    that cell's row, at the column's index, to a member of the row's subnet among its links. While
-    the cell is missing it asks another member every `ALARM_NEXT`, up to `ALARM_MAX`.
+    that cell's row, at the column's index, to a member of the row's subnet among its links that
+    joined the row type, since another link ignores the WANT (§2). While the cell is missing it asks
+    another member every `ALARM_NEXT`, up to `ALARM_MAX`.
   - *The member.* A member that deferred on a verified claim asks that claimant for the index once,
     with the probe's promise (`DEFER_WINDOW`), started at the ask's write, as the probe's is. A
     broken promise counts against the claimant, and the member rebuilds the row and repairs it as
@@ -3371,7 +3385,7 @@ list of versions, with what each brought and when it was carried, is in
 | evidence | none |
 | wire | `protocol.md` §2's magic strings (`protocol-v2-bindings.md` §4) |
 
-**Three differences in the rules, which no recorded cell exercises.**
+**Five differences in the rules, which no recorded cell exercises.**
 - *A source with an empty mesh.* A source with no mesh peer for the payload offers its chunks to its
   links whose interest holds them, and owes them a refused push (§4.7, `source_pool`); below
   `STRIPE_UPLINK` it also pushes to them, as a column's source does with no relation in the family.
@@ -3391,8 +3405,21 @@ list of versions, with what each brought and when it was carried, is in
 - *An IHAVE entry by id.* On the gossipsub binding this document takes offers as bitmaps only
   (`protocol-v2-bindings.md` §4), where `protocol.md` records a valid structured id in an IHAVE as
   an offer, which can draw an ask under its §4.4's checks. No recorded cell names an id in an IHAVE.
+- *An id asked twice in one frame.* Here it is answered once and charged once against the stock
+  limit of three answers per id (§4.5); `protocol.md`'s `on_iwant` charges each repeat. The recorded
+  cells did not move with it.
+- *A link that has not joined the type.* Here an offer, a WANT, a GRAFT or a PRUNE for an object
+  type the link has not joined is ignored (§2). In this setting every link has joined the payload's
+  type, so no recorded cell has such a link.
 
-The differences the recorded cells do show are in the scheduling (§4.11 to §4.13), which moves
+**One difference in the rules, which a recorded cell shows.** A holding that reports an index the
+peer had reported already frees the window's room of a copy written to it since (§4.3,
+`on_holding`); `protocol.md`'s `on_have` frees it for new bits only, so that room waits for
+`WINDOW_TIMEOUT`. Only a run without cancel (card 8) writes such copies, and of the recorded cells
+`without-a` moves with it: p50 432 to 429 ms, p99 517 to 518 ms, copies 3.99 to 3.97
+(protocol-v2-figures.md, §6.1).
+
+The other differences the recorded cells show are in the scheduling (§4.11 to §4.13), which moves
 times and copies by measured amounts (protocol-v2-figures.md, §6.1).
 
 **The regression.** The toy's fifteen cells are the regression for this setting, recorded for this

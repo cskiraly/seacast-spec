@@ -175,7 +175,9 @@ and where one has a control that must come out the other way, it is named:
   document's own handlers: a cell that names its column group is verified, stored and acknowledged;
   a holding frees the room of S's copy in flight, and so does the same holding again after the copy
   is written again, its bit no longer new; a cell naming an index beyond its header's count is
-  rejected and counted against its sender, without an error. On a link that joined neither, a cell
+  rejected and counted against its sender, without an error, and so is one whose descriptor keeps the
+  header's root with a larger count, as level 1 reads the group's own header. On a link that joined
+  neither, a cell
   is stored and a holding frees the room. A holding that claims a column whole is kept, but makes no
   claimant on the rows-only link; the control, on a link that joined columns, does. No other
   penalty. It fails on the document before the rule.
@@ -189,8 +191,10 @@ and where one has a control that must come out the other way, it is named:
   the same id in one frame, in either order, give one answer with the probe's exemption, and spend
   no budget. With one unit of the group's limit left, plain asks of A and B and a probe of A in one
   frame answer A as the probe and refuse B, and A is written after the asker's holding of it; a
-  standing ask beside a probe that does not pass as one keeps its standing request. No penalty. It
-  fails on the document before the budget.
+  standing ask beside a probe that does not pass as one keeps its standing request. On a rows
+  network, a plain ask of a cell through its column and a probe of it through the node's row in one
+  frame, in either order, give one answer with the probe's exemption, written after the asker's
+  holding of the cell. No penalty. It fails on the document before the budget.
 - `unknown_groups_known.py`: `protocol.md` §8.2's limit of unknown groups per peer, in both
   documents. With the node's `admitted` refusing one group, a HAVE (a holding claiming the group
   whole) and an offer of it leave nothing in `peer_has`, `holders`, `claims`, `offered` or `offers`;
@@ -203,7 +207,9 @@ and where one has a control that must come out the other way, it is named:
   (`MAX_PENDING_GROUPS`), a second unknown group is ignored while a known one is kept, a place frees
   when its group resolves, its lifetime passes (and the asker's standing request goes with it, at
   the next heartbeat or the group's opening, whichever comes first), or the connection closes,
-  which leaves no empty entry. A standing WANT kept at the source
+  which leaves no empty entry. A request another peer's WANT left for an unknown group does not
+  exempt a second peer from its limit, and each peer's place for the group goes at its lifetime
+  with that peer's request. A standing WANT kept at the source
   before its publish is answered by the publish. No penalty. It fails on the document before the
   bounds.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an

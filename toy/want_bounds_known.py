@@ -18,7 +18,11 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
   (`drop_peer`), the asker's places go, with its standing requests and no empty entry left; (h) a second peer's place past its lifetime, with no WANT after it: the
   heartbeat (`release_wanted_groups`) frees it and drops its standing request, leaving no empty entry; (j) the same
   peer's place for another column past its lifetime, the group's first cell arriving before the next heartbeat
-  (`fill`): the opening frees the place first, so the request is not answered;
+  (`fill`): the opening frees the place first, so the request is not answered; (k) two peers and one unknown
+  column: with the second peer's one place taken by another column, the first peer's request for the column, then
+  the second's: the second ignored, as a request kept for a group the node has not opened does not exempt it from
+  the limit; with room, the second's own place; both places past their lifetimes, the heartbeat drops both
+  requests, leaving no entry;
 - (d) with the type's most raised past the count, a routed standing WANT for a column S knows nothing of, at an index
   past its count: kept, with its route mark; then the block runs until S stores the column's cells, and the group's
   opening (`fill`, `drop_wants_beyond`) drops both;
@@ -28,7 +32,8 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
 On the document before the bounds, (a) to (d) and (f) fail. (e) and (g) read the limit's places, which that document
 does not have, so they pass there; they fail on a version of the limit that never freed a place. (h) fails on the
 document before the heartbeat freed places, (j) on the document before a group's opening freed them, and (i) on
-the document before the publish answered standing requests.
+the document before the publish answered standing requests. (k) fails on a version of the limit that exempted a
+group for which the node kept any request.
 """
 import sys
 from pathlib import Path
@@ -137,6 +142,27 @@ def main():
     del ns["GROUP_TTL"]
     line(f"(j) node {q}'s place for column {sim.gcol[gy]}: kept; past its lifetime, the group opening before the "
          f"heartbeat: answers to node {q}", (before, ns["served"][q][gy]), (True, 0))
+    ns["MAX_PENDING_GROUPS"] = 1
+    gz, gw = [g for g in sorted(sim.canonical) if sim.gtype.get(g) == "column" and g not in ns["hdr"]
+              and g not in ns["T_of"] and g not in cols and g != gy][:2]
+    ns["authenticable"] = lambda g: False if g in (gz, gw) else spec_auth(g)   # gates closed, as before the header
+    ns["on_want"](r, [Wm.FlaggedWant(gw, 0, True, 0)])          # r's one place
+    ns["on_want"](q, [Wm.FlaggedWant(gz, 0, True, 0)])          # q's: S now keeps a request for column gz
+    ns["on_want"](r, [Wm.FlaggedWant(gz, 0, True, 0)])          # r, at its limit, names gz too
+    first = (kept(ns, gw, 0, r), kept(ns, gz, 0, q), kept(ns, gz, 0, r))
+    ns["MAX_PENDING_GROUPS"] = 2
+    ns["on_want"](r, [Wm.FlaggedWant(gz, 0, True, 0)])          # with room, r's own place for gz
+    places = (gz in getattr(S, "want_unknown", {}).get(q, {}), gz in getattr(S, "want_unknown", {}).get(r, {}))
+    ns["authenticable"] = spec_auth
+    ns["GROUP_TTL"] = 0.001
+    ns["now"] += 0.01                               # S's clock, past both places' lifetimes
+    ns["on_heartbeat"]()
+    del ns["GROUP_TTL"]
+    line(f"(k) limit 1: node {r} holding a place for column {sim.gcol[gw]}, node {q}'s request for unknown column "
+         f"{sim.gcol[gz]}, then node {r}'s for it: kept (gw by {r}, gz by {q}, gz by {r}); with limit 2, {r}'s again: "
+         f"places of {q} and {r} for gz; past their lifetimes, after the heartbeat: requests of {q} and {r} kept, an "
+         f"entry left", (first, places, (kept(ns, gz, 0, q), kept(ns, gz, 0, r), gz in ns["standing"])),
+         ((True, True, False), (True, True), (False, False, False)))
     ns["MAX_PENDING_GROUPS"] = float("inf")
     if "drop_wants_beyond" not in ns:
         line("(d) the sweep as the group opens (drop_wants_beyond)", "not in the document", "present")

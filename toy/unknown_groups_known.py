@@ -12,9 +12,9 @@ under each document:
 - a HAVE of G (under protocol-v2.md, a holding that claims G whole): nothing in `peer_has` or `holders`, and under
   protocol-v2.md nothing in `claims`;
 - an offer of G (an IHAVE's bitmap; under protocol-v2.md, an offer): nothing in `offered` or `offers`, and no ask;
-- the controls, the same for G2, a group the node admits: each leaves its state;
+- the controls, the same for H, a group the node admits: each leaves its state;
 - penalties: none.
-Under protocol.md, G and G2 are groups no block commits; under protocol-v2.md, two columns of the published block
+Under protocol.md, G and H are groups no block commits; under protocol-v2.md, two columns of the published block
 in the node's custody, not yet open at the node. On the documents before the rule, the HAVE and the offer of G
 leave state.
 """
@@ -61,10 +61,10 @@ def check(doc):
     ns = node.ns
     p = min(q for q in node.peers if q != 1)
     if v2:
-        G, G2 = [g for g in sorted(sim.gcol, key=str) if g not in ns["T_of"]
+        G, H = [g for g in sorted(sim.gcol, key=str) if g not in ns["T_of"]
                  and ns["our_interest_for"](p, g).has(1)][:2]   # in the node's custody: offers of it are kept
     else:
-        G, G2 = bytes([0x35]) * 32, bytes([0x36]) * 32
+        G, H = bytes([0x35]) * 32, bytes([0x36]) * 32
 
     def group_of(x):
         return x.group if hasattr(x, "group") else ns["group"](x)
@@ -93,16 +93,16 @@ def check(doc):
 
     pen0 = node.penalties
     have(G)
-    have(G2)
+    have(H)
     asks = offer(G)
-    offer(G2)
+    offer(H)
     yes = (True,) * (3 if v2 else 2)
     what = "a holding claiming it whole" if v2 else "a HAVE"
     line(f"{doc}: {what} of G, beyond p's unknown groups: in peer_has, holders" + (", claims" if v2 else ""),
          held_state(G), tuple(not x for x in yes))
     line(f"{doc}: an offer of G: in offered, offers; asks", (offer_state(G), asks), ((False, False), []))
-    line(f"{doc}: the controls, G2 admitted: {'the holding' if v2 else 'the HAVE'}'s state; the offer's state",
-         (held_state(G2), offer_state(G2)), (yes, (True, True)))
+    line(f"{doc}: the controls, H admitted: {'the holding' if v2 else 'the HAVE'}'s state; the offer's state",
+         (held_state(H), offer_state(H)), (yes, (True, True)))
     line(f"{doc}: penalties", node.penalties - pen0, 0)
 
 

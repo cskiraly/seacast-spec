@@ -1261,10 +1261,11 @@ class Node:
             COL.name = COL.id = "column"
             COL.index_count = lambda h: h.count          # the blob count
             COL.threshold = lambda h: h.count            # K = N: no code within a column
-            def cell_ok(f, h):                           # level 1 here: the copy's header is its group's, its index within
-                gh = sim.ghdr.get(f.group)               #   the header's count, and its slot the header's (§1); the cell's
-                return (gh is not None and gh.root == h.root and f.index < h.count   # KZG proof, assumed to check
-                        and f.slot == sim.blocks[h.block].slot)   # (honest chunks only, as v0.3's Merkle proof here)
+            def cell_ok(f, h):                           # level 1 here: the copy's header is its group's, whole, its index
+                gh = sim.ghdr.get(f.group)               #   within that header's count, and its slot the header's (§1); the
+                return (gh is not None and getattr(h, "__dict__", None) == vars(gh)   # cell's KZG proof, assumed to
+                        and f.index < gh.count and f.slot == sim.blocks[gh.block].slot)   # check (honest chunks only,
+                                                         #   as v0.3's Merkle proof here)
 
             COL.verify = lambda f, h: ACCEPT if cell_ok(f, h) else REJECT
             COL.decode = lambda fr, h: dict(fr)          # the cells present, if all are; nothing rebuilt within a column
@@ -1315,7 +1316,7 @@ class Node:
                 ROW.name = ROW.id = "row"
                 ROW.index_count = lambda h: h.count      # 128 cells
                 ROW.threshold = lambda h: ns["K"](h)     # 64: any half of a row rebuilds it
-                ROW.verify = COL.verify                  # the same slot check, the KZG proof assumed to check
+                ROW.verify = COL.verify                  # the same level 1 (cell_ok), the KZG proof assumed to check
                 ROW.decode = lambda fr, h: sim.rebuild_row(fr, h)   # recover_cells_and_kzg_proofs, as the source's chunks
                 ROW.header_of = lambda f: f.descriptor
                 ROW.project = COL.project                # the same chunk, the same two groups

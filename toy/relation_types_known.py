@@ -29,13 +29,16 @@ handler as if p had sent it, and S's sends to p are recorded:
     is no longer new: the room freed again;
   - a copy of a column's cell naming an index beyond the header's count: rejected and counted against the sender,
     without an error;
+  - the same, its descriptor keeping the header's root but giving a count one larger: rejected and counted, as
+    level 1 reads the group's own header;
   and from a fourth peer with both JOINs taken back: a cell stored, and its holding freeing the room;
 - (i) a holding of a column group that claims it whole (`claim_all`), from the third peer: kept in `peer_has` with
   its claim, but the peer is not a claimant S would probe (`claims`), as the probe is a WANT that link ignores;
   the control, the same from p, whose link joined columns: a claimant.
 On the document before the rule, (a), (b), (c), (e) and (f) fail; on the documents that tested chunks and holdings
 for the link's types, (h) fails; before a repeated bit freed the room, (h)'s third part fails; before the toy's
-level 1 checked a cell's index, (h)'s fourth part raises; before a claim needed a joined link, (i) fails.
+level 1 checked a cell's index, (h)'s fourth part raises; before it read the index against the group's own header,
+(h)'s fifth part raises; before a claim needed a joined link, (i) fails.
 """
 import copy as C
 import sys
@@ -216,6 +219,21 @@ def main():
         del pen[n_pen:]
         line(f"(h) node {p3}: a copy of a cell of column {sim.gcol[g3]} naming index {bad_cell.index}, beyond the "
              f"header's count: stored, penalties", got, (False, [p3]))
+        g6 = cols[5]                                 # a column of its own: the id above is seen already
+        f6 = src["chunks"][g6][min(src["chunks"][g6])]
+        bad_hdr = C.copy(sim.ghdr[g6])
+        bad_hdr.count += 1                           # the header's root, a count one larger
+        bad_cell = C.copy(f6)
+        bad_cell.descriptor, bad_cell.index = bad_hdr, sim.ghdr[g6].count
+        n_pen = len(pen)
+        try:
+            ns["on_frame"](p3, Wm.Frame(Wm.Entry(chunk=bad_cell)))
+            got = (stored(g6, bad_cell.index), pen[n_pen:])
+        except Exception as e:
+            got = f"{type(e).__name__}: {e}"
+        del pen[n_pen:]
+        line(f"(h) node {p3}: a copy of a cell of column {sim.gcol[g6]} naming index {bad_cell.index}, its descriptor "
+             f"keeping the header's root with a count of {bad_hdr.count}: stored, penalties", got, (False, [p3]))
         g4 = cols[3]
         f4 = src["chunks"][g4][min(src["chunks"][g4])]
         ns["on_frame"](p4, Wm.Frame(Wm.Entry(chunk=f4)))

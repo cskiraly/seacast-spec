@@ -593,8 +593,12 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   only once the link carries an object type of the chunk (§7.1): the group's, or for a cell either
   of its two, since a cell answered in its row can name its column (`protocol-v2.md` §2). Until
   then the rest of the stream waits unread, and the stream credit the receiver granted caps how much
-  of it can arrive (§7.1). A receiver keeps such streams waiting up to a limit of its own, and stops
-  the others (`STOP_SENDING`) without penalty. Two things are open here (§7.9): when a stream still
+  of it can arrive (§7.1). This binding's rule is narrower than §1.1's, which takes a chunk on any
+  link: an honest node sends a chunk only on a link that carries one of its types, as a push, an
+  answer or a probe's answer, or on a connection opened for a fetch, so the rule stops no honest
+  chunk, and a chunk from a link that never joins one of its types waits and is stopped. A
+  receiver keeps such streams waiting up to a limit of its own, and stops the others
+  (`STOP_SENDING`) without penalty. Two things are open here (§7.9): when a stream still
   waiting is discarded, and how much of the connection's receive credit a receiver keeps for the
   control stream, so that the JOIN can still arrive while chunk streams wait. On a connection opened
   for a fetch, the client reads the answer without a JOIN. The server opens its control stream first
