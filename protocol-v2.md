@@ -539,6 +539,10 @@ Offered, such a chunk would draw asks that the node does not answer, and an aske
 break against an honest node. The sampler's `sample`, `resample` and `ask_sample` check it (§4.10),
 so a draw or a retry after the expiry makes no park, interest or WANT again. Reading a missing entry
 allocates nothing; the admission checks of `protocol.md` §8.2 and the limits of §6.3 come first. A
+group with no entry in `interest` reads as the node's own interest in it, from what it declared:
+every index under `ALL`, its derived interest under `DERIVED` (every index of a column it
+custodies, or of its own subnet's row, and none of another), the cells it asked for under
+`DECLARED`, and, for a supernode, every row besides (§4.6, the second phase). A
 node may hold state for a group it has no interest in, when it holds chunks of it or a peer's
 interest names it (a reconstructor's non-custodied columns, R4); the number of such groups per slot
 is bounded (§6.3).
