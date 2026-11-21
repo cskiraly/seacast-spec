@@ -1156,7 +1156,7 @@ the setting trades is the source's own:
   nodes (40 asks against 45, the medians within 4 ms). A fast source can gain where its peers pull
   chunks from it while its uplink has room: the draft's 1 Gbps proposer of many column groups
   completes 44 ms sooner at 60 nodes and 9 ms sooner at 500 when it offers at publish, and its
-  50 Mbps proposer 26 ms later at 500 (`protocol-v2.md` §4.7).
+  50 Mbps proposer 26 ms later at 500 (`protocol-v2-figures.md`, §4.7).
 - *Its privacy.* Every chunk announced at once, by the one node that holds them all, names the
   source to its mesh, and the paced HAVE [P4] then hides nothing from it. A source that wants P4's
   cover announces at the acknowledgement.

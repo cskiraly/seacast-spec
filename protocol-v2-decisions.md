@@ -20,7 +20,7 @@ states.
 | `[D3]` two claims (decided, as written) | §2 `Have`, §1.5, §4.6 |
 | `[D4]` repair's parameters (decided: EIP-8371's phases, rebuilt cells pushed to the custodians lacking them, `DEFER_WINDOW` 1 s, `REPAIR_BUDGET` an option, off; the repair floor at least one link to a custodian of each column) | `TypeParams.DECODE_AT_K`, `DECODE_LATER`, `REPAIR_TO`, `DEFER_WINDOW`; §6.3's `REPAIR_SAMPLE`, `REBUILT_SEEN`, `ALARM_WAIT`; §4.6 `check_completion`, `reconsider`, `push_rebuilt` |
 | `[D5]` the announce relation's width (decided: `ALL_JOINED` for columns and rows; `NONE` permitted for columns, never for rows) | `TypeParams.ANNOUNCE_EXTRA`, §4.4 `announce_extra`, §4.8 `send_gossip` |
-| `[D6]` the payload's consistency route (decided: none in this version; the `EVIDENCE` hook stays) | `TypeParams.EVIDENCE`, §4.6 `decode_group`, the payload's leaf rule in §1.1's table |
+| `[D6]` the payload's consistency route (decided: none in this version; the `EVIDENCE` hook stays) | `TypeParams.EVIDENCE`, §4.6 `decode_group`, the payload's leaf rule (`protocol.md` §1's commitment, which §1.1's `verify` checks) |
 | `[D7]` groups per column and per row, cross-fill (decided, as written) | `ObjectType.project`, `family`, §4.2 `on_validated`, §4.4 `forward` |
 | `[D8]` the row pull delay (decided: 1 s; shorter at a cost under liars) | `TypeParams.START_DELAY`, §4.3 `on_offer` |
 | `[D9]` one document or a sibling (decided: a sibling) | `protocol-v2.md`; §6.1 is the merge path |
@@ -310,9 +310,10 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). EVIDENCE is reserved
   there, as a full message on the rendezvous topic, as it is on the libp2p stream binding.
 - **A cell group's header in three forms** (§1.6 there): from the block, in every cell, or in a
-  message of its own. Each object type's definition fixes one form, never mixed on one topic, and
-  the same three are open on every binding. Not taken: one form for every object type, since whether
-  a block comes before its cells differs between applications.
+  message of its own. Each object type's definition fixes one form, never mixed on one topic. The
+  same three are open on the libp2p stream, Waggle and gossipsub bindings; the partial-messages
+  binding carries form (b), by the partial columns' own rule. Not taken: one form for every object
+  type, since whether a block comes before its cells differs between applications.
 
 ## The versions of `protocol.md` carried
 
