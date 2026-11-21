@@ -1332,17 +1332,17 @@ more need be pushed or offered to it (`complete`). A claim of the whole group ca
 node's own decode duties (`note_claim`, §4.6), if the link has joined the group's type: the probe
 that checks the claim is a WANT, which a link that has not joined the type ignores (§2). On a link
 that has not, the claim is kept as a plain holding: its bits and its `claim_all` go into `peer_has`,
-as any holding's do (so the peer may be asked for any index, `may_be_asked`), and the peer is no
-claimant (`claims`). The subnet's view of the row then counts its bits if it is in the suppression
-scope (`known_in_scope`), and the repair sample may draw it under the sample's own conditions
-(`ask_custodian`). The peer becomes a claimant only at a holding that claims the group whole and
-comes on a link that has joined the type. For each index the peer newly holds, the node
-counts the peer as a holder (card 9), frees the window's room taken by any copy it sent the peer at
-that index (card 14, §4.11), and, for a group it publishes, takes it as the chunk's acknowledgement
-(`origin_acked`, §4.7), which acts once per chunk and does nothing at `SOURCE_OFFERS = PUBLISH`. An
-index the peer held already frees the window's room too: a copy can be written to a peer that holds
-it (a probe's answer whatever the peer holds, §4.6, and any copy without cancel, card 8), and its
-acknowledgement repeats the bit.
+as any holding's do (so, once the link has joined the type, the peer may be asked for any index,
+`may_be_asked`), and the peer is no claimant (`claims`). The subnet's view of the row then counts
+its bits if it is in the suppression scope (`known_in_scope`), and the repair sample may draw it
+under the sample's own conditions (`ask_custodian`). The peer becomes a claimant only at a holding
+that claims the group whole and comes on a link that has joined the type. For each index the peer
+newly holds, the node counts the peer as a holder (card 9), frees the window's room taken by any
+copy it sent the peer at that index (card 14, §4.11), and, for a group it publishes, takes it as the
+chunk's acknowledgement (`origin_acked`, §4.7), which acts once per chunk and does nothing at
+`SOURCE_OFFERS = PUBLISH`. An index the peer held already frees the window's room too: a copy can
+be written to a peer that holds it (a probe's answer whatever the peer holds, §4.6, and any copy
+without cancel, card 8), and its acknowledgement repeats the bit.
 
 **An offer** (`on_offer`) plays the role of `protocol.md` §4.4's IHAVE over one group's bitmap. An
 offer of an expired group is ignored, and one beyond a holding's limits is ignored and counts
@@ -1651,11 +1651,12 @@ ask of an index that the same frame also probes is handled as that probe, if the
 one (§4.6's cap): the one answer, at the first of the two asks, is the probe's, with its exemptions,
 and the asks between them are handled in their order. A probe that would not pass leaves the plain
 ask as it is, its standing request included. A cell asked through both its types in one frame, a
-plain ask in one and a probe that would pass in the other, is one id: it is answered once, and
-charged as the first of the two asks is, against its own group's `SERVE_LIMIT` and, for a plain ask,
-the budget. The probe's exemption goes with that answer whichever of the two came first, unless the
-probe's group has reached `SERVE_LIMIT` when the probe is read (an ask between the two can take the
-last answer): the probe is then refused at the limit, as any probe there is (§4.6). The stock limit
+plain ask in one and a probe that would pass in the other, is one id and is answered once. The ask
+that gives the answer is charged for it: the first of the two that is not refused, against its own
+group's `SERVE_LIMIT` and, if it is a plain ask not on the node's offer, the budget. A probe read
+after a plain ask gave the answer takes the probe's exemption for that answer, unless the probe's
+group has reached `SERVE_LIMIT` by then (an ask between the two can take the last answer): the
+probe is then refused at the limit, as any probe there is (§4.6). The stock limit
 holds for the answers `on_want` gives; a standing request's answer and a kept probe's are given once
 each, as before. An ask over the
 budget is refused, and a standing request's answer dropped, without penalty; the node does not retry
