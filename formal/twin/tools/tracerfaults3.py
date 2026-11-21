@@ -387,6 +387,15 @@ def early_install_v2(toy):
         return _install(self, nd, ns)
 
     T.Tracer3.install = install
+    _repoint = T.Tracer3.repoint_aliases
+
+    @functools.wraps(_repoint)
+    def repoint_aliases(self, nd, ns):  # the whole hook at the end of construction skipped: its re-pointing too
+        if id(nd) in early:
+            return None
+        return _repoint(self, nd, ns)
+
+    T.Tracer3.repoint_aliases = repoint_aliases
     _over = N.Node._override
 
     def _override(self, ns):
@@ -405,6 +414,46 @@ def raw_alias_v2():
         PLANTED[0] += 1
 
     T.Tracer3.repoint_aliases = repoint_aliases
+
+
+def raw_chunk_id_v2():
+    """Under v2: `hdr` re-pointed, `chunk_id` left as the toy bound it (the toy's message_id, not the installed one).
+    The names' check at the nodes line must stop it at `chunk_id`, `hdr`'s check having passed."""
+    def repoint_aliases(self, nd, ns):
+        ns["hdr"] = ns["desc"]
+        PLANTED[0] += 1
+
+    T.Tracer3.repoint_aliases = repoint_aliases
+
+
+def before_install_v2(plant):
+    """Run `plant(ns)` on the node's namespace just before the tracer installs itself (under v2, at the end of the
+    node's construction)."""
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        plant(ns)
+        PLANTED[0] += 1
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+
+
+def hdr_other_v2():
+    """Under v2: `hdr` bound, before the install, to another object than the toy's `desc` (a copy of it). Re-pointing
+    it would hide that; the check before the re-pointing must stop it."""
+    def plant(ns):
+        ns["hdr"] = dict(ns["desc"])
+    before_install_v2(plant)
+
+
+def alias_missing_v2():
+    """Under v2: `chunk_id` taken out of the namespace before the install. The check before the re-pointing must stop
+    it (a missing alias is not left alone)."""
+    def plant(ns):
+        del ns["chunk_id"]
+    before_install_v2(plant)
 
 
 def unscanned_layer_v2(toy):
@@ -583,7 +632,8 @@ def suppressed_entry_v2(toy, off):
 FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "--pending-twice", "--alias-start",
           "--alias-message", "--defer-chain", "--replaced", "--false-wrapper", "--stale-id", "--level1-in-cell",
           "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
-          "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2")
+          "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2", "--raw-chunk-id-v2",
+          "--hdr-other-v2", "--alias-missing-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off")
@@ -606,6 +656,12 @@ def main(argv):
             other_node_v2()
         elif fault == "--unscanned-layer-v2":
             unscanned_layer_v2(rest[0])
+        elif fault == "--raw-chunk-id-v2":
+            raw_chunk_id_v2()
+        elif fault == "--hdr-other-v2":
+            hdr_other_v2()
+        elif fault == "--alias-missing-v2":
+            alias_missing_v2()
         elif fault.startswith("--bare-in-question-v2"):
             bare_in_question_v2(per_node=fault.endswith("-per-node"))
         else:

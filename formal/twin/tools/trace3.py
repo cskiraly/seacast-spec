@@ -752,13 +752,18 @@ class Tracer3(Tracer):
         """Under v2, after the install at the end of construction: two names the toy bound to the raw
         objects before the install are pointed at the installed ones, `hdr` at the view of `desc` (`_v2`'s
         `hdr=ns["desc"]`) and `chunk_id` at the installed `message_id` (`_v2` binds the toy's `message_id` wrapper
-        to it), and the identities are checked: a raw `hdr` would make every `hdr[g]` read unlogged."""
-        if "hdr" in ns:
-            ns["hdr"] = ns["desc"]
-        if "chunk_id" in ns:
-            ns["chunk_id"] = ns["message_id"]
+        to it), and the identities are checked: a raw `hdr` would make every `hdr[g]` read unlogged. Before the
+        re-pointing, each alias must be there and bound as the toy binds it (`hdr` the raw `desc` object, `chunk_id`
+        the toy's `message_id`, the function the tracer's wrapper of it holds): an alias bound to anything else was
+        bound by something else, and is refused, not overwritten."""
         for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
-            if alias in ns and ns[alias] is not ns[name]:
+            raw = F.unwrap(ns[name]) if alias == "hdr" else getattr(ns.get(name), "__wrapped__", None)
+            if alias not in ns:
+                raise SystemExit(f"trace3: node {nd.id}: {alias} is missing under v2")
+            if ns[alias] is not raw:
+                raise SystemExit(f"trace3: node {nd.id}: {alias} is not the toy's {name} before the install")
+            ns[alias] = ns[name]
+            if ns[alias] is not ns[name]:
                 raise SystemExit(f"trace3: node {nd.id}: {alias} is not the installed {name}")
 
     def final_check(self):
@@ -774,9 +779,9 @@ class Tracer3(Tracer):
         must be the tracer's own wrapper, no listed wrapper over it (one there means an install before the toy's
         bindings), and the two aliases must still be the installed objects (`repoint_aliases`)."""
         for nd, ns, bound in self.bound:
-            if self.doc_v2:
+            if self.doc_v2:                     # both aliases there and still the installed objects
                 for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
-                    if alias in ns and ns[alias] is not ns[name]:
+                    if alias not in ns or ns[alias] is not ns[name]:
                         raise SystemExit(f"trace3: node {nd.id}: {alias} is not the installed {name}")
             for name, w in bound.items():
                 now = ns.get(name)
@@ -1300,7 +1305,8 @@ class Tracer3(Tracer):
                           and c.cell_contents.__code__.co_name == "message_id")
         self.doc_mid[int(nd.id)] = mid_fn
         rec = F.Recorder()
-        F.install(rec, ns, [t for t in self.schema(ns) if not (self.doc_v2 and t.name in WINDOW)])
+        views = [t for t in self.schema(ns) if not (self.doc_v2 and t.name in WINDOW)]
+        F.install(rec, ns, views)
         window = {} if self.doc_v2 else {name: ns[name] for name in WINDOW}    # the installed cell and views: each
         #                                                                         record's end checks they are still there
         st = self.vst if self.doc_v2 else {"depth": 0, "ext": 0, "cur": None}
@@ -1312,7 +1318,10 @@ class Tracer3(Tracer):
                 if tr.doc_v2 and (st["supp"] or (st["depth"] and st["node"] != int(nd.id))):
                     if st["supp"] or st["ext"]:     # inside a question at another node, or inside a replaced name
                         tr.bare[f"{nd.id} {name}"] += 1     # entered outside any record: bare, and counted
-                        return fn(*args, **kw)
+                        r = fn(*args, **kw)
+                        if name == "message_id":    # m2_check there too, as in any other bare call
+                            tr.m2_check(args[0], r, nd.id)
+                        return r
                     raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record is "
                                      f"open and no question runs")
                 if st["ext"]:                       # inside an interface call: not §6.1's own call
@@ -1573,9 +1582,13 @@ class Tracer3(Tracer):
             raise SystemExit("trace3: the replaceable names' encoders are not REPLACEABLE's")
         for name in tr.traced:
             ns[name] = iface(name, ns[name], replaced_enc[name]) if name in replaced else sec61(name, ns[name])
-        tr.bound.append((nd, ns, {name: ns[name] for name in tr.traced}))      # for final_check
         for name, e in enc.items():
             ns[name] = iface(name, ns[name], e)
+        slots = {name: ns[name] for name in tr.traced}          # for final_check: the traced names; under v2,
+        if tr.doc_v2:                                           #   where the install is the namespace's last
+            slots.update({name: ns[name] for name in enc})      #   binding, every installed slot (the tape
+            slots.update({t.name: ns[t.name] for t in views})   #   names and the views) too
+        tr.bound.append((nd, ns, slots))
 
 
 class GossipQuestion:
@@ -1664,8 +1677,13 @@ def main(argv):
     import run                          # noqa: E402: the toy's run.py, from TOYDIR
     try:
         run.main(rest)
-    finally:
-        tr.close()
+    except BaseException:               # a stop (or any error) in flight: close the trace, but a later check at the
+        try:                            #   close must not replace the first reason, which is the one raised
+            tr.close()
+        except SystemExit as later:
+            print(f"trace3: (at the close, after the stop above) {later}", file=sys.stderr)
+        raise
+    tr.close()
     print(f"trace3: {sum(tr.counts.values())} records, {dict(sorted(tr.counts.items()))}", file=sys.stderr)
 
 

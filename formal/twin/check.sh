@@ -726,8 +726,11 @@ s_tracercontrols() {
   else no "the tracer stopped on an unlogged assignment for another reason (c-unlogged.err)"; fi
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2; do
     case $f in
+      raw-chunk-id-v2) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
+      hdr-other-v2) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
+      alias-missing-v2) want="^trace3: node [0-9]*: chunk_id is missing under v2" ;;
       unscanned-layer-v2) want="^trace3: node [0-9]*: on_frame is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.on_frame \(node\.py:2\)" ;;
       early-install-v2) want="^trace3: node [0-9]*: promise_due was bound again after the tracer was installed, which under v2 must be the namespace's last binding: Node\._v2\.<locals>\.promise_due" ;;
       raw-alias-v2) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
@@ -755,8 +758,8 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 20 ] || no "not 20 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 20 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 23 ] || no "not 23 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 23 planted faults stop the tracer with their own words"
   # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
