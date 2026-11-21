@@ -2238,7 +2238,7 @@ fingerprint definition Refine.Ask.World.noConfusionType : 1972120583 2314692525
 fingerprint definition Refine.Ask.World.push : 3291377923 1722934925
 fingerprint definition Refine.Ask.World.recOn : 3962436978 2579647597
 fingerprint definition Refine.Ask.World.st : 1387758646 552212811
-fingerprint definition Refine.Ask.World.st._default : 734558010 1494565972
+fingerprint definition Refine.Ask.World.st._default : 734558010 3771115667
 fingerprint definition Refine.Ask.World.timers : 3047342305 3629616932
 fingerprint definition Refine.Ask.World.timers._default : 2598820738 2945939570
 fingerprint definition Refine.Ask.alpha : 3351233345 1260750114
@@ -2286,7 +2286,7 @@ fingerprint definition Refine.Ask.retryArmedP.match_4 : 2545649084 3216673842
 fingerprint definition Refine.Ask.retryFire : 1041952349 402272187
 fingerprint definition Refine.Ask.run : 761291896 3409781018
 fingerprint definition Refine.Ask.stopP : 949096890 4290301617
-fingerprint definition Refine.Ask.threeAnn : 840518160 3067645546
+fingerprint definition Refine.Ask.threeAnn : 840518160 1471798047
 fingerprint definition Refine.Ask.tiedP : 1606262045 2124318667
 fingerprint definition Refine.Ask.tiedP.match_1 : 2905842104 3480120348
 fingerprint definition Refine.Ask.tiedP.match_3 : 108034822 2597909489

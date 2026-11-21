@@ -4203,7 +4203,7 @@ fingerprint statement Refine.Carry.control_start : 1276033131
 fingerprint statement Refine.Carry.covered_keeps_window : 2721824688
 fingerprint statement Refine.Carry.covered_preserves : 2680549103
 fingerprint statement Refine.Carry.covered_run_keeps_work : 3609428293
-fingerprint statement Refine.Carry.empty_is_init : 1797430559
+fingerprint statement Refine.Carry.empty_is_init : 1098381547
 fingerprint statement Refine.Carry.held_last_open_breaks_window_retry : 1072282744
 fingerprint statement Refine.Carry.idleButPromises_of_empty : 1816332951
 fingerprint statement Refine.Carry.idleState_invariants : 3166637346
@@ -4369,10 +4369,10 @@ fingerprint definition Refine.Carry.n0 : 1157460454 1172186728
 fingerprint definition Refine.Carry.parkedWorld : 3478904157 2359743029
 fingerprint definition Refine.Carry.promState : 2891830844 746488015
 fingerprint definition Refine.Carry.promiseFire : 4017565922 811577998
-fingerprint definition Refine.Carry.promisedOne : 840518160 296967862
-fingerprint definition Refine.Carry.quietHeld : 840518160 1062946977
+fingerprint definition Refine.Carry.promisedOne : 840518160 2104425075
+fingerprint definition Refine.Carry.quietHeld : 840518160 1202280719
 fingerprint definition Refine.Carry.rOn : 1455053208 829348486
-fingerprint definition Refine.Carry.stalledStart : 840518160 205844534
+fingerprint definition Refine.Carry.stalledStart : 840518160 1413544413
 fingerprint definition Refine.Carry.withBlocks : 672814338 1393218655
 fingerprint inductive Refine.Carry.Cfg : 2301245127
 fingerprint constructor Refine.Carry.Cfg.mk : 2175270735
