@@ -354,18 +354,248 @@ def level1_in_cell():
     before_install(wrap)
 
 
+TR = []                                 # the run's tracer, once made (tracer_instance)
+
+
+def tracer_instance():
+    """Keep the run's tracer in TR: the v2 faults reach other nodes' namespaces and the shared depth through it."""
+    _init = T.Tracer3.__init__
+
+    @functools.wraps(_init)
+    def init(self, *a, **kw):
+        _init(self, *a, **kw)
+        TR.append(self)
+
+    T.Tracer3.__init__ = init
+
+
+def early_install_v2(toy):
+    """Under v2: the tracer installed where protocol.md has it, inside `Node._override`, before `_v2` and the options'
+    bindings, and the install at the end of construction skipped. `_v2` then binds its `promise_due` over the tracer's
+    wrapper, a listed wrapper that protocol.md's reading accepts. Under v2 the install is the namespace's last binding:
+    the names' check at the nodes line must stop it."""
+    sys.path.insert(0, str(Path(toy).resolve()))
+    import node as N                    # noqa: E402: the pinned toy's
+    tracer_instance()
+    _install = T.Tracer3.install
+    early = set()
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        if id(nd) in early:             # the hook at the end of construction: installed already, inside _override
+            return None
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+    _over = N.Node._override
+
+    def _override(self, ns):
+        _over(self, ns)
+        TR[0].install(self, ns)
+        early.add(id(self))
+        PLANTED[0] += 1
+
+    N.Node._override = _override
+
+
+def raw_alias_v2():
+    """Under v2: the aliases `hdr` and `chunk_id` left as the toy bound them, to the raw objects of before the
+    install. The names' check at the nodes line must stop it: a raw `hdr` makes every `hdr[g]` read unlogged."""
+    def repoint_aliases(self, nd, ns):
+        PLANTED[0] += 1
+
+    T.Tracer3.repoint_aliases = repoint_aliases
+
+
+def other_node_v2():
+    """Under v2: at the first table read inside a record at node a, outside any question, node c's traced `N` is
+    called. The tracer must stop before the call runs (its argument, None, is never reached)."""
+    tracer_instance()
+    nss = {}
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        r = _install(self, nd, ns)
+        nss[int(nd.id)] = ns
+        return r
+
+    T.Tracer3.install = install
+    _read = F.Recorder.read
+
+    @functools.wraps(_read)
+    def read(self, t, p):
+        st = TR[0].vst if TR else None
+        if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"]:
+            c = next((i for i in sorted(nss) if i != st["node"]), None)
+            if c is not None:
+                PLANTED[0] += 1
+                nss[c]["N"](None)
+        return _read(self, t, p)
+
+    F.Recorder.read = read
+
+
+SEEN = {}                               # the v2 plants' observations, printed on the fault's line
+
+
+def watch_records(inside):
+    """Count the records written while `inside()` names a (node, name) pair: a record of that name at that node."""
+    _write = T.Tracer3.write
+
+    @functools.wraps(_write)
+    def write(self, rec):
+        at = inside()
+        if at and isinstance(rec, dict) and rec.get("fn") == at[1] and int(rec.get("n", -1)) == at[0]:
+            SEEN["records inside"] = SEEN.get("records inside", 0) + 1
+        return _write(self, rec)
+
+    T.Tracer3.write = write
+
+
+def bare_in_question_v2(per_node):
+    """Under v2: a question at node a (`peer_id_bytes`, its function replaced before the install by a layer of this
+    tool's own, which the tracer then wraps as the question) calls node c's traced `N` with one of node c's
+    descriptors, once. The tracer-wide depth makes that call bare at node c: no record there, a count `"c N"` in the
+    run's bare counts, and the trace's body that of the run without the plant. With `per_node`, each install gets a
+    depth state of its own (today's per-node depth, the planted fault): a record of `N` at node c starts inside node
+    a's question."""
+    tracer_instance()
+    nss, at = {}, [None]
+    watch_records(lambda: at[0])
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        if per_node:
+            self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0}
+        st, a = self.vst, int(nd.id)
+        nss[a] = ns
+        doc = ns["peer_id_bytes"]
+
+        def peer_id_bytes(p):
+            if not PLANTED[0] and st["depth"] and st["ext"]:
+                c = next((i for i in sorted(nss) if i != a and F.unwrap(nss[i]["desc"])), None)
+                if c is not None:
+                    PLANTED[0] += 1
+                    SEEN["node a, node c"] = f"{a}, {c}"
+                    at[0] = (c, "N")
+                    try:
+                        nss[c]["N"](next(iter(F.unwrap(nss[c]["desc"]).values())))
+                    finally:
+                        at[0] = None
+                    SEEN["bare c N"] = TR[0].bare.get(f"{c} N", 0)
+            return doc(p)
+        ns["peer_id_bytes"] = peer_id_bytes
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+
+
+class Planted(Exception):
+    """The exception the suppressed-entry plant raises inside the replaced name, and catches outside it."""
+
+
+def suppressed_entry_v2(toy, off):
+    """Under v2, hand5-own's arguments: at the node whose `on_iwant` is replaced (the silent node), a call of it from
+    outside any record (from the toy's `Node._write`, which the simulator calls at depth 0). A layer of this tool's own,
+    bound before the install and live for that call alone, calls the same node's traced `N` and raises `Planted`, which
+    the call's site catches. The tracer must suppress records inside the entry (no record of `N`, a count `"s N"`), and
+    restore its state on the raise (`supp` 0 at the catch). With `off`, the layer clears the suppression for its call
+    of `N` (depth 0 there, the planted fault): a record of `N` starts inside the replaced name."""
+    sys.path.insert(0, str(Path(toy).resolve()))
+    import node as N                    # noqa: E402: the pinned toy's
+    tracer_instance()
+    live, at, silent = [False], [None], {}
+    watch_records(lambda: at[0])
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        fn = ns["on_iwant"]
+        if getattr(getattr(fn, "__code__", None), "co_filename", None) != T.DOC_FILE:  # the node's own: replaced
+            s = int(nd.id)
+            silent[s] = ns
+            st = self.vst
+
+            def on_iwant(*a, **kw):
+                if live[0]:
+                    live[0] = False
+                    d = next(iter(F.unwrap(ns["desc"]).values()))
+                    at[0] = (s, "N")
+                    try:
+                        if off:
+                            saved, st["supp"] = st["supp"], 0
+                            try:
+                                ns["N"](d)
+                            finally:
+                                st["supp"] = saved
+                        else:
+                            ns["N"](d)
+                    finally:
+                        at[0] = None
+                    raise Planted()
+                return fn(*a, **kw)
+            ns["on_iwant"] = on_iwant
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+    _w = N.Node._write
+
+    def _write(self, p):
+        st = TR[0].vst if TR else None
+        if (not PLANTED[0] and int(self.id) in silent and st and not st["depth"] and not st["supp"]
+                and F.unwrap(self.ns["desc"])):
+            PLANTED[0] += 1
+            live[0] = True
+            try:
+                self.ns["on_iwant"](p, None)
+            except Planted:
+                pass
+            SEEN["node s"] = int(self.id)
+            SEEN["supp after the raise"] = st["supp"]
+            SEEN["bare s N"] = TR[0].bare.get(f"{int(self.id)} N", 0)
+        return _w(self, p)
+
+    N.Node._write = _write
+
+
 FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "--pending-twice", "--alias-start",
           "--alias-message", "--defer-chain", "--replaced", "--false-wrapper", "--stale-id", "--level1-in-cell",
-          "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction")
+          "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
+          "--early-install-v2", "--raw-alias-v2", "--other-node-v2")
+# the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
+PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
+          "--suppressed-entry-v2-off")
 HAND5 = ["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
+HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
 
 def main(argv):
-    if len(argv) < 3 or argv[0] not in FAULTS:
-        print(f"usage: tracerfaults3.py {'|'.join(FAULTS)} TOYDIR OUT.jsonl.gz [directed42.py's arguments ...]",
+    if len(argv) < 3 or argv[0] not in FAULTS + PLANTS:
+        print(f"usage: tracerfaults3.py {'|'.join(FAULTS + PLANTS)} TOYDIR OUT.jsonl.gz [directed42.py's arguments ...]",
               file=sys.stderr)
         return 2
     fault, rest = argv[0], argv[1:]
+    if fault.endswith("-v2") or "-v2-" in fault:    # under v2: trace3.py's own run of hand5 (or hand5-own)
+        if fault == "--early-install-v2":
+            early_install_v2(rest[0])
+        elif fault == "--raw-alias-v2":
+            raw_alias_v2()
+        elif fault == "--other-node-v2":
+            other_node_v2()
+        elif fault.startswith("--bare-in-question-v2"):
+            bare_in_question_v2(per_node=fault.endswith("-per-node"))
+        else:
+            suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
+        args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") else HAND5
+        try:
+            T.main([rest[0], rest[1], *args, "--doc", "v2"])
+        finally:
+            seen = "".join(f"; {k}: {v}" for k, v in SEEN.items())
+            print(f"tracerfaults3: {fault[2:]}, planted {PLANTED[0]} time{'s' if PLANTED[0] != 1 else ''}{seen}",
+                  file=sys.stderr)
+        return 0
     if fault == "--made-rows-off":
         made_rows_off()
     elif fault == "--alias":

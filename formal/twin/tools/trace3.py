@@ -744,12 +744,26 @@ class Tracer3(Tracer):
         be the tracer's own wrapper at that node, or a listed wrapper that holds it: anything else runs outside the
         records, unseen where no record calls it and another function's where one does. The names on the tape are
         not held so: a question rebound later is missing from a tape, which the replay refuses, and under v2 the toy
-        rebinds several that no kept function asks."""
+        rebinds several that no kept function asks.
+
+        Under v2 the install is at the end of the node's construction, the namespace's last binding: a traced name
+        must be the tracer's own wrapper, no listed wrapper over it (one there means an install before the toy's
+        bindings), and the two aliases must still be the installed objects (`repoint_aliases`)."""
         for nd, ns, bound in self.bound:
+            if self.doc_v2:
+                for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
+                    if alias in ns and ns[alias] is not ns[name]:
+                        raise SystemExit(f"trace3: node {nd.id}: {alias} is not the installed {name}")
             for name, w in bound.items():
                 now = ns.get(name)
                 if now is w:
                     continue
+                if self.doc_v2:
+                    code = getattr(now, "__code__", None)
+                    where = (f"{getattr(now, '__qualname__', '?')} ({Path(code.co_filename).name}:{code.co_firstlineno})"
+                             if code is not None else repr(now))
+                    raise SystemExit(f"trace3: node {nd.id}: {name} was bound again after the tracer was installed, "
+                                     f"which under v2 must be the namespace's last binding: {where}")
                 held = []
                 for cell in getattr(now, "__closure__", None) or ():
                     try:
