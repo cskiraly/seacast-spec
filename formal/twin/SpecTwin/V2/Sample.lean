@@ -48,6 +48,8 @@ def pick (p : Peer) (ks : List Nat) : M2 m Nat := do
   if !(← read).base.c.RAREST then                             -- `return ks[0]`
     let some k := ks.head? | crash "IndexError: list index out of range (pick: ks[0])"
     return k
+  -- `min` of no places raises before its key reads anything
+  if ks.isEmpty then crash "ValueError: min() iterable argument is empty (pick)"
   let normal := (← lane? p .normal).getD []
   -- `min(ks, key=lambda k: (len(holders[q.normal[k].chunk.group][q.normal[k].chunk.index]), k))`
   let mut best : Option (Nat × Nat) := none

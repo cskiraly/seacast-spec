@@ -105,6 +105,11 @@ def pushRebuilt (g : Group) (new : List Nat) : M2 m Unit := do
           branch "push_rebuilt: a push refused, owed"
       branch "push_rebuilt: a peer short"
 
+/-- A call `push_rebuilt(g, new)` as the node binds the name: the node's own where its line names it as
+replaced, a question (design §1.4), else the document's -/
+def pushRebuiltCall (g : Group) (new : List Nat) : M2 m Unit := do
+  if (← read).base.replaced.contains "push_rebuilt" then NodeV2.pushRebuiltNode g new else pushRebuilt g new
+
 /-- `fill(g, i, f, p)` (§4.2, main's text): chunk i of g is ours, from peer p, or from our own decode where p is
 none (R4) -/
 def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
@@ -122,7 +127,7 @@ def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
   let dup ← if (← receivedBits g).has i then pure true else do pure ((← rebuiltBits g).has i)
   if dup then
     probeAnswer g i p                                         -- (R5) a duplicate from the claimant passes too
-    if let some q := p then sendHave q g
+    if let some q := p then sendHaveCall q g
     branch "fill: held before"
     return
   store g i f
@@ -133,7 +138,7 @@ def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
   let kept ← probePromise g i                                 -- (R5) another peer's copy leaves it open
   v1 (closePromises g i none)                                 -- [c5] the chunk arrived, from anyone
   if let some ((a, q), t) := kept then setPromise a q t       -- `promises[kept[0]] = kept[1]`
-  serveStanding g i                                           -- WANTs that preceded it are answered now
+  serveStandingCall g i                                       -- WANTs that preceded it are answered now
   serveWaitingProbe g i                                       -- (R5) and a probe that reached us while we decoded
   let claim := !(← mineBits g).has i                          -- not yet claimed
   if claim then setMine g ((← mineBits g).set i)              -- [c7] only chunks that passed level 1
@@ -143,10 +148,10 @@ def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
     let scope ← suppressionScope g
     let union := scope ++ ack.filter (!scope.contains ·)
     for q in ← NodeV2.order "fill" union do
-      sendHave q g                                            -- [c7] the holding to our pushers, [c14] the ack
+      sendHaveCall q g                                        -- [c7] the holding to our pushers, [c14] the ack
     branch "fill: stored and claimed"
   else
-    for q in ack do sendHave q g                              -- `ack`, a plain set of one peer or none
+    for q in ack do sendHaveCall q g                          -- `ack`, a plain set of one peer or none
     branch "fill: stored, claimed before"
 
 /-- `arm(g, at)` (§4.6): a decode duty that fires unless the group fills first -/
@@ -179,7 +184,7 @@ def checkCompletion (g : Group) : M2 m Unit := do
     if let some later := (← NodeV2.decodeLater T g) then      -- a later duty, if still short then [D4]
       arm g (((← knownAt? g).getD 0.0) + later)               -- `known_at[g] + later`
   for q in ← NodeV2.order "check_completion" (← suppressionScope g) do
-    sendHave q g                                              -- complete; and claim_all when decoding
+    sendHaveCall q g                                          -- complete; and claim_all when decoding
   closePromisesOfGroup g                                      -- [c5] nobody owes us chunks of this group
   if (← state? g) == some .decoding then
     start "decode_group" g                                    -- level 2, off the chunk path
@@ -196,8 +201,9 @@ def deferOnClaim (g : Group) : M2 m Unit := do
   setDutyAt g ((← reconsiderAt? g).getD now)                  -- `duty_at[g] = reconsider_at.get(g, now)`
   -- `[i for i in range(T.index_count(hdr[g])) if not mine[g].has(i)]`
   let n ← NodeV2.indexCount T (← desc g)
-  let mine ← mineBits g
-  let lack := (List.range n).filter (!mine.has ·)
+  let lack ← if n == 0 then pure [] else do                  -- `mine[g]` is read per index: on an empty range,
+    let mine ← mineBits g                                     --   not at all
+    pure ((List.range n).filter (!mine.has ·))
   let i ← NodeV2.choiceNat lack                               -- an index we lack, at random
   setProbe g i                                                -- `probe[g] = i`
   let q ← NodeV2.choiceOfSet ((← claims? g).getD {}).toList   -- `q = probed[g] = choice(list(claims[g]))`
@@ -205,7 +211,8 @@ def deferOnClaim (g : Group) : M2 m Unit := do
   let a : Key := .want g i
   v1 (addOffer a q)                                           -- a claim is an offer of every index (§6.1's tables)
   setTried a q now                                            -- `tried[a][q] = now`
-  if !(← probeAsk? a) then setProbeAsk a true                 -- `probe_asks.add(a)`: gated exempts it
+  setProbeAsk a true                                          -- `probe_asks.add(a)`: gated exempts it; a write
+                                                              --   with no read, as the tracer's view of a set logs it
   let w : Want := { group := g, bits := (0 : Bits).set i, standing := false, hops := 0, probe := true }
   if !(← NodeV2.send q (.want w) false) then                  -- marked: answered whatever we hold
     settleProbe g none                                        -- refused by a full queue, never written: no verdict
@@ -243,7 +250,7 @@ def reconsider (g : Group) (at_ : Float) : M2 m Unit := do
         settleProbe g none
         branch "reconsider: the probe got no verdict"
   -- `popcount(known_in_scope(g)) >= T.index_count(hdr[g])`: whole in the subnet's view
-  let kis ← knownInScope g
+  let kis ← knownInScopeCall g
   if kis.popcount ≥ (← NodeV2.indexCount T (← desc g)) then
     branch "reconsider: whole in the subnet's view"
     return
@@ -253,12 +260,12 @@ def reconsider (g : Group) (at_ : Float) : M2 m Unit := do
     let some pi ← probe? g | crash s!"KeyError: {g} (reconsider: probe[g])"
     if !r.has pi then pure false else do
       if !(← NodeV2.wantsFamily T (← NodeV2.family T g)) then pure false else do
-        pure !(← owedMissing g)
+        pure !(← owedMissingCall g)
   if claimHeld then
     if (← param T "REPAIR_SAMPLE" (·.REPAIR_SAMPLE)).isNone then
       branch "reconsider: the claim held, no repair sample"
       return
-    match ← repairVerdict g with                              -- (R5, option) the repair sampled across the columns
+    match ← repairVerdictCall g with                          -- (R5, option) the repair sampled across the columns
     | .repaired =>
       branch "reconsider: repaired"
       return
@@ -270,7 +277,7 @@ def reconsider (g : Group) (at_ : Float) : M2 m Unit := do
   -- `not waited[g] and not deferred[g] and popcount(known_in_scope(g) | known_across(g)) >= T.index_count(…)`
   let wait ← if ← waited? g then pure false else do
     if ← deferred? g then pure false else do
-      let a ← knownInScope g
+      let a ← knownInScopeCall g
       let b ← knownAcross g
       pure ((a ||| b).popcount ≥ (← NodeV2.indexCount T (← desc g)))
   if wait then
@@ -287,7 +294,7 @@ def reconsider (g : Group) (at_ : Float) : M2 m Unit := do
   setState g .decoding                                        -- the late decode claim, as at K
   setMine g ((1 <<< (← NodeV2.indexCount T (← desc g))) - 1)
   for q in ← NodeV2.order "reconsider" (← suppressionScope g) do
-    sendHave q g
+    sendHaveCall q g
   start "decode_group" g
   branch "reconsider: decoding"
 
@@ -309,14 +316,14 @@ def decodeGroup (g : Group) : M2 m Unit := do
     let some f := whole.lookup i | crash s!"KeyError: {i} (decode_group: whole[i])"
     store g i f
     setRebuilt g ((← rebuiltBits g).set i)                    -- servable from now on
-    serveStanding g i                                         -- as in fill
+    serveStandingCall g i                                     -- as in fill
     serveWaitingProbe g i                                     -- (R5) a probe that reached us while we decoded
     for (g2, i2) in ← NodeV2.project T f do                   -- (R4) a rebuilt chunk fills its other groups too
       if g2 == g then continue
       fill g2 i2 f none
       if !filled.contains g2 then filled := filled ++ [g2]
   setState g .complete
-  pushRebuilt g new                                           -- [c10] repair: level 2 has passed
+  pushRebuiltCall g new                                       -- [c10] repair: level 2 has passed
   for g2 in filled do checkCompletion g2                      -- (R4) a filled group may be complete
   deliver g (← payloadOf whole)                               -- level 3: the application's checks
   branch "decode_group: complete"
@@ -332,7 +339,7 @@ def claimsClose (p : Peer) : M2 m Unit := do
   for g in ← NodeV2.claimsOrder (all.map (·.1)) do
     match all.lookup g with
     | some qs => if qs.contains p then gs := gs ++ [g]
-    | none => return (← crash "KeyError: claims (claims_close: the order names a group the table has not)")
+    | none => return (← crash "twin: claims_close: the order names a group claims has not")
   for g in gs do
     let s := (← claims? g).getD {}                            -- `claims[g].discard(p)`: the leaf is kept
     if s.contains p then setClaims g (s.erase p)
@@ -358,6 +365,11 @@ def noteClaim (p : Peer) (g : Group) : M2 m Unit := do
   if c < (← NodeV2.indexCount (← NodeV2.typeOfGroup g) (← desc g)) then
     deferOnClaim g
     branch "note_claim: deferred"
+
+/-- A call `note_claim(p, g)` as the node binds the name: the node's own where its line names it as replaced, a
+question (design §1.4), else the document's -/
+def noteClaimCall (p : Peer) (g : Group) : M2 m Unit := do
+  if (← read).base.replaced.contains "note_claim" then NodeV2.noteClaimNode p g else noteClaim p g
 
 /-- The asks of one IWANT that still go (`filter_entry`'s `c.ids = [a for a in c.ids if …]`), and the promises
 they start at the write [c5] -/

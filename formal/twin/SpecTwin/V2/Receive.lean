@@ -78,6 +78,11 @@ def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit
     branch "forward: an axis"
   if (← state? f.g) != some .invalid then gossipPut f         -- heartbeat gossip (§4.8); never a dropped group's
 
+/-- A call `forward(f, from_peer, axes)` as the node binds the name: the node's own where its line names it as
+replaced, a question with `axes` (design §1.4), else the document's -/
+def forwardCall (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit := do
+  if (← read).base.replaced.contains "forward" then NodeV2.forwardNode f fromPeer axes else forward f fromPeer axes
+
 /-- `on_validated`'s head: `if expired(f.group) or not live(f.slot): return`; whether the call goes on -/
 private def validatedHead (f : ChunkF) : M2 m Bool := do
   enter "on_validated"
@@ -111,7 +116,7 @@ private def validatedBody (p : Peer) (f : ChunkF) (result : Verdict) : M2 m Unit
     if (← NodeV2.dutyFor g) == .forward then
       fwd := true
       break
-  if fwd then forward f p (some acting)                       -- on any axis we serve; never waits for level 2
+  if fwd then forwardCall f p (some acting)                   -- on any axis we serve; never waits for level 2
   for (g, _) in ← NodeV2.project T f do
     checkCompletion g                                         -- §4.6
   branch "on_validated: filled"
@@ -155,7 +160,7 @@ def onChunk (p : Peer) (f : ChunkF) : M2 m Unit := do
     if ← accepted mid then                                    -- (R5) the claimant's copy passes its probe too
       for (g, i) in ← NodeV2.project (← NodeV2.typeOfGroup f.g) f do
         probeAnswer g i (some p)
-      sendHave p f.g                                          -- [c14] duplicates are acknowledged too
+      sendHaveCall p f.g                                      -- [c14] duplicates are acknowledged too
       branch "on_chunk: a duplicate, acknowledged"
     else if ← pendingId? mid then                             -- another copy of one that waits: its sender too
       v1 (tie p f)
@@ -189,7 +194,7 @@ def onHolding (p : Peer) (h : Have) : M2 m Unit := do
   -- h.complete`
   setPeerHas p g { bits := e.bits ||| h.bits, ttl := (← read).base.c.HAVE_TTL,
                    claimAll := e.claimAll || h.claimAll, complete := e.complete || h.complete }
-  if h.claimAll then noteClaim p g                            -- (R5) it may defer a decode duty of ours
+  if h.claimAll then noteClaimCall p g                        -- (R5) it may defer a decode duty of ours
   for i in newly.toList do
     setHolders g i ((← holdersOf g i).insert p)               -- [c9] distinct live holders
     V2Later.windowRelease p g i                               -- [c14] a slot to p frees when p holds i

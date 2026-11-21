@@ -18,7 +18,17 @@ sections call each other both ways (`protocol.md`'s twin does the same, README.m
   plus one; `keep_coverage`'s is the sum of the positive needs at the first guard, plus one. Running out of fuel
   is a crash of the twin's own name.
 - **`or` and `and` short-circuit** as the Python's do: `send_relation` asks `send` only where nothing is owed,
-  and `serves` asks `interest_of_peer` only where p's interest is not `DECLARED`. -/
+  and `serves` asks `interest_of_peer` only where p's interest is not `DECLARED`.
+- **Writes, in every v2 file.** A change in place of a value (`.set(i)`, `.clear(i)`, `|=`, a set value's
+  `.add` or `.discard`) reads its entry first, as the Python does; the twin may then write it whether it changes
+  or not, since the replay passes a write that leaves an entry the Python read as it was (`Replay.lean`'s
+  footprint), as `protocol.md`'s twin does. Some places skip the unchanged write, some make it: both pass. A
+  member of a set that is a table of its own (`probe_asks`, `probe_sent`) is different: its `add` and `discard`
+  are a write with no read, as the tracer's view of a set logs them, so the twin writes it unconditionally and
+  reads nothing.
+- **A function a node can replace** (design §1.4: `forward`, `push_rebuilt`, `send_have`, `serve_standing`,
+  `owed_missing`, `repair_verdict`, `note_claim`, `known_in_scope`) is called through its `…Call`, which asks the
+  node's own where the node's line names it as replaced. -/
 
 namespace SpecTwin.V2
 

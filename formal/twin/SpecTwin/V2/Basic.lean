@@ -220,6 +220,25 @@ class NodeV2 (m : Type → Type) where
   /-- `own_interest(g)`: `interest[g]`'s default, read where the table has no entry for g, which stores nothing
   (design §1's fourth point, §4.4) -/
   ownInterest : Group → m IBits
+  -- The eight names of the 71 that a node can replace and that have a call site inside the replayed closure
+  -- (design §1.4: the second and fourth kinds): where the node's line names one as replaced, the Python asks the
+  -- node, and the twin asks this question in place of the document's body, as `protocol.md`'s `forwardNode` is.
+  /-- `forward(f, from_peer, axes)` as the node binds it -/
+  forwardNode : ChunkF → Peer → Option (List GI) → m Unit
+  /-- `push_rebuilt(g, new)` as the node binds it -/
+  pushRebuiltNode : Group → List Nat → m Unit
+  /-- `send_have(p, g)` as the node binds it -/
+  sendHaveNode : Peer → Group → m Unit
+  /-- `serve_standing(g, i)` as the node binds it -/
+  serveStandingNode : Group → Nat → m Unit
+  /-- `owed_missing(g)` as the node binds it -/
+  owedMissingNode : Group → m Bool
+  /-- `repair_verdict(g)` as the node binds it -/
+  repairVerdictNode : Group → m RepairVerdict
+  /-- `note_claim(p, g)` as the node binds it -/
+  noteClaimNode : Peer → Group → m Unit
+  /-- `known_in_scope(g)` as the node binds it -/
+  knownInScopeNode : Group → m Bits
 
 /-- The functions of the 89 left out of this cycle that the 71 call (design §8). Until each is transcribed, its
 instance is a question on the tape. -/
@@ -279,6 +298,14 @@ abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α
   probeWaitingOrder a b := f (probeWaitingOrder a b)
   claimsOrder a := f (claimsOrder a)
   ownInterest a := f (ownInterest a)
+  forwardNode a b c := f (forwardNode a b c)
+  pushRebuiltNode a b := f (pushRebuiltNode a b)
+  sendHaveNode a b := f (sendHaveNode a b)
+  serveStandingNode a b := f (serveStandingNode a b)
+  owedMissingNode a := f (owedMissingNode a)
+  repairVerdictNode a := f (repairVerdictNode a)
+  noteClaimNode a b := f (noteClaimNode a b)
+  knownInScopeNode a := f (knownInScopeNode a)
 
 instance {m : Type → Type} {σ : Type} [Monad m] [NodeV2 m] : NodeV2 (StateT σ m) :=
   lift (m := m) (n := StateT σ m) fun x => monadLift x
@@ -292,16 +319,16 @@ instance {m : Type → Type} {σ : Type} [Monad m] [V2Later m] : V2Later (StateT
 instance {m : Type → Type} {ρ : Type} [Monad m] [V2Later m] : V2Later (ReaderT ρ m) where
   windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
 
-/-- v2's node-wide constants this cycle reads (design §5). `IWANT_WINDOW` is the effective one, already scaled
-by `ask_scale()` at load time. -/
+/-- v2's node-wide constants this cycle reads (design §5) that `protocol.md`'s `Consts` lacks. Two of v2's
+constants are `Consts`' own fields, read there, so that v2 and the kept functions it calls read one value:
+`SOURCE_OFFERS` is `SOURCE_OFFERS_PUBLISH` (whether it is `PUBLISH`), and `IWANT_WINDOW` is the effective window,
+already scaled by `ask_scale()` at load time, which `may_ask`, `retry_offer` and `ask_parked` read. -/
 structure ConstsV2 where
   ANSWERS_FIRST : Bool
   /-- §4.13's uplink, in bits per second, at and above which `IWANT_WINDOW` keeps `protocol.md`'s value; 0 never
   scales (the toy's `--ask-uplink 0`) -/
   ASK_UPLINK : Float
   MERGE_HOLDINGS : Bool
-  SOURCE_OFFERS : Bool
-  IWANT_WINDOW : Float
   deriving Repr, Inhabited
 
 /-- What a call of v2's code reads that does not change during it: `protocol.md`'s context, v2's constants, and

@@ -20,8 +20,8 @@ main's, v0.10.11's; part G changes it, and it is transcribed again from v0.10.12
   table's level, whose keys' order is asked with `probeWaitingOrder` (design §3.2's `keys` entry).
 - **`interest[g2]`** reads the table, and asks `own_interest(g2)` where it has no entry, storing nothing
   (design §1's fourth point).
-- **A change in place that leaves a value as it was is no write** (design §7): `probe_asks.discard` of an ask
-  that is not there, `probe_answers[p][g].set(i)` and `owed_answers[q][g].set(i)` of a bit already set.
+- **Writes** follow `V2/Relations.lean`'s rule: `probe_asks.discard`, a set's member, is a write with no read,
+  as the tracer's view of a set logs it (`tools/footprint.py`, `add` and `discard`).
 - **`repair_verdict`'s steps** (design §7): a `None` list crashes as `TypeError` at its first subscript, a step
   past the list as `IndexError`; `want` is an `Int`, and the loop stops at `want == 0` alone. -/
 
@@ -57,11 +57,8 @@ def settleProbe (g : Group) (verdict : Option Bool) : M2 m Unit := do
   enter "settle_probe"
   setProbeOk g verdict                                        -- `probe_ok[g] = verdict`
   let some i ← probe? g | crash s!"KeyError: {g} (settle_probe: probe[g])"
-  if ← probeAsk? (.want g i) then                             -- `probe_asks.discard(Ask(g, probe[g]))`
-    setProbeAsk (.want g i) false
-    branch "settle_probe: the probe's ask gated again"
-  else
-    branch "settle_probe: no ask to gate"
+  setProbeAsk (.want g i) false                               -- `probe_asks.discard(Ask(g, probe[g]))`: a write
+  branch "settle_probe: the probe's ask gated again"          --   with no read, as the tracer's view of a set logs it
 
 /-- `probe_answer(g, i, p)` (§4.6, R5): the claimant's own copy of the probed index, first or a duplicate, passes
 the probe and keeps its promise -/
@@ -187,9 +184,11 @@ def serveWaitingProbe (g : Group) (i : Nat) : M2 m Unit := do
   for q in ← NodeV2.probeWaitingOrder g (items.map (·.1)) do
     match items.lookup q with
     | some j => if j == i then qs := qs ++ [q]
-    | none => return (← crash "KeyError: probe_waiting (serve_waiting_probe: the order names a peer the table has not)")
+    | none => return (← crash "twin: serve_waiting_probe: the order names a peer probe_waiting[g] has not")
   for q in qs do
-    eraseProbeWaiting g q                                     -- `del probe_waiting[g][q]`
+    -- `del probe_waiting[g][q]`: a question's notes may have taken it out since the list was made; then it raises
+    let some _ ← probeWaiting? g q | return (← crash s!"KeyError: {q} (serve_waiting_probe: probe_waiting[g][q])")
+    eraseProbeWaiting g q
     -- `probe_served[q][g] or served[q][g] >= …SERVE_LIMIT`
     if ← probeServed q g then
       branch "serve_waiting_probe: a probe answered before"
@@ -327,5 +326,26 @@ def owedMissing (g : Group) : M2 m Bool := do
           return true
   branch "owed_missing: nothing missing"
   return false
+
+/-! ### The calls as the node binds the names
+
+A node can replace four of this file's functions (design §1.4). A call of one is the node's own where its line
+names it as replaced, a question, and the document's otherwise. -/
+
+/-- A call `serve_standing(g, i)` as the node binds the name -/
+def serveStandingCall (g : Group) (i : Nat) : M2 m Unit := do
+  if (← read).base.replaced.contains "serve_standing" then NodeV2.serveStandingNode g i else serveStanding g i
+
+/-- A call `known_in_scope(g)` as the node binds the name -/
+def knownInScopeCall (g : Group) : M2 m Bits := do
+  if (← read).base.replaced.contains "known_in_scope" then NodeV2.knownInScopeNode g else knownInScope g
+
+/-- A call `repair_verdict(g)` as the node binds the name -/
+def repairVerdictCall (g : Group) : M2 m RepairVerdict := do
+  if (← read).base.replaced.contains "repair_verdict" then NodeV2.repairVerdictNode g else repairVerdict g
+
+/-- A call `owed_missing(g)` as the node binds the name -/
+def owedMissingCall (g : Group) : M2 m Bool := do
+  if (← read).base.replaced.contains "owed_missing" then NodeV2.owedMissingNode g else owedMissing g
 
 end SpecTwin.V2

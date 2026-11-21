@@ -19,7 +19,11 @@ and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes a
   the place named for the caller.
 - **`planned` and `origin` are plain dicts** in the toy, so `planned[g][i]` and `origin[g]` raise `KeyError` on
   a missing key, as they crash here. `planned[g][i]` is read once per peer of the pool, as the comprehension
-  reads it: not at all where the pool is empty.
+  reads it: not at all where the pool is empty. It is read as its leaf alone, as the tracer's view logs it
+  (`tools/footprint.py`'s `__getitem__` logs no read of a level it passes through). **A gap on the two raises:**
+  the view logs nothing where `planned[g]` is missing, and the leaf's read alone where only `[i]` is; the twin
+  needs the row's read to tell the two apart, so a record that raises there fails the replay, loudly, until the
+  view logs a missing level (the tracer's v2 step).
 - **Questions asked twice where the Python calls twice:** `announce_extra` asks `links(T)` twice, `source_pool`
   a second time where no relation peer holds the colour, `offer_at_publish` reads `N(d)` twice, and `projected`
   asks `T.threshold(h)` twice.
@@ -87,6 +91,11 @@ def sendHave (p : Peer) (g : Group) : M2 m Unit := do
       return
   let _ ← NodeV2.send p (.have h) true
   branch "send_have: sent"
+
+/-- A call `send_have(p, g)` as the node binds the name: the node's own where its line names it as replaced, a
+question (design §1.4), else the document's -/
+def sendHaveCall (p : Peer) (g : Group) : M2 m Unit := do
+  if (← read).base.replaced.contains "send_have" then NodeV2.sendHaveNode p g else sendHave p g
 
 /-- `announce(p, g, bits)` (§4.4) [c3, c7]: an offer, of what p does not hold, was not pushed and wants -/
 def announce (p : Peer) (g : Group) (bits : Bits) : M2 m Unit := do
@@ -216,7 +225,7 @@ def originWritten (f : ChunkF) : M2 m Unit := do
     else
       setOrigin g (b.set f.i)                                 -- `origin[g].set(f.index)`
       for q in ← NodeV2.order "origin_written" (← suppressionScope g) do
-        V2.sendHave q g
+        sendHaveCall q g
       branch "origin_written: the holding grows"
 
 /-- `offer_at_publish(g, d)` (§4.7): a pull-only type's source pushes nothing, so every chunk is offered at once
@@ -225,7 +234,7 @@ def offerAtPublish (g : Group) (d : Descriptor) : M2 m Unit := do
   enter "offer_at_publish"
   setOrigin g ((1 <<< (← v1 (N (some d)))) - 1)              -- `origin[g] = all_bits(N(d))`
   for q in ← NodeV2.order "offer_at_publish" (← suppressionScope g) do
-    V2.sendHave q g
+    sendHaveCall q g
   let T ← NodeV2.typeOfGroup g
   -- `offers.setdefault(q, set()).add(i)`: a dict, in the order its keys were first set
   let mut offers : List (Peer × Bits) := []
@@ -241,7 +250,7 @@ def offerAtPublish (g : Group) (d : Descriptor) : M2 m Unit := do
 and the pool's peers not chosen to be pushed it are offered it -/
 def originAcked (g : Group) (i : Nat) : M2 m Unit := do
   enter "origin_acked"
-  if (← read).c2.SOURCE_OFFERS then                           -- `if SOURCE_OFFERS == PUBLISH: return`
+  if (← read).base.c.SOURCE_OFFERS_PUBLISH then               -- `if SOURCE_OFFERS == PUBLISH: return`
     branch "origin_acked: at PUBLISH, nothing"
     return
   let some b ← origin g | crash s!"KeyError: {g} (origin_acked: origin[g])"
@@ -250,15 +259,17 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
     return
   setOrigin g (b.set i)                                       -- `origin[g].set(i)`
   for q in ← NodeV2.order "origin_acked" (← suppressionScope g) do
-    V2.sendHave q g
+    sendHaveCall q g
   let T ← NodeV2.typeOfGroup g
   let _fam ← NodeV2.family T g                                -- `fam = T.family(g)`: asked, not used
   let c ← colourOf g i
   -- `[q for q in source_pool(T, g, c) if q not in planned[g][i]]`: planned[g][i] read once per peer
   let ps ← (← sourcePool T g c).filterM fun q => do
-    if !(← planned g) then return (← crash s!"KeyError: {g} (origin_acked: planned[g])")
-    let some ts ← plannedTargets? g i | return (← crash s!"KeyError: {i} (origin_acked: planned[g][i])")
-    return !ts.contains q
+    match ← plannedTargets? g i with                          -- the leaf alone, as the tracer's view logs it
+    | some ts => return !ts.contains q
+    | none =>                                                 -- (the raises' reads: a gap, in the header)
+      if !(← planned g) then return (← crash s!"KeyError: {g} (origin_acked: planned[g])")
+      return (← crash s!"KeyError: {i} (origin_acked: planned[g][i])")
   for p in ps do
     V2.announce p g (1 <<< i)                                 -- a refused push is owed (v0.7)
   branch "origin_acked: the holding grows"
