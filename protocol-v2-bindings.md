@@ -535,13 +535,13 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   libp2p. Three models are considered:
   1. *Beside libp2p, on libp2p's port.* The native connection shares the UDP port of libp2p's QUIC
      transport, and the ALPN tells the two apart. libp2p's peer choice, gating, scoring and identity
-     are reused. A host's queue that tells flows apart by their UDP addresses and ports, as
-     `fq_codel` does, sees the native connection and libp2p's connection to the same peer as one
-     flow if both run between the same two sockets. They do if both are dialed from libp2p's
-     listening socket. By default, go-libp2p tries to dial from that socket. If the native
-     connection is dialed from a socket of its own, with a source port of its own, such a queue can
-     see it as a separate flow, even on the shared listening port; `fq_codel` hashes flows, and two
-     flows can collide. The rest of this section is written in this model.
+     are reused. A queue that tells UDP traffic apart by addresses and ports, such as `fq_codel`,
+     treats the native connection and libp2p's connection to the same peer as one flow when their
+     local and remote UDP addresses and ports match. By default, go-libp2p tries to dial from its
+     listening socket. If the native connection is dialed from a socket of its own, with a source
+     port of its own, such a queue can see it as a separate flow, even on the shared listening port;
+     `fq_codel` hashes flows, and two flows can collide. The rest of this section is written in this
+     model.
   2. *Beside libp2p, on a port of its own.* A new ENR field gives the port, and a queue that tells
      flows apart by their addresses and ports can see the native connection as a separate flow.
   3. *Alone, with no libp2p.* The binding must then define who counts as a peer (its limits and
@@ -620,11 +620,11 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   sender then resets the stream as RFC 9000 §3.5 requires. If some of the stream's bytes, or its
   end, are not yet sent, it resets the stream at once. Once all are sent, it may wait until they are
   acknowledged or declared lost: it resets the stream if any are declared lost, and lets it finish
-  if all are acknowledged. The receiver discards a stopped copy unread, even if its bytes still
-  arrive at QUIC: it computes no chunk id for it (§1.2) and validates nothing, and `on_chunk` never
-  sees it. It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read.
-  What a receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes
-  back when a later holding that names the chunk's index arrives from the receiver, or when the room
+  if all are acknowledged. The receiver discards the stopped copy before it computes the copy's
+  chunk id (§1.2), validates it or passes it to `on_chunk`, even if more of its bytes arrive at
+  QUIC. It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read. What
+  a receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes back
+  when a later valid holding from the receiver newly reports the chunk's index, or when the room
   times out, as below.
 - **The window.** A reset changes nothing in the window: the chunk's room comes back at the peer's
   holding, or when it times out, as for any chunk (`window_release`, `window_timeout`,
@@ -698,7 +698,8 @@ The binding also adds three rows to that table. Its own answers are these:
 - **a chunk's lost bytes leave a gap only in that chunk's delivery:** yes. Lost bytes leave a gap
   in the ordered delivery of their own stream only. A lost packet that carried bytes of several
   streams, the control stream among them, can leave a gap on each stream whose bytes are then
-  missing, and each such stream waits only for its own bytes to be resent.
+  missing. Later bytes on that stream wait for the gap to be filled. A reset ends delivery on the
+  stream.
 
 ### 7.8 What it needs from QUIC
 
@@ -717,8 +718,8 @@ This draft leaves these questions open:
 - when a chunk stream still waiting for the link to carry its object type is discarded, and how
   much of the connection's receive credit a receiver keeps for the control stream meanwhile (§7.2);
 - what a receiver sends for a copy it stopped (§7.3): a holding made from what it holds and has
-  verified, or nothing, in which case the sender's room for the chunk comes back when a later
-  holding that names the chunk's index arrives from the receiver, or when that room times out; and
+  verified, or nothing, in which case the sender's room for the chunk comes back when a later valid
+  holding from the receiver newly reports the chunk's index, or when that room times out; and
   whether a receiver may stop a stream that carries a header it has not yet validated;
 - which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written before
   and after it;
@@ -752,13 +753,13 @@ has one connection per peer, but the binding must then define what libp2p gives 
 The choice between the models stays open because it is not settled whether a node that speaks this
 binding also runs libp2p on the same port.
 
-**A stream per chunk.** Lost bytes hold up only their own stream, so a chunk waits only for its own
-bytes to be resent. On one stream per peer, every later chunk to that peer waits until QUIC has
-resent the lost bytes. On any binding, loss can still slow the connection's sending, through
-congestion control. With a stream per chunk, cancel also reaches a chunk already written. In the
-toy, a stream per chunk recovered much of what packet loss costs one stream per peer, on every seed.
-The alternative is a stream per group and peer, which needs fewer streams and confines the wait
-behind lost bytes to the group's chunks; whether it does as well is open (§7.9).
+**A stream per chunk.** A gap holds up later bytes on its own stream. With one stream per chunk, the
+wait is confined to that stream. With one stream per peer, it also holds up later chunks on the same
+stream. On any binding, loss can still slow the connection's sending, through congestion control.
+With a stream per chunk, cancel also reaches a chunk already written. In the toy, a stream per chunk
+recovered much of what packet loss costs one stream per peer, on every seed. The alternative is a
+stream per group and peer, which needs fewer streams and confines the wait behind lost bytes to the
+group's chunks; whether it does as well is open (§7.9).
 
 **A stream per chunk on libp2p would keep most of the gain.** libp2p's streams on its QUIC
 connection are QUIC streams, and a reset of one is QUIC's reset. In the toy, a stream per chunk on
