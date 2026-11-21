@@ -390,8 +390,8 @@ class Recorder:
             rec.peak[nid] = max(rec.peak[nid], ns["in_flight"])
             return got
 
-        def track_in_flight(p, f):
-            out = spec_track(p, f)
+        def track_in_flight(p, f, *rest):   # protocol-v2.md's takes the room too: (p, f, need)
+            out = spec_track(p, f, *rest)
             rec.peak[nid] = max(rec.peak[nid], ns["in_flight"])
             return out
         ns["filter_entry"], ns["acquire_slot"], ns["track_in_flight"] = filter_entry, acquire_slot, track_in_flight

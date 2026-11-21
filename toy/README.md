@@ -141,6 +141,9 @@ where one has a control that must come out the other way, it is named:
   its cap, and q gets no run; (e) as (b) with no send buffer, so the write completes at once, and
   `write_waits` is not called. In (a), (b) and (d), p keeps its place. A run for q is read from the
   simulator's queue of events. Case (a) fails on v0.10.7 and v0.10.8, which woke q before the write.
+- `xcheck_observes_known.py [--doc v2]`: `--xcheck` only observes. `check.py`'s push cell runs with
+  and without it, and both give the same digest. Under `protocol-v2.md` it fails on the toy before
+  its fix, whose wrapper of `track_in_flight` took two arguments where that document passes three.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an
   index it has already received, is acknowledged and neither forwarded nor put in the gossip
   history; a copy of an index held only as rebuilt is still forwarded, and the publisher's first
