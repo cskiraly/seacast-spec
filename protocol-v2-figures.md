@@ -129,8 +129,8 @@ They were not run again.
   link had not come back by the run's end to their count of (family, colour) below `F_LO` before the
   close, at every seed; with it, 0.1 to 1.2 %.
 - **Churn's excess:** the floor removed 84 to 91 % of churn's excess in the share of (node, family,
-  colour) below `F_LO`, the share averaged over the heartbeats from the first block on [84.0 to 90.5
-  % at 1 %, 85.2 to 86.9 % at 5 %].
+  colour) below `F_LO`, the share averaged over the heartbeats from the first block on [84.0 to
+  90.5 % at 1 %, 85.2 to 86.9 % at 5 %].
 - **Its cost per node and message gap**, paired by seed: 0.14 to 0.19 JOINs and 0.30 to 0.44 GRAFTs
   more at 1 %, and 0.69 to 0.88 JOINs and 1.53 to 1.92 GRAFTs more at 5 %.
 - **Delivery:** every node completed, and the warm block's 99th percentile moved within the toy's
@@ -196,9 +196,9 @@ Whether any of these moves a figure is not traced.
 **Conditions.** First written on 2026-10-07 (03:59) [`08fbc3d`, 2026-10-21]. The record is the toy's
 README of that commit and README 977–979. The runs: the 60-node rows cells without liars (honest
 with 32 subnets; half the columns withheld with 16 and with 32 subnets), degree 30, a 1 Gbps
-proposer, 6 reconstructors, one seed (7). They ran under v0.3's slot window (a window counted in 12
-KB slots), before the window in bytes (§4.11, 2026-10-07 04:40), and with v0.3's `PROMISE` of 400 ms
-as the probe's promise, the rule this figure changed. The record gives one figure, not its
+proposer, 6 reconstructors, one seed (7). They ran under v0.3's slot window (a window counted in
+12 KB slots), before the window in bytes (§4.11, 2026-10-07 04:40), and with v0.3's `PROMISE` of
+400 ms as the probe's promise, the rule this figure changed. The record gives one figure, not its
 statistic: whether it is one probe or typical is not stated.
 - A reconstructor's answer to a probe left 450 ms after the probe was decided, behind its burst of
   rebuilt cells. The deferred duties re-armed against honest claimants were 1 in the honest cell and
@@ -255,8 +255,8 @@ them are not traced here) and the later changes to the draft, among them those n
   on the claimant's own copy. The record does not count whether that claimant was honest or a liar;
   its counts suggest a liar's push but do not show it.
 - C2 at seed 9 decided 3 probes.
-- The wait from decision to write was 0 ms at the median in every run; the longest was 101 ms (101.2
-  ms, C3), against 62.2 ms in C2 and 60.7 ms in C4.
+- The wait from decision to write was 0 ms at the median in every run; the longest was 101 ms
+  (101.2 ms, C3), against 62.2 ms in C2 and 60.7 ms in C4.
 - These runs' C4 at seeds 8 and 9 carry v0.10's order of the announcers beyond the list
   (`protocol.md` §6.1, spec `512efe6`), found by a bisection.
 
@@ -313,9 +313,9 @@ repair floor at 1. The figures on the wording ran with the member check on (READ
   supernode ended its duty on a verified claim (README 1173–1175).
 - *Without supernodes*, first written the same day [`08fbc3d`]: a fifth of the nodes hoarding (16
   subnets, half withheld) left custodians short in every run over seeds 7 to 19, under draft 1 and
-  under the wording before the member check (371 to 810 pairs; README 1163). The record traces seed
-  7: its four short rows were all of one subnet, rebuilt only by a hoarding row reconstructor to
-  which 15 duties had deferred.
+  under the wording before the member check (371 to 810 pairs; README 1163). The record traces
+  seed 7: its four short rows were all of one subnet, rebuilt only by a hoarding row reconstructor
+  to which 15 duties had deferred.
 
 ### The member check
 
@@ -467,8 +467,9 @@ hidden index.
 
 **On the rules of 2026-11-18.** First written on 2026-11-18 (11:53) [`0edbdc7`, 2026-11-18]. The
 runs: every cell `--send-buffer 0`, on the toy of 2026-11-18, from 09:24 CET that day. The figures
-restated from them are the six `hoardcol20` cells' (the sample `4:0,8:1` with re-ask, alarm off and
-at 3.5 s, seeds 11, 12 and 16). Rules changed since: those named for the probe's runs of 2026-11-18.
+come from the six `hoardcol20` cells (the sample `4:0,8:1` with re-ask, alarm off and at 3.5 s,
+seeds 11, 12 and 16); the last item names the honest and `claim20` cells of the same runs. Rules
+changed since: those named for the probe's runs of 2026-11-18.
 - Without the alarm, 2 of 6 blocks were short, 108 custodians (seed 12's first block, 53; seed 16's
   second, 55). Before, 3 of 6 and 165: seed 16's first block now completes. Each block's prediction
   still equals its count.
@@ -481,9 +482,9 @@ at 3.5 s, seeds 11, 12 and 16). Rules changed since: those named for the probe's
 the toy of 2026-11-01, from 2026-11-01 17:00 to 2026-11-02 06:17 CET, all with the sample `4:0,8:1`,
 re-ask and rebuilt cells marked seen (but for the honest cost's off arm), alarm off or at 3.5 s.
 These ran before the member's changes of 2026-11-17.
-- `hoardcol20` without supernodes: without the alarm, 3 of 20 blocks short, 165 custodians (seed
-  12's first block and both of seed 16's); with it, none, for 61 alarms and 10 rebuilds, all at
-  those two seeds (seed 12: 41 alarms and 5 rebuilds; seed 16: 20 and 5).
+- `hoardcol20` without supernodes: without the alarm, 3 of 20 blocks short, 165 custodians
+  (seed 12's first block and both of seed 16's); with it, none, for 61 alarms and 10 rebuilds, all
+  at those two seeds (seed 12: 41 alarms and 5 rebuilds; seed 16: 20 and 5).
 - `hoardcol20` with 5 % supernodes (25), alarm off: none short.
 - Honest cells, builder at 1 Gbps (`bld`) or at home: no alarm; the latest custodians completed at
   2.60 s and 2.77 s (the text rounds them to 2.6 and 2.8 s).
@@ -492,8 +493,8 @@ These ran before the member's changes of 2026-11-17.
 ### The repair floor
 
 **Conditions.** First written on 2026-10-07 (14:21) [`08fbc3d`, 2026-10-21]. Record: README
-999–1018, first recorded the same day. The runs: the withheld row cell at 60 nodes, degree 30, a 1
-Gbps proposer, 6 row reconstructors, 16 row subnets, half the columns withheld, seeds 7 to 19,
+999–1018, first recorded the same day. The runs: the withheld row cell at 60 nodes, degree 30, a
+1 Gbps proposer, 6 row reconstructors, 16 row subnets, half the columns withheld, seeds 7 to 19,
 `--repair-floor 0` against 1; the window in bytes; no member check (decided 2026-10-09) and no
 supernodes (2026-10-08) yet; the probe as before 2026-11-15.
 - Without the floor, 5 of 13 runs left custodians short, each by a missing link. In four (seeds 10,
@@ -514,9 +515,9 @@ supernodes (2026-10-08) yet; the probe as before 2026-11-15.
 **Conditions.** First written on 2026-10-08 (01:14) [`08fbc3d`, 2026-10-21], and the fast class's
 budget later that night (01:31). Record: README 1020–1072. The runs: 60 nodes, degree 30, a 1 Gbps
 proposer, 6 row reconstructors where there are rows, three supernodes (5 %) on datacenter links
-(`--supernode-link dc`) unless the figure says home links, `--phase2` 1 s with `--phase2-jitter` 0.2
-s, seeds 7 to 19; the medians over the seeds, and the tail's worst seed where named. The rules: the
-window in bytes, the repair floor at 1, the probe as before 2026-11-15, before the member check
+(`--supernode-link dc`) unless the figure says home links, `--phase2` 1 s with `--phase2-jitter`
+0.2 s, seeds 7 to 19; the medians over the seeds, and the tail's worst seed where named. The rules:
+the window in bytes, the repair floor at 1, the probe as before 2026-11-15, before the member check
 (which changes no event without a fault).
 - The custody cell with half the columns withheld: none complete without supernodes (58 of 59
   custodians short at seed 7); with them, every custodian on all thirteen seeds, at 1 196 ms at the
@@ -610,8 +611,8 @@ and v0.10's since 2026-11-16. Changed since: the line skip (2026-11-20) and the 
 (v0.10.9), both §4.11; the record does not say whether they move these cells.
 - A 1 Gbps proposer that offers at publish completes its block sooner at the median. On the 60-node
   graph it is 37 to 114 ms sooner with writes at once and 30 to 102 ms sooner with one write at a
-  time; on the 100-node graph, 13 to 86 ms and 17 to 92 ms. Over both transports, that is 30 to 114
-  ms and 13 to 92 ms.
+  time; on the 100-node graph, 13 to 86 ms and 17 to 92 ms. Over both transports, that is 30 to
+  114 ms and 13 to 92 ms.
 - It answers more asks: 6.1 to 9.7 times as many with writes at once and 4.7 to 8.2 times with one
   write at a time on the 60-node graph, 9.5 to 12.2 and 6.8 to 8.9 times on the 100-node one: 4.7 to
   12 times in all.
@@ -641,8 +642,8 @@ taken at once (`--send-buffer 0`). "With §4.11's rule" is `--send-buffer 1`, co
 claim (R5, 2026-11-15, §4.6), in the row cells; v0.10's rules (spec `62a8179`, 2026-11-16);
 `SOURCE_OFFERS` (2026-11-18), which keeps the acknowledgement as the default; the line skip
 (2026-11-20) and the wake at the wait (v0.10.9), both §4.11.
-- The payload moves by −4 ms (`push`), −4 (`--rebuilt none`), −8 (`sil30`) and 0 (`dcb20`): 0 to 8
-  ms sooner.
+- The payload moves by −4 ms (`push`), −4 (`--rebuilt none`), −8 (`sil30`) and 0 (`dcb20`): 0 to
+  8 ms sooner.
 - A 50 Mbps proposer's custody block completes 24 ms sooner (−46 to +10), sooner on eight seeds.
 - A column's source, the medians over the seeds: it uploads 5 to 28 % less (the 50 Mbps custody cell
   1.46 copies of its block against 1.54, the rows' proposer 1.49 against 2.07, a 1 Gbps proposer
@@ -671,8 +672,8 @@ changes since are those of the 60-node entry.
 - Against the document before, at seed 7: the payload −4 ms, the rows −8 ms, a 50 Mbps proposer's
   custody block −48 ms, and a 1 Gbps proposer's +5 ms.
 - Against offers per type: the rows +7 ms (−15 to +17), later on two seeds of three; with §4.11's
-  rule, +28 ms (+18 to +54), later on all three. A 1 Gbps proposer's block +9 ms (+6 to +15). A 50
-  Mbps proposer's −26 ms (−38 to −18), and −41 ms (−62 to −30) at the tail. A column's source
+  rule, +28 ms (+18 to +54), later on all three. A 1 Gbps proposer's block +9 ms (+6 to +15). A
+  50 Mbps proposer's −26 ms (−38 to −18), and −41 ms (−62 to −30) at the tail. A column's source
   uploads 8 to 33 % less (the 50 Mbps custody cell 8 to 9 %, the rows 14 to 23 %, the 1 Gbps custody
   cell 28 to 33 %) and is asked 57 to 98 % less.
 - The relation peers, at seed 7, from stage 4's per-node lines. Under offers per type, 12 of the 499
@@ -699,9 +700,9 @@ nodes they are compared with offers per type itself, over seeds 7 to 9, as above
 ### A source's links in a family it does not custody
 
 **Conditions.** The withheld block at 500 nodes is §4.11's run of 2026-10-07 (§4.11's entry, "The
-window's unit"): the row setting at 500 nodes, degree 70, half the columns withheld, 32 subnets, 50
-reconstructors, a 1 Gbps proposer, one seed, every write at once, under the window in bytes and
-v0.3's order of the queue. Its rules and the changes since are given there.
+window's unit (X3), and what it changes"): the row setting at 500 nodes, degree 70, half the columns
+withheld, 32 subnets, 50 reconstructors, a 1 Gbps proposer, one seed, every write at once, under the
+window in bytes and v0.3's order of the queue. Its rules and the changes since are given there.
 - Every custodian completed through the rows, at 2 368 ms at the median and 2 505 ms at the tail
   (the toy's README of 2026-10-07, 04:40).
 - The columns that no node but the source custodies, first written on 2026-11-13 as "seven of 128 in
@@ -717,9 +718,9 @@ v0.3's order of the queue. Its rules and the changes since are given there.
 write at once, and with §4.11's rule as `--send-buffer 1`.
 - With writes at once, 2 to 6 of a payload's chunks come back a message at the median of the seeds,
   and up to 59 at one seed: seed 9's `push` cell, with 65, 61 and 51 over its three messages.
-- With §4.11's rule, 0 to 2 come back at the median of the seeds, and up to 17 at one seed: seed
-  14's `push` cell, with 17, 18 and 17 over its three messages. The record's text gives no maximum;
-  the run's output gives these counts.
+- With §4.11's rule, 0 to 2 come back at the median of the seeds, and up to 17 at one seed:
+  seed 14's `push` cell, with 17, 18 and 17 over its three messages. The record's text gives no
+  maximum; the run's output gives these counts.
 - No cell of a column comes back in custody. In the rows the counts are repair deliveries to the
   proposer, which keeps every row, and they are the same in every arm.
 
@@ -737,9 +738,9 @@ offered at publish, and its paced holding grew at each chunk's write. Changed si
 ("measured with the holding at the write"); the line skip (2026-11-20) and the wake at the wait
 (v0.10.9), both §4.11.
 - The holdings: at seed 7, in the custody cell with writes at once, the source sent 38 808 holdings
-  of the groups it publishes, 52 bytes each on average. That is 2.03 MB over the three blocks, 0.68
-  MB a block, 5.4 Mbit, which takes about 108 ms of a 50 Mbps uplink (counted from a debug trace of
-  the run).
+  of the groups it publishes, 52 bytes each on average. That is 2.03 MB over the three blocks,
+  0.68 MB a block, 5.4 Mbit, which takes about 108 ms of a 50 Mbps uplink (counted from a debug
+  trace of the run).
 - With a 50 Mbps proposer the custody block completes 116 ms later at the median (+53 to +164) and
   106 ms later at the tail (−4 to +175). The rows complete 98 ms later at the median (+4 to +180)
   and 132 ms later at the tail (+96 to +157). With a 1 Gbps proposer the cost is 6 ms (−1 to +7).
@@ -791,10 +792,10 @@ commit, the paragraph on `--answers-first`), the same runs that checked §4.12's
 that day [`08fbc3d`, 2026-10-21]. 60 nodes, degree 30, three payloads, seeds 7, 8 and 9. The tier 4
 cells are `push` (a 50 Mbps home builder) and `dcb20` (a 1 Gbps builder), with the source's offers
 dropped (`--source-offers off`) against the same cells with them; the source then offered at
-publish, as v0.3's did. The 1 Gbps proposer of columns is the custody setting, the mean over seeds
-7, 8 and 9, paired by seed, against v0.3's order of the queue with the offers. Every write was taken
-at once, under the window in bytes. The rules are the draft's of 2026-10-07. Changed since: P4 and
-v0.5 (2026-10-21); v0.9's offers at the acknowledgement (2026-11-11), so that a source no longer
+publish, as v0.3's did. The 1 Gbps proposer of columns is the custody setting, the mean over
+seeds 7, 8 and 9, paired by seed, against v0.3's order of the queue with the offers. Every write was
+taken at once, under the window in bytes. The rules are the draft's of 2026-10-07. Changed since: P4
+and v0.5 (2026-10-21); v0.9's offers at the acknowledgement (2026-11-11), so that a source no longer
 offers at publish by default (§4.7); the payload cells' group key (2026-10-23), which moves their
 exact values (the toy's README); the line skip (2026-11-20) and the wake at the wait (v0.10.9), both
 §4.11.
@@ -802,8 +803,8 @@ exact values (the toy's README); the line skip (2026-11-20) and the wake at the 
   those answers arrive as duplicates.
 - Without its offers a home builder uploads 1.6 to 1.8 copies of the message instead of 2.1 to 2.9,
   and its cells' medians move by less than 10 ms.
-- A fast builder uploads 9.7 to 12.0 copies with its offers and 2.0 without, and then completes 10
-  ms later at the median.
+- A fast builder uploads 9.7 to 12.0 copies with its offers and 2.0 without, and then completes
+  10 ms later at the median.
 - Without its offers a 1 Gbps proposer of columns completes 75 ms later at the median, and 59 ms
   later at the tail.
 
@@ -816,13 +817,13 @@ as `--send-buffer 1`. First written on 2026-11-11 [`0d968d8`].
 - It uploads 2.07 copies of the message against 2.50, and a 1 Gbps builder (`dcb20`) 5.94 against
   9.98.
 - The medians move by −4 ms (`push`), −4 (`--rebuilt none`), −8 (`sil30`) and 0 (`dcb20`).
-- With §4.11's rule the home builder is asked for 40 ids against 45, and the medians move within 4
-  ms.
+- With §4.11's rule the home builder is asked for 40 ids against 45, and the medians move within
+  4 ms.
 
 ### A column's offers at the acknowledgement, and the offers keyed on the uplink
 
-**Conditions.** The campaign of 2026-11-10: at 60 nodes over seeds 7 to 16, at 500 nodes over seeds
-7 to 9 with a fifth of the nodes sampling, each paired by seed.
+**Conditions.** The campaign of 2026-11-10: at 60 nodes over seeds 7 to 16, at 500 nodes over
+seeds 7 to 9 with a fifth of the nodes sampling, each paired by seed.
 - A 1 Gbps proposer's block, with its offers at the acknowledgement against its offers at publish
   (offers per type's stand-in), completes 44 ms later at 60 nodes (+28 to +121) and 9 ms later at
   500 (+6 to +15).
@@ -872,8 +873,8 @@ wake at the wait (v0.10.9).
 - Under the slot window, a reconstructor's answer to a probe left 450 ms after it was decided, in
   the honest row cells at 60 nodes (the toy's README of 03:59 that day).
 - The custody block at 60 nodes, warm p50 / p99: with a 1 Gbps proposer 347 / 456 ms, against 777 /
-  963 ms under slots. With a 50 Mbps proposer, 2 444 / 2 907 ms under v0.3's order and 2 220 / 2 479
-  ms with §4.12's source rule (11:05 that day), against 9 173 / 9 475 ms under slots.
+  963 ms under slots. With a 50 Mbps proposer, 2 444 / 2 907 ms under v0.3's order and 2 220 /
+  2 479 ms with §4.12's source rule (11:05 that day), against 9 173 / 9 475 ms under slots.
 - The sampling cell (60 nodes, 12 samplers, a 1 Gbps proposer): the samples arrive at 277 ms at the
   median (p99 440 ms) under bytes, against 750 ms (p99 828 ms) under slots, in the toy's README of
   04:40 that day. The text had 264 ms, which no record found gives.
@@ -931,9 +932,9 @@ before every control write of a writer in line (`67cbfba`). v0.10.9's wake at th
 `rr-stripe` and `push-deep` in their digest only, and no other cell (§4.11).
 - Before the rule, with the source's line head stalled, nine other peers' chunks waited in an empty
   window, and none was sent in the check's two seconds.
-- `loss-thin`: p50 807 → 814 ms, p99 922 → 894 ms, copies 1.64 → 1.65. `late-block`: p99 727 → 718
-  ms. With the line skip alone (00:45), `loss-thin` moved to p50 805 ms, p99 938 ms and 1.65 copies,
-  and `late-block` to p99 726 ms.
+- `loss-thin`: p50 807 → 814 ms, p99 922 → 894 ms, copies 1.64 → 1.65. `late-block`: p99 727 →
+  718 ms. With the line skip alone (00:45), `loss-thin` moved to p50 805 ms, p99 938 ms and 1.65
+  copies, and `late-block` to p99 726 ms.
 
 ## §4.12 Which entry goes next
 
@@ -975,8 +976,8 @@ the rule's 247; with a fast proposer, 7 to 355 ms later at the median, each agai
   39 ms sooner;
 - the asks' round trip at the 99th percentile is shorter in most cells, by up to 44 ms, and a few
   hundredths of a copy are saved;
-- with cards 8, 9, 12 and 15 off (seeds not given in the record), a node's answers waited 1.1 to 1.7
-  s at the 99th percentile, and at most 0.22 s with the option.
+- with cards 8, 9, 12 and 15 off (seeds not given in the record), a node's answers waited 1.1 to
+  1.7 s at the 99th percentile, and at most 0.22 s with the option.
 
 **The three other forms, against v0.3's order:** over seeds 7, 8 and 9 (the mean), the oldest answer
 first costs a 50 Mbps proposer 315 ms at the median, and the same with the answer's writer ahead of
@@ -997,9 +998,9 @@ ten-seed corpus; tier 4's cell with 30 % withholders at 10 Mbps was run for this
 the 99th percentile of the warm payloads, and the copies are data copies. A figure is the median
 over the seeds of the change, with its range. "10 Mbps" is the 10/20 Mbps network and "25 Mbps" the
 25/100 Mbps one. The forms: the ask window stretched alone (an ask window of 1 000 ms with a promise
-of 400 ms at 10 Mbps, and 400 / 400 ms at 25 Mbps), and the promise stretched with it (1 000 / 2 000
-ms at 10 Mbps). The record does not name the seeds. The rules are the research harness's own, tier
-4's, not this draft's.
+of 400 ms at 10 Mbps, and 400 / 400 ms at 25 Mbps), and the promise stretched with it (1 000 /
+2 000 ms at 10 Mbps). The record does not name the seeds. The rules are the research harness's own,
+tier 4's, not this draft's.
 - The promise stretched with the window, with 30 % withholders at 10 Mbps, over three paired seeds:
   the tail 18.5 % longer at the median (+9.7 to +18.6 %), better on both axes on none of the three.
 - The ask window alone, at 10 Mbps, over ten paired seeds: the tail 5.1 % shorter at the median (2.2
@@ -1019,8 +1020,8 @@ broken promise in a run. The rules are the draft's of 2026-10-19. Changed since:
 (2026-10-21), v0.9's source rules (2026-11-11), the line skip (2026-11-20) and the wake at the wait
 (v0.10.9).
 - The ask window alone, §4.13's form, parks 503 to 642 pairs in the all-home network, against 584 to
-  702 with v0.3's window. With 30 % withholders it parks about 10 700, against about 12 600. With 10
-  % of chunks lost it parks 9 054 to 9 313, against 5 575 to 5 864: about 60 % more.
+  702 with v0.3's window. With 30 % withholders it parks about 10 700, against about 12 600. With
+  10 % of chunks lost it parks 9 054 to 9 313, against 5 575 to 5 864: about 60 % more.
 - The record gives no parked count for the mixed network, which §4.13 names among the networks where
   the count stayed below v0.3's.
 - The per-peer promise (the decision record's "The promise's length") parks 283 to 360 honest pairs
@@ -1058,22 +1059,22 @@ The bullets give the distances on their dates. Since 2026-11-15 both recordings 
 `protocol.md` §7.1's and §7.2's window line (2026-11-20, `1dc2d93` and `903f12b`) moved
 `protocol.md`'s `ihave-limits` cell (p50 512 to 511 ms, p99 592 to 594 ms, copies 2.05 to 2.06), its
 `loss-thin` (p50 789 to 788 ms, p99 888 to 867 ms, copies 1.71 to 1.70) and its `late-block`. This
-document's §4.11 (2026-11-20, `67cbfba`) moved its `loss-thin` (p50 807 to 814 ms, p99 922 to 894
-ms, copies 1.64 to 1.65) and its `late-block`. The wake at the wait (2026-11-21, `5372ebb`) moved
-the digests of `rr-stripe` and `push-deep` only. Read from both recordings at `9f300cf`
+document's §4.11 (2026-11-20, `67cbfba`) moved its `loss-thin` (p50 807 to 814 ms, p99 922 to
+894 ms, copies 1.64 to 1.65) and its `late-block`. The wake at the wait (2026-11-21, `5372ebb`)
+moved the digests of `rr-stripe` and `push-deep` only. Read from both recordings at `9f300cf`
 (2026-11-21), the eleven cells of the last bullet stand as they stood on 2026-11-15. `loss-thin` is
 26 ms later at the median, 27 ms later at the tail and 0.05 copies lighter (p50 814 against 788 ms,
-p99 894 against 867 ms, 1.65 against 1.70 copies). `late-block` is 6 ms later at the median and 11
-ms later at the tail. `ihave-limits` is 1 ms sooner at the median and at the tail, with 0.01 copies
-more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies).
+p99 894 against 867 ms, 1.65 against 1.70 copies). `late-block` is 6 ms later at the median and
+11 ms later at the tail. `ihave-limits` is 1 ms sooner at the median and at the tail, with 0.01
+copies more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies).
 
 - **v0.3's window and the window in bytes** (2026-10-07). With v0.3's window (slots of one payload
   chunk), eleven of the twelve cells reproduced v0.3's completion times and bytes exactly, and
-  `rr-stripe` differed by 3 ms at the median. With the window in bytes, the cells moved by at most 7
-  ms at the median, 15 ms at the tail and 0.04 copies either way: `announce` p99 576 → 587 ms,
+  `rr-stripe` differed by 3 ms at the median. With the window in bytes, the cells moved by at most
+  7 ms at the median, 15 ms at the tail and 0.04 copies either way: `announce` p99 576 → 587 ms,
   `without-a` 578 → 565 ms, `loss-thin` 984 → 999 ms, `push` copies 2.41 → 2.43.
-- **v0.4's P4** (2026-10-21), against v0.4's recording: eleven cells within 3 ms at the median, 16
-  ms at the tail and 0.03 copies (`announce` p99 568 → 584 ms, `rr-stripe` 521 → 505 ms).
+- **v0.4's P4** (2026-10-21), against v0.4's recording: eleven cells within 3 ms at the median,
+  16 ms at the tail and 0.03 copies (`announce` p99 568 → 584 ms, `rr-stripe` 521 → 505 ms).
   `loss-thin` was 8 ms later at the median and 0.10 copies lighter. Without P4, the medians had been
   up to 102 ms behind v0.4's (`silent` 678 against 576 ms).
 - **v0.5** (2026-10-21), against v0.5's recording: eleven cells within 7 ms at the median, 15 ms at
@@ -1083,8 +1084,8 @@ more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies).
   0.03 copies (`without-a` p99 613 → 578 ms, `cap-wait` 815 → 797 ms). `loss-thin` was 10 ms later
   at the median and 0.11 copies lighter (1.81 copies).
 - **Ties, and no second ask of a peer at once** (2026-10-26): eleven cells within 8 ms at the
-  median, 30 ms at the tail and 0.03 copies (`silent` p50 641 → 649 ms, `without-a` p99 598 → 568
-  ms). `loss-thin` was 8 ms later at the median and 0.12 copies lighter (1.81 copies).
+  median, 30 ms at the tail and 0.03 copies (`silent` p50 641 → 649 ms, `without-a` p99 598 →
+  568 ms). `loss-thin` was 8 ms later at the median and 0.12 copies lighter (1.81 copies).
 - **v0.9's rules** (2026-11-11), against v0.9's own recording: eleven cells within 13 ms at the
   median, 18 ms at the tail and 0.06 copies (`cap-wait` 630 → 643 ms, `without-a` p99 551 → 533 ms).
   `loss-thin` was 6 ms later at the median and 0.14 copies lighter (1.80 copies).
@@ -1107,8 +1108,8 @@ recording of 2026-10-27, with the earlier transport. First written on the main l
 - With `--send-buffer 1`, this document held back 26 667 asks to the next heartbeat, where
   `protocol.md` held back 26 799. It was 2 ms sooner at the median and 1 ms later at the tail, with
   0.02 copies more: p50 510 against 512 ms, p99 593 against 592 ms, 2.07 against 2.05 copies.
-- With `--send-buffer 0`, it held back 24 248 asks against 24 538, 3 ms sooner at the median and 7
-  ms sooner at the tail: p50 541 against 544 ms, p99 621 against 628 ms, 2.41 against 2.40 copies.
+- With `--send-buffer 0`, it held back 24 248 asks against 24 538, 3 ms sooner at the median and
+  7 ms sooner at the tail: p50 541 against 544 ms, p99 621 against 628 ms, 2.41 against 2.40 copies.
 - Before §4.3 carried the limits, it held back none and ran as without them (p50 470 ms).
 
 ## §6.2 The five designs as settings
@@ -1159,16 +1160,17 @@ entry, and the same transport. A column has about ten custodians at this scale.
 
 **Conditions.** The figures come from the toy but for the last, which comes from the research
 harness of the posts (below). The honest row cell: 60 nodes, degree 30, the 1 Gbps proposer, 6 row
-reconstructors, the default 32 row subnets and no supernodes, seeds 7 to 9, at v0.3's promise of 400
-ms and at 0.8 s (`--promise 0.8`). The times of the late answers, and the refusals, are seed 7's.
-Run on 2026-10-08, first written on the main line in `08fbc3d`, recorded in the toy's README there;
-the same later rules as §6.2's entry, and the same transport.
+reconstructors, the default 32 row subnets and no supernodes, seeds 7 to 9, at v0.3's promise of
+400 ms and at 0.8 s (`--promise 0.8`). The times of the late answers, and the refusals, are
+seed 7's. Run on 2026-10-08, first written on the main line in `08fbc3d`, recorded in the toy's
+README there; the same later rules as §6.2's entry, and the same transport.
 
 The payload's promise was evaluated with §4.13 on 2026-10-19, and first written on the main line in
-`08fbc3d`. Its figure comes from the research harness, not the toy: every node at 10 Mbps up and 20
-Mbps down, 30 % withholders, the median of three seeds, each paired with the tier 4 cell of the same
-seed under v0.3's fixed ask window and promise. The promise was scaled with the ask window, to 2 s
-in place of 400 ms. The text's statement that silent peers were not hurt in the toy gives no figure.
+`08fbc3d`. Its figure comes from the research harness, not the toy: every node at 10 Mbps up and
+20 Mbps down, 30 % withholders, the median of three seeds, each paired with the tier 4 cell of the
+same seed under v0.3's fixed ask window and promise. The promise was scaled with the ask window, to
+2 s in place of 400 ms. The text's statement that silent peers were not hurt in the toy gives no
+figure.
 
 - In the honest row cell the 400 ms promise broke 3 321 to 4 204 times per run and parked 804 to
   1 039 honest (peer, group) pairs.
@@ -1348,14 +1350,14 @@ The figures:
 - At 500 nodes, in custody, `NONE` moves the custodians by +2 ms at the median (−4 to +6) and −7 ms
   at the tail (−17 to +46), with no pair short. It sends 7 % fewer offers (1.135 M against 1.222 M)
   and 0.03 fewer copies of 1.81.
-- At 500 nodes, in the rows half withheld with a 1 Gbps proposer, `NONE` moves the custodians by +11
-  ms at the median (+2 to +21) and +7 ms at the tail (−9 to +20), with no pair short. It sends 28 %
-  fewer offers (3.62 M against 5.05 M) and 0.15 fewer copies of about 2.3.
-- At 500 nodes with liars: in the rows with no column withheld, the custodians' median moves by +19
-  ms (0 to +31), with +31 at seed 7, 0 at seed 8 and +19 at seed 9, the middle seed; in the rows
+- At 500 nodes, in the rows half withheld with a 1 Gbps proposer, `NONE` moves the custodians by
+  +11 ms at the median (+2 to +21) and +7 ms at the tail (−9 to +20), with no pair short. It sends
+  28 % fewer offers (3.62 M against 5.05 M) and 0.15 fewer copies of about 2.3.
+- At 500 nodes with liars: in the rows with no column withheld, the custodians' median moves by
+  +19 ms (0 to +31), with +31 at seed 7, 0 at seed 8 and +19 at seed 9, the middle seed; in the rows
   half withheld, by +40 ms (−13 to +71). No node is short in either.
-- The columns' `SAMPLE`, at 500 nodes in the rows half withheld: the custodians' tail moves by +26
-  ms at the median (−12 to +28), on seed 8, the middle seed; their median by +11 ms; no pair is
+- The columns' `SAMPLE`, at 500 nodes in the rows half withheld: the custodians' tail moves by
+  +26 ms at the median (−12 to +28), on seed 8, the middle seed; their median by +11 ms; no pair is
   short.
 - The rows' `NONE` at 60 nodes leaves row members short on every seed: 1 365, 1 444 and 1 770
   node-blocks in the rows, the rows with liars and the rows half withheld, against 0, 1 and 0.
@@ -1397,9 +1399,9 @@ were not run again.
   more than one of a sampler's samples in a block.
 - **The hunt's cost** (half the columns withheld, `--withhold 64`, two blocks), after: 1.3 to 1.7
   asks per sample without routed requests [1.32 with no floor, 1.65 with two covers], 3.0 with them
-  [2.96], and 4.2 to 5.2 with the floor of one or two covers as well [5.20 with two]. 380 to 704
-  requests were passed on over two blocks. Before: 11 to 12 asks per sample, and 1 813 to 2 042
-  requests passed on.
+  [2.96], and 4.2 to 5.2 with the floor of one or two covers as well [5.20 with two; the record does
+  not give the 4.2]. 380 to 704 requests were passed on over two blocks. Before: 11 to 12 asks per
+  sample, and 1 813 to 2 042 requests passed on.
 - **The cost of one sample per peer** (30 % withholders, the floor of one cover with routed
   requests, seed 8; the record does not give the blocks): every sample arrived, at a median of 2.7
   to 3.7 s and a 99th percentile up to 7.7 s, against 2.2 to 2.7 s and 4.9 s before.
