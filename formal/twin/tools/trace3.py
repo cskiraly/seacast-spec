@@ -725,7 +725,7 @@ class Tracer3(Tracer):
                              f"gives {bytes(want).hex()} for that chunk: the id stored on it is not the document's")
 
     def repoint_aliases(self, nd, ns):
-        """Under v2, after the install at the end of construction (design-r4's R1): two names the toy bound to the raw
+        """Under v2, after the install at the end of construction: two names the toy bound to the raw
         objects before the install are pointed at the installed ones, `hdr` at the view of `desc` (`_v2`'s
         `hdr=ns["desc"]`) and `chunk_id` at the installed `message_id` (`_v2` binds the toy's `message_id` wrapper
         to it), and the identities are checked: a raw `hdr` would make every `hdr[g]` read unlogged."""
@@ -1605,7 +1605,7 @@ def main(argv):
     toy, out, rest = Path(argv[0]).resolve(), argv[1], argv[2:]
     tr = Tracer3(toy, out, rest, cli=True)
     if tr.doc_v2:       # under v2, at the end of the node's construction: after _v2 and every option's binding, so that
-        orig_init = tr.N.Node.__init__      # the tracer sees each name as it finally stands (design-r4's R1)
+        orig_init = tr.N.Node.__init__      # the tracer sees each name as it finally stands
 
         def __init__(self, *a, **kw):
             orig_init(self, *a, **kw)
