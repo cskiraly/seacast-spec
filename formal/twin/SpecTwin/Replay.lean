@@ -77,7 +77,7 @@ inductive Entry where
   -- §4.2's deferral path: its questions, and the orders of the twin's levels the Python iterates,
   -- each a list of keys in the Python's order
   | installedBlock (slot : Nat) (root : Root) (r : Option Block)  -- the block as level 1 reads it, or nothing
-  | admitted (p : Peer) (f : ChunkF) (r : Bool)
+  | admitted (p : Peer) (x : Admit) (r : Bool)            -- of a chunk, a HAVE or an offered id
   | reserve (p : Peer) (f : ChunkF) (r : Bool)
   | release (p : Peer) (f : ChunkF)
   | bidGroup (root : Root) (g : Option Group)
@@ -319,7 +319,7 @@ def entry (j : Json) : Except String Entry := do
   | "validate_chunk", #[f] => return .validateChunk (← chunkF f) (← verdict r)
   | "installed_block", #[sl, root] =>
     return .installedBlock (← nat sl) (← rootKey root) (← if r == .null then pure none else some <$> blockOf r)
-  | "admitted", #[p, f] => return .admitted (← nat p) (← chunkF f) (← r.getBool?)
+  | "admitted", #[p, x] => return .admitted (← nat p) (← admitOf x) (← r.getBool?)
   | "reserve", #[p, f] => return .reserve (← nat p) (← chunkF f) (← r.getBool?)
   | "bid_group", #[root] => return .bidGroup (← rootKey root) (← if r == .null then pure none else some <$> groupKey r)
   | "has_room", #[p] => return .hasRoom (← nat p) (← r.getBool?)       -- §7.2's
@@ -612,11 +612,11 @@ instance : Node61 R where
     | some (.installedBlock sl' r' v) =>
       if sl' == sl && r' == r then return v else asked s!"installed_block({sl}, {r})" (some (.installedBlock sl' r' v))
     | e => asked s!"installed_block({sl}, {r})" e
-  admitted p f := do
+  admitted p x := do
     match ← pop with
-    | some (.admitted p' f' v) =>
-      if p' == p && f' == f.narrow then return v else asked s!"admitted({p}, {reprStr f})" (some (.admitted p' f' v))
-    | e => asked s!"admitted({p}, {reprStr f})" e
+    | some (.admitted p' x' v) =>
+      if p' == p && x' == x.narrow then return v else asked s!"admitted({p}, {reprStr x})" (some (.admitted p' x' v))
+    | e => asked s!"admitted({p}, {reprStr x})" e
   reserve p f := do
     match ← pop with
     | some (.reserve p' f' v) =>

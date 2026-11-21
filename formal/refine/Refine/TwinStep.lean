@@ -38,7 +38,7 @@ structure Answers where
   meshAnd : Peer → List Peer := fun p => [p]
   -- §4.2's deferral path: its questions, and the node's orders of the twin's own levels
   installedBlock : Nat → Root → Option Block := fun _ _ => none
-  admitted : Peer → ChunkF → Bool := fun _ _ => true
+  admitted : Peer → Admit → Bool := fun _ _ => true
   reserve : Peer → ChunkF → Bool := fun _ _ => true
   bidGroup : Root → Option Group := fun _ => none
   pendingOrder : List Root → List Root := fun rs => rs

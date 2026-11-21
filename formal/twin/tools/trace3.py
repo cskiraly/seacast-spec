@@ -584,6 +584,19 @@ class Tracer3(Tracer):
         (toy/node.py's message_id), so the twin never computes one."""
         return [f.group.hex(), int(f.index), int(f.slot), f.beacon_block_root.hex(), self.mid_of(f).hex()]
 
+    def admitted_arg(self, x):
+        """What admitted(p, x) is asked of (protocol.md §8): the group a chunk, a HAVE or an offered id names. A HAVE
+        is written as an IHAVE's bitmap, ["bits", group, bitmap]; an offered id (what expand yields: a full id, or a
+        WantIndex) as an ask key; a chunk as the twin reads it. The four shapes differ: a list of three whose first
+        member is "bits", a string or a list of two, and a list of five."""
+        if self.Wm.is_have_bitmap(x):
+            return self.ihave_entry(x)
+        if isinstance(x, (bytes, self.Wm.WantIndex)):
+            return self.key(x)
+        if all(hasattr(x, k) for k in ("group", "index", "slot", "beacon_block_root")):
+            return self.chunk(x)
+        raise TypeError(f"not an argument of admitted: {x!r}")
+
     def wchunk(self, f):
         """A chunk where it arrives or waits: the chunk, and what level 1 reads of it, [descriptor, the proof's
         digests, the data as a blob]. A chunk object without all three (a directed set's, whose level 1 is its
@@ -1354,7 +1367,7 @@ class Tracer3(Tracer):
             "start": lambda r, fn, g: [[fn.__name__, g.hex()], None],
             # the deferral path's questions (defer and tie are the twin's own)
             "installed_block": lambda r, slot, root: [[int(slot), root.hex()], tr.installed(slot, root, r)],
-            "admitted": lambda r, p, f: [[p, tr.chunk(f)], bool(r)],
+            "admitted": lambda r, p, x: [[p, tr.admitted_arg(x)], bool(r)],
             "reserve": lambda r, p, f: [[p, tr.chunk(f)], bool(r)],
             "release": lambda r, p, f: [[p, tr.chunk(f)], None],
             "bid_group": lambda r, root: [[root.hex()], None if r is None else r.hex()],

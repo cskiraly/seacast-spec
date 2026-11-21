@@ -9,7 +9,9 @@ import SpecTwin.Sec71
   twin's state: `peerHas` and `holders` in Readers.lean.
 - **The twin's own too:** `window_release` (§7.1, Sec71.lean) and `origin_acked` (§5.1, Sec51.lean).
 - **`h.group in planned`** is a read of another section's table, asked once for each new index, as the Python
-  evaluates it. -/
+  evaluates it.
+- **`admitted(p, h)`** (v0.10.12) is a question of the HAVE, its group and bits, asked after `valid_have`: a HAVE
+  for a group beyond the peer's limit of unknown groups is ignored, without penalty. -/
 
 namespace SpecTwin
 
@@ -25,6 +27,8 @@ def onHave (p : Peer) (g : Group) (bits : Bits) : M m Unit := do
   if !(← validHave g bits) then                             -- length, and indices within N once known (§8.2)
     penalise p
     branch "on_have: not a valid HAVE"; return
+  if !(← admitted p (.bitmap g bits)) then                  -- a group beyond the peer's unknown groups (§8.2): ignored
+    branch "on_have: not admitted"; return
   let e := (← peerHasEntry? p g).getD {}                    -- created at p's first HAVE for the group
   let newly := bits.minus e.bits                            -- `h.bits & ~e.bits`
   -- `e.bits |= h.bits`; `e.ttl = HAVE_TTL`: heartbeats, refreshed by each HAVE from p for the group

@@ -9,7 +9,9 @@ the document's own nodes ask by index, and never send a full id as an ask.
 The places a full id stands by design (trace3.py), and the only ones taken out before the search:
 - the chunk argument `[group, index, slot, root, id]`: its last member, message_id(f). It is in the args of a record
   of a function that takes a chunk (CHUNK_FNS), and in the tape's validate_chunk, open_group, store, forward,
-  admitted, reserve and release;
+  admitted, reserve and release. admitted's argument is a chunk on the deferral path alone: asked by on_have and
+  on_ihave, it is a HAVE or an offered id, which no blanking takes out. An offered full id there counts, whatever
+  admitted answers: it is a full id the peer offered, which may never become an ask (on_ihave can skip it first);
 - the tape's seen, accepted and mark_seen, whose one argument is a chunk's id;
 - a queue entry's chunk, the first member of each entry of a lane's value (`queue`'s entries in reads, writes,
   rest, and a callee's cr and cw): a pushed or answered chunk, as the toy queues it;
@@ -319,6 +321,15 @@ def self_test():
         ("defer's chunk in its record's args (a directed record)", 0, {"fn": "defer", "args": [4, chunk]}),
         ("a chunk's id on admitted's tape entry, under another function", 1,
          {"fn": "send_have", "args": [4, g], "tape": [["admitted", [4, chunk], True]]}),
+        ("a synthetic record: an offer by index and a HAVE on admitted's tape entries, under on_frame (on_ihave's "
+         "and on_have's, in a frame's order)", 0,
+         {"fn": "on_frame", "args": [4, [[], [], [], []]],
+          "tape": [["admitted", [4, [g, 1]], True], ["admitted", [4, ["bits", g, 3]], True]],
+          "reached": ["on_frame", "on_have", "on_ihave"]}),
+        ("a synthetic record: an offered full id on admitted's tape entry, under on_frame (on_ihave's), refused: an "
+         "offered full id all the same, so it counts", 1,
+         {"fn": "on_frame", "args": [4, [[], [], [], []]], "tape": [["admitted", [4, other], False]],
+          "reached": ["on_frame", "on_ihave"]}),
         ("a wait's chunk in pending's value, in a read", 0,
          {"fn": "send_have", "args": [4, g], "reads": [["pending", ["22" * 32], [[4, chunk]]]]}),
         ("a wait's chunk in pending's value, in a callee's cw", 0,
