@@ -45,7 +45,8 @@ says what was not taken:
   question that no measurement here settles, and it is outside this version.
 - **`[D4]` the repair floor.** A node that may rebuild keeps at least `REPAIR_FLOOR` links to
   custodians of each column that it does not custody (§4.6). The parameter is at least 1. Without
-  the floor, some runs of the toy's withheld row cell left custodians short, each one by a missing
+  the floor, some runs of the toy's row cell with half the columns withheld left custodians short,
+  each one by a missing
   link; with a floor of 1, every run completed (protocol-v2-figures.md, §6.2). Opening a link only
   when a rebuilt cell has nowhere to go (§4.6) was not taken; it is kept as an option.
 - **`[D6]` the payload's consistency route.** This version has no such route: it leaves the
@@ -88,8 +89,9 @@ build of the research harness runs them. Nothing measured argues against them.
   (§2, §4.1).
 
 **The promise's length.** §4.13 stretches the ask window on thin links and keeps the promise at
-400 ms, so a peer that does not answer is parked as in `protocol.md` §6.1, and a slow honest peer
-can be parked too before the asker has moved on. The option is a promise per peer that follows the
+400 ms, so a peer that does not answer is parked as in `protocol.md` §6.1. A slow honest peer can be
+parked as well: its answer can take longer than the promise while the stretched ask window still
+keeps the asker waiting on it. The option is a promise per peer that follows the
 times its answers took: `max(PROMISE, srtt + 4 · rttvar)`, smoothed as TCP's retransmission timer is
 (RFC 6298); a peer that never answered keeps the floor. In the toy, in the setting of the research
 harness at 12.5 Mbps, the option gave the same completion times and bytes as §4.13's form, parked
@@ -140,8 +142,9 @@ row settings a row member's 64th cell, by at most +20 ms at the median over the 
     [D5]).
   - *At 500 nodes*, it is close in custody, with fewer offers and slightly fewer copies. It is close
     in rows with half the columns withheld and a 1 Gbps proposer, with fewer offers and fewer
-    copies. With liars it is close only by the letter without withheld columns: the custodians'
-    median is inside the bound on the middle seed and outside it on another. It is not close with
+    copies. With liars and no withheld columns it is close by the rule as written, the median over
+    the seeds, but not on every seed: the custodians' median is inside the bound on the middle seed
+    and outside it on another. It is not close with
     half withheld. No node is short in either (protocol-v2-figures.md, [D5]). Three seeds show a
     pass or a fail, not a comparison, and do not show the 60-node shortfall gone.
   - *The rows' `NONE`* left row members short on every seed in every row setting: the rows need
@@ -212,7 +215,8 @@ subnet custodies.
   member lacks look uncovered, so the bias barely narrows the draw.
 - *The odds.* In a network model of the toy's 500-node rows, in one network whose hoarders repair
   the members' cells and leave a few columns unrepaired, the bias over linked members makes it only
-  somewhat less likely that every honest member of the subnet passes, so that the row stays short.
+  somewhat less likely that every honest member of the subnet passes the member check, the case in
+  which nobody repairs the row and it stays short.
   It makes that unlikely only with every member known, a view the node does not have.
 - *Where hoarders mark their rebuilt cells seen,* the uniform sample already catches them in the
   model. Beside that option, the runs (a toy check) showed nothing from the bias
@@ -333,7 +337,8 @@ carried later than its version.
     connection, and both recordings were made again (`protocol-v2-figures.md`'s preamble, §6.1).
   - What waits for a gate is carried where this document uses `protocol.md`'s functions: `tie`,
     with `tie_room`'s limits, the limit of unknown groups and the slot it records (`tie_slot`);
-    `close_promises`, now code, from `fill` and `tie`; and `on_block_installed`, which drops at
+    `close_promises`, which `protocol.md` now gives as code, called from `fill` and `tie`; and
+    `on_block_installed`, which drops at
     installation a tied index the group, known by then, does not have, and whose level 1 for the
     payload is `validate_chunk` with its new check of the copy's slot (`protocol.md` §3, §4.2).
   - The announcers beyond a chunk's ordered list are tried in the node's own order, in
@@ -361,8 +366,9 @@ carried later than its version.
   (`SOURCE_OFFERS`). This draft carries them all: the rename (`on_frame`, `frame`, `ihave_frames`),
   the bounds of §6.3 in the kinds of §8.3, the IHAVE values (§4.3, §6.3), "acknowledged" (§4.7), and
   `SOURCE_OFFERS` (§4.7, §6.3).
-- v0.10.4 (2026-11-18): `protocol.md` says what heartbeat gossip tells of the source, names a chunk
-  that is never acknowledged as open, and keeps an IDONTWANT entry that is not a HAVE bitmap as
+- v0.10.4 (2026-11-18): `protocol.md` says what heartbeat gossip tells of the source, names as open
+  the case of a chunk that is never acknowledged, and keeps an IDONTWANT entry that is not a
+  HAVE bitmap as
   stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped group and in
   its reading of bitmaps and ids. This draft runs on the same toy. It carries the IDONTWANT rule
   onto the gossipsub binding (`protocol-v2-bindings.md` §3), where the toy now keeps such an entry
