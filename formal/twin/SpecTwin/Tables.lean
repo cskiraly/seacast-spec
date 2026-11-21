@@ -320,9 +320,9 @@ class Tables (m : Type → Type) where
   /-- `probed[g] = q` -/
   setProbed : Group → Nat → m Unit
   /-- `a in probe_asks` -/
-  probeAsk? : GI → m Bool
+  probeAsk? : Key → m Bool
   /-- `probe_asks.add(a)`, or `.discard(a)` -/
-  setProbeAsk : GI → Bool → m Unit
+  setProbeAsk : Key → Bool → m Unit
   /-- `g in probe_sent` -/
   probeSent? : Group → m Bool
   /-- `probe_sent.add(g)`, or `.discard(g)` -/
@@ -494,7 +494,7 @@ class Tables (m : Type → Type) where
   /-- every `probed` -/
   allProbed : m (List (Group × Nat))
   /-- every member of `probe_asks` -/
-  allProbeAsk : m (List GI)
+  allProbeAsk : m (List Key)
   /-- every member of `probe_sent` -/
   allProbeSent : m (List Group)
   /-- every `probe_ok` -/

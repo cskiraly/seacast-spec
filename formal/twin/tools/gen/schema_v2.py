@@ -18,7 +18,8 @@ A table's codec follows from two things (design §4.4): what a read of a missing
 How a record writes them (design §4.4, agreed with the tracer):
 - keys: a type id as its string (`"payload"`, `"column"`, `"row"`); a family as an integer, a natural number or
   `["-", n]`; a block id as 64 hex digits; `backoff`'s inner key as `[colour, direction]`, the direction `"OUT"`,
-  `"IN"` or `"BOTH"`; a member of `probe_asks` as `[group, index]`;
+  `"IN"` or `"BOTH"`; a member of `probe_asks` as an ask key, as protocol.md's tables write one: an ask by index
+  `[group, index]`, a structured id its hex digits;
 - messages as tagged arrays in §2's field order: `["join", T, interest, custody_count, duty, colours]`,
   `["graft", T, family, colour, direction, answer]`, `["prune", T, family, colour, direction]`, enumerations as
   the toy's strings;
@@ -64,8 +65,7 @@ VALUES_V2 = {
                       empty="an empty list of groups and indices"),
 }
 # how a key of each of v2's Lean types is read from a record's path (ReplayBase.lean)
-PARSE_V2 = {"V2.TypeId": "typeId", "V2.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir",
-            "GI": "chunk"}
+PARSE_V2 = {"V2.TypeId": "typeId", "V2.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir"}
 
 P, G, I = ("p", "Peer"), ("g", "Group"), ("i", "Nat")
 TY, FAM, B = ("T", "V2.TypeId"), ("fam", "V2.Fam"), ("b", "BlockId")
@@ -129,6 +129,8 @@ TABLES_V2 = [
     Table("claims", "claims", "claims", [G], "opeerset",
           read=("claims?", "`claims[g]`: the peers whose claim_all arrived, or none where the group has no entry"),
           write=("setClaims", "`claims[g].add(q)`, `claims[g].discard(q)`: the entry stays, empty or not"),
+          # claims_close's `claims.items()`: the groups' order is asked (design §3.2, `keys` of `claims`)
+          ordered=True,
           scans=[whole("claims", "every `claims`: `claims.items()`", used=True)]),
     Table("reconsider_at", "reconsiderAt", "reconsiderAt", [G], "time",
           read=("reconsiderAt?", "`reconsider_at.get(g)`: when our later decode duty fires, or none"),
@@ -151,7 +153,9 @@ TABLES_V2 = [
           read=("probed?", "`probed[g]`, `probed.get(g)`: the claimant we asked, or none"),
           write=("setProbed", "`probed[g] = q`"),
           scans=[whole("probed", "every `probed`")]),
-    Table("probe_asks", "probeAsks", "probeAsk", [("a", "GI")], "member",
+    # an ask key, as protocol.md's tables keep one: `gated(a)` tests an ask by index or a structured id, two keys
+    # even where they name one chunk
+    Table("probe_asks", "probeAsks", "probeAsk", [("a", "Key")], "member",
           read=("probeAsk?", "`a in probe_asks`"), write=("setProbeAsk", "`probe_asks.add(a)`, or `.discard(a)`"),
           scans=[whole("probeAsk", "every member of `probe_asks`")]),
     Table("probe_sent", "probeSent", "probeSent", [G], "member",
@@ -192,6 +196,8 @@ TABLES_V2 = [
     Table("probe_waiting", "probeWaiting", "probeWaiting", [G, P], "slot",
           read=("probeWaiting?", "`probe_waiting[g][p]`: p's first marked ask of the group, or none"),
           write=("setProbeWaiting", "`probe_waiting[g][p] = i`"), erase=("eraseProbeWaiting", "`del probe_waiting[g][p]`"),
+          # serve_waiting_probe's `probe_waiting[g].items()`: a group's peers' order is asked (design §3.2)
+          ordered_levels=[1],
           scans=[Scan("allProbeWaiting", "probeWaiting", "every `probe_waiting[g]`: `probe_waiting[g].items()`",
                       row=True, used=True),
                  whole("probeWaitingAll", "every `probe_waiting`", note="every `probe_waiting[g][p]`")]),
@@ -241,13 +247,13 @@ def colour_dir(k):
     return [c, d]
 
 
-def python_tables_v2(F, fbits, msg):
+def python_tables_v2(F, key, fbits, msg):
     """v2's tables as the Python tracer's schema lines (footprint.Table), as `schema.python_tables` gives
-    protocol.md's: how each key and each value is written in a record. `fbits` writes a float as its 64 bits, `msg`
-    a JOIN, GRAFT or PRUNE as its tagged array (the tracer's, which knows the toy's messages)."""
-    keyenc = {"Peer": int, "Group": lambda g: g.hex(), "Nat": int, "V2.TypeId": type_id, "V2.Fam": signed,
-              "BlockId": lambda b: b.hex(), "ColourDir": colour_dir,
-              "GI": lambda a: [a.group.hex(), int(a.index)]}
+    protocol.md's: how each key and each value is written in a record. `key` writes an ask key as protocol.md's
+    tables do (an ask by index `[group, index]`, a structured id its hex digits), `fbits` a float as its 64 bits,
+    `msg` a JOIN, GRAFT or PRUNE as its tagged array (the tracer's, which knows the toy's messages)."""
+    keyenc = {"Key": key, "Peer": int, "Group": lambda g: g.hex(), "Nat": int, "V2.TypeId": type_id,
+              "V2.Fam": signed, "BlockId": lambda b: b.hex(), "ColourDir": colour_dir}
 
     def finite(t):                      # `--prune-backoff` is not validated: a non-finite leaf is refused here
         if not math.isfinite(t):
@@ -307,11 +313,21 @@ def self_test():
     class F:                                        # footprint.Table's arguments, kept
         class Table:
             def __init__(self, name, keys, value, **kw):
-                self.name, self.keys, self.value = name, keys, value
+                self.name, self.keys, self.value, self.kw = name, keys, value, kw
+
+    class WantIndex(NS):                            # the toy's ask by index, a stand-in
+        pass
+
+    def key(a):                                     # the tracer's ask key (trace61.py's `key`), over the stand-in
+        if isinstance(a, WantIndex):
+            return [a.group.hex(), a.index]
+        if isinstance(a, bytes):
+            return a.hex()
+        raise TypeError(f"not an ask key: {a!r}")
 
     fbits = lambda t: struct.unpack("<Q", struct.pack("<d", t))[0]      # noqa: E731
     msg = lambda m: ["join", m.T, "ALL", 0, "NONE", 1]                   # noqa: E731: the tracer's, here a stand-in
-    by = {t.name: t for t in python_tables_v2(F, fbits, msg)}
+    by = {t.name: t for t in python_tables_v2(F, key, fbits, msg)}
     names = [t.name for t in TABLES_V2]
     case("v2's tables", len(names), 36)
     case("no name twice, none of protocol.md's", sorted(set(names) - {t.name for t in TABLES}) == sorted(names), True)
@@ -336,7 +352,18 @@ def self_test():
     case("probe_served's False", by["probe_served"].value(False), None)
     case("rsample, in order", by["rsample"].value([3, 1, 2]), [3, 1, 2])
     case("held_samples", by["held_samples"].value([(g, 3)]), [[g.hex(), 3]])
-    case("a member of probe_asks", by["probe_asks"].keys[0](NS(group=g, index=3)), [g.hex(), 3])
+    # an ask by index and a structured id that name one chunk are two members (a5's round t3)
+    sid = g + (3).to_bytes(4, "little") + bytes(20)
+    case("a member of probe_asks, by index", by["probe_asks"].keys[0](WantIndex(group=g, index=3)), [g.hex(), 3])
+    case("a member of probe_asks, a structured id", by["probe_asks"].keys[0](sid), sid.hex())
+    case("the two forms of one chunk's ask, apart",
+         by["probe_asks"].keys[0](WantIndex(group=g, index=3)) != by["probe_asks"].keys[0](sid), True)
+    # the levels whose iteration order the tracer puts on the tape (design §3.2's `keys` entries)
+    case("claims' groups, ordered", (by["claims"].kw["ordered"], tuple(by["claims"].kw["ordered_levels"])), (True, ()))
+    case("probe_waiting[g]'s peers, ordered",
+         (by["probe_waiting"].kw["ordered"], tuple(by["probe_waiting"].kw["ordered_levels"])), (False, (1,)))
+    case("no other v2 table ordered", sorted(t.name for t in TABLES_V2 if t.ordered or t.ordered_levels),
+         ["claims", "probe_waiting"])
     case("samples_in_flight below zero", by["samples_in_flight"].value(-1), ["-", 1])
     case("owed_relations, empty", by["owed_relations"].value([]), None)
     case("a JOIN, by the tracer's encoder", by["join_recv"].value(NS(T="row")), ["join", "row", "ALL", 0, "NONE", 1])

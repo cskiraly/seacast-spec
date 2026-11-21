@@ -70,7 +70,7 @@ structure State where
   waited : Std.HashSet Group := {}
   probe : Std.HashMap Group Nat := {}
   probed : Std.HashMap Group Nat := {}
-  probeAsks : Std.HashSet GI := {}
+  probeAsks : Std.HashSet Key := {}
   probeSent : Std.HashSet Group := {}
   probeOk : Std.HashMap Group (Option Bool) := {}
   rsample : Std.HashMap Group (List Nat) := {}
@@ -151,7 +151,7 @@ inductive Cell where
   | waited (g : Group)
   | probe (g : Group)
   | probed (g : Group)
-  | probeAsk (a : GI)
+  | probeAsk (a : Key)
   | probeSent (g : Group)
   | probeOk (g : Group)
   | rsample (g : Group)

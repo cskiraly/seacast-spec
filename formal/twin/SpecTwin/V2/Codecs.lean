@@ -34,6 +34,15 @@ def refused (table path value : String) : Bool :=
 def g : String := "\"" ++ String.ofList (List.replicate 64 'a') ++ "\""
 def gk : Group := String.ofList (List.replicate 64 'a')
 
+/-- A structured id of chunk 3 of `gk`: the group, the index's four bytes little-endian, a content id. -/
+def sid : String := String.ofList (List.replicate 64 'a') ++ "03000000" ++ String.ofList (List.replicate 40 '0')
+
+/-- The two forms of one chunk's ask name two cells of `probe_asks` (`gated(a)`'s `a not in probe_asks`). -/
+def twoForms : Except String Bool := do
+  let a ← cell "probe_asks" (← Json.parse s!"[[{g}, 3]]")
+  let b ← cell "probe_asks" (← Json.parse s!"[\"{sid}\"]")
+  return a != b
+
 -- per link and object type: a JOIN; the colours of a relation under a signed family; a relation list
 #guard reads "join_recv" s!"[5, \"row\"]" "[\"join\", \"row\", \"DERIVED\", 0, \"FORWARD\", 1]"
   (.join { objectType := "row", interest := .derived, custodyCount := 0, duty := .forward, colours := 1 })
@@ -67,6 +76,10 @@ def gk : Group := String.ofList (List.replicate 64 'a')
 #guard reads "deferred" s!"[{g}]" "true" .flag
 #guard reads "probe" s!"[{g}]" "0" (.slot 0)
 #guard reads "probe_asks" s!"[[{g}, 3]]" "true" .flag
+-- an ask key either way: by index, or a structured id of the same chunk, which is another member
+#guard reads "probe_asks" s!"[\"{sid}\"]" "true" .flag
+#guard twoForms.toOption == some true
+#guard refused "probe_asks" "[\"abcd\"]" "true"                             -- an id of another length is no ask
 -- per peer and group: a flag of two keys, false no value; an IBits with presence
 #guard reads "probe_served" s!"[5, {g}]" "true" .flag
 #guard refused "probe_served" s!"[5, {g}]" "false"
