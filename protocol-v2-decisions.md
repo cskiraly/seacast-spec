@@ -26,15 +26,16 @@ draft" mean `protocol-v2.md`. The figures behind this record are in
 | `[D10]` colours (decided: a parameter, with no default) | `TypeParams.M`, `F_LO`, `F_HI`, `D_OUT`, `SYMMETRIC`, §1.4, §4.1 |
 | `[D11]` join = (interest, duty); topics as rendezvous (decided: the join as written; the rendezvous gossipsub topics per family, with the ENR beside them) | §2 `Join`, §1.2, `protocol-v2-bindings.md` §0's rendezvous row |
 | `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_OUTSTANDING`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
-| the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | v0.3 §6.1's `PROMISE`; §6.3's `PROMISE` row |
+| the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | `protocol.md` §6.1's `PROMISE`; §6.3's `PROMISE` row |
 | a source's links in a family it does not custody (decided: it never waits for links; three layers on top of its fanout; a refused push to a fallback link owed) | §4.7 `source_pool`, `candidates_for_source`, `origin_acked`, `unpush`; §6.3's `SOURCE_FLOOR` row |
 | the probe of a claim (R5) (decided: the claimant judged by its own copy; the probe marked and answered whatever the asker holds, once per asker and group; the asker's queue keeps it; its cell drawn at random) | §2 `Want.probe`; §4.2 `on_chunk`, `fill`; §4.5 `on_want`; §4.6 `reconsider`, `defer_on_claim`, `settle_probe`, `probe_answer`, `probe_promise`, `probe_waits`, `probe_of_claim`, `serve_probe`, `filter_entry`; `protocol-v2-bindings.md` §0's WANT row |
 
 **Decided on 2026-11-13.** Six of the decisions above were chosen, each with what was not taken:
 - **`[D1]` identity and bindings.** v2 is a protocol of its own, defined on its own messages and
   carried by three bindings, defined in their own document (`protocol-v2-bindings.md`, since
-  2026-11-17): the standalone one, the binding onto gossipsub's Partial Messages Extension, and v0.3's
-  wire. §7 states what every binding provides and the capabilities each gives up. Not taken: the
+  2026-11-17): the standalone one, the binding onto gossipsub's Partial Messages Extension, and the
+  gossipsub binding (`protocol-v2-bindings.md` §3). §7 states what every binding provides and the
+  capabilities each gives up. Not taken: the
   extension alone, which gives up interest without subscription and the push relation's floor and
   direction (§7);
   and deciding after a paired cell of the signalling cost on both wires, which neither
@@ -57,7 +58,8 @@ draft" mean `protocol-v2.md`. The figures behind this record are in
   document is ever wanted. The cost is that each version of `protocol.md` is carried in here (§5).
   Not taken: one document, whose case is that the payload and the general rules are the same code;
   folding `protocol.md` into these notions would rewrite text without changing behaviour.
-- **`[D10]` colours.** `M` is a parameter with no default. It is measured at 1 (tier 4, v0.3) and
+- **`[D10]` colours.** `M` is a parameter with no default.
+  It is measured at 1 (tier 4, `protocol.md`) and
   at N (variant C); 1 < M < N is for later study, which needs colour negotiation and a floor per
   colour in the toy first. Not taken: a measured default before release.
 - **`[D11]` the rendezvous.** Gossipsub topics per family, in every binding, with the ENR beside
@@ -82,12 +84,14 @@ Nothing measured argues against them.
 - **`[D11]`, the join:** a JOIN per link and object type, carrying interest and duty (§2, §4.1).
 
 **The promise's length.** §4.13 stretches the ask window on thin links and keeps the promise at
-400 ms, so a peer that does not answer is parked as in v0.3, and a slow honest peer can be parked
+400 ms, so a peer that does not answer is parked as in `protocol.md`,
+and a slow honest peer can be parked
 too before the asker has moved on. The option is a promise per peer that follows the times its
 answers took: `max(PROMISE, srtt + 4 · rttvar)`, smoothed as TCP's retransmission timer (RFC 6298),
 a peer that never answered keeping the floor. In the toy, in the research harness's setting at
 12.5 Mbps, it gave the same completion times and bytes as §4.13's form, parked fewer honest (peer,
-group) pairs than that form and than v0.3, and parked the withholders of a 30 % withholding network
+group) pairs than that form and than `protocol.md`,
+and parked the withholders of a 30 % withholding network
 as before (protocol-v2-figures.md, §4.13). What it buys is the honest peers' standing (and whatever
 scoring reads from broken promises), not time; it needs per-peer state and a sample on every
 answered ask. Not measured in the harness. A promise stretched with the window, the other form, is
@@ -112,7 +116,8 @@ holding that names the chunk or a later copy's timeout.
 
 **The window's unit** (X3, decided 2026-11-13): bytes, as §4.11 runs it, a chunk taking its own
 length of the window. The column cells gain in the toy, at 500 nodes too, and tier 4 moves little
-(protocol-v2-figures.md, §4.11). Not taken: v0.3's slots of `CHUNK_BYTES`, and slots per object
+(protocol-v2-figures.md, §4.11).
+Not taken: `protocol.md`'s slots of `CHUNK_BYTES`, and slots per object
 type, which leave the same capacity question at every boundary between types (§4.11).
 
 **Decided on 2026-11-14.** Two decisions after their runs, and §4.12's rule. The runs are toy
@@ -156,7 +161,8 @@ at most +20 ms at the median over the seeds.
     any short. Why was not traced.
   - Not taken: 2 s, which fails R7; and a delay under 1 s as the default.
 - **A source's own chunks go first** (§4.12), under X3's window in bytes. In the toy its clearest
-  gain was in custody with a 50 Mbps proposer, and single-group cells run as under v0.3's order
+  gain was in custody with a 50 Mbps proposer, and single-group cells run as under v0.3's order,
+  which takes the rarest of the chunks ahead of the first control-only entry (card 9)
   (protocol-v2-figures.md, §4.12). Not taken: v0.3's order, and dropping the source's offers or
   queueing them after the block's pushes, which delay a fast proposer's completion at the median
   (protocol-v2-figures.md, §4.12).
@@ -345,7 +351,8 @@ carried into them, with the date each was carried where it came later than the v
   that is never acknowledged as open, and keeps an IDONTWANT entry that is not a HAVE bitmap as
   stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped group and in
   its reading of bitmaps and ids. This draft runs on the same toy. It carries the IDONTWANT rule
-  onto v0.3's wire (`protocol-v2-bindings.md` §3), where the toy now keeps such an entry in
+  onto the gossipsub binding (`protocol-v2-bindings.md` §3),
+  where the toy now keeps such an entry in
   `unwanted[p]`. §4.7 already says that, for a type that gossips (`ANNOUNCE_EXTRA = SAMPLE`), the
   source's heartbeat gossip draws on every chunk at either setting, and its open item on a chunk
   that is never acknowledged is the one `protocol.md` §5.1 names.
