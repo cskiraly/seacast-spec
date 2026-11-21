@@ -15,14 +15,17 @@ messages. The detailed notes of every release up to v0.10.8 are in
 
 ## After v0.10.10 — not yet released
 
-The next version's draft moves its decisions and its figures to files of their own, names its
-bindings by their carriers and defines the gossipsub binding's extra fields to the byte; its files
-are rewritten in plain sentences.
+The next version's draft gives a cell group's header three forms, moves its decisions and its
+figures to files of their own, names its bindings by their carriers and defines the gossipsub
+binding's extra fields to the byte; its files are rewritten in plain sentences.
 
 ### Rules
 - `protocol-v2-bindings.md` §1.6: a cell group's header travels in one of three forms: from the
   block, in every cell message, or in a header message of its own; the object type's definition
   fixes the form, and no topic mixes two forms.
+- `protocol-v2-bindings.md` §2.3, §3: on the libp2p stream binding, and on the Waggle binding as on
+  it, form (a) leaves `CellChunk.header` empty, and form (c) needs a message kind of its own, which
+  this version does not define.
 - `protocol-v2-bindings.md` §4: on the gossipsub binding, form (a) puts the header in no cell's
   message, form (b) in every copy of each cell's message, and form (c) in a header message of its
   own on each family's topic.
@@ -36,15 +39,15 @@ are rewritten in plain sentences.
 - `protocol-v2-decisions.md`: the draft's decision record, with an index of the decisions, the
   dated record from `protocol-v2.md` §8, and the list of the versions of `protocol.md` carried,
   from §5.
+- `protocol-v2-decisions.md`: three decisions of 2026-11-21 on the bindings: the bindings by
+  carrier, the gossipsub binding to the byte, and a cell group's header in three forms.
 - `protocol-v2-figures.md`: the figures behind `protocol-v2.md`'s reasons, by the section that
   cites them, each with its conditions.
 - `protocol-v2.md`: a reading guide in §0, and a glossary of the document's own terms, each with
   the section that defines it.
 - `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
 - `protocol-v2-bindings.md` §1.6: "Open: a cell before its block, under form (a)".
-- `protocol-v2-bindings.md` §4: "Open: the strings for cell groups, and the versions written": the
-  32 bytes that name a column's or a row's group, the version a node writes when it has no flag to
-  carry, and whether every binding ignores a WANT whose `hops` is over `ROUTE_HOPS`.
+- `protocol-v2-bindings.md` §4: "Open: the strings for cell groups, and the versions written".
 - `protocol-v2-bindings.md` §0, `protocol-v2.md` §7: a native QUIC binding is being drafted.
 
 ### Changed
@@ -62,8 +65,8 @@ are rewritten in plain sentences.
 - `protocol-v2.md`, `protocol-v2-decisions.md`, `protocol-v2-figures.md`: each "v0.3" names what
   it means: `protocol.md`, the gossipsub binding, or draft v0.3's own rules.
 - `protocol-v2.md`, `protocol-v2-bindings.md`, `protocol-v2-decisions.md`,
-  `protocol-v2-figures.md`: plain sentences, with the code, every number, code span, heading, bold
-  lead and obligation word the same.
+  `protocol-v2-figures.md`: plain sentences; the prose is rewritten and points its terms to where
+  they are defined, and the code is the same.
 - `protocol-v2-figures.md` §6.1: the comparison of `ihave-limits` with `protocol.md`'s is dated,
   since `protocol.md`'s recording moved on 2026-11-20.
 - `README.md`: the bindings document's entry names the carriers, and the decision record, the
@@ -87,13 +90,18 @@ are rewritten in plain sentences.
 - `protocol-v2.md` §2: a cell's header travels in one of the three forms, and on the libp2p stream
   binding the second form carries it once per group and link.
 - `protocol-v2.md` §4.5: an ask by derived interest makes no promise with a timer, since an ask
-  made by `want`, not on an offer, starts none, except a claim's probe (`filter_entry`); the
-  custodian answers from what it holds, and keeps the ask for later only as a standing request.
+  marked `want`, one sent in a WANT and not on an offer, starts none, except a claim's probe
+  (`filter_entry`); the custodian answers from what it holds and keeps the ask for later only as a
+  standing request, and a claimant still decoding keeps the probe of its claim.
 - `protocol-v2.md` §4.7: merging the source's holdings moves copies by 0.01 at most.
 - `protocol-v2.md` §4.9, §5: `projected` is `protocol.md` §7.2's.
 - `protocol-v2.md` §4.11: the line-stall check counts the sends to the other peers from 600 ms
   after the stall on, and accepts queues left empty.
 - `protocol-v2.md` §4.13: at 50 Mbps and above, the ask window is `protocol.md`'s.
+- `protocol-v2.md` §6.3, `protocol-v2-figures.md` §6.3: at a promise of 0.8 s, completion times move
+  a little: the medians by at most 3 ms, and the tails by at most 20 ms.
+- `protocol-v2-figures.md` §4.3: under custody, the busiest peer is given per cell: 244
+  offer-bearing frames and 58 asks in a heartbeat without samplers, and 248 and 49 with them.
 - `protocol-v2.md` preamble, §6.2: the toy checks the tier 4 setting against its own recorded cells
   (`check.py --doc v2`), which §6.1 compares with `protocol.md`'s.
 - `protocol-v2-figures.md` §4.6: where the toy's records differ from the old text, the entry gives
@@ -101,8 +109,10 @@ are rewritten in plain sentences.
   range, a saving per cell, and the tails with the fast class off.
 - `protocol-v2-figures.md` §4.6: with supernodes, the 500-node medians run from 1 170 to 1 179 ms,
   over both arms.
-- `protocol-v2-figures.md` §4.7: the chunks that come back at the source are given as a seed's mean
-  a message: at most 59 at one seed, and at most 17 with §4.11's rule.
+- `protocol-v2.md` §4.7, `protocol-v2-figures.md` §4.7: the chunks that come back to the source are
+  counted in the three all-home payload cells (`push`, `--rebuilt none`, `sil30`), as a seed's mean
+  a message: at most 59 at one seed, and at most 17 with §4.11's rule; the 1 Gbps builder's cell
+  (`dcb20`) is given apart.
 - `protocol-v2-figures.md` §4.7, §4.11: the figure on the columns that no node but the source
   custodies gives both cells that count it, and the window's sampling cell is given as its record
   has it.
