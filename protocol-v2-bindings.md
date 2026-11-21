@@ -261,6 +261,13 @@ eager push of each group and link, form (b). The gossipsub binding's wire charge
 form (a) for a node that holds the block before the cells, and the toy does not model a block that
 comes after its cells.
 
+**Open: a cell before its block, under form (a).** A cell's message names its group (the block root
+and the column or the row, §1.2) but not its slot, and under form (a) no header comes with it.
+`protocol-v2.md` §4.2's `on_chunk` checks the slot's live window before the cell can wait in
+`defer`, and `tie` keeps the slot too. How a receiver admits, bounds and expires a cell whose slot
+it does not know yet, or whether the cell's message names its slot under form (a), is for a later
+release.
+
 ## 2. The libp2p stream binding
 
 This binding is a protocol of its own, carrying `protocol-v2.md` §2's messages with every rule of
@@ -367,11 +374,11 @@ protobuf field or a gossipsub message type. The toy runs `protocol-v2.md` on it.
   topic, so beside the `HaveBitmap`s its entries can be stock message ids, such as another topic's.
   An entry is a holding (`protocol-v2.md` §4.3's `on_holding`) if it opens with `HaveBitmap`'s
   MAGIC and a version this binding writes, and holds after them a group and, at version 4, the
-  claims' flags byte. The versions this binding writes are version 1 of `protocol.md` §2, which its
-  `is_have_bitmap` tests, and version 4, below. Any other entry, one cut short included, is an
-  opaque id, kept in `unwanted[p]` with stock gossipsub's admission and lifetime, where `on_want`
-  reads it (`protocol-v2.md` §4.5); it is not read as a holding. Both are handled after the frame's
-  asks, as `protocol-v2.md` §4's `on_frame` handles holdings.
+  claims' flags byte with no reserved bit set. The versions this binding writes are version 1 of
+  `protocol.md` §2, which its `is_have_bitmap` tests, and version 4, below. Any other entry, one
+  cut short included, is an opaque id, kept in `unwanted[p]` with stock gossipsub's admission and
+  lifetime, where `on_want` reads it (`protocol-v2.md` §4.5); it is not read as a holding. Both are
+  handled after the frame's asks, as `protocol-v2.md` §4's `on_frame` handles holdings.
 - **An IHAVE's entries** are offers only as `HaveBitmap`s. Any other entry is ignored, without
   penalty, where `protocol.md` §4.4 reads it as a structured id: this draft offers by bitmap only.
 - **The extra fields** are carried in version 4 of the strings: a holding's `claim_all` and
@@ -384,8 +391,15 @@ protobuf field or a gossipsub message type. The toy runs `protocol-v2.md` on it.
     as `protocol.md` §2 states for `WantIndex`. The research harness writes it big-endian, a
     difference of that implementation.
   - *An offer* keeps version 1, which has no flags.
+  - *The group* is 32 bytes: `protocol.md` §2's group key, which is the whole id of a payload group.
+    A column's or a row's `GroupId` also has a type and an index (§1.2), and an IDONTWANT or an
+    IWANT names no topic, so these strings name such a group only as the Open below leaves it.
   - *An entry with a reserved bit set,* a WANT of the wrong length, or a WANT whose `hops` is over
     its type's `ROUTE_HOPS` (`protocol-v2.md` §6.3) is ignored without penalty.
+- **Open: the strings for cell groups, and the versions written.** Three points are left for a
+  later release: the 32 bytes that name a column's or a row's group; which version a node writes
+  when it has no flag to carry, since a `protocol.md` node reads version 1 only; and whether every
+  binding ignores a WANT whose `hops` is over `ROUTE_HOPS`, as this one does.
 - **EVIDENCE** would travel as a full gossipsub message on the family's rendezvous topic, as on the
   partial-messages binding (§0's table). None is defined in this version (`[D6]`), so this carrier
   is reserved, as SEACAST's message encoding reserves its kind `0x08` (§1.1).
