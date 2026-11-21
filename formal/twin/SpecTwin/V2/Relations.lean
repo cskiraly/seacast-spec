@@ -19,13 +19,15 @@ sections call each other both ways (`protocol.md`'s twin does the same, README.m
   is a crash of the twin's own name.
 - **`or` and `and` short-circuit** as the Python's do: `send_relation` asks `send` only where nothing is owed,
   and `serves` asks `interest_of_peer` only where p's interest is not `DECLARED`.
-- **Writes, in every v2 file.** A change in place of a value (`.set(i)`, `.clear(i)`, `|=`, a set value's
-  `.add` or `.discard`) reads its entry first, as the Python does; the twin may then write it whether it changes
-  or not, since the replay passes a write that leaves an entry the Python read as it was (`Replay.lean`'s
-  footprint), as `protocol.md`'s twin does. Some places skip the unchanged write, some make it: both pass. A
-  member of a set that is a table of its own (`probe_asks`, `probe_sent`) is different: its `add` and `discard`
-  are a write with no read, as the tracer's view of a set logs them, so the twin writes it unconditionally and
-  reads nothing.
+- **Writes, in every v2 file.** A method call that changes a value in place (`.set(i)`, `.clear(i)`, a set
+  value's `.add` or `.discard`, an attribute of an entry object such as `e.bits |= h.bits`) reads its entry
+  first, as the Python does, and the tracer logs a write only where the value changed. The twin may write it
+  whether it changes or not, since the replay passes a write that leaves an entry the Python read as it was
+  (`Replay.lean`'s footprint), as `protocol.md`'s twin does; some places skip the unchanged write, some make it,
+  and both pass. Two kinds are writes always, so the twin makes them unconditionally: an assignment to a
+  subscript, augmented ones included (`interest[g] |= bits` is `interest[g] = interest[g] | bits`, a write even
+  where nothing changes; `served[q][g] += 1`), and a set that is a table of its own (`probe_asks`, `probe_sent`),
+  whose `add` and `discard` the tracer's view logs as a write with no read, so the twin reads nothing there.
 - **A function a node can replace** (design §1.4: `forward`, `push_rebuilt`, `send_have`, `serve_standing`,
   `owed_missing`, `repair_verdict`, `note_claim`, `known_in_scope`) is called through its `…Call`, which asks the
   node's own where the node's line names it as replaced. -/

@@ -58,7 +58,7 @@ def settleProbe (g : Group) (verdict : Option Bool) : M2 m Unit := do
   setProbeOk g verdict                                        -- `probe_ok[g] = verdict`
   let some i ← probe? g | crash s!"KeyError: {g} (settle_probe: probe[g])"
   setProbeAsk (.want g i) false                               -- `probe_asks.discard(Ask(g, probe[g]))`: a write
-  branch "settle_probe: the probe's ask gated again"          --   with no read, as the tracer's view of a set logs it
+  branch "settle_probe: the probe's exemption discarded"      --   with no read, as the tracer's view of a set logs it
 
 /-- `probe_answer(g, i, p)` (§4.6, R5): the claimant's own copy of the probed index, first or a duplicate, passes
 the probe and keeps its promise -/
@@ -186,9 +186,11 @@ def serveWaitingProbe (g : Group) (i : Nat) : M2 m Unit := do
     | some j => if j == i then qs := qs ++ [q]
     | none => return (← crash "twin: serve_waiting_probe: the order names a peer probe_waiting[g] has not")
   for q in qs do
-    -- `del probe_waiting[g][q]`: a question's notes may have taken it out since the list was made; then it raises
-    let some _ ← probeWaiting? g q | return (← crash s!"KeyError: {q} (serve_waiting_probe: probe_waiting[g][q])")
+    -- `del probe_waiting[g][q]`: the view logs the write before the deletion, which raises where a question's notes
+    -- took the entry out since the list was made (the scan read it, so its read here is the Python's)
+    let present ← probeWaiting? g q
     eraseProbeWaiting g q
+    if present.isNone then return (← crash s!"KeyError: {q} (serve_waiting_probe: probe_waiting[g][q])")
     -- `probe_served[q][g] or served[q][g] >= …SERVE_LIMIT`
     if ← probeServed q g then
       branch "serve_waiting_probe: a probe answered before"
