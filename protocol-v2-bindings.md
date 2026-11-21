@@ -2,8 +2,8 @@
 
 > **DRAFT.** A companion of [`protocol-v2.md`](protocol-v2.md), released with it. SEACAST's message
 > encoding and the libp2p stream and Waggle bindings are defined to the byte (§1 to §3); the two
-> bindings onto gossipsub's wires are defined to the field (§4, §5). Checked in the toy only: no
-> client speaks these bytes yet.
+> bindings onto gossipsub's wires are defined to the field (§4, §5), and the gossipsub binding's
+> extra fields to the byte. Checked in the toy only: no client speaks these bytes yet.
 
 *Written 2026-11-17 from `protocol-v2.md`'s §7 of that date, which it takes over whole, and the
 bytes of SEACAST's message encoding and of the libp2p stream and Waggle bindings, decided the same
@@ -42,7 +42,8 @@ A node may speak more than one binding, and negotiates per link which one a peer
 
 **What is normative:**
 - §1 to §3, SEACAST's message encoding and the libp2p stream and Waggle bindings, to the byte;
-- §4 and §5, the bindings onto gossipsub's wires, to the field;
+- §4 and §5, the bindings onto gossipsub's wires, to the field, and the gossipsub binding's extra
+  fields to the byte;
 - §6, the rules on gossipsub's wires.
 
 The sizes in §1.5 are informative.
@@ -53,11 +54,11 @@ The sizes in §1.5 are informative.
 |---|---|---|---|
 | JOIN | kind `0x01`, the first message per object type on a link | subscription; a sampler's is none (§6) | `SubOpts(topic, requestsPartial, supportsSendingPartial)` plus an extension field for duty and `M`; a sampler's `(DECLARED, NONE)` is no subscription (§6) |
 | GRAFT, PRUNE with colour and direction | kinds `0x02`, `0x03`: an accepted GRAFT is answered by one marked `answer`, and a GRAFT for a relation the receiver holds by a yes again; `PRUNE_BACKOFF` `protocol-v2.md`'s (§4.1 there) | stock, accepted in silence as on the partial-messages binding; under `--upkeep on` the toy runs `protocol-v2.md` §4.1's answered exchange instead, `answer` carried beside the GRAFT, with `PRUNE_BACKOFF` from `--prune-backoff` | gossipsub's GRAFT/PRUNE with an extension field for the colour; direction `BOTH` only; no floor per colour; accepted in silence, as gossipsub's: the sender is in the relation from its GRAFT, and the backoff after a PRUNE keeps the ends together (`protocol-v2.md` §4.1) |
-| HAVE, holding | kind `0x04`, flag bit 0 clear | IDONTWANT `HaveBitmap`; `claim_all` and `complete` read from a full bitmap, or carried beside it (the toy's extension, needed for a row member complete at 64; the toy charges no bytes for them, the research harness's Go path a flags byte after the root, under version 4) | `partsMetadata.available` plus two flag bits |
+| HAVE, holding | kind `0x04`, flag bit 0 clear | IDONTWANT `HaveBitmap`; `claim_all` and `complete` read from a full bitmap, or carried in a flags byte after the group, under version 4 of the strings (§4; needed for a row member complete at 64; the toy charges no bytes for them) | `partsMetadata.available` plus two flag bits |
 | HAVE, offer | kind `0x04`, flag bit 0 set | IHAVE `HaveBitmap` | `partsMetadata.available` to a peer not being pushed |
-| WANT | kind `0x05`: `standing` and `probe` in one flags byte, `hops` a byte | IWANT `WantIndex`; `standing`, `hops` and `probe` carried beside the index, as a holding's claims (the toy charges no bytes for them, the research harness's Go path a flags byte and a hops byte, 43 bytes in all, where `probe` would be a second bit of the flags byte) | `partsMetadata.requests`; `standing`, `hops` and `probe` need an extension field, which also asks for the part where the asker has not subscribed (§6) |
+| WANT | kind `0x05`: `standing` and `probe` in one flags byte, `hops` a byte | IWANT `WantIndex`; `standing` and `probe` in a flags byte after the index, and `hops` a byte, under version 4 of the strings: 43 bytes in all (§4; the toy charges no bytes for them) | `partsMetadata.requests`; `standing`, `hops` and `probe` need an extension field, which also asks for the part where the asker has not subscribed (§6) |
 | CHUNK | kind `0x06` for the payload, `0x07` for a cell | a gossipsub message per chunk | `partialMessage` |
-| EVIDENCE | kind `0x08`, reserved: none in this version (`[D6]`) | – | a full message on the rendezvous topic |
+| EVIDENCE | kind `0x08`, reserved: none in this version (`[D6]`) | a full message on the rendezvous topic, reserved: none in this version (`[D6]`) | a full message on the rendezvous topic |
 | rendezvous | gossipsub topics per family, with the ENR beside them `[D11]` | the topic | the topics |
 
 ## 1. SEACAST's message encoding
@@ -310,7 +311,7 @@ message-id strings inside existing control fields. Nothing here adds a protobuf 
 message type. The toy runs `protocol-v2.md` on it.
 
 - **What it gives up** (`protocol-v2.md` §7's capabilities): the same as the partial-messages
-  binding (§5), and EVIDENCE.
+  binding (§5).
 - **The two ends of a relation** agree through gossipsub's backoff, as on the partial-messages
   binding (§5).
 - **The fork** is in the topic's name.
@@ -318,7 +319,7 @@ message type. The toy runs `protocol-v2.md` on it.
 - **An IDONTWANT's entries** are read as `protocol.md` §4.1 reads them. An IDONTWANT names no topic, so
   beside the `HaveBitmap`s its entries can be stock message ids, another topic's say. An entry that
   opens with `HaveBitmap`'s MAGIC and a version this binding writes (`protocol.md` §2's 1, which its
-  `is_have_bitmap` tests, or the research harness's 4, below), and holds a group after them, and at
+  `is_have_bitmap` tests, or version 4, below), and holds a group after them, and at
   version 4 the claims' flags byte, is a holding (`protocol-v2.md` §4.3's `on_holding`). Any other
   entry, one cut short included, is an opaque id, kept in
   `unwanted[p]` with stock gossipsub's admission and lifetime, where `on_want` reads it
@@ -326,10 +327,21 @@ message type. The toy runs `protocol-v2.md` on it.
   `protocol-v2.md` §4's `on_frame` handles holdings.
 - **An IHAVE's entries** are offers only as `HaveBitmap`s. Any other entry is ignored, without
   penalty, where `protocol.md` §4.4 reads it as a structured id: this draft offers by bitmap only.
-- **The extra fields** are carried beside the bitmap or the index: a holding's `claim_all` and
-  `complete`, and the WANT's `standing`, `hops` and `probe`. The toy charges no bytes for them. The
-  research harness's Go path writes a flags byte after the root for the claims, and a flags byte and a
-  hops byte for the WANT (43 bytes), under version 4 of the strings.
+- **The extra fields** are carried in version 4 of the strings: a holding's `claim_all` and
+  `complete`, and the WANT's `standing`, `hops` and `probe`. The toy charges no bytes for them.
+  - *A holding* travels in an IDONTWANT as `"HAVE"` ‖ `0x04` ‖ the group (32) ‖ flags (1: bit 0
+    `claim_all`, bit 1 `complete`) ‖ the bitmap. The bitmap is `protocol.md` §2's: least significant
+    bit first, trailing zero bytes dropped, at most `MAX_HAVE_BYTES`.
+  - *A WANT* travels in an IWANT as `"WANT"` ‖ `0x04` ‖ the group (32) ‖ the index (4) ‖ flags (1:
+    bit 0 `standing`, bit 1 `probe`) ‖ `hops` (1): 43 bytes. The index is a little-endian `uint32`,
+    as `protocol.md` §2 states for `WantIndex`. The research harness writes it big-endian, a
+    difference of that implementation.
+  - *An offer* keeps version 1, which has no flags.
+  - *An entry with a reserved bit set,* a WANT of the wrong length, or a WANT whose `hops` is over
+    its type's `ROUTE_HOPS` (`protocol-v2.md` §6.3) is ignored without penalty.
+- **EVIDENCE** would travel as a full gossipsub message on the family's rendezvous topic, as on the
+  partial-messages binding (§0's table). None is defined in this version (`[D6]`), so this carrier
+  is reserved, as SEACAST's message encoding reserves its kind `0x08` (§1.1).
 - **Gossipsub's IHAVE limits:** offers are IHAVEs, so a stock gossipsub client applies its own
   (`protocol-v2.md` §4.3).
 - **The mapping** is §0's table, middle column.
