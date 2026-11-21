@@ -436,10 +436,12 @@ class Evidence(Container):               # [D6]
   third field, `probe`, marks the one ask that verifies a peer's claim (§4.6): the claimant answers
   it whatever the asker's holdings say, once per asker and group. SEACAST's message encoding
   carries `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
-- **A cell carries its header once per group and link**, so cells can be verified before the block
-  (P2). The payload's header is the descriptor, which every chunk carries under design A and the bid
-  under design B, a choice `protocol.md` §1 leaves open; the installed block confirms it, as in
-  `protocol.md`.
+- **A cell group's header travels in one of three forms**, which the object type's definition fixes
+  (`protocol-v2-bindings.md` §1.6, and §7): from the block, in every cell message, or in a header
+  message of its own. On the libp2p stream binding, the second form carries the header once per
+  group and link, so cells can be verified before the block (P2). The payload's header is the
+  descriptor, which every chunk carries under design A and the bid under design B, a choice
+  `protocol.md` §1 leaves open; the installed block confirms it, as in `protocol.md`.
 
 ## 3. State
 
@@ -1414,10 +1416,12 @@ a routed request and goes to a peer with duty `FORWARD` (below). A promise is ma
 a broken one parks the peer for the group (`protocol.md` §6.1). A `DECLARED` peer's WANT is also its
 interest: `want_p[p][g]` is set from it before the asks are answered, and what the peer does not
 hold yet is kept as a standing request (§4.10). An ask by derived interest makes no promise with a
-timer either: an ask sent as a WANT starts none, a claim's probe apart (`filter_entry`, §4.6), and
-the custodian answers when it can. A standing request is answered when the chunk is stored, received
-or rebuilt (`serve_standing`, from `fill` and `decode_group`). Standing requests live with the
-group's state (`GROUP_TTL`) and count against the serving limit when answered.
+timer either: an ask made by `want` (§3), not on an offer, starts none, a claim's probe apart
+(`filter_entry`, §4.6). The custodian answers from what it holds, and keeps the ask for later only
+as a standing request: a `DECLARED` peer's WANT, or one marked `standing`. A standing request is
+answered when the chunk is stored, received or rebuilt (`serve_standing`, from `fill` and
+`decode_group`). Standing requests live with the group's state (`GROUP_TTL`) and count against the
+serving limit when answered.
 
 **A routed sample request** (a WANT with `hops` above zero, §4.10) may also go to a peer with duty
 `FORWARD` that neither offered the index nor custodies it `[D12]`. That peer answers it from what it
@@ -2519,8 +2523,8 @@ together: a small share of the slow proposer's holdings merge, and the custody b
 gain a little, at the median and at the tail. With a transport that takes one write per connection
 at a time (the toy's `--send-buffer 1`), a holding also waits while another entry to the same peer
 goes out: more holdings merge, and the custody block gains a larger share of P4's cost, which is
-smaller there; the rows gain as little at the median. Copies and completion do not change, and
-under the liar fault merging leaves slightly fewer pairs short than P4 alone (both before v0.5).
+smaller there; the rows gain as little at the median. Copies move by 0.01 at most, and under the
+liar fault merging leaves slightly fewer pairs short than P4 alone (both before v0.5).
 Most holdings would leave alone anyway: at one seed, most find no earlier holding of their group
 still waiting, in the queue or in the transport. Taking back more needs fewer holdings, which v0.4
 does not provide for: holding them back for a set time, or sending them to fewer of the scope's
@@ -2918,8 +2922,8 @@ the column cells little at the median, at one seed (protocol-v2-figures.md, §4.
   heads the line held every free byte. On 2026-11-20 `toy/line_stall_known.py --doc v2` showed it on
   the `push` cell's network: with the source's line head stalled, the other peers' chunks waited in
   an empty window and none was sent during the check (protocol-v2-figures.md, §4.11). With the rule
-  none was held up. The check now counts the sends from 600 ms after the stall on (past
-  `WINDOW_TIMEOUT`), or accepts queues left empty.
+  none was held up. The check counts the sends to the other peers from 600 ms after the stall on
+  (past `WINDOW_TIMEOUT`), and accepts queues left empty.
 - *The wake when a control write waits* (since `protocol.md` v0.10.9's §7.1). A burst of urgent
   entries woke writers in line that each blocked on its write, and free room went to nobody.
   `protocol.md`'s monitor (its W2) found this in `loss-thin`. So a writer in line whose control
@@ -3529,16 +3533,25 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   peer it pushes to, and beyond them a width that `ANNOUNCE_EXTRA` sets (§1.3, `[D5]`).
 - **ask**: a request for one index of a group, keyed `Ask(g, i)` (`protocol.md`'s `WantIndex`; §3)
   and carried in a WANT (§2). Asks on offers follow `protocol.md` §6.1's pull discipline (§4.3).
-- **ask window**: `protocol.md`'s `IWANT_WINDOW`, how long one ask of a chunk is in flight before
-  the retry. It stretches as the node's uplink falls below `ASK_UPLINK` (§4.13).
+- **ask window**: `protocol.md`'s `IWANT_WINDOW`, how long one ask of a chunk counts as in flight;
+  its retry comes `RETRY_SLACK` after the window. It stretches as the node's uplink falls below
+  `ASK_UPLINK` (§4.13).
+- **axis**: one of the groups a chunk lies in: a cell lies on its column and on its row (`project`,
+  §1.1, R4). The rules that act per axis (`fill`, `forward`, an expired or dropped group) act on
+  each of these groups apart (§3, §4.2).
 - **backoff**: after a PRUNE it receives, the time during which a node does not graft that peer
   again for the relation the PRUNE named (`PRUNE_BACKOFF`, §4.1).
+- **cell**: the chunk of the column and row types: one blob's 2 048 bytes at one column, with its
+  proof (§1.1, `protocol-v2-bindings.md` §1.2). In `protocol-v2-figures.md`, a cell of the toy is
+  also one run of one configuration (that file's preamble).
 - **chunk**: one index of a group, with the proof that verifies it alone. A payload chunk fills one
   (group, index) pair, and a cell two, in its column and in its row (`project`, §1.1, R4).
 - **claim**: either of the two flags a holding carries besides its bitmap (§1.5, `[D3]`).
   `claim_all`: the sender holds or can produce every index, `protocol.md`'s decode claim, made at K
   before the decode. `complete`: the sender's interest in the group is satisfied. Both are
   unverified; a probe verifies a `claim_all` that defers a decode (§4.6).
+- **claimant**: the peer whose `claim_all` defers a node's decode of a group. The node's probe asks
+  it for one index to verify the claim (§4.6, R5).
 - **colour**: one of `M` values that partition a group's indices (`colour_of`, §1.4, `[D10]`). A
   chunk is pushed eagerly only on links whose push relation for its family holds its colour. A
   colour is not a subnet (§0).
@@ -3639,8 +3652,9 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   a routed request steps (§1.3, `[D12]`).
 - **row member**: a node that takes part in a row's family: the row of its own subnet
   (`wants_family`, §4.6). It completes at K cells (§1.5).
-- **sampler**: a node with interest `DECLARED` and duty `NONE`. It declares each sample to one peer,
-  and asks each peer for at most one sample of a block (§1.2, §4.10).
+- **sampler**: a node's role on a link joined with interest `DECLARED` and duty `NONE`; the same
+  node can be a custodian on other links. It declares each sample to one peer, and asks each peer
+  for at most one sample of a block (§1.2, §4.10).
 - **sampling-only link**: a link opened where a node's other links leave its coverage floor short,
   joined as `(DECLARED, NONE)`; it carries no relation, no push and no offer (§1.3).
 - **serving**: answering an ask from what a node holds, received or rebuilt, within `SERVE_LIMIT`
