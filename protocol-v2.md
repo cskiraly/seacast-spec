@@ -153,6 +153,7 @@ class TypeParams:                                    # per object type; values i
     D_OUT_MAX: int                                   # what a node accepts to push for others
     SYMMETRIC: bool                                  # one relation both ways, kept as gossipsub keeps its mesh (§4.1)
     PRUNE_BACKOFF: float                             # seconds before a relation a PRUNE named is grafted again (§4.1)
+    MAX_RELATIONS: int                               # the families × colours one link carries at most (§6.3, X6)
     ANNOUNCE_EXTRA: AnnounceWidth                    # ALL_JOINED | SAMPLE | NONE              [D5]
     EAGER: bool                                      # chunks of this type are pushed; False: holdings and offers only (rows, EIP-8371),
                                                      #   at the source too: it offers every chunk at publish (§4.7)
@@ -163,6 +164,10 @@ class TypeParams:                                    # per object type; values i
                                                      #   to the rest (§1.6: its rebuilder is its source); False: protocol.md's,
                                                      #   every peer short of K up to its shortfall   [D4]
     DEFER_WINDOW: float                              # repair: how long a peer's claim defers our own decode (R5) [D4]
+    REPAIR_SAMPLE: Optional[List[Tuple[int, int]]]   # repair: the sample's steps [(S1, L1), (S2, L2), ...] after a
+                                                     #   verified claim; None: off (§4.6, R5)
+    SAMPLE_WAIT: float                               # repair: the wait for each step's cells (§4.6)
+    REPAIR_REASK: bool                               # repair: a lost cell re-asked of another peer (§4.6)
     START_DELAY: float                               # seconds before the first ask             [D8]
     SERVE_LIMIT: int                                 # chunks served per peer and group         (R6)
     SAMPLE_RETRY: float                              # a sampler's first wait, before asking another peer (§4.10)
@@ -669,11 +674,12 @@ def no(p, T, fam, c, d):                               # a refused GRAFT's answe
 def on_graft(p, gr: Graft):                            # each direction answered: a GRAFT is yes, a PRUNE no
     if not joined_on(p, gr.object_type): return        # §2: not joined on this link: no state, no answer, no penalty
     T = type_of(gr.object_type); fam, c = gr.family, gr.colour
+    room = relation_room(p, T, fam, c)                 # §6.3: a relation new to the link fits under its limit
     if T.params.SYMMETRIC:                             # one relation both ways: decided as one, one answer
         asked = c in grafted_in[p][T][fam] or c in grafted_out[p][T][fam]   # the yes to ours, or a crossing
         grafted_in[p][T][fam].discard(c); grafted_out[p][T][fam].discard(c)
         held = c in push_in[p][T][fam] or c in push_out[p][T][fam]   # either way: held, made whole again
-        if held or (len(in_pushers(T, fam, c)) < T.params.F_HI and wants_family(T, fam)
+        if held or (room and len(in_pushers(T, fam, c)) < T.params.F_HI and wants_family(T, fam)
                     and join_sent[p][T].duty == FORWARD):
             push_in[p][T][fam].add(c)
             if not asked and not (held and gr.answer): yes(p, T, fam, c, BOTH)   # held: yes again, unless a yes
@@ -686,7 +692,7 @@ def on_graft(p, gr: Graft):                            # each direction answered
         grafted_in[p][T][fam].discard(c)
         if c in push_in[p][T][fam]:                    # held: yes again, unless it answers ours or is a yes
             if not asked and not gr.answer: yes(p, T, fam, c, IN)
-        elif len(in_pushers(T, fam, c)) < T.params.F_HI and wants_family(T, fam):
+        elif room and len(in_pushers(T, fam, c)) < T.params.F_HI and wants_family(T, fam):
             push_in[p][T][fam].add(c)
             if not asked: yes(p, T, fam, c, IN)        # yes: "push me"
         else:
@@ -696,11 +702,16 @@ def on_graft(p, gr: Graft):                            # each direction answered
         grafted_out[p][T][fam].discard(c)
         if c in push_out[p][T][fam]:                   # held: yes again, unless it answers ours or is a yes
             if not asked and not gr.answer: yes(p, T, fam, c, OUT)
-        elif join_sent[p][T].duty == FORWARD and len(out_pushees(T, fam, c)) < T.params.D_OUT_MAX:
+        elif room and join_sent[p][T].duty == FORWARD and len(out_pushees(T, fam, c)) < T.params.D_OUT_MAX:
             if not asked: yes(p, T, fam, c, OUT)       # yes: "I will push you"
             join_push(p, T, fam, c)                    # in the relation at our end: what we hold is announced
         else:
             no(p, T, fam, c, OUT)                      # no: "I will not push you"
+
+def relation_room(p, T, fam, c) -> bool:               # §6.3, X6: the link carries (fam, c) already, or fewer
+    held = {(f, k) for m in (push_in, push_out, grafted_in, grafted_out)   #   relations of T than MAX_RELATIONS,
+            for f, ks in m[p][T].items() for k in ks}  #   our GRAFTs not yet answered counted
+    return (fam, c) in held or len(held) < T.params.MAX_RELATIONS
 
 def join_push(p, T, fam, c):                           # p joins our push relation for colour c: what we hold of
     if c in push_out[p][T][fam]: return                #   it is announced (protocol.md §5.4's on_mesh_join);
@@ -856,6 +867,13 @@ link has not joined, a JOIN each way (`joined_on`), is ignored too: no relation,
 no backoff and no answer. None of them is penalised. Without the check, a peer could make the node
 hold JOINs for types it does not run, and relations and backoffs for types it never joined with that
 peer.
+
+**A link carries at most `MAX_RELATIONS` relations of a type** (§6.3): its families times colours,
+the node's own GRAFTs not yet answered counted (`relation_room`). A GRAFT for a family and colour
+the link does not carry yet, once the link is at the limit, is answered no, as a GRAFT over a
+family's cap is, without penalty. One for a relation the link carries is answered as before. The
+bound is at least the families of the node's own interest times `M`, so it never refuses what an
+honest peer asks, since an honest peer grafts only a family the other end's interest holds.
 
 **A peer that joins a push relation is announced what the node holds.**
 - **What is announced** (`join_push`) is what the node stores of each live group of the relation's
@@ -3383,7 +3401,7 @@ nobody withheld.
 | `ANSWERS_FIRST` | node | queued answers by rarity before pushes, after a source's own chunks (§4.12) | an option, off in every setting; a wash in three-seed toy checks |
 | `SOURCE_OFFERS` | node | when a source offers each chunk to the peers of its pool (§4.7) it did not choose to push it to: `ACK`, at the chunk's acknowledgement; `PUBLISH`, at publish, its holding growing at each chunk's first write (§4.7) | a default, `ACK`, `protocol.md` §5.1's rule; `PUBLISH` is the source's own choice: sooner for a fast source, later for a slow one, and it names the source (§4.7); decided |
 | groups tracked per slot | node | state for groups we hold or peers want, beyond our interest | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the groups the chunks a node holds or rebuilds project onto (R4, §3), which for a row member or a reconstructor is up to every column of the block, for each block in its live window. The value is the client's; no limit in the measurements |
-| relations per link | link | families × colours a link may carry | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the families of the node's own interest times `M`, per object type, since an honest peer grafts a relation only for a family the other end's interest holds (`candidates`, §4.1). The value is the client's; no limit in the measurements |
+| `MAX_RELATIONS`, relations per link | object type, per link | families × colours a link may carry; a GRAFT for a relation new to a link at the limit is answered no, without penalty (`relation_room`, §4.1) | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the families of the node's own interest times `M`, per object type, since an honest peer grafts a relation only for a family the other end's interest holds (`candidates`, §4.1). The value is the client's; no limit in the measurements |
 | sampling-only links accepted | node | inbound links joined `(DECLARED, NONE)` that a node accepts (§1.3) | `[D12]`; X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: high enough that the network's samplers each keep `SAMPLE_COVER` links per family they sample. The value is the client's; no limit in the measurements, and the serving load not measured |
 | `ASK_UPLINK` | node | the uplink at and above which `IWANT_WINDOW` keeps `protocol.md`'s value; below it the window scales by `ASK_UPLINK / UPLINK` (§4.13); 50 Mbps | scaling by the asked peer's link is open (below) |
 | `IWANT_WINDOW` | node | `protocol.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |

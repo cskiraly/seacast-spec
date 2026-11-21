@@ -1234,6 +1234,7 @@ class Node:
         #   §4.1 keeps it under --upkeep on (--symmetric off: one-way); the recorded cells keep the mesh as built,
         #   where nodes at F_HI would otherwise be pruned at the first heartbeat
         prm.PRUNE_BACKOFF = c.get("prune_backoff", 0.0)      # §4.1 (--prune-backoff; 0: none)
+        prm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
         prm.ANNOUNCE_EXTRA, prm.START_DELAY, prm.SERVE_LIMIT, prm.EVIDENCE = "SAMPLE", 0.0, math.inf, None
         prm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
         prm.EAGER, prm.DEFER_WINDOW = True, c.get("DEFER_WINDOW", 0.5)
@@ -1274,6 +1275,7 @@ class Node:
             cprm = Obj()
             cprm.M, cprm.F_LO, cprm.F_HI, cprm.D_OUT, cprm.D_OUT_FAST, cprm.D_OUT_MAX = 1, c["F_LO"], 12, 8, 8, 12
             cprm.SYMMETRIC, cprm.PRUNE_BACKOFF = False, c.get("prune_backoff", 0.0)   # one-way, as measured
+            cprm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
             cprm.ANNOUNCE_EXTRA, cprm.START_DELAY, cprm.SERVE_LIMIT, cprm.EVIDENCE = c.get("COL_ANNOUNCE", "ALL_JOINED"), 0.0, math.inf, None   # [D5]
             cprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
             cprm.SAMPLE_RETRY2, cprm.SAMPLE_OUTSTANDING = c.get("SAMPLE_RETRY2", 0.5), c.get("SAMPLE_OUTSTANDING", 4)   # [D12]
@@ -1317,6 +1319,7 @@ class Node:
                 rprm = Obj()
                 rprm.M, rprm.F_LO, rprm.F_HI, rprm.D_OUT, rprm.D_OUT_FAST, rprm.D_OUT_MAX = 1, c["F_LO"], 12, 8, 8, 12
                 rprm.SYMMETRIC, rprm.PRUNE_BACKOFF = False, c.get("prune_backoff", 0.0)
+                rprm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
                 rprm.ANNOUNCE_EXTRA, rprm.START_DELAY, rprm.EVIDENCE = c.get("ROW_ANNOUNCE", "ALL_JOINED"), c["ROW_DELAY"], None   # [D5]
                 rprm.SERVE_LIMIT = 64                    # (R6) half a row per peer, EIP-8371
                 rprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)

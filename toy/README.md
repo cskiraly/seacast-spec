@@ -151,6 +151,10 @@ where one has a control that must come out the other way, it is named:
   claimed whole, and an ask that came while the gate was closed, kept and then dropped by
   `drop_outside` when it opens. Two honest runs, custody with samplers and the rows, ignore no ask.
   It fails on the document before the rule.
+- `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the relations one link may carry
+  (`MAX_RELATIONS`). With the limit set to what the link carries, a GRAFT for a new column family is
+  answered no and makes no relation; one for a family the link carries is answered yes again; with
+  no limit, the first is answered yes. No penalty. It fails on the document before the limit.
 - `relation_types_known.py`: `protocol-v2.md` §2 and §4.1, object types a link has not joined. A
   JOIN for a type the node does not run stores nothing and draws no JOIN back; with the link's rows
   JOIN taken back, a GRAFT for a row family makes no relation and draws no answer, and a PRUNE sets
