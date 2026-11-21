@@ -185,8 +185,8 @@ figure says otherwise, the runs made before 2026-11-15 had the probe ask the low
 member lacked, without the mark and the kept WANT (`protocol-v2.md` §4.6), and let any peer's copy
 pass the claimant. The 60-node rows runs of 2026-10-07 to 2026-10-10 had degree 30, a 1 Gbps
 proposer and 6 row reconstructors (`--reconstructors 10`, percent), as the README states (README
-947, 1030); the probe's runs of November name their own command line. "README" below is
-`toy/README.md` at `9f300cf`, with its line numbers. Each sub-entry gives the date on which its
+949, 1032); the probe's runs of November name their own command line. "README" below is
+`toy/README.md` at `a6ca1fc`, with its line numbers. Each sub-entry gives the date on which its
 figures were first written, and in brackets the commit of the main line that first carried them.
 
 **Rules changed since the October runs** (the runs of the sub-entries dated 2026-10-07 to
@@ -202,7 +202,7 @@ a chunk fills (2026-11-17). Whether any of these moves a figure is not traced.
 ### The deferral
 
 **Conditions.** The figures were first written on 2026-10-07 (03:59) [`08fbc3d`, 2026-10-21]. The
-record is the toy's README of that commit and README 977–979. The runs are the 60-node rows cells
+record is the toy's README of that commit and README 979–981. The runs are the 60-node rows cells
 without liars (honest with 32 subnets; half the columns withheld with 16 and with 32 subnets), at
 degree 30, with a 1 Gbps proposer and 6 reconstructors, at one seed (7). They ran under
 `protocol.md`'s slot window (a window counted in 12 KB slots), before the window in bytes (§4.11,
@@ -226,7 +226,7 @@ of 60). The runs before 2026-11-16 called `run.py` itself, with the variant's te
 which prints the probe's counts. `DEFER_WINDOW` was 1 s in every run (the toy's default). A toy liar
 answers no ask, so it passes a probe only on a copy it pushed. The toy's queues refuse nothing, and
 these cells close no connection. C2 at seed 9 never completes: a published column's custodians are
-all liars (README 1132–1137).
+all liars (README 1134–1139).
 
 **On the rules of 2026-11-18.** These figures were first written on 2026-11-18 (08:11) [`0edbdc7`,
 2026-11-18]. The runs used
@@ -307,9 +307,9 @@ index.
 **Conditions.** The figures come from rows and custody cells at 60 nodes (degree 30, a 1 Gbps
 proposer, 6 row reconstructors), at seeds 7 to 19, as each figure names them, with three supernodes
 on datacenter links where the figure says so. The record is the toy's README of 2026-10-09 (01:54),
-and README 1112–1130 (and 1146–1189 for the member check). The rules are the probe as before
+and README 1114–1132 (and 1148–1191 for the member check). The rules are the probe as before
 2026-11-15, the window in bytes, and the repair floor at 1. The figures on the wording ran with the
-member check on (README 1125–1128).
+member check on (README 1127–1130).
 - *The earlier wording* (a member told by a non-empty suppression scope), first written on
   2026-10-09 (16:01) [`08fbc3d`]: with 32 subnets, members decoded 20 rows per run against draft 1's
   16, about 4 more, the median over seeds 7 to 19; with 16 subnets, they decoded 9, as under draft
@@ -326,23 +326,23 @@ member check on (README 1125–1128).
   19. That is two to four times as many, for no change in time or bytes. It was traced in three
   runs. The record does not name the cells.
 - *Supernodes and hoarders*, first written the same day [`08fbc3d`]: in three traced runs no
-  supernode ended its duty on a verified claim (README 1173–1175).
+  supernode ended its duty on a verified claim (README 1175–1177).
 - *Without supernodes*, first written the same day [`08fbc3d`]: a fifth of the nodes hoarding (16
   subnets, half withheld) left custodians short in every run over seeds 7 to 19, under draft 1 and
-  under the wording before the member check (371 to 810 pairs; README 1163). The record traces
+  under the wording before the member check (371 to 810 pairs; README 1165). The record traces
   seed 7: its four short rows were all of one subnet, rebuilt only by a hoarding row reconstructor
   to which 15 duties had deferred.
 
 ### The member check
 
 **Conditions.** The figures were first written on 2026-10-09 (12:42) [`08fbc3d`, 2026-10-21] unless
-a figure says otherwise. The record is README 1146–1189, first recorded on 2026-10-09. The runs have
+a figure says otherwise. The record is README 1148–1191, first recorded on 2026-10-09. The runs have
 60 nodes, degree 30, a 1 Gbps proposer, 6 row reconstructors and 16 row subnets, with half the
 columns withheld, at seeds 7 to 19, and without supernodes unless the figure says so. They set
 `--member-check on` against `off`, under the faults `--fault hoard20`, `hoard50` and `claim20`. The
 rules are the probe as before 2026-11-15 (the liars' figure says so itself), the window in bytes,
 the repair floor at 1, and R5's wording before its fix of 2026-10-09 (16:01), which changed no cell
-without supernodes (README 1171–1172).
+without supernodes (README 1173–1174).
 - With a fifth of the nodes hoarding, custodians were left short on every seed without the check
   (371 to 810 pairs), and on 3 of 13 with it (seeds 14, 17 and 18, one subnet each without an honest
   member).
@@ -351,14 +351,14 @@ without supernodes (README 1171–1172).
 - In the liars' cell without supernodes, the check fired 1 to 3 times per run on 5 of 13 seeds, each
   time on a liar's claim that passed because another peer brought the probed cell (measured when
   that copy also passed the claimant). The firings were traced at seeds 8, 11 and 12 (README
-  1183–1184). The check moved the short pairs on three seeds by one or two (4 to 5, 0 to 1, 3 to 5),
+  1185–1186). The check moved the short pairs on three seeds by one or two (4 to 5, 0 to 1, 3 to 5),
   and in the three traces every short pair, with and without the check, was a liar's own row.
 - A member whose 8 custody columns of 128 are all among the 64 published holds its cells whatever
   the claimant does. Such members make up 0.3 % of the members. This is arithmetic, not a run:
   C(64, 8) / C(128, 8) ≈ 0.31 %.
 - Against a claimant that pushes each member exactly its custody cells (`--fault hoardm20`, without
   supernodes), custodians were short on all 13 seeds with the member check alone. This figure was
-  first written on 2026-10-10 [`08fbc3d`]; its record is README 1202–1208.
+  first written on 2026-10-10 [`08fbc3d`]; its record is README 1204–1210.
 - Without a fault, in the five cells run (rows honest with and without supernodes; withheld with 16
   subnets with and without; withheld with 32 with supernodes), the check never fired and every event
   is the same.
@@ -372,13 +372,13 @@ without supernodes (README 1171–1172).
 
 **Conditions.** The 60-node figures were first written on 2026-10-10 (02:32), those on re-ask the
 same day (10:47) and those at 500 nodes later that day (13:46), all [`08fbc3d`, 2026-10-21]. The
-record is README 1191–1257. The 60-node runs have degree 30, a 1 Gbps proposer, 6 row reconstructors
+record is README 1193–1259. The 60-node runs have degree 30, a 1 Gbps proposer, 6 row reconstructors
 and 16 row subnets, with half the columns withheld, at seeds 7 to 19, with the member check on
 throughout and `--sample-wait 0.5` (s). They run the forms `--repair-sample 3:1,6:2`, `4:0,8:1` and
 `6:0,12:1`, without supernodes or with three, under the faults `hoard20`, `hoardm20` and `claim20`.
 The 500-node runs have degree 70 and 32 row subnets, with half withheld, at seeds 7, 8 and 9,
 without supernodes or with 25 (5 %); they set `4:0,8:1` with re-ask against the member check alone,
-and took 47 to 105 minutes a run (README 1241). Blocks per run are not stated for the 60-node runs;
+and took 47 to 105 minutes a run (README 1243). Blocks per run are not stated for the 60-node runs;
 the per-run and per-node-and-block counts below imply two. The rules are the probe as before
 2026-11-15, the window in bytes, and the repair floor at 1.
 - Against `hoardm20` without supernodes, the member check alone left 13 seeds short,
@@ -406,10 +406,10 @@ the per-run and per-node-and-block counts below imply two. The rules are the pro
   rescued blocks complete at 4 714 / 4 876 ms and 4 688 / 4 915 ms (p50 / p99), about 0.5 s later
   (one more `SAMPLE_WAIT` of 0.5 s); `(3, 1), (6, 2)` is short on 4 seeds.
 - At 500 nodes without a fault, the member check never fired and no sample failed. The medians were
-  2 309 to 2 360 ms without supernodes and 1 170 to 1 178 ms with them (README 1247–1248; the text
-  had 2 312 to 2 360 ms, which leaves out the member check alone at seed 9). The sample asked 2 687
-  to 2 788 cells per run without supernodes, 2.7 per node and block over two blocks, and 172 to 258
-  with them.
+  2 309 to 2 360 ms without supernodes and 1 170 to 1 179 ms with them, over both arms (README
+  1249–1250; the text had 2 312 to 2 360 ms, which leaves out the member check alone at seed 9). The
+  sample asked 2 687 to 2 788 cells per run without supernodes, 2.7 per node and block over two
+  blocks, and 172 to 258 with them.
 - At 500 nodes against `hoardm20`, nobody was short with the member check alone (2 354 to 2 388 ms
   at the median). With the sample, seeds 8 and 9 are similar (2 410 and 2 389 ms); at seed 7 nine
   samples failed, all on one subnet's row of the second block, which its members rebuilt at 19.5 s.
@@ -519,7 +519,7 @@ with the alarm off or at 3.5 s. These ran before the member's changes of 2026-11
 ### The repair floor
 
 **Conditions.** The figures were first written on 2026-10-07 (14:21) [`08fbc3d`, 2026-10-21]. The
-record is README 999–1018, first recorded the same day. The runs are the withheld row cell at 60
+record is README 1001–1020, first recorded the same day. The runs are the withheld row cell at 60
 nodes and degree 30, with a 1 Gbps proposer, 6 row reconstructors, 16 row subnets and half the
 columns withheld, at seeds 7 to 19, with `--repair-floor 0` against 1. They ran with the window in
 bytes, with no member check (decided 2026-10-09) and no supernodes (2026-10-08) yet, and with the
@@ -540,7 +540,7 @@ probe as before 2026-11-15.
 ### Supernodes
 
 **Conditions.** The figures were first written on 2026-10-08 (01:14) [`08fbc3d`, 2026-10-21], and
-those on the fast class's budget later that night (01:31). The record is README 1020–1072. The runs
+those on the fast class's budget later that night (01:31). The record is README 1022–1074. The runs
 have 60 nodes, degree 30, a 1 Gbps proposer, 6 row reconstructors where there are rows, and three
 supernodes (5 %) on datacenter links (`--supernode-link dc`) unless the figure says home links, with
 `--phase2` 1 s and `--phase2-jitter` 0.2 s, at seeds 7 to 19. The figures are the medians over the
@@ -573,7 +573,7 @@ fault).
 ### A rebuilder pushes as a source
 
 **Conditions.** The figures were first written on 2026-10-08 (01:14) [`08fbc3d`, 2026-10-21]. The
-record is README 1033–1072 (`--repair-budget on` against off). The runs are as for supernodes above,
+record is README 1035–1074 (`--repair-budget on` against off). The runs are as for supernodes above,
 with members on home links, at seeds 7 to 19 unless the figure says 7 to 9.
 - Without supernodes, in the withheld 16-subnet row cell, there were 12 900 repair pushes against
   36 900 (the text's figures; the README gives no push counts); the copies were 2.19 against 2.36;
@@ -591,7 +591,7 @@ with members on home links, at seeds 7 to 19 unless the figure says 7 to 9.
 ### Whom rebuilt cells go to
 
 **Conditions.** The figures were first written on 2026-10-09 (01:54) [`08fbc3d`, 2026-10-21]. The
-record is README 1088–1110, "explored on 2026-10-08". The 60-node runs have three supernodes, at
+record is README 1090–1112, "explored on 2026-10-08". The 60-node runs have three supernodes, at
 seeds 7 to 19, and give the medians over the seeds; they set the arms `--repair-keepers offer`,
 `--repair-keepers skip` and `--repair-push offer` against the push. The 500-node figure comes from
 seed 7. The rules are those of the supernodes' runs.
@@ -759,10 +759,11 @@ changes since are given there.
 entry above), at seeds 7 to 16. The counts are the chunks of a message that come back to its
 source, per message, with every write at once, and with §4.11's rule as `--send-buffer 1`.
 - With writes at once, 2 to 6 of a payload's chunks come back a message at the median of the seeds,
-  and up to 59 at one seed: seed 9's `push` cell, with 65, 61 and 51 over its three messages.
-- With §4.11's rule, 0 to 2 come back at the median of the seeds, and up to 17 at one seed:
-  seed 14's `push` cell, with 17, 18 and 17 over its three messages. The record's text gives no
-  maximum; the run's output gives these counts.
+  and at most 59 a message on average at one seed: seed 9's `push` cell, with 65, 61 and 51 over
+  its three messages.
+- With §4.11's rule, 0 to 2 come back at the median of the seeds, and at most 17 a message on
+  average at one seed (17.3): seed 14's `push` cell, with 17, 18 and 17 over its three messages.
+  The record's text gives no maximum; the run's output gives these counts.
 - No cell of a column comes back in custody. In the rows the counts are repair deliveries to the
   proposer, which keeps every row, and they are the same in every arm.
 
@@ -973,9 +974,11 @@ rules and the changes since are those of §4.7's entry for this campaign.
 **Conditions.** The figures come from 2026-11-20, from the line skip alone (00:45) and then from
 spec `67cbfba` (01:07), as their commit messages give them. The known answer
 `toy/line_stall_known.py --doc v2` runs on the `push` cell's network (60 nodes, degree 30, three
-payloads, seed 7) and watches two seconds from the first publish (its `SPAN`). Since `aba3986`
-(2026-11-20, 01:52), after these figures, it counts the sends from 600 ms after the stall on (past
-`WINDOW_TIMEOUT`), or accepts queues left empty. The recorded cells
+payloads, seed 7). It stalls the source's line head when the line first holds two writers, watches
+the two seconds after the stall (its `SPAN`), and counts the chunks sent to the other peers from
+600 ms after the stall on (past `WINDOW_TIMEOUT`). Since `aba3986` (2026-11-20, 01:52), after these
+figures, the other peers count as held up where none was sent to them and chunks still wait for
+them, whatever the window's state; before, only while the window had room. The recorded cells
 (`toy/check.py --doc v2`: 60 nodes, degree 30, three payloads, seed 7) ran at the toy's default
 transport since 2026-11-15, one write per connection at a time (`--send-buffer 1`), except
 `push-deep`, which runs at `--send-buffer 0`. The baseline is v0.10.6's recording, `golden-v2.txt`.
@@ -983,7 +986,8 @@ The figures are of v0.10.7's form: the line skip, with a wake before every contr
 writer in line (`67cbfba`). v0.10.9's wake at the wait moves `rr-stripe` and `push-deep` in their
 digest only, and no other cell (§4.11).
 - Before the rule, with the source's line head stalled, nine other peers' chunks waited in an empty
-  window, and none was sent in the check's two seconds.
+  window, and none was sent to them from 600 ms after the stall to the end of the check's two
+  seconds.
 - In `loss-thin`, p50 moved 807 → 814 ms, p99 922 → 894 ms and the copies 1.64 → 1.65. In
   `late-block`, p99 moved 727 → 718 ms. With the line skip alone (00:45), `loss-thin` moved to p50
   805 ms, p99 938 ms and 1.65 copies, and `late-block` to p99 726 ms.
@@ -1117,7 +1121,7 @@ The bullets give the distances on their dates. Since 2026-11-15 both recordings 
 `loss-thin` (p50 789 to 788 ms, p99 888 to 867 ms, copies 1.71 to 1.70) and its `late-block`. This
 document's §4.11 (2026-11-20, `67cbfba`) moved its `loss-thin` (p50 807 to 814 ms, p99 922 to
 894 ms, copies 1.64 to 1.65) and its `late-block`. The wake at the wait (2026-11-21, `5372ebb`)
-moved the digests of `rr-stripe` and `push-deep` only. Read from both recordings at `9f300cf`
+moved the digests of `rr-stripe` and `push-deep` only. Read from both recordings at `a6ca1fc`
 (2026-11-21), the eleven cells of the last bullet stand as they stood on 2026-11-15. `loss-thin` is
 26 ms later at the median, 27 ms later at the tail and 0.05 copies lighter (p50 814 against 788 ms,
 p99 894 against 867 ms, 1.65 against 1.70 copies). `late-block` is 6 ms later at the median and
