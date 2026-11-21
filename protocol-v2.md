@@ -3488,9 +3488,9 @@ Rendezvous and discovery are outside the bindings (§0).
 | how a cell's header travels (§2), in the form the object type's definition fixes (`protocol-v2-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`protocol-v2-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`protocol-v2-bindings.md` §4); the toy charges no header there, as in (a) | as on the libp2p stream binding; (c) on the control stream, before the group's first chunk stream (`protocol-v2-bindings.md` §7.2) | – |
 | an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | yes, where the implementation orders streams (`protocol-v2-bindings.md` §7.4) | the writer's urgent lane alone, as one stream per peer gives |
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
-| a chunk ordered with the messages written after it | yes | yes | yes | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
+| a chunk ordered with the messages written before and after it | yes | yes | yes | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
-| a lost packet delays only its own chunk | no | no | no | yes | a lost packet delays every later frame on its stream until it is resent |
+| a lost packet holds up only the streams whose bytes it carried | no | no | no | yes | a lost packet holds up every later frame on its stream until it is resent, and on TCP every later frame on the connection |
 
 **Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
 interest without subscription, a push relation per family and colour with a floor and a direction,

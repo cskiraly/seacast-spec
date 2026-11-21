@@ -318,10 +318,9 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
 - **The native QUIC binding, as a draft** (§7 there). It carries SEACAST directly on QUIC, with a
   control stream, a stream per chunk, cancel by a stream's reset, and the control stream first where
   the implementation orders streams. It is for study, and not normative. *Open:* whether it runs
-  beside libp2p on libp2p's port, beside it on a port of its own, or alone; the choice waits on how
-  the host's queue treats a flow of its own, and on how one flow compares with two on a real stack.
-  Not taken in this version: datagrams for chunks, since a cell never fits one and small payload
-  chunks in datagrams were slower in the toy.
+  beside libp2p on libp2p's port, beside it on a port of its own, or alone; two studies bear on it
+  (§7.1 there), and neither chooses a model. Not taken in this version: datagrams for chunks, since
+  a cell never fits one and small payload chunks in datagrams were slower in the toy.
 
 ## The versions of `protocol.md` carried
 
