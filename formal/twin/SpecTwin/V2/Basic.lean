@@ -240,4 +240,28 @@ structure TypeParams where
 #guard Bits.andI 255 (-13) == 243
 #guard Bits.andI 255 (-256) == 0
 
+/-! ## The new constructors in `protocol.md`'s pure case analyses (D1)
+
+`QEntry.asks` reads every IWANT, marked or not, as the toy's `entry.iwants()` does, and drops the flags; a
+relation and a holding hold no ask. `Ctl.isEmpty` is the toy's `_Msg.empty`: an IWANT with no asks is empty, a
+relation never is (notes/spec-lean/v2-layer/design.md §4.3). -/
+
+private def k1 : Key := .want "g" 1
+private def k2 : Key := .want "g" 2
+private def rel : Relation := .prune { objectType := "payload", family := -1, colour := 0, direction := .outward }
+private def ctlE (cs : List Ctl) : QEntry := { chunk := none, control := some cs, solicited := false }
+
+#guard (ctlE [.iwantV2 true [{ key := k1, standing := true, hops := 2 }, { key := k2 }]]).asks == [k1, k2]
+#guard (ctlE [.iwantV2 false [{ key := k1, probe := true }]]).asks == [k1]
+#guard (ctlE [.iwant [k2], .iwantV2 true [{ key := k1 }]]).asks == [k2, k1]
+#guard (ctlE [.relation rel, .idontwant [.holding "g" 5 true false]]).asks == []
+#guard (ctlE [.iwantV2 true []]).asks == []
+#guard (Ctl.iwantV2 true []).isEmpty
+#guard !(Ctl.iwantV2 false [{ key := k1 }]).isEmpty
+#guard !(Ctl.relation rel).isEmpty
+#guard (Ctl.idontwant [.holding "g" 0 false false]).isEmpty == false
+#guard (Ctl.idontwant []).isEmpty
+#guard (ctlE [.iwantV2 true []]).isEmpty
+#guard !(ctlE [.relation rel]).isEmpty
+
 end SpecTwin.V2

@@ -1,5 +1,6 @@
 import Std.Data.HashMap
 import Std.Data.HashSet
+import SpecTwin.V2.Types
 
 /-! # The types of the twin of protocol.md §6.1, §4.4 and §4.2 (v0.10.4, spec 34f60f8)
 
@@ -103,6 +104,9 @@ inductive IhaveEntry where
   | id (a : Key)
   | other (raw : String)
   | bitmap (g : Group) (bits : Bits)
+  /-- protocol-v2.md's holding: an IDONTWANT's one `HaveBitmap` with its two claims. Only a record under v2
+  holds one; `protocol.md`'s functions that match an entry crash on it, and no v2 record reaches them. -/
+  | holding (g : Group) (bits : Bits) (claimAll complete : Bool)
   deriving BEq, Repr
 
 /-- A byte string, as its lowercase hex digits (as `Group` and `Root` are). -/
@@ -216,6 +220,15 @@ structure Job where
   at_ : UInt64
   deriving BEq, Repr
 
+/-- An ask of protocol-v2.md's WANT (§2): a key, and the toy's `FlaggedWant` flags where any is set (false, 0
+and false for a plain ask). It equals its plain key where promises, offers and tries are kept. -/
+structure AskV2 where
+  key : Key
+  standing : Bool := false
+  hops : Nat := 0
+  probe : Bool := false
+  deriving BEq, Repr
+
 /-- A control message of a queue entry (§7.2), as a record writes it: its kind and its ids. The block reads an
 IWANT's ids alone (`outstanding`), as ask keys; an IHAVE's and an IDONTWANT's are IHAVE entries; a PRUNE's are
 none in the toy's runs (its stock prunes are none), and a GRAFT or a JOIN is never queued there. -/
@@ -224,6 +237,11 @@ inductive Ctl where
   | ihave (ids : List IhaveEntry)
   | idontwant (ids : List IhaveEntry)
   | prune
+  /-- protocol-v2.md's IWANT, as a record under v2 writes every IWANT of a lane: its `want` mark and its asks,
+  each with its flags -/
+  | iwantV2 (want : Bool) (asks : List AskV2)
+  /-- protocol-v2.md's JOIN, GRAFT or PRUNE, queued by `send` under upkeep -/
+  | relation (m : V2.Relation)
   deriving BEq, Repr
 
 /-- A queue entry (§7.2): at most one chunk, its control (none, or a list of messages), and whether it answers an
@@ -238,14 +256,17 @@ structure QEntry where
 def QEntry.asks (e : QEntry) : List Key :=
   match e.control with
   | none => []
-  | some cs => cs.flatMap fun | .iwant ids => ids | _ => []
+  | some cs => cs.flatMap fun | .iwant ids => ids | .iwantV2 _ asks => asks.map (·.key) | _ => []
 
-/-- A control message with no ids (the toy's `_Msg.empty`): a PRUNE's are none in the toy's runs, so it is one. -/
+/-- A control message with no ids (the toy's `_Msg.empty`): a PRUNE's are none in the toy's runs, so it is one;
+a relation holds its one message. -/
 def Ctl.isEmpty : Ctl → Bool
   | .iwant ids => ids.isEmpty
   | .ihave ids => ids.isEmpty
   | .idontwant ids => ids.isEmpty
   | .prune => true
+  | .iwantV2 _ asks => asks.isEmpty
+  | .relation _ => false
 
 /-- `e.is_empty()` (§7.2): no chunk, and no control or only empty messages -/
 def QEntry.isEmpty (e : QEntry) : Bool := e.chunk.isNone && e.control.all (·.all Ctl.isEmpty)

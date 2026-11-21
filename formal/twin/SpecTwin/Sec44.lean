@@ -57,6 +57,7 @@ def validId (e : IhaveEntry) : M m Bool := do
     branch "valid_id: not 56 bytes"
     return false
   | .bitmap .. => crash "TypeError: len() of a bitmap (valid_id)"
+  | .holding .. => crash "twin: a v2 holding reached protocol.md's valid_id (D1)"
   | .id a =>                                                -- `g, i = group(a), index(a)`
     let c := (← read).c
     if !(a.index < c.MAX_PLAIN_CHUNKS) then                 -- `i < MAX_PLAIN_CHUNKS and (…)`
@@ -91,6 +92,7 @@ def expand (entry : IhaveEntry) : M m (List Key) := do
         out := out.push ((← knownId g i).getD (.want g i))  -- `known_id[g].get(i) or WantIndex(group=g, index=i)`
     branch "expand: a bitmap"
     return out.toList
+  | .holding .. => crash "twin: a v2 holding reached protocol.md's expand (D1)"
 
 /-- `on_ihave(p, ih)`: returns the asks (§4.1). `ids` is `ih.ids`. -/
 def onIhave (p : Peer) (ids : List IhaveEntry) : M m (List Key) := do
@@ -98,6 +100,7 @@ def onIhave (p : Peer) (ids : List IhaveEntry) : M m (List Key) := do
   if !ids.isEmpty then setIhaveFrames p ((← ihaveFrames p) + 1)  -- IHAVE-bearing frames (§8.2)
   let mut candidates := #[]
   for entry in ids do
+    if let .holding .. := entry then crash "twin: a v2 holding reached protocol.md's on_ihave (D1)"
     if let .bitmap g bits := entry then                     -- `if is_have_bitmap(entry) and not valid_have(entry):`
       if !(← validHave g bits) then                         --   a bitmap is held to a HAVE's limits: ignored,
         penalise p                                          --   and counted (§8.2)
