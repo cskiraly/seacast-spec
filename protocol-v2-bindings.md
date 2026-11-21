@@ -541,7 +541,7 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
      listening socket. By default, go-libp2p tries to dial from that socket. If the native
      connection is dialed from a socket of its own, with a source port of its own, such a queue can
      see it as a separate flow, even on the shared listening port; `fq_codel` hashes flows, and two
-     can collide. The rest of this section is written in this model.
+     flows can collide. The rest of this section is written in this model.
   2. *Beside libp2p, on a port of its own.* A new ENR field gives the port, and a queue that tells
      flows apart by their addresses and ports can see the native connection as a separate flow.
   3. *Alone, with no libp2p.* The binding must then define who counts as a peer (its limits and
@@ -612,21 +612,20 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   none of the stream's bytes not yet sent, and resends none of those lost (RFC 9000 §3.1, §13.3). A
   reset takes back nothing already delivered. Once all of a stream's bytes and its end are sent
   (QUIC's "Data Sent" state), the sender may let the stream finish instead, and resets it if any of
-  those bytes are declared lost. An answer
-  to the peer's probe is exempt, as it is from cancel. Since `filter_entry` clears the probe's mark
-  once the answer is written, the sender marks the answer's stream as exempt when it writes the
-  answer.
+  those bytes are declared lost. An answer to the peer's probe is exempt, as it is from cancel.
+  Since `filter_entry` clears the probe's mark once the answer is written, the sender marks the
+  answer's stream as exempt when it writes the answer.
 - **A receiver may stop a chunk stream** (QUIC's `STOP_SENDING`) whose chunk it already holds,
   except the answer to a probe of its own that is not yet judged (`protocol-v2.md` §4.6). The
-  sender then resets the stream as RFC 9000 §3.5 requires. Until all of the stream's bytes and its
-  end are sent, it resets the stream at once. After that, it may wait until they are acknowledged or
-  declared lost: it resets the stream if any are declared lost, and lets it finish if all are
-  acknowledged. The receiver discards a stopped copy unread, even if its bytes still arrive at
-  QUIC: it computes no chunk id for it (§1.2) and validates nothing, and `on_chunk` never sees it.
-  It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read. What a
-  receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes back at a
-  later holding from the receiver that names the chunk's index, or when the room times out, as
-  below.
+  sender then resets the stream as RFC 9000 §3.5 requires. If some of the stream's bytes, or its
+  end, are not yet sent, it resets the stream at once. Once all are sent, it may wait until they are
+  acknowledged or declared lost: it resets the stream if any are declared lost, and lets it finish
+  if all are acknowledged. The receiver discards a stopped copy unread, even if its bytes still
+  arrive at QUIC: it computes no chunk id for it (§1.2) and validates nothing, and `on_chunk` never
+  sees it. It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read.
+  What a receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes
+  back when a later holding that names the chunk's index arrives from the receiver, or when the room
+  times out, as below.
 - **The window.** A reset changes nothing in the window: the chunk's room comes back at the peer's
   holding, or when it times out, as for any chunk (`window_release`, `window_timeout`,
   `protocol-v2.md` §4.11).
@@ -663,10 +662,10 @@ This version sends no datagrams (RFC 9221). Two uses are considered:
   before compression, with its kind byte and without a header (§1.5), and does not fit unless it
   compresses well. A payload chunk of the default unit also fits only if it compresses well, and a
   payload's last chunk fits if it is short enough. The study's payload was compressed before it was
-  cut into chunks. With that payload, its chunks fit only with a builder's unit far below the
-  default; for a payload of 1 MiB, such a unit gives more chunks than `protocol.md`'s `MAX_CHUNKS`
-  allows a coded group. Offering a chunk whose datagram was lost, when its room in the window times
-  out, would be a new action: today the timeout frees the room (`window_timeout`).
+  cut into chunks. Its chunks fit only with a builder's unit far below the default; for a payload of
+  1 MiB, such a unit gives more chunks than `protocol.md`'s `MAX_CHUNKS` allows a coded group.
+  Offering a chunk whose datagram was lost, when its room in the window times out, would be a new
+  action: today the timeout frees the room (`window_timeout`).
 
 Datagrams count against the connection's congestion window like any data (RFC 9221 §5.4).
 
@@ -718,9 +717,9 @@ This draft leaves these questions open:
 - when a chunk stream still waiting for the link to carry its object type is discarded, and how
   much of the connection's receive credit a receiver keeps for the control stream meanwhile (§7.2);
 - what a receiver sends for a copy it stopped (§7.3): a holding made from what it holds and has
-  verified, or nothing, in which case the sender's room for the chunk comes back at a later holding
-  that names its index, or when that room times out; and whether a receiver may stop a stream that
-  carries a header it has not yet validated;
+  verified, or nothing, in which case the sender's room for the chunk comes back when a later
+  holding that names the chunk's index arrives from the receiver, or when that room times out; and
+  whether a receiver may stop a stream that carries a header it has not yet validated;
 - which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written before
   and after it;
 - how a server tells a connection opened for a fetch from a link's connection (§7.6): by an ALPN of
@@ -794,7 +793,7 @@ difference, so the binding does not depend on it (§7.4).
 
 **No datagrams for chunks, in this version.** At the study's packet sizes, a cell's encoded message
 (2 140 bytes before compression) fits in a datagram only if it compresses well. For the study's
-1 MiB payload, in the three chunk formats it tested, chunks small enough to fit a 1 415-byte
+1 MiB payload, in the three chunk formats it tested, chunks small enough to fit in a 1 415-byte
 datagram would be eight to thirteen times as many as with the default unit. In the two formats
 with a proof in each chunk, about a third of each datagram would be header and proof. A
 small-chunk mode would need two changes:
