@@ -232,7 +232,16 @@ statement Refine.promiseDue_parks : ∀ {a : SpecTwin.Key} {p : SpecTwin.Peer} {
           slotHeld := st.slotHeld, paceQueue := st.paceQueue, stopPull := st.stopPull, peerHas := st.peerHas,
           holders := st.holders, serveCount := st.serveCount, origin := st.origin, planned := st.planned,
           pushed := st.pushed, desc := st.desc, inFlight := st.inFlight, waiters := st.waiters, sent := st.sent,
-          unwanted := st.unwanted }
+          unwanted := st.unwanted, joinRecv := st.joinRecv, joinSent := st.joinSent, pushOut := st.pushOut,
+          pushIn := st.pushIn, graftedOut := st.graftedOut, graftedIn := st.graftedIn,
+          owedRelations := st.owedRelations, backoff := st.backoff, tOf := st.tOf, rebuilt := st.rebuilt,
+          interest := st.interest, knownAt := st.knownAt, standing := st.standing, claims := st.claims,
+          reconsiderAt := st.reconsiderAt, deferred := st.deferred, dutyAt := st.dutyAt, waited := st.waited,
+          probe := st.probe, probed := st.probed, probeAsks := st.probeAsks, probeSent := st.probeSent,
+          probeOk := st.probeOk, rsample := st.rsample, rsampleStep := st.rsampleStep, rsampleAsked := st.rsampleAsked,
+          rsampleFinal := st.rsampleFinal, served := st.served, wantP := st.wantP, probeServed := st.probeServed,
+          probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
+          samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded }
 statement Refine.promiseDue_refines : ∀ (kind ord : Type) [inst : DecidableEq kind] [inst_1 : Inhabited kind]
   [inst_2 : NoStallEquiv.kind_EnumClass kind] [inst_3 : DecidableEq ord] [inst_4 : Inhabited ord]
   [inst_5 : NoStallEquiv.ord_EnumClass ord] {n₀ : SpecTwin.Peer} {bg : Refine.MState kind ord}
