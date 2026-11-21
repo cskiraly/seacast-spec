@@ -15,8 +15,10 @@ and S's answers to p are recorded:
 - (d) the same limit, S's own GRAFT for a new family (`graft`, as its upkeep calls it): nothing sent, nothing pending;
 - (e) the same limit, a PRUNE for a new family: no backoff;
 - (c) the control: with no limit, the GRAFT of (a): answered yes, and the relation made;
+- (f) what counts toward the limit, read from `relation_room` with the limit one above what the link has: a backoff
+  not yet run out counts, one run out does not, and a PRUNE of S's still owed to p counts;
 - penalties: none.
-On the document before the limit, (a), (d) and (e) fail.
+On the document before the limit, (a), (d), (e) and (f) fail.
 """
 import math
 import sys
@@ -89,6 +91,25 @@ def main():
          False)
     COL.params.MAX_RELATIONS = math.inf
     line(f"(c) no limit: a GRAFT for column family {new[0]}: answers, relation", graft(new[0]), (["Graft"], True))
+    if "relation_room" in ns:
+        have = {(f, k) for m in ("push_in", "push_out", "grafted_in", "grafted_out")
+                for f, ks in ns[m][p][COL].items() for k in ks}
+        COL.params.MAX_RELATIONS = len(have) + 1
+        x, y = new[3], new[4]
+        room = lambda: ns["relation_room"](p, COL, y, 0)
+        r0 = room()
+        ns["backoff"][p][COL][x][(0, "IN")] = ns["now"] + 10.0
+        r1 = room()
+        ns["backoff"][p][COL][x][(0, "IN")] = ns["now"] - 1.0
+        r2 = room()
+        ns["owed_relations"][p].append(ns["Prune"](object_type="column", family=x, colour=0, direction="IN"))
+        r3 = room()
+        ns["owed_relations"][p].pop()
+        COL.params.MAX_RELATIONS = math.inf
+        line("(f) one place left: room; with a backoff running; with it run out; with a PRUNE of S's owed",
+             (r0, r1, r2, r3), (True, False, True, False))
+    else:
+        line("(f) relation_room", "not in the document", "present")
     line("penalties", pen, [])
 
 

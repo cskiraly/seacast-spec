@@ -149,31 +149,40 @@ where one has a control that must come out the other way, it is named:
   and draws no penalty; a sampler's WANT for one adds no bit to its interest. The controls: a column
   the node custodies, a routed WANT to a forwarding node (kept, and marked routed), a group the node
   claimed whole, and an ask that came while the gate was held closed, kept and then dropped when the
-  header is validated (`on_header_validated`). A sampler's routed WANT across the gate's opening
-  keeps its standing request and its interest bit exactly when the node passed it on. Two honest
-  runs, custody with samplers and the rows, publish their blocks and ignore no ask; it prints how
-  many asks they tested, and fails if none. It fails on the document before the rule.
+  header is validated (`on_header_validated`). A sampler's routed WANT outside the node's interest,
+  across the gate's opening, is kept standing exactly when the node passed it on, read from its own
+  sends, and adds no interest bit; refused by the next queue, it is neither kept nor counted against
+  `FORWARD_LIMIT`. Two honest runs, custody with samplers and the rows, publish their blocks and
+  ignore no ask; it prints how many asks they tested, and fails if none, or if the custody run met
+  no routed request. It fails on the document before the rule.
 - `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the pairs of family and colour a link
   may have (`MAX_RELATIONS`). With the limit set to what the link has, a GRAFT for a new column
   family is ignored without an answer, the node's own GRAFT for one is not sent, and a PRUNE for one
   sets no backoff; a GRAFT for a family the link carries is answered yes again; with no limit, the
-  first is answered yes. No penalty. It fails on the document before the limit.
+  first is answered yes. A backoff not yet run out counts toward the limit, one run out does not,
+  and a PRUNE of the node's still owed counts. No penalty. It fails on the document before the
+  limit.
 - `relation_types_known.py`: `protocol-v2.md` §2 and §4.1, object types a link has not joined, under
   `--upkeep on`. A JOIN for a type the node does not run stores nothing and draws no JOIN back; with
   the link's rows JOIN taken back, a GRAFT for a row family makes no relation and draws no answer, a
   PRUNE sets no backoff, and a WANT for a row cell keeps no standing request; with the node's own
-  JOIN owed to a second peer, that peer's GRAFT is ignored. The control: a GRAFT for a joined column
-  family is answered. No penalty. It fails on the document before the rule.
+  JOIN owed to a second peer, that peer's GRAFT is ignored. The controls: a GRAFT for a joined column
+  family is answered, and so is one when only the other type's JOIN is owed. No penalty. It fails on
+  the document before the rule.
 - `serve_budget_known.py`: `protocol-v2.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
   budget set to two, of three asks for cells of distinct columns the node holds, not on its offers,
   two are answered and the third refused; an ask on an offer the writer wrote, sent or owed, is
   answered over the budget; a standing request's answer is dropped, and a kept probe answered; after
-  the heartbeat, asks are answered again. No penalty. It fails on the document before the budget.
+  the heartbeat, asks are answered again. An id asked twice in a frame is answered and charged once,
+  and one at the stock limit of three answers is refused without spending the budget. No penalty.
+  It fails on the document before the budget.
 - `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
   beyond the group's count keeps no standing request, nor one past the type's most before the count
-  is known; one kept before the count is dropped once it is known (`drop_wants_beyond`); and with
-  the asker's limit of unknown groups set to one (`MAX_PENDING_GROUPS`), a second unknown group is
-  ignored while a known one is kept. No penalty. It fails on the document before the bounds.
+  is known; a routed one kept before the count is dropped with its route mark when the group opens
+  in the run (`fill`, `drop_wants_beyond`); and with the asker's limit of unknown groups set to one
+  (`MAX_PENDING_GROUPS`), a second unknown group is ignored while a known one is kept, a place frees
+  when its group resolves, its lifetime passes (and the asker's standing request goes with it), or
+  the connection closes. No penalty. It fails on the document before the bounds.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an
   index it has already received, is acknowledged and neither forwarded nor put in the gossip
   history; a copy of an index held only as rebuilt is still forwarded, and the publisher's first

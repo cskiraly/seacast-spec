@@ -16,8 +16,10 @@ handler as if p had sent it, and S's sends to p are recorded:
 - (d) the control: a GRAFT for a column family the link has joined is handled: S answers it;
 - (e) with S's own JOIN for columns owed to a second peer (not yet queued), that peer's GRAFT for a column family:
   ignored, as the link is not yet one of `links(T)`;
-- (f) a WANT for a row cell on the link of (b), which has not joined rows: ignored, no standing request, no error.
-On the document before the rule, (a), (b) and (c) fail.
+- (f) a WANT for a cell of the row S serves, on the link of (b), which has not joined rows: ignored, no standing
+  request, no error;
+- (g) the control: with only S's JOIN for rows owed to the second peer, its GRAFT for a column family: answered.
+On the document before the rule, (a), (b), (c), (e) and (f) fail.
 """
 import sys
 from pathlib import Path
@@ -105,13 +107,21 @@ def main():
     ns["owed_relations"][p2].clear()
 
     import wire as Wm
-    rg = next(iter(sim.gsub))                       # a row group
+    rg = next(g for g, sub in sim.gsub.items() if sub == S.row_subnet)   # the row S serves, its own subnet's
     try:
         ns["on_want"](p, [Wm.FlaggedWant(rg, 0, True, 0)])
         got = p in ns["standing"].get(rg, {}).get(0, ())
     except Exception as e:
         got = f"{type(e).__name__}: {e}"
-    line("(f) a WANT for a row cell, the link not joined for rows: standing request kept", got, False)
+    line("(f) a WANT for a cell of S's own row, the link not joined for rows: standing request kept", got, False)
+
+    ns["owed_relations"][p2].append(ns["join_sent"][p2][ROW])
+    sent.clear()
+    ns["on_graft"](p2, ns["Graft"](object_type="column", family=cfam, colour=0, direction="IN", answer=False))
+    answered = bool(sent) or any(type(m).__name__ == "Graft" for m in ns["owed_relations"][p2])   # owed behind
+    ns["owed_relations"][p2].clear()                #   the JOIN, as every later relation message is (§4.1)
+    line(f"(g) control: S's JOIN for rows owed to node {p2}, its GRAFT for column family {cfam}: answered (sent "
+         f"or owed)", answered, True)
     line("penalties", pen, [])
 
 

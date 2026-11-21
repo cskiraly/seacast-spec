@@ -13,12 +13,15 @@ does not, each of a different column:
 - (a) three asks, none on an offer of S's: two answered, the third refused;
 - (b) the same heartbeat, S sends p an offer of a cell as `announce` does, and its writer writes it; p's ask for it:
   answered;
-- (c) the same, for an offer owed through a full queue (`owe`), written with the next entry: answered;
+- (c) the same, for an offer owed (`owe`, as a full queue makes it), which the writer writes on its own: answered;
 - (d) the same heartbeat, a standing request of p's whose chunk S holds (`serve_standing`): its answer dropped;
 - (e) the same heartbeat, p's kept probe of S's claim (`serve_waiting_probe`): answered;
 - (f) after the heartbeat (`on_heartbeat`), two of (a)'s asks again: both answered;
+- (g) one frame asking an id twice: one answer, the budget, the stock count and `served` charged once;
+- (h) an id at the stock limit of three answers: refused without spending the budget, and the next eligible ask is
+  answered;
 - penalties: none.
-On the document before the budget, (a) and (d) fail, and (b) and (c) have no record of S's offers.
+On the document before the budget, (a), (d), (g) and (h) fail, and (b) and (c) have no record of S's offers.
 """
 import sys
 from pathlib import Path
@@ -102,6 +105,19 @@ def main():
     line("(e) p's kept probe, the budget spent: answer queued", len(ns["queue"][p].normal) > before, True)
     ns["on_heartbeat"]()
     line("(f) after the heartbeat, two asks of (a) again: answered", [answered(c) for c in cells[:2]], [1, 1])
+    ns["on_heartbeat"]()
+    g, i = cells[2]
+    mid = ns["resolve"](Wm.WantIndex(g, i))
+    hb0, sc0, sv0 = ns["served_hb"][p], ns["serve_count"][p][mid], ns["served"][p][g]
+    got = len(ns["on_want"](p, [Wm.WantIndex(g, i), Wm.WantIndex(g, i)]))
+    line("(g) one frame asking an id twice: answers; budget, stock count, served charged",
+         (got, ns["served_hb"][p] - hb0, ns["serve_count"][p][mid] - sc0, ns["served"][p][g] - sv0), (1, 1, 1, 1))
+    g, i = cells[3]
+    mid = ns["resolve"](Wm.WantIndex(g, i))
+    ns["serve_count"][p][mid] = ns["GOSSIP_RETRANSMISSION"]
+    hb0 = ns["served_hb"][p]
+    got = (answered(cells[3]), ns["served_hb"][p] - hb0, answered(cells[4]))
+    line("(h) an id at the stock limit: answered, budget spent; then an eligible ask: answered", got, (0, 0, 1))
     line("penalties", pen, [])
 
 

@@ -1236,7 +1236,7 @@ class Node:
         #   where nodes at F_HI would otherwise be pruned at the first heartbeat
         prm.PRUNE_BACKOFF = c.get("prune_backoff", 0.0)      # §4.1 (--prune-backoff; 0: none)
         prm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
-        prm.MAX_INDICES = c.get("MAX_INDICES_PAYLOAD", math.inf)   # §6.3: the payload's plain chunks; none here
+        prm.MAX_INDICES = 8192                          # §6.3: protocol.md's MAX_PLAIN_CHUNKS
         prm.ANNOUNCE_EXTRA, prm.START_DELAY, prm.SERVE_LIMIT, prm.EVIDENCE = "SAMPLE", 0.0, math.inf, None
         prm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
         prm.EAGER, prm.DEFER_WINDOW = True, c.get("DEFER_WINDOW", 0.5)
@@ -1388,11 +1388,10 @@ class Node:
         def runs_type(tid):                             # protocol-v2.md §3's helper: a type id the node runs
             return tid in types
 
-        def links(T):
-            if not c.get("upkeep"):
-                return node.peers                       # every peer joins every type of the setting
-            return [q for q in node.peers if T in ns["join_recv"][q] and T in ns["join_sent"][q]   # §4.1, under
-                    and not any(isinstance(m, Join) for m in ns["owed_relations"][q])]           #   --upkeep on
+        def links(T):                                   # §4.1: p's JOIN for T received, ours queued, not owed; without
+            return [q for q in node.peers if T in ns["join_recv"][q] and T in ns["join_sent"][q]   #   --upkeep every
+                    and not any(isinstance(m, Join) and m.object_type == T.id   #   peer joins every type of the
+                                for m in ns["owed_relations"][q])]               #   setting, so this is every peer
 
         def joined_types():
             return list(types.values())
@@ -1422,9 +1421,15 @@ class Node:
             if g in ns["hdr"] or g in ns["T_of"]:       #   limit of unknown groups named in WANTs; the toy sets no
                 return True                             #   limit unless MAX_PENDING_GROUPS is given
             seen = node.want_unknown.setdefault(p, {})
-            for h in [h for h, t in seen.items()        # one that resolved, or whose lifetime would have passed,
-                      if h in ns["hdr"] or ns["now"] - t > ns.get("GROUP_TTL", math.inf)]:   #   frees its place
-                del seen[h]
+            for h, t in list(seen.items()):             # one that resolved, or whose lifetime would have passed,
+                if h in ns["hdr"]:                      #   frees its place; at the lifetime, the asker's standing
+                    del seen[h]                         #   requests and interest bits for it go too (§4.5)
+                elif ns["now"] - t > ns.get("GROUP_TTL", math.inf):
+                    del seen[h]
+                    for i in list(ns["standing"].get(h, {})):
+                        ns["standing"][h][i].discard(p); ns["routed_standing"][h][i].discard(p)
+                    if h in ns["want_p"][p]:
+                        del ns["want_p"][p][h]
             if g in seen:
                 return True
             if len(seen) >= ns["MAX_PENDING_GROUPS"]:

@@ -12,10 +12,15 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
 - (b) with p's limit of unknown groups set to one, two columns S knows nothing of yet: the first kept, the second
   ignored; a third column, whose header S holds, kept whatever the limit;
 - (c) a column S knows nothing of yet, at an index past the type's most (`MAX_INDICES`): ignored;
-- (d) with the type's most raised past the count, a column S knows nothing of: an index past its count kept, and, once
-  the count is known (`drop_wants_beyond`, which `fill` calls as the group opens), dropped; index 0 kept;
+- the limit of unknown groups' places, with the limit one: (e) once (b)'s first column resolves (its header known),
+  its place frees and another unknown column is kept; (f) when a place's lifetime passes (`GROUP_TTL`, made short
+  here), the next admission frees it and drops the asker's standing request for that column; (g) at the close
+  (`drop_peer`), the asker's places go;
+- (d) with the type's most raised past the count, a routed standing WANT for a column S knows nothing of, at an index
+  past its count: kept, with its route mark; then the block runs until S stores the column's cells, and the group's
+  opening (`fill`, `drop_wants_beyond`) drops both;
 - penalties: none.
-On the document before the bounds, (a) to (d) fail.
+On the document before the bounds, (a) to (g) fail.
 """
 import sys
 from pathlib import Path
@@ -81,17 +86,32 @@ def main():
     ns["on_want"](p, [Wm.FlaggedWant(ge, COL.params.MAX_INDICES, True, 0)])
     line(f"(c) column {sim.gcol[ge]}, count unknown: index {COL.params.MAX_INDICES} (the type's most) kept",
          kept(ns, ge, COL.params.MAX_INDICES, p), False)
+    ns["MAX_PENDING_GROUPS"] = 1
+    ns["hdr"][gb] = sim.ghdr[gb]                    # (b)'s first column resolves
+    ns["on_want"](p, [Wm.FlaggedWant(gc, 0, True, 0)])
+    line(f"(e) column {sim.gcol[gb]} resolved: unknown column {sim.gcol[gc]} kept", kept(ns, gc, 0, p), True)
+    ns["GROUP_TTL"] = 0.001
+    ns["now"] += 0.01                               # S's clock, past the short lifetime
+    gh = cols[6]
+    ns["on_want"](p, [Wm.FlaggedWant(gh, 0, True, 0)])
+    del ns["GROUP_TTL"]
+    line(f"(f) column {sim.gcol[gc]}'s place past its lifetime: its standing request kept; column {sim.gcol[gh]} kept",
+         (kept(ns, gc, 0, p), kept(ns, gh, 0, p)), (False, True))
+    S.drop_peer(p)
+    line("(g) at the close: p's places kept", p in getattr(S, "want_unknown", {}), False)
+    ns["MAX_PENDING_GROUPS"] = float("inf")
+    q = next(x for x in sorted(S.peers) if x not in (1, p))
     if "drop_wants_beyond" not in ns:
-        line("(d) the sweep once the count is known (drop_wants_beyond)", "not in the document", "present")
+        line("(d) the sweep as the group opens (drop_wants_beyond)", "not in the document", "present")
     else:
         spec_max, COL.params.MAX_INDICES = COL.params.MAX_INDICES, 1000
-        ns["on_want"](p, [Wm.FlaggedWant(gf, 100, True, 0), Wm.FlaggedWant(gf, 0, True, 0)])
-        before = (kept(ns, gf, 100, p), kept(ns, gf, 0, p))
-        ns["hdr"][gf] = sim.ghdr[gf]
-        ns["drop_wants_beyond"](gf)
+        ns["on_want"](q, [Wm.FlaggedWant(gf, 100, True, 1)])
+        before = (kept(ns, gf, 100, q), q in ns["routed_standing"][gf][100])
+        sim.run(sim.cfg["first"] + 1.5)             # the block runs: S stores column gf's cells, and gf opens
         COL.params.MAX_INDICES = spec_max
-        line(f"(d) column {sim.gcol[gf]}: index 100 and 0 kept before the count; after it", (before,
-             (kept(ns, gf, 100, p), kept(ns, gf, 0, p))), ((True, True), (False, True)))
+        line(f"(d) column {sim.gcol[gf]}, index 100 routed, from node {q}: kept, marked; after the group opened "
+             f"(stored {len(ns['chunks'].get(gf, {}))} cells)",
+             (before, (kept(ns, gf, 100, q), q in ns["routed_standing"][gf][100])), ((True, True), (False, False)))
     line("penalties", pen, [])
 
 

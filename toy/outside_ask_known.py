@@ -20,12 +20,14 @@ its peers p, each ask given to S's `on_want` as a WANT that p sent:
 - (f) on a network with samplers, a sampler's WANT to S for a column S does not custody: no standing request and no
   bit in the sampler's interest (`want_p`); the control, a column S custodies: both kept;
 - (h) on the same network, with S's gate held closed, a sampler's routed WANT (hops 1) for a column S does not
-  custody: kept standing if S passed it on, and its interest bit set; once the gate opens (`on_header_validated`), the
-  standing request and the bit are kept if S passed it on, and dropped if not.
+  custody: kept standing if S passed it on (read from S's own sends), and no interest bit, as it is outside S's
+  interest; the same once the gate opens (`on_header_validated`);
+- (i) the same, with the next peer's queue refusing S's WANT: not kept, no interest bit, and not counted against
+  `FORWARD_LIMIT`.
 Then (g): honest runs drop nothing: in a custody run with samplers and routed requests (12 nodes, 25 % samplers, two
 blocks) and in a rows run (8 nodes, one block), `on_want` ignores no ask as outside.
-(g) prints how many asks reached the test, and how many of them were routed. On the document before the rule, (a),
-(c), (e), (f) and (h) fail.
+(g) prints how many asks reached the test, and how many of them were routed, and fails if the custody run met no
+routed request. On the document before the rule, (a), (c), (e), (f), (h) and (i) fail.
 """
 import sys
 from pathlib import Path
@@ -128,18 +130,26 @@ def sampler_cases():
     line(f"    control, column {sim.gcol[gi]} (S's custody): kept, in p's interest",
          (kept(ns, gi, 0, p), gi in wp and wp[gi].has(0)), (True, True))
     gr = out_cols[1]
-    spec_auth = ns["authenticable"]
+    spec_auth, spec_send, sends = ns["authenticable"], ns["send"], []
+    ns["send"] = lambda q, m, urgent=False: (sends.append(type(m).__name__), spec_send(q, m, urgent))[1]
     ns["authenticable"] = lambda g: False if g == gr else spec_auth(g)
-    fwd = ns["forwarded"][p]
     ns["on_want"](p, [Wm.FlaggedWant(gr, 0, True, 1)])
-    passed = ns["forwarded"][p] > fwd
+    passed = "Want" in sends                        # S's own WANT one step on, read from its sends
     before = (kept(ns, gr, 0, p), gr in wp and wp[gr].has(0))
     ns["authenticable"] = spec_auth
     ns["on_header_validated"](sim.ghdr[gr].block)
     after = (kept(ns, gr, 0, p), gr in wp and wp[gr].has(0))
     line(f"(h) sampler p's routed WANT (hops 1), column {sim.gcol[gr]} outside S's custody, passed on {passed}: "
          f"kept, in p's interest, before the gate and after it", (before, after),
-         ((passed, True), (passed, passed)))
+         ((passed, False), (passed, False)))
+    gq = out_cols[2]
+    fwd = ns["forwarded"][p]
+    ns["send"] = lambda q, m, urgent=False: False if type(m).__name__ == "Want" else spec_send(q, m, urgent)
+    ns["on_want"](p, [Wm.FlaggedWant(gq, 0, True, 1)])
+    ns["send"] = spec_send
+    line(f"(i) the same for column {sim.gcol[gq]}, the next queue refusing S's WANT: kept, in p's interest, "
+         f"counted against FORWARD_LIMIT", (kept(ns, gq, 0, p), gq in wp and wp[gq].has(0), ns["forwarded"][p] > fwd),
+         (False, False, False))
 
 
 def honest_runs():
@@ -179,6 +189,7 @@ def honest_runs():
         print(f"    {label}: asks tested {tested[0]}, of them routed {routed_n[0]}")
         global bad
         bad += tested[0] == 0                       # a control that tested nothing would show nothing
+        bad += label.startswith("custody") and routed_n[0] == 0   # nor one that met no routed request
         line(f"(g) {label}: asks ignored as outside", dropped[0], 0)
 
 

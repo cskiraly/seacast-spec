@@ -187,8 +187,8 @@ class CellChunk(Container):            # 0x07
     for later study.
 - **A bitmap's length** is the sender's, up to the bound. In a HAVE, bits past the group's count,
   once known, are the violation `protocol-v2.md` makes them (`valid_have`, `drop_beyond`). In a
-  WANT, an index past the count, or before the count is known past the most a group of the type has,
-  is ignored without penalty (`protocol-v2.md` §4.5).
+  WANT, an index at or beyond the count, or before the count is known at or beyond the most a group
+  of the type has, is ignored without penalty (`protocol-v2.md` §4.5).
 - **A chunk's id** (`chunk_id`, `protocol-v2.md` §3) takes the part of `protocol.md` §2's structured
   id, which hashes a topic in, on a binding that has no topics. It is 59 bytes:
   - *the payload's chunk:* the id is the chunk's `GroupId`, its index as a little-endian `uint32`,
