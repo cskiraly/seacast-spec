@@ -503,9 +503,10 @@ def close_keyerror_v2():
 
 def hdr_read_v2(raw):
     """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
-    g a group node a holds a descriptor of). With `hdr` re-pointed at the installed view, the record logs it as its
-    first touch of `desc` at g: the line says "desc read logged: 1". With `raw` (the control), `hdr` is left as the
-    toy bound it, the raw table, and its two guards are bypassed: the read goes unlogged, "desc read logged: 0"."""
+    g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
+    view, the record as written holds the read of `desc` at g: the line says "desc read in its record: 1". With `raw`
+    (the control), `hdr` is left as the toy bound it, the raw table, and its two guards are bypassed: the read goes
+    unlogged, "desc read in its record: 0", and the body is the plain run's."""
     tracer_instance()
     nss = {}
     _install = T.Tracer3.install
@@ -539,6 +540,16 @@ def hdr_read_v2(raw):
                     ns["hdr"] = saved[id(ns)]
 
         T.Tracer3.final_check = final_check
+    want, inrec = [None, None], Count()     # the open record and the read's path; whether the record holds it
+    _write = T.Tracer3.write
+
+    @functools.wraps(_write)
+    def write(self, rec):
+        if rec is want[0]:
+            inrec.n = int(any(e[0] == "desc" and e[1] == want[1] for e in rec.get("reads", [])))
+        return _write(self, rec)
+
+    T.Tracer3.write = write
     _read = F.Recorder.read
 
     @functools.wraps(_read)
@@ -546,13 +557,13 @@ def hdr_read_v2(raw):
         st = TR[0].vst if TR else None
         if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"]:
             a = st["node"]
-            g = next(iter(F.unwrap(nss[a]["desc"])), None)
+            g = next((x for x in F.unwrap(nss[a]["desc"]) if ("desc", (x,)) not in self.first), None)
             if g is not None:
                 PLANTED[0] += 1
-                before = set(self.first)
+                want[:] = [st["cur"], self.roots["desc"][0].path((g,))]
                 nss[a]["hdr"][g]
                 SEEN["node a"] = a
-                SEEN["desc read logged"] = sum(1 for e in set(self.first) - before if e[0] == "desc")
+                SEEN["desc read in its record"] = inrec
         return _read(self, t, p)
 
     F.Recorder.read = read
@@ -642,11 +653,16 @@ def bare_in_question_v2(per_node, callee="N"):
       starts inside node a's question.
     - `on_iwant` (hand5-own's arguments): node c the node whose `on_iwant` is replaced (the silent node's, which
       answers nothing); a traced name replaced there, counted `"c on_iwant"` as a traced one is.
-    - `after` (a tape question, a timer): node c's `after(0, a no-op)`; bare, on no tape, so the body is the plain
-      run's (taped on node a's question, it would differ); not counted (no traced name)."""
+    - `after` (a tape question, a timer): node c's `after(0, a callback)`; bare, on no tape, so the body is the plain
+      run's (taped on node a's question, it would differ); not counted (no traced name). Its line counts the
+      simulator's events pushed for node c with the callback (`Sim.after`), and the callback's runs called by the
+      simulator's loop (`Sim.run`) with no question or record open: one each.
+    - `after-now` (the control of `after`): the callback run at once, inside the question, and not scheduled (the
+      planted fault): none of either."""
     tracer_instance()
     nss, at, replaced_at = {}, [None], set()
     ran, fired = Count(), Count()       # the replaced body's runs, the timer's firings: printed at the run's end
+    sched, cb, sims = Count(), [None], []
     watch_records(lambda: at[0])
 
     def stored(c):                      # a chunk stored at node c with its id cached, or None
@@ -663,6 +679,15 @@ def bare_in_question_v2(per_node, callee="N"):
             self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0}
         st, a = self.vst, int(nd.id)
         nss[a] = ns
+        if callee.startswith("after") and not sims:     # the simulator's own scheduling, seen once per run
+            sims.append(type(nd.sim))
+            _after = sims[0].after
+
+            def after(sim, node, delay, fn, *args):
+                if fn is cb[0] and node is not None and int(node.id) == cb[1]:
+                    sched.n += 1
+                return _after(sim, node, delay, fn, *args)
+            sims[0].after = after
         own = ns["on_iwant"]
         if getattr(getattr(own, "__code__", None), "co_filename", None) != T.DOC_FILE:
             replaced_at.add(a)          # the node's own on_iwant (the silent node's), before the tracer wraps it
@@ -698,11 +723,21 @@ def bare_in_question_v2(per_node, callee="N"):
                             f.mid = m[:36] + bytes([m[36] ^ 1]) + m[37:]
                             nss[c]["message_id"](f)
                         else:
-                            SEEN["the timer fired at node c"] = fired
-                            nss[c]["after"](0, lambda: setattr(fired, "n", fired.n + 1))
+                            def timer():        # fired by the simulator's loop, with nothing open: counted
+                                caller = sys._getframe(1).f_code
+                                if (caller.co_name == "run" and Path(caller.co_filename).name == "sim.py"
+                                        and not st["depth"] and not st["ext"]):
+                                    fired.n += 1
+                            cb[:] = [timer, c]
+                            SEEN["the timer scheduled at node c"] = sched
+                            SEEN["fired from the simulator, outside the question"] = fired
+                            if callee == "after":
+                                nss[c]["after"](0, timer)
+                            else:               # the control: run at once, not scheduled
+                                timer()
                     finally:
                         at[0] = None
-                    if callee != "after":
+                    if not callee.startswith("after"):
                         SEEN[f"bare c {callee}"] = TR[0].bare.get(f"{c} {callee}", 0)
             return doc(p)
         ns["peer_id_bytes"] = peer_id_bytes
@@ -822,7 +857,8 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
           "--rebind-tape-v2", "--rebind-view-v2", "--stale-id-bare-v2", "--close-keyerror-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
-          "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--hdr-read-v2", "--hdr-read-v2-raw")
+          "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
+          "--hdr-read-v2-raw")
 HAND5 = ["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -854,6 +890,8 @@ def main(argv):
             bare_in_question_v2(per_node=False, callee="on_iwant")
         elif fault == "--bare-timer-v2":
             bare_in_question_v2(per_node=False, callee="after")
+        elif fault == "--bare-timer-v2-now":
+            bare_in_question_v2(per_node=False, callee="after-now")
         elif fault == "--other-node-tape-v2":
             other_node_tape_v2()
         elif fault == "--rebound-scanned-v2":

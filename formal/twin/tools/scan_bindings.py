@@ -22,17 +22,27 @@ Each function bound has a class:
   a node attribute so assigned, `self._doc_x = ns["x"]`) and passes the observer test: its code names no question
   (trace3.py's TAPE, and protocol-v2.md's: the names its functions call that no document defines and that the toy
   binds under v2 alone) and no traced function but the earlier binding; it assigns, deletes or mutates no table,
-  through its own aliases too, following the local functions and node methods it calls with the tables it hands
-  them, and hands no table to a call the test cannot follow; it rebinds no namespace name (a scalar too: a layer
+  through its own aliases too, following the local functions, lambdas and node methods it calls with the tables it
+  hands them; on a table, or on what a table's method returns, it calls only the methods that read it, and it hands
+  a table to no call the test cannot follow (a builtin but those that only read, `len`, `sorted`, ...); the functions
+  and lambdas made inside it are read as its own code; it rebinds no namespace name (a scalar too: a layer
   that changes a node constant around the call, as the peer promise's `filter_entry` sets PROMISE, is a changing
-  layer); and it calls the earlier binding once on every path (branches, `try`, `with`, loops walked),
-  with its own parameters unchanged and nothing more, returning its result, or nothing where the document's
-  function returns nothing (a least fixpoint over both documents: `return f(...)` of a function that returns nothing
-  returns nothing). `message_id`'s cache is an observer by name (it skips the call on a hit).
+  layer); and it calls the earlier binding once on every path (branches, `try`, `with`, loops walked; a statement
+  the walk does not follow, `match` among them, holds no call and no return; a `try`'s `else` with handlers neither),
+  never in a function made inside it, the earlier binding's name bound nowhere in its body,
+  with its own parameters unchanged (a handler's, a pattern's or a walrus's name counts) and nothing more, returning
+  its result, or nothing where the document's function returns nothing (a least fixpoint over both documents:
+  `return f(...)` of a function that returns nothing returns nothing). `message_id`'s cache is an observer by name
+  (it skips the call on a hit). What the test cannot establish is not an observer: an unknown effect denies.
 - **layer**: it holds the earlier binding and fails the test (the reason is given);
 - **closure-dependent**: its first statement branches on a value the node is made with (no parameter of its own,
-  no state): its class per branch is given (`owed_missing`'s `--member-check`: `not on`, own; else, observer), and
-  the node's own value is read where classes are first read;
+  no field, call or element, each name bound exactly once in the nearest enclosing function that binds it and
+  rebound by no `nonlocal` or `global` there; a module's global is state): its class per branch is given, under
+  each document it may run under where the two differ (`owed_missing`'s `--member-check`: `not on`, own; else,
+  observer), and the node's own value is read where classes are first read;
+- **per-document**: an observer under one document and a layer under the other, its class under each given. A
+  row's classes are conditional on the document: the scan does not establish which run reaches a binding (a
+  fixture whose callers make v2 nodes alone is classed under both documents);
 - **own**: any other function (a lambda included);
 - **value**: anything else (a table, a constant, a class, an expression); a name that holds another slot's value
   (`chunk_id = ns["message_id"]`) is marked as its alias.
@@ -53,6 +63,19 @@ FORMS = ("subscript", "tuple", "update-keyword", "update-dict", "locals-export",
 MUTATORS = {"add", "append", "appendleft", "extend", "extendleft", "insert", "pop", "popleft", "popitem", "remove",
             "discard", "clear", "update", "setdefault", "sort", "reverse", "__setitem__", "__delitem__", "set", "unset",
             "difference_update", "intersection_update", "symmetric_difference_update"}
+# the methods that only read a table (a dict, a set, a list, a deque): any other call on a table, or on what one of
+# its methods returns, is one the test cannot establish as a read, and denies
+READONLY_METHODS = {"get", "keys", "values", "items", "copy", "count", "index", "issubset", "issuperset", "isdisjoint",
+                    "union", "intersection", "difference", "symmetric_difference", "__contains__", "__len__",
+                    "__iter__", "__getitem__"}
+# the builtins that only read what they are handed: any other builtin handed a table denies (setattr, map, ...)
+READONLY_BUILTINS = {"len", "list", "tuple", "set", "frozenset", "dict", "sorted", "reversed", "iter", "next",
+                     "enumerate", "zip", "sum", "min", "max", "any", "all", "isinstance", "bool", "int", "float", "str",
+                     "repr", "hash", "id", "type", "abs", "round", "range", "callable", "bytes", "hasattr"}
+# the toy's own methods taken as reads (a bitmap's `has`), each only where the scan finds that every definition of
+# that name in the toy's classes only reads: no field or element assigned or deleted, and no call but these reads,
+# the methods above and the builtins above (`Scanner.toy_reads`); else it is no read
+TOY_READS = {"has"}
 BY_NAME = {"message_id": "a cache: it skips the call on a hit"}     # observers by name
 
 
@@ -118,6 +141,7 @@ class Scanner:
         self.skip = set(skip)       # forms whose reader is off (the self-test's control)
         self.off = set(off)         # clauses of the observer test that are off (the self-test's control)
         self.rows, self.funcs, self.methods = [], [], {}
+        self.reads = set(READONLY_METHODS)  # with the toy's reads that hold (scan(), toy_reads)
         self.attr_captures = {}     # (file, attribute) -> the namespace name a node attribute was assigned from
         self.traced, self.questions = TRACED, QUESTIONS_DOC
         self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
@@ -389,8 +413,9 @@ class Scanner:
             else:
                 r["holds"] = held
                 docs = ("v2",) if r["v2_only"] else ("protocol.md", "v2")     # the documents it runs under
-                split = self.closure_split(fn, name, held, docs[0])
-                if split is not None:       # its class per branch on a closure value (the node's, read later)
+                split = self.closure_split(fn, name, held, docs)
+                if split is not None:       # its class per branch on a closure value (the node's, read later), each
+                                            #   branch's per document where the two differ
                     r["class"], r["closure"] = "closure-dependent", split
                 else:
                     by = {d: self.observer_test(fn, name, held, d) for d in docs}
@@ -452,7 +477,7 @@ class Scanner:
     # -- the observer test ------------------------------------------------------------------------------------
     # the observer test, clause by clause; each clause can be switched off (`self.off`), for the self-test's controls
     CLAUSES = ("question", "traced", "assign", "delete", "mutate", "unfollowed", "local-fn", "node-method", "twice",
-               "branch", "arguments", "result", "by-name")
+               "branch", "arguments", "result", "rebind", "by-name")
 
     def is_held(self, n, held):
         return isinstance(n, ast.Call) and ast.unparse(n.func) == held
@@ -474,12 +499,11 @@ class Scanner:
         """A function's own scope for the test: its parameters shadow the enclosing captures, except those named in
         `tables` (a followed callee's parameters given a table); its local aliases of a table are captures too."""
         s = Scope(node, qual, parent)
-        if not isinstance(node, ast.Lambda):
-            pos, kwo, var, kw = params_of(node)
-            for p in pos + kwo + [x.arg for x in (var, kw) if x is not None]:
-                s.captures[p] = "<table>" if p in tables else None
-        assigns = sorted((n for n in self.walk_no_nested(node) if isinstance(n, ast.Assign)),
-                         key=lambda n: (n.lineno, n.col_offset))
+        pos, kwo, var, kw = params_of(node)         # a lambda's too
+        for p in pos + kwo + [x.arg for x in (var, kw) if x is not None]:
+            s.captures[p] = "<table>" if p in tables else None
+        assigns = sorted((n for n in ast.walk(node) if isinstance(n, ast.Assign)),      # its nested functions' too:
+                         key=lambda n: (n.lineno, n.col_offset))                        #   they are read with it
         for n in assigns:                   # in source order: an alias of an alias is one
             for t in n.targets:
                 pairs = (list(zip(t.elts, n.value.elts)) if isinstance(t, ast.Tuple) and isinstance(n.value, ast.Tuple)
@@ -515,8 +539,10 @@ class Scanner:
 
     def names_and_writes(self, node, scope, name, held, seen):
         """Why the code names a question or a traced function, or writes, deletes or mutates a table, following the
-        local functions and node methods it calls (with the tables it hands them); or None."""
-        for n in self.walk_no_nested(node):
+        local functions and node methods it calls (with the tables it hands them); or None. The functions and lambdas
+        defined inside it are read as its own code, whether or not they run: a closure needs no argument to reach a
+        table."""
+        for n in ast.walk(node):
             k = None
             if isinstance(n, ast.Subscript) and is_ns(n.value):
                 k = ns_key(n)
@@ -542,15 +568,21 @@ class Scanner:
             if isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS and "mutate" not in self.off:
                 if self.ns_rooted(n.func.value, scope, bare=True):
                     return f"mutates {ast.unparse(n.func.value)[:60]} by {n.func.attr}"
+            if (isinstance(n.func, ast.Attribute) and n.func.attr not in MUTATORS | self.reads
+                    and "mutate" not in self.off and self.ns_rooted(n.func.value, scope, bare=True)):
+                return (f"calls {n.func.attr} on {ast.unparse(n.func.value)[:60]}, which the test does not establish "
+                        f"as a read")
             if self.is_held(n, held):
                 continue
             callee, clause = None, None
             if isinstance(n.func, ast.Name):
                 f = scope.lookup(n.func.id, "funcs")
-                if f is not None and not isinstance(f.node, ast.Lambda):
+                if f is not None:       # a local function or lambda, followed
                     callee, clause = (f.node, f.scope, f.qual), "local-fn"
-                elif f is None and (n.func.id in BUILTIN_NAMES or scope.lookup(n.func.id, "captures") is not None):
-                    continue            # a builtin, or a namespace function (named, and so checked, above)
+                elif f is None and scope.lookup(n.func.id, "captures") is not None:
+                    continue            # a namespace function (named, and so checked, above)
+                elif f is None and n.func.id in READONLY_BUILTINS:
+                    continue            # a builtin that only reads (any other is unfollowed, below)
             elif (isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
                   and n.func.value.id in ("self", "node")):
                 m = self.methods.get((self.path.name, "Node", n.func.attr))
@@ -581,16 +613,54 @@ class Scanner:
     def ns_rooted(self, e, scope, bare=False):
         """Whether an expression reaches into a namespace name: `ns[...]` itself or anything under it, or anything
         under a variable that holds a table (captured from `ns[...]`, aliased, or a followed callee's parameter given
-        one). With `bare`, the variable itself counts too (a method's receiver, a call's argument)."""
+        one). With `bare`, the variable itself counts too (a method's receiver, a call's argument). What a method of
+        a table returns is under the table (`ns["t"].get(k)`: a row, which can be changed in place)."""
         top = e
-        while isinstance(e, (ast.Subscript, ast.Attribute)):
+        while isinstance(e, (ast.Subscript, ast.Attribute, ast.Call)):
             if isinstance(e, ast.Subscript) and is_ns(e.value):
                 return True
-            e = e.value
+            if isinstance(e, ast.Call):
+                if not isinstance(e.func, ast.Attribute):
+                    break               # a function's result: not a table's
+                e = e.func.value
+            else:
+                e = e.value
         if isinstance(e, ast.Name) and (bare or e is not top):
             k = scope.lookup(e.id, "captures")
             return k is not None and k not in self.questions | self.traced | CALLABLES
         return bare and isinstance(top, ast.Subscript) and is_ns(top.value)
+
+    def toy_reads(self):
+        """The names of TOY_READS that the toy's classes define, each definition only reading."""
+        out = set()
+        for name in TOY_READS:
+            defs = [f.node for (_, q), f in self.globals.items() if "." in q and q.rsplit(".", 1)[1] == name]
+            if defs and all(self.only_reads(d) for d in defs):
+                out.add(name)
+        return out
+
+    @staticmethod
+    def only_reads(d):
+        for n in ast.walk(d):
+            if isinstance(n, (ast.Attribute, ast.Subscript)) and isinstance(n.ctx, (ast.Store, ast.Del)):
+                return False
+            if isinstance(n, (ast.Global, ast.Nonlocal)):
+                return False
+            if isinstance(n, ast.Call) and not (
+                    (isinstance(n.func, ast.Attribute) and n.func.attr in READONLY_METHODS | TOY_READS)
+                    or (isinstance(n.func, ast.Name) and n.func.id in READONLY_BUILTINS)):
+                return False
+        return True
+
+    def binds(self, node, held):
+        """Whether the function binds the earlier binding's name in its own body (an assignment, a parameter, a
+        handler's or a pattern's name, an import, a definition, a `global` or `nonlocal`), or for a node attribute
+        (`self._doc_x`) assigns or deletes it anywhere in it: its call is then not the earlier binding's."""
+        if "." in held:
+            return any(isinstance(n, ast.Attribute) and isinstance(n.ctx, (ast.Store, ast.Del))
+                       and ast.unparse(n) == held for n in ast.walk(node))
+        return bool(self.bindings(node, held)) or any(isinstance(n, (ast.Global, ast.Nonlocal)) and held in n.names
+                                                    for n in self.walk_no_nested(node))
 
     def args_ok(self, call, node, params):
         """Why the earlier binding's call does not pass the function's own parameters exactly, or None."""
@@ -619,6 +689,13 @@ class Scanner:
                 why = self.args_ok(c, node, params)
                 if why:
                     return why
+        if "rebind" not in self.off and self.binds(node, held):     # then its call is not the earlier binding's
+            return f"binds {held} again in its own body"
+        if "twice" not in self.off and any(self.is_held(n, held) for d in ast.walk(node)
+                                           if d is not node and isinstance(d, (ast.FunctionDef, ast.AsyncFunctionDef,
+                                                                                ast.Lambda))
+                                           for n in ast.walk(d)):
+            return f"calls {held} in a function defined in it"     # a call the walk below cannot count
         st = {"count": 0, "res": None, "assigned": set()}
         why, ended = self.walk(body, st, held, params, name in self.returns)
         if why:
@@ -638,25 +715,35 @@ class Scanner:
         made on some paths only, a second time, or after a parameter is rebound."""
         always = set(id(n) for n in self.own_exprs(node)) if isinstance(node, ast.stmt) else set(
             id(n) for n in self.every_path(node))
-        for n in ast.walk(node):
+        walrus = {w.target.id for w in ast.walk(node) if isinstance(w, ast.NamedExpr)}     # beside the call: its order
+        for n in ast.walk(node):                                                            #   in the line not read
             if not self.is_held(n, held):
                 continue
             if id(n) not in always and "branch" not in self.off:
                 return f"calls {held} on some paths only"
             if st["count"] and "twice" not in self.off:
                 return f"calls {held} twice"
-            if st["assigned"] & params and "arguments" not in self.off:
-                return f"rebinds its parameter {sorted(st['assigned'] & params)[0]} before it calls {held}"
+            if (st["assigned"] | walrus) & params and "arguments" not in self.off:
+                return f"rebinds its parameter {sorted((st['assigned'] | walrus) & params)[0]} before it calls {held}"
             st["count"] += 1
         return None
 
     def note_assigns(self, s, st):
         """The names a statement may assign: each counts as rebound, and the result variable is no longer the
-        earlier binding's result."""
+        earlier binding's result: a name assigned (a walrus's too), a handler's or a pattern's name, an import."""
         for n in self.walk_no_nested(s):
+            names = []
             if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
-                st["assigned"].add(n.id)
-                if n.id == st["res"]:
+                names = [n.id]
+            elif isinstance(n, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar)) and n.name:
+                names = [n.name]
+            elif isinstance(n, ast.MatchMapping) and n.rest:
+                names = [n.rest]
+            elif isinstance(n, ast.alias):
+                names = [n.asname or n.name.split(".")[0]]
+            for x in names:
+                st["assigned"].add(x)
+                if x == st["res"]:
                     st["res"] = None
 
     def walk(self, stmts, st, held, params, rv):
@@ -668,6 +755,7 @@ class Scanner:
                 why = self.calls_in(s.test, st, held, params)
                 if why:
                     return why, False
+                self.note_assigns(ast.Expr(value=s.test), st)     # a walrus in the test assigns
                 a = {"count": st["count"], "res": st["res"], "assigned": set(st["assigned"])}
                 b = {"count": st["count"], "res": st["res"], "assigned": set(st["assigned"])}
                 wa, ea = self.walk(s.body, a, held, params, rv)
@@ -703,8 +791,12 @@ class Scanner:
                     return "returns or raises in a handler", False
                 if any(self.is_held(n, held) for h in s.handlers for b in h.body for n in ast.walk(b)):
                     return f"calls {held} in a handler", False
-                for h in s.handlers:            # a handler may run: what it assigns is assigned
-                    self.note_assigns(ast.Module(body=h.body, type_ignores=[]), st)
+                if (s.handlers and "branch" not in self.off      # a handler's path does not run the else
+                        and any(self.is_held(n, held) or isinstance(n, (ast.Return, ast.Raise))
+                                for b in s.orelse for n in self.walk_no_nested(b))):
+                    return "calls, returns or raises in a try's else, which a handler's path skips", False
+                for h in s.handlers:            # a handler may run: what it assigns is assigned, its name too
+                    self.note_assigns(h, st)
                 for part in (s.body, s.orelse):
                     why, ended = self.walk(part, st, held, params, rv)
                     if why or ended:
@@ -716,6 +808,7 @@ class Scanner:
                     why = self.calls_in(it.context_expr, st, held, params)
                     if why:
                         return why, False
+                    self.note_assigns(ast.Expr(value=it.context_expr), st)
                     if it.optional_vars is not None:    # `with … as x` assigns x
                         self.note_assigns(ast.Expr(value=it.optional_vars), st)
                 why, ended = self.walk(s.body, st, held, params, rv)
@@ -738,9 +831,10 @@ class Scanner:
                 if not rv and (v is None or (isinstance(v, ast.Constant) and v.value is None)):
                     return None, True
                 return f"does not return {held}'s result", True
-            if any(isinstance(c, ast.stmt) for c in ast.iter_child_nodes(s)):   # a compound statement the walk
-                if any(self.is_held(n, held) or isinstance(n, (ast.Return, ast.Raise))  #   does not follow
-                       for n in self.walk_no_nested(s)):
+            if any(isinstance(c, ast.stmt) for c in self.walk_no_nested(s) if c is not s):  # a compound statement
+                if "branch" not in self.off and any(                                        #   the walk does not
+                        self.is_held(n, held) or isinstance(n, (ast.Return, ast.Raise))    #   follow (match: its
+                        for n in self.walk_no_nested(s)):                                   #   arms are statements
                     return f"a {type(s).__name__} statement the test cannot follow holds the call or a return", False
                 self.note_assigns(s, st)
                 continue
@@ -793,10 +887,15 @@ class Scanner:
                 if isinstance(v, ast.AST):
                     yield from Scanner.every_path(v)
 
-    def closure_split(self, fn, name, held, doc):
+    def closure_split(self, fn, name, held, docs):
         """A layer whose first statement branches on a closure value alone (no parameter of its own): its class per
         branch, as {"on": the test's text, "true": class, "false": class}, or None. Such a layer is
-        classified per node by that value; the scan gives both, and the node's own value is read where classes are."""
+        classified per node by that value; the scan gives both, and the node's own value is read where classes are.
+        A branch's class is given under each document the row runs under, as {document: class} where they differ.
+        A value the node is made with: each name of the test bound exactly once (a parameter, or one assignment) in
+        the nearest enclosing function that binds it, declared `nonlocal` or `global` in no function made in that
+        one, bound to no container and mutated by no method there; a module's global, or a name bound twice, is
+        state, and splits nothing."""
         node = fn.node
         if isinstance(node, ast.Lambda) or not node.body or not isinstance(node.body[0], ast.If):
             return None
@@ -807,6 +906,15 @@ class Scanner:
         names = {n.id for n in ast.walk(test) if isinstance(n, ast.Name)}
         if not names or names & own or any(fn.scope.lookup(x, "captures") for x in names):
             return None
+        for x in names:                 # each bound once, in the nearest enclosing function that binds it
+            s = fn.scope
+            while s is not None and not (isinstance(s.node, (ast.FunctionDef, ast.AsyncFunctionDef))
+                                         and self.bindings(s.node, x)):
+                s = s.parent
+            if s is None or self.bindings(s.node, x) != 1:
+                return None             # a module's global, or a name bound more than once
+            if any(isinstance(n, (ast.Global, ast.Nonlocal)) and x in n.names for n in ast.walk(s.node)):
+                return None             # a function made there rebinds it
         s = fn.scope                    # a value the node is made with, not state: no name of the test bound to a
         while s is not None:            #   container or mutated by a method in an enclosing function
             if isinstance(s.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -838,9 +946,29 @@ class Scanner:
             ast.fix_missing_locations(alt)
             f2 = Func(alt, fn.qual, fn.scope, self.src, self.path)
             h = self.held(f2, name)
-            out[str(truth).lower()] = "own" if h is None else (
-                "observer" if self.observer_test(f2, name, h, doc) is None else "layer")
+            by = {d: "own" if h is None else ("observer" if self.observer_test(f2, name, h, d) is None else "layer")
+                  for d in docs}
+            out[str(truth).lower()] = by[docs[0]] if len(set(by.values())) == 1 else by
         return out if out["true"] != out["false"] else None
+
+    def bindings(self, fn_node, x):
+        """How many times a function binds the name in its own body: its parameters, each assignment (an augmented
+        one, a loop's or a `with`'s target, a walrus), each handler's or pattern's name, import and definition."""
+        pos, kwo, var, kw = params_of(fn_node)
+        k = (pos + kwo + [a.arg for a in (var, kw) if a is not None]).count(x)
+        for n in self.walk_no_nested(fn_node):
+            if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)) and n.id == x:
+                k += 1
+            elif isinstance(n, (ast.ExceptHandler, ast.MatchAs, ast.MatchStar)) and n.name == x:
+                k += 1
+            elif isinstance(n, ast.MatchMapping) and n.rest == x:
+                k += 1
+            elif isinstance(n, ast.alias) and (n.asname or n.name.split(".")[0]) == x:
+                k += 1
+            for c in ast.iter_child_nodes(n):
+                if isinstance(c, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and c.name == x:
+                    k += 1
+        return k
 
 
 QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, CALLABLES = set(), set(), set(), set(), set()
@@ -918,6 +1046,7 @@ def scan(toy, skip=(), off=()):
     files = sorted(Path(toy).glob("*.py"))
     for f in files:                     # every module's own functions and imports first, then the bindings
         sc.prepass(f)
+    sc.reads = READONLY_METHODS | sc.toy_reads()
     for f in files:
         sc.scan_file(f)
     return sc
@@ -941,6 +1070,11 @@ def lists(sc, T):
     own = sorted({(r["name"], r["value"]["qual"]) for r in rows if r["class"] == "own" and r["name"] not in defined})
     repl = sorted({r["name"] for r in rows if r["class"] in ("own", "layer") and r["name"] in defined})
     out, other = [], 0
+    for r in rows:                      # a class the lists cannot hold: the trace's lists take one class a name
+        if r["class"] in ("closure-dependent", "per-document"):
+            other += 1
+            out.append(f"{r['class']} {r['name']} {r['value']['qual']}: NOT one class, which trace3.py's lists need "
+                       f"({r['file']}:{r['line']})")
     hand_obs = sorted(T.WRAPPERS.items())
     for x in obs:
         if x in hand_obs:
@@ -1020,6 +1154,14 @@ WANT = {"subscript": ("a", 7, "observer"), "tuple": ("b", 8, "own"), "update-key
 # layer branching on a closure value; the names: askq a question, trf a traced function, tbl a table; every c_* name
 # a function of the document that returns a value, but c_none
 LAYERS = '''\
+GLOBAL_ON = True
+
+
+class Bits:
+    def has(self, i):
+        return (self.v >> i) & 1 == 1
+
+
 class Node:
     def meth(self, x):
         self.ns["tbl"].clear()
@@ -1037,6 +1179,90 @@ class Node:
         d_none, d_mid = ns["c_none"], ns["message_id"]
         d_qualified, d_aliasrow, d_methodarg, d_brres = ns["c_qualified"], ns["c_aliasrow"], ns["c_methodarg"], ns["c_brres"]
         d_finally, d_handler, d_with, d_effect, d_v2q = ns["c_finally"], ns["c_handler"], ns["c_with"], ns["c_effect"], ns["c_v2q"]
+        d_put, d_setattr, d_getmut, d_nested = ns["c_put"], ns["c_setattr"], ns["c_getmut"], ns["c_nested"]
+        d_lambda, d_lamq, d_outlam, d_reads = ns["c_lambda"], ns["c_lamq"], ns["c_outlam"], ns["c_reads"]
+        d_tryelse, d_match, d_handleras, d_walrus = ns["c_tryelse"], ns["c_match"], ns["c_handleras"], ns["c_walrus"]
+        d_rebind, d_again, d_has = ns["c_rebind"], ns["c_again"], ns["c_has"]
+        clr = lambda: ns["tbl"].clear()
+
+        def c_put(x):
+            ns["tbl"].put(x)
+            return d_put(x)
+
+        def c_setattr(x):
+            setattr(ns["tbl"], "k", 1)
+            return d_setattr(x)
+
+        def c_getmut(x):
+            ns["tbl"].get(x).append(1)
+            return d_getmut(x)
+
+        def c_nested(x):
+            def bump():
+                ns["tbl"].clear()
+            bump()
+            return d_nested(x)
+
+        def c_lambda(x):
+            (lambda: ns["tbl"].clear())()
+            return d_lambda(x)
+
+        def c_lamq(x):
+            foreign(lambda: ns["askq"]())
+            return d_lamq(x)
+
+        def c_outlam(x):
+            clr()
+            return d_outlam(x)
+
+        def c_reads(x):
+            if ns["tbl"].get(x) and len(ns["tbl"]) and sorted(ns["tbl"]):
+                pass
+            return d_reads(x)
+
+        def c_tryelse(x):
+            try:
+                int(x)
+            except ValueError:
+                pass
+            else:
+                return d_tryelse(x)
+            return 0
+
+        def c_match(x):
+            match x:
+                case 0:
+                    return 0
+                case _:
+                    pass
+            return d_match(x)
+
+        def c_handleras(x):
+            try:
+                pass
+            except ValueError as x:
+                pass
+            return d_handleras(x)
+
+        def c_walrus(x):
+            if (x := x + 1):
+                pass
+            return d_walrus(x)
+
+        def c_rebind(x):
+            d_rebind = replace
+            return d_rebind(x)
+
+        def c_again(x):
+            def again():
+                d_again(x)
+            again()
+            return d_again(x)
+
+        def c_has(x):
+            if ns["tbl"].has(x):
+                pass
+            return d_has(x)
 
         def c_qualified(x):
             foreign.process(ns["tbl"])
@@ -1165,7 +1391,10 @@ class Node:
                   c_branch=c_branch, c_args=c_args, c_result=c_result, c_extra=c_extra, c_fallthrough=c_fallthrough,
                   c_arms=c_arms, c_plain=c_plain, c_none=c_none, message_id=message_id, c_qualified=c_qualified,
                   c_aliasrow=c_aliasrow, c_methodarg=c_methodarg, c_brres=c_brres, c_finally=c_finally,
-                  c_handler=c_handler, c_with=c_with, c_effect=c_effect, c_v2q=c_v2q)
+                  c_handler=c_handler, c_with=c_with, c_effect=c_effect, c_v2q=c_v2q, c_put=c_put,
+                  c_setattr=c_setattr, c_getmut=c_getmut, c_nested=c_nested, c_lambda=c_lambda, c_lamq=c_lamq,
+                  c_outlam=c_outlam, c_reads=c_reads, c_tryelse=c_tryelse, c_match=c_match, c_handleras=c_handleras,
+                  c_walrus=c_walrus, c_rebind=c_rebind, c_again=c_again, c_has=c_has)
 
     def closure(self, ns, on):
         d_closed = ns["c_closed"]
@@ -1175,15 +1404,63 @@ class Node:
                 return 0
             return d_closed(x)
         ns["c_closed"] = c_closed
+
+    def closure_global(self, ns):
+        d_global = ns["c_global"]
+
+        def c_global(x):
+            if not GLOBAL_ON:
+                return 0
+            return d_global(x)
+        ns["c_global"] = c_global
+
+    def closure_sibling(self, ns):
+        on = True
+        d_sibling = ns["c_sibling"]
+
+        def c_sibling(x):
+            if not on:
+                return 0
+            return d_sibling(x)
+
+        def flip():
+            nonlocal on
+            on = False
+        ns["c_sibling"] = c_sibling
+
+    def closure_param(self, ns, on):
+        on = not on
+        d_param = ns["c_param"]
+
+        def c_param(x):
+            if not on:
+                return 0
+            return d_param(x)
+        ns["c_param"] = c_param
+
+    def closure_doc(self, ns, on):
+        d_doc = ns["c_doc"]
+
+        def c_doc(x):
+            if not on:
+                return 0
+            ns["v2q"](x)
+            return d_doc(x)
+        ns["c_doc"] = c_doc
 '''
 BREAKS = {"c_question": "question", "c_traced": "traced", "c_assign": "assign", "c_delete": "delete",
           "c_mutate": "mutate", "c_unfollowed": "unfollowed", "c_localfn": "local-fn", "c_method": "node-method",
           "c_twice": "twice", "c_branch": "branch", "c_args": "arguments", "c_result": "result",
           "c_extra": "arguments", "c_fallthrough": "result", "c_qualified": "unfollowed", "c_aliasrow": "delete",
           "c_methodarg": "node-method", "c_brres": "result", "c_finally": "result", "c_handler": "arguments",
-          "c_with": "arguments"}
-PASSES = ("c_arms", "c_plain", "c_none", "message_id")
-NOT_SPLIT = ("c_effect",)               # a branch on a call's answer: no construction value, so no class per branch
+          "c_with": "arguments", "c_put": "mutate", "c_setattr": "unfollowed", "c_getmut": "mutate",
+          "c_nested": "mutate", "c_lambda": "mutate", "c_lamq": "question", "c_outlam": "local-fn",
+          "c_tryelse": "branch", "c_match": "branch", "c_handleras": "arguments", "c_walrus": "arguments",
+          "c_rebind": "rebind", "c_again": "twice"}
+PASSES = ("c_arms", "c_plain", "c_none", "message_id", "c_reads", "c_has")
+# a branch on a call's answer, a module's global, a name a sibling rebinds through `nonlocal`, a parameter assigned
+# again: no construction value, so no class per branch (each a layer, whole)
+NOT_SPLIT = ("c_effect", "c_global", "c_sibling", "c_param")
 
 
 def self_test():
@@ -1215,7 +1492,7 @@ def self_test():
                moved == [("subscript", "a", 7)] and set(before) == set(after), f"moved {moved}")
     sets = (QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, DEFS_DOC, RETURNS_DOC)
     saved = [set(s) for s in sets]
-    names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_v2q"}
+    names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_v2q", "c_doc"}
     for s, v in zip(sets, ({"askq"}, {"askq", "v2q"}, {"trf"}, {"trf"}, names,
                            names - {"c_none", "message_id"})):
         s.clear()
@@ -1238,6 +1515,11 @@ def self_test():
             report("control: message_id with the rule by name off a layer", c == "layer", f"got {c}")
             for name in NOT_SPLIT:
                 report(f"{name} not split, a layer", cls(rows, name) == "layer", f"got {cls(rows, name)}")
+            (Path(d) / "layers.py").write_text(LAYERS.replace("        return (self.v >> i) & 1 == 1\n",
+                                                              "        self.v = 0\n"))
+            c = cls(scan(d).rows, "c_has")
+            report("control: a toy's `has` that writes is no read, c_has a layer", c == "layer", f"got {c}")
+            (Path(d) / "layers.py").write_text(LAYERS)
             got = [r for r in rows if r["name"] == "c_v2q"]
             ok = (len(got) == 1 and got[0]["class"] == "per-document"
                   and got[0]["by_document"]["protocol.md"] == "observer"
@@ -1249,6 +1531,25 @@ def self_test():
                   and got[0]["closure"] == {"on": "not on", "true": "own", "false": "observer"})
             report("c_closed closure-dependent: own where `not on`, an observer where not", ok,
                    f"got {[(r['class'], r.get('closure')) for r in got]}")
+            got = [r for r in rows if r["name"] == "c_doc"]
+            ok = (len(got) == 1 and got[0]["class"] == "closure-dependent"
+                  and got[0]["closure"] == {"on": "not on", "true": "own",
+                                            "false": {"protocol.md": "observer", "v2": "layer"}})
+            report("c_doc closure-dependent, its branches per document: own where `not on`; where not, an observer "
+                   "under protocol.md and a layer under v2 (a v2 question)", ok,
+                   f"got {[(r['class'], r.get('closure')) for r in got]}")
+        # the lists count a row of a traced name that has no one class; the control, the same row an observer
+        # in WRAPPERS, counts none
+        T = type("T", (), {"WRAPPERS": {}, "NODE_OWN": {}, "REPLACEABLE": (), "REPLACEABLE_WHOLE": ()})
+        row = {"file": "node.py", "line": 5, "in": "Node.p", "form": "subscript", "name": "trf", "v2_only": False,
+               "value": {"qual": "Node.p.<locals>.trf", "file": "node.py", "line": 6, "sha256": "0" * 64}}
+        for c in ("closure-dependent", "per-document"):
+            out, other = lists(type("S", (), {"rows": [dict(row, **{"class": c})]}), T)
+            report(f"the lists count a {c} row of a traced name", other == 1 and out[0].startswith(f"{c} trf "),
+                   f"got {other}: {out}")
+        T.WRAPPERS = {"trf": "Node.p.<locals>.trf"}
+        out, other = lists(type("S", (), {"rows": [dict(row, **{"class": "observer"})]}), T)
+        report("control: the same row an observer in WRAPPERS, none counted", other == 0, f"got {other}: {out}")
     finally:
         for s, v in zip(sets, saved):
             s.clear()

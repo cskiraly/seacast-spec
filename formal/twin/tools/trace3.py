@@ -1697,8 +1697,9 @@ def main(argv):
     except BaseException:               # a stop (or any error) in flight: close the trace, but a later check at the
         try:                            #   close must not replace the first reason, which is the one raised
             tr.close()
-        except BaseException as later:  # a stop or any other error at the close: a note
-            print(f"trace3: (at the close, after the stop above) {type(later).__name__}: {later}", file=sys.stderr)
+        except BaseException as later:  # a stop or any other error at the close: a note (printed before the
+            print(f"trace3: (at the close, after the stop) {type(later).__name__}: {later}",   # stop's own line)
+                  file=sys.stderr)
         raise
     tr.close()
     print(f"trace3: {sum(tr.counts.values())} records, {dict(sorted(tr.counts.items()))}", file=sys.stderr)
