@@ -218,6 +218,68 @@ class V2Later (m : Type → Type) where
   /-- `window_release(p, g, i)` (§4.11) -/
   windowRelease : Peer → Group → Nat → m Unit
 
+namespace NodeV2
+
+/-- Asking through a monad transformer, as `Node61.lift`. -/
+abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α) : NodeV2 n where
+  typeOfGroup a := f (typeOfGroup a)
+  typeOf a := f (typeOf a)
+  indexCount a b := f (indexCount a b)
+  threshold a b := f (threshold a b)
+  verify a b c := f (verify a b c)
+  decode a b c := f (decode a b c)
+  headerOf a b := f (headerOf a b)
+  project a b := f (project a b)
+  cross a b c := f (cross a b c)
+  family a b := f (family a b)
+  derivedInterest a b c d e := f (derivedInterest a b c d e)
+  decodeAtK a b := f (decodeAtK a b)
+  decodeLater a b := f (decodeLater a b)
+  repairTo a b := f (repairTo a b)
+  send a b c := f (send a b c)
+  afterV2 a b := f (afterV2 a b)
+  links a := f (links a)
+  linkCover a b := f (linkCover a b)
+  coverCandidates a := f (coverCandidates a)
+  floorCandidates a := f (floorCandidates a)
+  floorLinks a b := f (floorLinks a b)
+  highCustody a b := f (highCustody a b)
+  families a := f (families a)
+  familiesWithDuty a := f (familiesWithDuty a)
+  wantsFamily a b := f (wantsFamily a b)
+  dutyFor a := f (dutyFor a)
+  routeNext a b c := f (routeNext a b c)
+  blockOf a := f (blockOf a)
+  groupOf a b := f (groupOf a b)
+  nodeId a := f (nodeId a)
+  interestSatisfied a := f (interestSatisfied a)
+  validHaveV2 a := f (validHaveV2 a)
+  mergeWaiting a b := f (mergeWaiting a b)
+  deferredOffers a b := f (deferredOffers a b)
+  openGroupSource a b := f (openGroupSource a b)
+  openLink a b := f (openLink a b)
+  openSamplingLink a b := f (openSamplingLink a b)
+  choicePeer a := f (choicePeer a)
+  choiceOfSet a := f (choiceOfSet a)
+  choiceNat a := f (choiceNat a)
+  choiceCover a := f (choiceCover a)
+  shuffledPeers a := f (shuffledPeers a)
+  shuffledPairs a := f (shuffledPairs a)
+  sampleCovers a b := f (sampleCovers a b)
+  order a b := f (order a b)
+
+instance {m : Type → Type} {σ : Type} [Monad m] [NodeV2 m] : NodeV2 (StateT σ m) :=
+  lift (m := m) (n := StateT σ m) fun x => monadLift x
+instance {m : Type → Type} {ρ : Type} [Monad m] [NodeV2 m] : NodeV2 (ReaderT ρ m) :=
+  lift (m := m) (n := ReaderT ρ m) fun x => monadLift x
+
+end NodeV2
+
+instance {m : Type → Type} {σ : Type} [Monad m] [V2Later m] : V2Later (StateT σ m) where
+  windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
+instance {m : Type → Type} {ρ : Type} [Monad m] [V2Later m] : V2Later (ReaderT ρ m) where
+  windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
+
 /-- v2's node-wide constants this cycle reads (design §5). `IWANT_WINDOW` is the effective one, already scaled
 by `ask_scale()` at load time. -/
 structure ConstsV2 where
