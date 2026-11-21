@@ -15,10 +15,9 @@ messages. The detailed notes of every release up to v0.10.8 are in
 
 ## v0.10.11 — 2026-11-21
 
-The next version's draft gives a cell group's header three forms, moves its decisions and its
-figures to files of their own, names its bindings by their carriers, defines the gossipsub
-binding's extra fields to the byte and drafts a native QUIC binding; its files are rewritten in
-plain sentences.
+The next version gives a cell group's header three forms, moves its decisions and its figures to
+files of their own, names its bindings by their carriers, defines the gossipsub binding's extra
+fields to the byte and drafts a native QUIC binding; its files are rewritten in plain sentences.
 
 ### Rules
 - `protocol-v2-bindings.md` §1.6: a cell group's header comes from the block, in every cell message
@@ -37,9 +36,9 @@ plain sentences.
   with a reserved bit set is not read as a holding.
 
 ### Added
-- `protocol-v2-decisions.md`: the draft's decision record, with the decisions of 2026-11-21 and the
-  versions of `protocol.md` carried.
-- `protocol-v2-figures.md`: the figures behind the draft's reasons, each with its conditions.
+- `protocol-v2-decisions.md`: the next version's decision record, with the decisions of 2026-11-21
+  and the versions of `protocol.md` carried.
+- `protocol-v2-figures.md`: the figures behind the next version's reasons, each with its conditions.
 - `protocol-v2.md`: a reading guide in §0, and a glossary of the document's own terms.
 - `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
 - `protocol-v2-bindings.md` §7: the native QUIC binding, a draft section, not normative, with a
