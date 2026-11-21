@@ -537,7 +537,8 @@ is bounded (§6.3).
 **Helpers not written out**, beyond `protocol.md` §8.1's, are these: `type_of_group(g)` (the object
 type a group id names), `links(T)` (the peers with a JOIN for `T` both ways: theirs received, ours
 queued rather than owed, §4.1), `our_join(T)` (the JOIN the node sends for `T`: its interest,
-custody count, duty and `M`, §1.2), `joined_types()`, `node_id(p)`, `own_id()` (the node's own id),
+custody count, duty and `M`, §1.2), `joined_types()`, `runs_type(tid)` (the node runs the object
+type `tid` names), `node_id(p)`, `own_id()` (the node's own id),
 `in_pushers(T, fam, c)` and
 `out_pushees(T, fam, c)` (the peers whose relation holds that colour), `candidates(T, fam, c, d)`
 (joined peers with duty whose interest holds the family, by `link_cover`; not yet in the relation of
@@ -598,10 +599,14 @@ def on_frame(p, frame):
 
 ```python
 def on_join(p, j: Join):
+    if not runs_type(j.object_type): return            # §2: a type the node does not run: no state, no penalty
     T = type_of(j.object_type)
     if j.colours != T.params.M: return                 # no v2 for T on this link; the stock path remains
     join_recv[p][T] = j
     if T not in join_sent[p]: send_join(p, our_join(T))   # the answer, unless ours went first
+
+def joined_on(p, tid) -> bool:                         # §2: the link joined the type, a JOIN each way
+    return runs_type(tid) and type_of(tid) in join_recv[p] and type_of(tid) in join_sent[p]
 
 def send_join(p, j: Join):                             # every JOIN of ours, once per link and type: when the node opens
     join_sent[p][type_of(j.object_type)] = j           #   the link, a sampling link's included, or in answer to p's;
@@ -662,6 +667,7 @@ def no(p, T, fam, c, d):                               # a refused GRAFT's answe
     send_relation(p, Prune(object_type=T.id, family=fam, colour=c, direction=d))
 
 def on_graft(p, gr: Graft):                            # each direction answered: a GRAFT is yes, a PRUNE no
+    if not joined_on(p, gr.object_type): return        # §2: not joined on this link: no state, no answer, no penalty
     T = type_of(gr.object_type); fam, c = gr.family, gr.colour
     if T.params.SYMMETRIC:                             # one relation both ways: decided as one, one answer
         asked = c in grafted_in[p][T][fam] or c in grafted_out[p][T][fam]   # the yes to ours, or a crossing
@@ -705,6 +711,7 @@ def join_push(p, T, fam, c):                           # p joins our push relati
                                                        #   minus what p holds, was pushed or does not want (§4.4)
 
 def on_prune(p, pr: Prune):                            # p's no, or p's end of the relation: ours ends too
+    if not joined_on(p, pr.object_type): return        # §2: not joined on this link: no backoff, no penalty
     T = type_of(pr.object_type); fam, c = pr.family, pr.colour
     d = BOTH if T.params.SYMMETRIC else pr.direction   # a symmetric relation ends both ways
     until = now + T.params.PRUNE_BACKOFF               # and is not grafted again before then
@@ -841,6 +848,14 @@ peer's (`on_join`).
 - **On gossipsub's wires** a JOIN is a subscription (§7): both ends send theirs when the
   connection opens, and one made later goes to every peer, so none is an answer. A sampler's
   `(DECLARED, NONE)` writes nothing there, so it is never owed (`protocol-v2-bindings.md` §6).
+
+**A JOIN, GRAFT or PRUNE for a type not joined leaves no state,** as §2 says of any message for a
+type a link has not joined. A JOIN for an object type the node does not run is ignored
+(`runs_type`): the node stores nothing and sends no JOIN back. A GRAFT or a PRUNE for a type the
+link has not joined, a JOIN each way (`joined_on`), is ignored too: no relation, no pending GRAFT,
+no backoff and no answer. None of them is penalised. Without the check, a peer could make the node
+hold JOINs for types it does not run, and relations and backoffs for types it never joined with that
+peer.
 
 **A peer that joins a push relation is announced what the node holds.**
 - **What is announced** (`join_push`) is what the node stores of each live group of the relation's

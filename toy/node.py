@@ -1377,6 +1377,9 @@ class Node:
         def type_of(tid):
             return types[tid]
 
+        def runs_type(tid):                             # protocol-v2.md §3's helper: a type id the node runs
+            return tid in types
+
         def links(T):
             if not c.get("upkeep"):
                 return node.peers                       # every peer joins every type of the setting

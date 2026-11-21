@@ -151,6 +151,11 @@ where one has a control that must come out the other way, it is named:
   claimed whole, and an ask that came while the gate was closed, kept and then dropped by
   `drop_outside` when it opens. Two honest runs, custody with samplers and the rows, ignore no ask.
   It fails on the document before the rule.
+- `relation_types_known.py`: `protocol-v2.md` §2 and §4.1, object types a link has not joined. A
+  JOIN for a type the node does not run stores nothing and draws no JOIN back; with the link's rows
+  JOIN taken back, a GRAFT for a row family makes no relation and draws no answer, and a PRUNE sets
+  no backoff. The control: a GRAFT for a joined column family is answered. No penalty. It fails on
+  the document before the rule.
 - `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
   beyond the group's count keeps no standing request, and with the asker's limit of unknown groups
   set to one (`MAX_PENDING_GROUPS`), a second unknown group is ignored while a known one is kept.
