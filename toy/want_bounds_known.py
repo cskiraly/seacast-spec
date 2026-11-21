@@ -11,8 +11,11 @@ its peers p, each ask given to S's `on_want` as a standing WANT that p sent, for
   of the same column: kept;
 - (b) with p's limit of unknown groups set to one, two columns S knows nothing of yet: the first kept, the second
   ignored; a third column, whose header S holds, kept whatever the limit;
+- (c) a column S knows nothing of yet, at an index past the type's most (`MAX_INDICES`): ignored;
+- (d) with the type's most raised past the count, a column S knows nothing of: an index past its count kept, and, once
+  the count is known (`drop_wants_beyond`, which `fill` calls as the group opens), dropped; index 0 kept;
 - penalties: none.
-On the document before the bounds, (a) and (b) fail.
+On the document before the bounds, (a) to (d) fail.
 """
 import sys
 from pathlib import Path
@@ -57,7 +60,7 @@ def main():
     mine = sim.custody[S.id]
     cols = [g for c, g in sorted((sim.gcol[g], g) for g in sim.canonical if sim.gtype.get(g) == "column")
             if c in mine]
-    ga, gb, gc, gd = cols[:4]
+    ga, gb, gc, gd = cols[:4]                    # and cols[4], cols[5] for (c), (d)
     pen = []
     spec_pen = ns["penalise"]
     ns["penalise"] = lambda q: (pen.append(q), spec_pen(q))
@@ -72,6 +75,23 @@ def main():
     ns["on_want"](p, [Wm.FlaggedWant(gb, 0, True, 0), Wm.FlaggedWant(gc, 0, True, 0), Wm.FlaggedWant(gd, 0, True, 0)])
     line(f"(b) limit 1: unknown columns {sim.gcol[gb]} and {sim.gcol[gc]} kept, known column {sim.gcol[gd]} kept",
          (kept(ns, gb, 0, p), kept(ns, gc, 0, p), kept(ns, gd, 0, p)), (True, False, True))
+    ns["MAX_PENDING_GROUPS"] = float("inf")
+    COL = ns["type_of_group"](cols[4])
+    ge, gf = cols[4], cols[5]
+    ns["on_want"](p, [Wm.FlaggedWant(ge, COL.params.MAX_INDICES, True, 0)])
+    line(f"(c) column {sim.gcol[ge]}, count unknown: index {COL.params.MAX_INDICES} (the type's most) kept",
+         kept(ns, ge, COL.params.MAX_INDICES, p), False)
+    if "drop_wants_beyond" not in ns:
+        line("(d) the sweep once the count is known (drop_wants_beyond)", "not in the document", "present")
+    else:
+        spec_max, COL.params.MAX_INDICES = COL.params.MAX_INDICES, 1000
+        ns["on_want"](p, [Wm.FlaggedWant(gf, 100, True, 0), Wm.FlaggedWant(gf, 0, True, 0)])
+        before = (kept(ns, gf, 100, p), kept(ns, gf, 0, p))
+        ns["hdr"][gf] = sim.ghdr[gf]
+        ns["drop_wants_beyond"](gf)
+        COL.params.MAX_INDICES = spec_max
+        line(f"(d) column {sim.gcol[gf]}: index 100 and 0 kept before the count; after it", (before,
+             (kept(ns, gf, 100, p), kept(ns, gf, 0, p))), ((True, True), (False, True)))
     line("penalties", pen, [])
 
 

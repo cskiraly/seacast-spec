@@ -1236,6 +1236,7 @@ class Node:
         #   where nodes at F_HI would otherwise be pruned at the first heartbeat
         prm.PRUNE_BACKOFF = c.get("prune_backoff", 0.0)      # §4.1 (--prune-backoff; 0: none)
         prm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
+        prm.MAX_INDICES = c.get("MAX_INDICES_PAYLOAD", math.inf)   # §6.3: the payload's plain chunks; none here
         prm.ANNOUNCE_EXTRA, prm.START_DELAY, prm.SERVE_LIMIT, prm.EVIDENCE = "SAMPLE", 0.0, math.inf, None
         prm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
         prm.EAGER, prm.DEFER_WINDOW = True, c.get("DEFER_WINDOW", 0.5)
@@ -1277,6 +1278,7 @@ class Node:
             cprm.M, cprm.F_LO, cprm.F_HI, cprm.D_OUT, cprm.D_OUT_FAST, cprm.D_OUT_MAX = 1, c["F_LO"], 12, 8, 8, 12
             cprm.SYMMETRIC, cprm.PRUNE_BACKOFF = False, c.get("prune_backoff", 0.0)   # one-way, as measured
             cprm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
+            cprm.MAX_INDICES = c["blobs"]                # §6.3: a column has a cell per blob
             cprm.ANNOUNCE_EXTRA, cprm.START_DELAY, cprm.SERVE_LIMIT, cprm.EVIDENCE = c.get("COL_ANNOUNCE", "ALL_JOINED"), 0.0, math.inf, None   # [D5]
             cprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
             cprm.SAMPLE_RETRY2, cprm.SAMPLE_OUTSTANDING = c.get("SAMPLE_RETRY2", 0.5), c.get("SAMPLE_OUTSTANDING", 4)   # [D12]
@@ -1321,6 +1323,7 @@ class Node:
                 rprm.M, rprm.F_LO, rprm.F_HI, rprm.D_OUT, rprm.D_OUT_FAST, rprm.D_OUT_MAX = 1, c["F_LO"], 12, 8, 8, 12
                 rprm.SYMMETRIC, rprm.PRUNE_BACKOFF = False, c.get("prune_backoff", 0.0)
                 rprm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
+                rprm.MAX_INDICES = scenario.NUMBER_OF_COLUMNS   # §6.3: a row has a cell per column
                 rprm.ANNOUNCE_EXTRA, rprm.START_DELAY, rprm.EVIDENCE = c.get("ROW_ANNOUNCE", "ALL_JOINED"), c["ROW_DELAY"], None   # [D5]
                 rprm.SERVE_LIMIT = 64                    # (R6) half a row per peer, EIP-8371
                 rprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
@@ -1409,19 +1412,31 @@ class Node:
         def own_id():                                   # protocol-v2.md §3's helper: the node's own id
             return node.sim.peer_id(node.id)
 
-        want_unknown = {}                               # per peer: the unknown groups its WANTs named
+        def cell_groups(root):                          # protocol-v2.md §3's helper: a block's column and row groups
+            return [g for g, h in node.sim.ghdr.items() if h.block == root]   # (the toy calls on_header_validated
+                                                        #   only in its known answers: a cell's header rides with it)
 
-        def admitted_group(p, g):                       # protocol-v2.md §3's helper: a WANT's group within p's limit
-            if g in ns["hdr"] or g in ns["T_of"]:       #   of unknown groups (protocol.md §8.2); the toy sets no
+        node.want_unknown = {}                          # per peer: the unknown groups its WANTs named, and when
+
+        def admitted_group(p, g):                       # protocol-v2.md §3's helper: a WANT's group within p's own
+            if g in ns["hdr"] or g in ns["T_of"]:       #   limit of unknown groups named in WANTs; the toy sets no
                 return True                             #   limit unless MAX_PENDING_GROUPS is given
-            seen = want_unknown.setdefault(p, set())
-            seen -= {h for h in seen if h in ns["hdr"]}  # one that resolved frees its place
+            seen = node.want_unknown.setdefault(p, {})
+            for h in [h for h, t in seen.items()        # one that resolved, or whose lifetime would have passed,
+                      if h in ns["hdr"] or ns["now"] - t > ns.get("GROUP_TTL", math.inf)]:   #   frees its place
+                del seen[h]
             if g in seen:
                 return True
             if len(seen) >= ns["MAX_PENDING_GROUPS"]:
                 return False
-            seen.add(g)
+            seen[g] = ns["now"]
             return True
+
+        def offers_in(e):                               # protocol-v2.md §3's helper: the offers an entry carries
+            if e is None or not e.control:
+                return []
+            return [(hb.group, hb.bits) for m in e.control.items if m.kind == "ihave"
+                    for hb in m.ids if isinstance(hb, Wm.HaveBitmap)]
 
         def in_pushers(T, fam, col):
             return [q for q in node.peers if col in ns["push_in"][q][T][fam]]
@@ -1799,6 +1814,7 @@ class Node:
             def serve_standing(g, i):
                 if ns["rebuilt"][g].has(i):
                     ns["standing"][g].pop(i, None)
+                    ns["routed_standing"][g].pop(i, None)
                     return
                 spec_serve_standing(g, i)
             ns["serve_standing"] = serve_standing
@@ -1954,6 +1970,7 @@ class Node:
         if isinstance(ns.get("mesh"), set):
             ns["mesh"].discard(q)
         ns["leave_line"](q)                         # its place in the window's line, per connection (§8.1)
+        getattr(self, "want_unknown", {}).pop(q, None)   # protocol-v2.md §4.5: its WANTs' unknown groups
         sent = ns["sent"]                           # the room its chunks hold in flight: released when its queue
         for key in [k for k in sent if k[0] == q]:  #   closes (§8.1), as WINDOW_TIMEOUT releases it; but a close
             e = sent.pop(key)                       #   is not the chunk's acknowledgement, which a holding or a

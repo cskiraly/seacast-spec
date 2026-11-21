@@ -5,14 +5,18 @@ leave no state, draw no answer and no penalty.
 
     python3 relation_types_known.py
 
-The check, on a small rows network (8 nodes, seed 7, columns and rows) that is built and published, not run, with
-node S and one of its peers p, the link having JOINs both ways for both types. Each message is given to S's own
+The check, on a small rows network (8 nodes, seed 7, columns and rows, `--upkeep on`, so that the links are the JOINs'
+`links(T)`) that is built and published, not run, with node S and one of its peers p, the link having JOINs both
+ways for both types. Each message is given to S's own
 handler as if p had sent it, and S's sends to p are recorded:
 - (a) a JOIN for an object type S does not run: nothing stored in `join_recv`, no JOIN sent back;
 - (b) with p's JOIN for rows taken back (the link has not joined rows), a GRAFT for a row family: no relation, no
   GRAFT pending, nothing sent;
 - (c) the same link, a PRUNE for that family: no backoff set;
-- (d) the control: a GRAFT for a column family the link has joined is handled: S answers it.
+- (d) the control: a GRAFT for a column family the link has joined is handled: S answers it;
+- (e) with S's own JOIN for columns owed to a second peer (not yet queued), that peer's GRAFT for a column family:
+  ignored, as the link is not yet one of `links(T)`;
+- (f) a WANT for a row cell on the link of (b), which has not joined rows: ignored, no standing request, no error.
 On the document before the rule, (a), (b) and (c) fail.
 """
 import sys
@@ -46,7 +50,8 @@ def build(args):
 
 
 def main():
-    sim = build(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    sim = build(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7",
+                 "--upkeep", "on"])
     S = sim.nodes[2]
     ns = S.ns
     COL, ROW = ns["type_of"]("column"), ns["type_of"]("row")
@@ -86,6 +91,27 @@ def main():
     sent.clear()
     ns["on_graft"](p, ns["Graft"](object_type="column", family=cfam, colour=0, direction="IN", answer=False))
     line(f"(d) control: a GRAFT for column family {cfam}, joined: answered", bool(sent), True)
+
+    p2 = next(q for q in sorted(S.peers) if q not in (1, p) and COL in ns["join_recv"][q]
+              and COL in ns["join_sent"][q])
+    ns["owed_relations"][p2].append(ns["join_sent"][p2][COL])
+    rel = lambda: any(0 in ns[m][p2][COL][cfam] for m in ("push_out", "push_in", "grafted_out", "grafted_in"))
+    sent.clear()
+    ns["send"] = lambda q, m, urgent=False: (sent.append((q, type(m).__name__)) if q == p2 else None,
+                                              spec_send(q, m, urgent))[1]
+    ns["on_graft"](p2, ns["Graft"](object_type="column", family=cfam, colour=0, direction="IN", answer=False))
+    line(f"(e) S's JOIN to node {p2} owed: its GRAFT for column family {cfam}: relation, sent",
+         (rel(), [m for q, m in sent]), (False, []))
+    ns["owed_relations"][p2].clear()
+
+    import wire as Wm
+    rg = next(iter(sim.gsub))                       # a row group
+    try:
+        ns["on_want"](p, [Wm.FlaggedWant(rg, 0, True, 0)])
+        got = p in ns["standing"].get(rg, {}).get(0, ())
+    except Exception as e:
+        got = f"{type(e).__name__}: {e}"
+    line("(f) a WANT for a row cell, the link not joined for rows: standing request kept", got, False)
     line("penalties", pen, [])
 
 

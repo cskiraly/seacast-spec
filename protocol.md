@@ -1845,7 +1845,8 @@ of the two paths, with p the writer that writes control and q the other writer i
 run queued when `next_to_send` returns p's control; q has one after p's write starts to wait, and
 only after the control reached the transport and `write_waits(p)` was called with the write
 pending; q has none when p is not in line or when no slot is free; and a write that completes at
-once calls no `write_waits`. Where p is in line, it keeps its place at the head.
+once calls no `write_waits`. In the first, the second and the fourth, p keeps its place at the
+head of the line.
 
 ### 7.2 Choosing what to send, at the moment of sending [c8, c9, c12, c14]
 

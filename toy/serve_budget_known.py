@@ -1,18 +1,24 @@
 #!/usr/bin/env python3
 """A known answer for protocol-v2.md §4.5's serving budget (`SERVE_BUDGET`, `served_hb`, `offered_to`): a node answers
 one peer at most `SERVE_BUDGET` chunks a heartbeat across groups, not counting the answers to asks on its own offers or
-to a claim's probe; asks over it are refused without penalty, and the budget starts again at each heartbeat.
+to a claim's probe; an ask over it is refused, and a standing request's answer dropped, without penalty; the budget
+starts again at each heartbeat. The node records its offers when its writer writes them (`noted`, `offers_in`), so an
+owed offer counts as one.
 
     python3 serve_budget_known.py
 
 The check, on a small custody network (8 nodes, seed 7) whose block has run two seconds, with node S and one of its
 peers p, and S's budget set to two. Each ask is given to S's `on_want` as a WANT that p sent, for cells S holds and p
-does not:
+does not, each of a different column:
 - (a) three asks, none on an offer of S's: two answered, the third refused;
-- (b) the same heartbeat, an ask for a cell S offered p (`offered_to`): answered;
-- (c) after the heartbeat (`on_heartbeat`), two more asks: both answered;
+- (b) the same heartbeat, S sends p an offer of a cell as `announce` does, and its writer writes it; p's ask for it:
+  answered;
+- (c) the same, for an offer owed through a full queue (`owe`), written with the next entry: answered;
+- (d) the same heartbeat, a standing request of p's whose chunk S holds (`serve_standing`): its answer dropped;
+- (e) the same heartbeat, p's kept probe of S's claim (`serve_waiting_probe`): answered;
+- (f) after the heartbeat (`on_heartbeat`), two of (a)'s asks again: both answered;
 - penalties: none.
-On the document before the budget, (a) fails, and (b) has no record of S's offers.
+On the document before the budget, (a) and (d) fail, and (b) and (c) have no record of S's offers.
 """
 import sys
 from pathlib import Path
@@ -46,26 +52,56 @@ def main():
     S = sim.nodes[2]
     ns = S.ns
     p = min(q for q in S.peers if q != 1)
-    cells = [(g, i) for g in sorted(ns["chunks"], key=str) if sim.gtype.get(g) == "column"
-             for i in sorted(ns["chunks"][g]) if not ns["peer_has"][p][g].has(i)][:6]
+    cells = []                                      # one cell a column: S holds it, p does not
+    for g in sorted(ns["chunks"], key=str):
+        if sim.gtype.get(g) == "column":
+            i = next((i for i in sorted(ns["chunks"][g]) if not ns["peer_has"][p][g].has(i)), None)
+            if i is not None:
+                cells.append((g, i))
     pen = []
     spec_pen = ns["penalise"]
     ns["penalise"] = lambda q: (pen.append(q), spec_pen(q))
-    print(f"custody network, block run: S = node {S.id}, p = node {p}; {len(cells)} cells S holds and p does not")
+    print(f"custody network, block run: S = node {S.id}, p = node {p}; {len(cells)} columns with a cell S holds "
+          f"and p does not")
     ns["SERVE_BUDGET"] = 2
 
     def answered(gi):
         return len(ns["on_want"](p, [Wm.WantIndex(*gi)]))
 
-    line("(a) budget 2: three asks, none on an offer: answered", [answered(c) for c in cells[:3]], [1, 1, 0])
-    if "offered_to" in ns:
-        g, i = cells[3]
-        ns["offered_to"][p][g] = ns["offered_to"][p][g] | ns["bitmap"]({i})
-        line("(b) the same heartbeat, an ask for a cell S offered p: answered", answered(cells[3]), 1)
+    def write_all():                                # S's writer to p, until nothing is left to write
+        for _ in range(50):
+            e = ns["next_to_send"](p)
+            if e is None or e == ns.get("WAIT"):
+                return
+    line("(a) budget 2: three asks, distinct columns, none on an offer: answered",
+         [answered(c) for c in cells[:3]], [1, 1, 0])
+    if "offered_to" not in ns:
+        line("(b), (c) a record of S's offers to p (offered_to)", "not in the document", "present")
     else:
-        line("(b) a record of S's offers to p (offered_to)", "not in the document", "present")
+        g, i = cells[3]                             # the offer as announce sends it, past its filter
+        ns["send"](p, ns["Have"](group=g, bits=ns["bitmap"]({i}), offer=True, claim_all=False, complete=False),
+                   urgent=False)
+        write_all()
+        line("(b) an offer sent and written; p's ask on it: recorded, answered",
+             (ns["offered_to"][p][g].has(i), answered(cells[3])), (True, 1))
+        g, i = cells[4]
+        ns["owe"](p, g, ns["bitmap"]({i}))
+        write_all()
+        line("(c) an offer owed and written; p's ask on it: recorded, answered",
+             (ns["offered_to"][p][g].has(i), answered(cells[4])), (True, 1))
+    g, i = cells[5]
+    ns["standing"][g][i].add(p)
+    before = len(ns["queue"][p].normal)
+    ns["serve_standing"](g, i)
+    queued = len(ns["queue"][p].normal) > before or ns["owed_answers"][p][g].has(i)
+    line("(d) a standing request whose chunk S holds, the budget spent: answer queued or owed", queued, False)
+    g, i = cells[6]
+    ns["probe_waiting"][g][p] = i
+    before = len(ns["queue"][p].normal)
+    ns["serve_waiting_probe"](g, i)
+    line("(e) p's kept probe, the budget spent: answer queued", len(ns["queue"][p].normal) > before, True)
     ns["on_heartbeat"]()
-    line("(c) after the heartbeat, two more asks: answered", [answered(c) for c in cells[4:6]], [1, 1])
+    line("(f) after the heartbeat, two asks of (a) again: answered", [answered(c) for c in cells[:2]], [1, 1])
     line("penalties", pen, [])
 
 

@@ -15,13 +15,17 @@ its peers p, each ask given to S's `on_want` as a WANT that p sent:
   routed (`routed_standing`);
 - (d) a standing WANT for a column S does not custody, after S claimed it whole (`mine` full, as at K before the
   decode): kept;
-- (e) with S's gate held closed, a standing WANT for a column S does not custody: kept; once the gate opens,
-  `drop_outside` removes it and keeps a control in S's custody;
+- (e) with S's gate held closed, a standing WANT for a column S does not custody: kept; once the gate opens
+  (`on_header_validated`, which calls `drop_outside`), it is removed, and a control in S's custody is kept;
 - (f) on a network with samplers, a sampler's WANT to S for a column S does not custody: no standing request and no
-  bit in the sampler's interest (`want_p`); the control, a column S custodies: both kept.
+  bit in the sampler's interest (`want_p`); the control, a column S custodies: both kept;
+- (h) on the same network, with S's gate held closed, a sampler's routed WANT (hops 1) for a column S does not
+  custody: kept standing if S passed it on, and its interest bit set; once the gate opens (`on_header_validated`), the
+  standing request and the bit are kept if S passed it on, and dropped if not.
 Then (g): honest runs drop nothing: in a custody run with samplers and routed requests (12 nodes, 25 % samplers, two
 blocks) and in a rows run (8 nodes, one block), `on_want` ignores no ask as outside.
-On the document before the rule, (a), (c), (e) and (f) fail.
+(g) prints how many asks reached the test, and how many of them were routed. On the document before the rule, (a),
+(c), (e), (f) and (h) fail.
 """
 import sys
 from pathlib import Path
@@ -98,10 +102,9 @@ def custody_cases():
         ns["on_want"](p, [Wm.FlaggedWant(ge, 0, True, 0), Wm.FlaggedWant(in_cols[1], 0, True, 0)])
         before = (kept(ns, ge, 0, p), kept(ns, in_cols[1], 0, p))
         ns["authenticable"] = spec_auth
-        ns["drop_outside"](ge)
-        ns["drop_outside"](in_cols[1])
+        ns["on_header_validated"](sim.ghdr[ge].block)   # the gate opens: the block's header is validated
         line(f"(e) gate closed: column {sim.gcol[ge]} (outside) and {sim.gcol[in_cols[1]]} (custody) kept; "
-             f"gate open, after drop_outside: kept", (before, (kept(ns, ge, 0, p), kept(ns, in_cols[1], 0, p))),
+             f"gate open (on_header_validated): kept", (before, (kept(ns, ge, 0, p), kept(ns, in_cols[1], 0, p))),
              ((True, True), (False, True)))
     line("penalties in the custody cases", pen, [])
 
@@ -124,6 +127,19 @@ def sampler_cases():
          (kept(ns, go, 0, p), go in wp and wp[go].has(0)), (False, False))
     line(f"    control, column {sim.gcol[gi]} (S's custody): kept, in p's interest",
          (kept(ns, gi, 0, p), gi in wp and wp[gi].has(0)), (True, True))
+    gr = out_cols[1]
+    spec_auth = ns["authenticable"]
+    ns["authenticable"] = lambda g: False if g == gr else spec_auth(g)
+    fwd = ns["forwarded"][p]
+    ns["on_want"](p, [Wm.FlaggedWant(gr, 0, True, 1)])
+    passed = ns["forwarded"][p] > fwd
+    before = (kept(ns, gr, 0, p), gr in wp and wp[gr].has(0))
+    ns["authenticable"] = spec_auth
+    ns["on_header_validated"](sim.ghdr[gr].block)
+    after = (kept(ns, gr, 0, p), gr in wp and wp[gr].has(0))
+    line(f"(h) sampler p's routed WANT (hops 1), column {sim.gcol[gr]} outside S's custody, passed on {passed}: "
+         f"kept, in p's interest, before the gate and after it", (before, after),
+         ((passed, True), (passed, passed)))
 
 
 def honest_runs():
@@ -141,7 +157,7 @@ def honest_runs():
         finally:
             R.run = spec_run
         sim = got["sim"]
-        dropped = [0]
+        dropped, tested, routed_n = [0], [0], [0]
         for node in sim.nodes.values():
             ns = node.ns
             if "outside" not in ns:
@@ -150,11 +166,19 @@ def honest_runs():
 
             def counted(p, g, i, routed, spec_out=spec_out, ns=ns):
                 r = spec_out(p, g, i, routed)
+                tested[0] += 1
+                routed_n[0] += bool(routed)
                 if r and not ns["peer_has"][p][g].has(i):
                     dropped[0] += 1
                 return r
             ns["outside"] = counted
-        sim.run(sim.cfg["first"] + sim.cfg["gap"] * (sim.cfg["msgs"] + 2))
+        for k in range(sim.cfg["msgs"]):            # the blocks, published as run.py's schedule would
+            sim.run(sim.cfg["first"] + k * sim.cfg["gap"])
+            sim.publish(k + 1)
+        sim.run(sim.cfg["first"] + sim.cfg["gap"] * (sim.cfg["msgs"] + 1))
+        print(f"    {label}: asks tested {tested[0]}, of them routed {routed_n[0]}")
+        global bad
+        bad += tested[0] == 0                       # a control that tested nothing would show nothing
         line(f"(g) {label}: asks ignored as outside", dropped[0], 0)
 
 
