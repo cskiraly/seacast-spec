@@ -15,7 +15,7 @@ states.
 
 | decision | where in `protocol-v2.md` |
 |---|---|
-| `[D1]` identity and bindings (decided: a protocol of its own, carried by three bindings, in their own document since 2026-11-17; a bridge to the stock path is outside this version) | §7, `protocol-v2-bindings.md`; §0's "what is assumed" |
+| `[D1]` identity and bindings (decided: a protocol of its own, carried by its bindings, in their own document since 2026-11-17, three when decided and four by carrier since 2026-11-21; a bridge to the stock path is outside this version) | §7, `protocol-v2-bindings.md`; §0's "what is assumed" |
 | `[D2]` two bitmaps, WANT per recipient, no need bitmap (decided, as written) | §2 `Want`, `on_want`, `wants_from_me` |
 | `[D3]` two claims (decided, as written) | §2 `Have`, §1.5, §4.6 |
 | `[D4]` repair's parameters (decided: EIP-8371's phases, rebuilt cells pushed to the custodians lacking them, `DEFER_WINDOW` 1 s, `REPAIR_BUDGET` an option, off; the repair floor at least one link to a custodian of each column) | `TypeParams.DECODE_AT_K`, `DECODE_LATER`, `REPAIR_TO`, `DEFER_WINDOW`; §6.3's `REPAIR_SAMPLE`, `REBUILT_SEEN`, `ALARM_WAIT`; §4.6 `check_completion`, `reconsider`, `push_rebuilt` |
@@ -35,8 +35,10 @@ states.
 says what was not taken:
 - **`[D1]` identity and bindings.** v2 is a protocol of its own: it is defined on its own messages
   and carried by three bindings, which are defined in their own document (`protocol-v2-bindings.md`,
-  since 2026-11-17). The three are the standalone binding, the binding onto the Partial Messages
-  Extension of gossipsub, and the gossipsub binding (`protocol-v2-bindings.md` §3). §7 states what
+  since 2026-11-17). The three were the standalone binding, the binding onto the Partial Messages
+  Extension of gossipsub, and the gossipsub binding. Since 2026-11-21 they are named by their
+  carriers: the libp2p stream and Waggle bindings, the gossipsub binding and the partial-messages
+  binding (`protocol-v2-bindings.md` §2 to §5; below, "Decided on 2026-11-21"). §7 states what
   every binding provides and the capabilities that each gives up. The extension alone was not
   taken: it gives up interest without subscription and the floor and direction of the push relation
   (§7). Deciding after a paired test of the signalling cost on both wires was not taken either:
@@ -68,7 +70,7 @@ says what was not taken:
   release was not taken.
 - **`[D11]` the rendezvous.** Every binding uses gossipsub topics per family as the rendezvous, with
   the ENR beside them. This keeps the stock path, and a network that mixes it with the bindings. The
-  ENR alone was not taken; it is an option that the standalone binding could run.
+  ENR alone was not taken; it is an option that the libp2p stream binding could run.
 
 The other choices, listed below, were confirmed as the toy runs them and, where named, as the Go
 build of the research harness runs them. Nothing measured argues against them.
@@ -195,13 +197,14 @@ peer's copy passing the claimant, which let liars pass whenever another peer bro
 more often in the same settings, measured before 2026-11-16); hiding the probed cell from the
 claimant in the asker's holdings while the probe waits, which changes what a node announces and
 cannot hide a cell already named before the probe; and the lowest lacked index, which a claimant
-can read from the member's holdings. The random index is meant to counter a claimant that keeps
-only the cell it expects to be asked; that purpose is not measured, since the toy's liars do not
-aim. The standalone binding carries
-`standing` and `probe` in one `Bitvector[8]`; its other bits are zero when sent and ignored when
-received, so that a later flag fits without breaking older readers (`protocol-v2-bindings.md`
-§1.3). Two alternatives were not taken there: a byte of its own for the mark, which every WANT would
-pay, and a message of its own for the probe, which every binding would have to carry.
+can read from the member's holdings. The random index is meant to counter a claimant that keeps only
+the cell it expects to be asked; that purpose is not measured, since the toy's liars do not aim.
+SEACAST's message encoding carries `standing` and `probe` in one `Bitvector[8]`; its other bits are
+zero when sent and ignored when received, so that a later flag fits without breaking older readers
+(`protocol-v2-bindings.md` §1.2). On the gossipsub binding the mark is one more bit beside
+`standing`, in version 4 of the strings (§4 there). Two alternatives were not taken there: a byte of
+its own for the mark, which every WANT would pay, and a message of its own for the probe, which
+every binding would have to carry.
 
 **The repair's options** `[D4]` (decided 2026-11-01). The repair sample and rebuilt cells marked
 seen stay options. They are on together where a node defends against hoarding claimants, and the
@@ -296,6 +299,21 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   UDP, a fast QUIC connection or discv5.
 - *Rejected:* the draft rejects narrowing the sample to what the node's links serve (§4.10).
 
+**Decided on 2026-11-21.** Three decisions on the bindings, each given in `protocol-v2-bindings.md`:
+- **The bindings by carrier.** The bindings document defines SEACAST's message encoding once (§1
+  there), then one binding per carrier: the libp2p stream binding, the Waggle binding, the gossipsub
+  binding and the partial-messages binding (§2 to §5 there). A native QUIC binding is being drafted.
+  The gossipsub binding is v2's path on gossipsub alone; the partial-messages binding is kept beside
+  it.
+- **The gossipsub binding to the byte.** Its extra fields, a holding's `claim_all` and `complete`
+  and a WANT's `standing`, `hops` and `probe`, travel in version 4 of the id strings, and a WANT's
+  index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). EVIDENCE is reserved
+  there, as a full message on the rendezvous topic, as it is on the libp2p stream binding.
+- **A cell group's header in three forms** (§1.6 there): from the block, in every cell, or in a
+  message of its own. Each object type's definition fixes one form, never mixed on one topic, and
+  the same three are open on every binding. Not taken: one form for every object type, since whether
+  a block comes before its cells differs between applications.
+
 ## The versions of `protocol.md` carried
 
 **The versions carried.** Each later version of `protocol.md` comes in the same way. Its changes to
@@ -371,7 +389,7 @@ carried later than its version.
   HAVE bitmap as
   stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped group and in
   its reading of bitmaps and ids. This draft runs on the same toy. It carries the IDONTWANT rule
-  onto the gossipsub binding (`protocol-v2-bindings.md` §3), where the toy now keeps such an entry
+  onto the gossipsub binding (`protocol-v2-bindings.md` §4), where the toy now keeps such an entry
   in `unwanted[p]`. §4.7 already says that, for a type that gossips (`ANNOUNCE_EXTRA = SAMPLE`), the
   source's heartbeat gossip draws on every chunk at either setting, and its open item on a chunk
   that is never acknowledged is the one `protocol.md` §5.1 names.
