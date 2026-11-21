@@ -64,6 +64,7 @@ path.
 Each must end with a non-zero exit code and the tracer's own line. If the trace is written to the end, the check
 checks nothing. Its own line on stderr says which fault, and how many times it was planted.
 """
+import copy
 import functools
 import runpy
 import sys
@@ -390,10 +391,10 @@ def early_install_v2(toy):
     _repoint = T.Tracer3.repoint_aliases
 
     @functools.wraps(_repoint)
-    def repoint_aliases(self, nd, ns):  # the whole hook at the end of construction skipped: its re-pointing too
-        if id(nd) in early:
+    def repoint_aliases(self, nd, ns, pre):     # the whole hook at the end of construction skipped: its
+        if id(nd) in early:                     #   re-pointing too
             return None
-        return _repoint(self, nd, ns)
+        return _repoint(self, nd, ns, pre)
 
     T.Tracer3.repoint_aliases = repoint_aliases
     _over = N.Node._override
@@ -410,7 +411,7 @@ def early_install_v2(toy):
 def raw_alias_v2():
     """Under v2: the aliases `hdr` and `chunk_id` left as the toy bound them, to the raw objects of before the
     install. The names' check at the nodes line must stop it: a raw `hdr` makes every `hdr[g]` read unlogged."""
-    def repoint_aliases(self, nd, ns):
+    def repoint_aliases(self, nd, ns, pre):
         PLANTED[0] += 1
 
     T.Tracer3.repoint_aliases = repoint_aliases
@@ -419,7 +420,7 @@ def raw_alias_v2():
 def raw_chunk_id_v2():
     """Under v2: `hdr` re-pointed, `chunk_id` left as the toy bound it (the toy's message_id, not the installed one).
     The names' check at the nodes line must stop it at `chunk_id`, `hdr`'s check having passed."""
-    def repoint_aliases(self, nd, ns):
+    def repoint_aliases(self, nd, ns, pre):
         ns["hdr"] = ns["desc"]
         PLANTED[0] += 1
 
@@ -462,6 +463,99 @@ def rebound_scanned_v2():
     def plant(ns):
         ns["popcount_again"] = ns["popcount"]
     before_install_v2(plant)
+
+
+def rebind_tape_v2():
+    """Under v2: a tape name bound again after the install to the function the tracer wrapped as its question (as
+    `_repair_bias` writes back its captured `shuffled`). final_check, which under v2 holds every installed slot, must
+    stop it."""
+    def wrap(tr, ns):
+        q = ns["peer_id_bytes"]
+        ns["peer_id_bytes"] = getattr(q, "__wrapped__", q)
+        PLANTED[0] += 1
+    after_install(wrap)
+
+
+def rebind_view_v2():
+    """Under v2: a table's view replaced, after the install, by its raw table (`offers`). final_check must stop it:
+    the table would go on unlogged."""
+    def wrap(tr, ns):
+        ns["offers"] = F.unwrap(ns["offers"])
+        PLANTED[0] += 1
+    after_install(wrap)
+
+
+def close_keyerror_v2():
+    """Under v2: a stop (a traced call at another node in an open record, as `--other-node-v2`), and an ordinary
+    exception raised at the trace's close after it. The stop's reason must be the one raised; the close's is a note."""
+    other_node_v2()
+    _close = T.Tracer3.close
+
+    @functools.wraps(_close)
+    def close(self):
+        try:
+            _close(self)
+        finally:
+            raise KeyError("planted at the close")
+
+    T.Tracer3.close = close
+
+
+def hdr_read_v2(raw):
+    """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
+    g a group node a holds a descriptor of). With `hdr` re-pointed at the installed view, the record logs it as its
+    first touch of `desc` at g: the line says "desc read logged: 1". With `raw` (the control), `hdr` is left as the
+    toy bound it, the raw table, and its two guards are bypassed: the read goes unlogged, "desc read logged: 0"."""
+    tracer_instance()
+    nss = {}
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        r = _install(self, nd, ns)
+        nss[int(nd.id)] = ns
+        return r
+
+    T.Tracer3.install = install
+    if raw:
+        _repoint = T.Tracer3.repoint_aliases
+
+        def repoint_aliases(self, nd, ns, pre):
+            hdr = ns["hdr"]
+            _repoint(self, nd, ns, pre)
+            ns["hdr"] = hdr                 # left raw
+
+        T.Tracer3.repoint_aliases = repoint_aliases
+        _final = T.Tracer3.final_check
+
+        def final_check(self):              # its alias guard bypassed: hdr shown installed for the check alone
+            saved = {id(ns): ns["hdr"] for _, ns, _ in self.bound}
+            for _, ns, _ in self.bound:
+                ns["hdr"] = ns["desc"]
+            try:
+                _final(self)
+            finally:
+                for _, ns, _ in self.bound:
+                    ns["hdr"] = saved[id(ns)]
+
+        T.Tracer3.final_check = final_check
+    _read = F.Recorder.read
+
+    @functools.wraps(_read)
+    def read(self, t, p):
+        st = TR[0].vst if TR else None
+        if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"]:
+            a = st["node"]
+            g = next(iter(F.unwrap(nss[a]["desc"])), None)
+            if g is not None:
+                PLANTED[0] += 1
+                before = set(self.first)
+                nss[a]["hdr"][g]
+                SEEN["node a"] = a
+                SEEN["desc read logged"] = sum(1 for e in set(self.first) - before if e[0] == "desc")
+        return _read(self, t, p)
+
+    F.Recorder.read = read
 
 
 def unscanned_layer_v2(toy):
@@ -516,6 +610,15 @@ def other_node_v2():
 SEEN = {}                               # the v2 plants' observations, printed on the fault's line
 
 
+class Count:
+    """A count printed by its value at the run's end (an effect that happens after the plant's call)."""
+    def __init__(self):
+        self.n = 0
+
+    def __str__(self):
+        return str(self.n)
+
+
 def watch_records(inside):
     """Count the records written while `inside()` names a (node, name) pair: a record of that name at that node."""
     _write = T.Tracer3.write
@@ -543,7 +646,15 @@ def bare_in_question_v2(per_node, callee="N"):
       run's (taped on node a's question, it would differ); not counted (no traced name)."""
     tracer_instance()
     nss, at, replaced_at = {}, [None], set()
+    ran, fired = Count(), Count()       # the replaced body's runs, the timer's firings: printed at the run's end
     watch_records(lambda: at[0])
+
+    def stored(c):                      # a chunk stored at node c with its id cached, or None
+        for row in F.unwrap(nss[c]["chunks"]).values():
+            for f in (row.values() if hasattr(row, "values") else row):
+                if getattr(f, "mid", None):
+                    return f
+        return None
     _install = T.Tracer3.install
 
     @functools.wraps(_install)
@@ -552,14 +663,23 @@ def bare_in_question_v2(per_node, callee="N"):
             self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0}
         st, a = self.vst, int(nd.id)
         nss[a] = ns
-        if getattr(getattr(ns["on_iwant"], "__code__", None), "co_filename", None) != T.DOC_FILE:
+        own = ns["on_iwant"]
+        if getattr(getattr(own, "__code__", None), "co_filename", None) != T.DOC_FILE:
             replaced_at.add(a)          # the node's own on_iwant (the silent node's), before the tracer wraps it
+            if callee == "on_iwant":    # its body marks that the plant's call reached it
+                def on_iwant(p, iw, _own=own, _a=a):
+                    if at[0] == (_a, "on_iwant"):
+                        ran.n += 1
+                    return _own(p, iw)
+                ns["on_iwant"] = on_iwant
         doc = ns["peer_id_bytes"]
 
         def peer_id_bytes(p):
             if not PLANTED[0] and st["depth"] and st["ext"]:
                 if callee == "on_iwant":
                     c = next((i for i in sorted(replaced_at) if i != a), None)
+                elif callee == "stale-id":
+                    c = next((i for i in sorted(nss) if i != a and stored(i) is not None), None)
                 else:
                     c = next((i for i in sorted(nss) if i != a and F.unwrap(nss[i]["desc"])), None)
                 if c is not None:
@@ -570,9 +690,16 @@ def bare_in_question_v2(per_node, callee="N"):
                         if callee == "N":
                             nss[c]["N"](next(iter(F.unwrap(nss[c]["desc"]).values())))
                         elif callee == "on_iwant":
+                            SEEN["the replaced body ran"] = ran
                             nss[c]["on_iwant"](a, None)
+                        elif callee == "stale-id":      # a copy of a stored chunk, its cached id made stale
+                            f = copy.copy(stored(c))
+                            m = f.mid
+                            f.mid = m[:36] + bytes([m[36] ^ 1]) + m[37:]
+                            nss[c]["message_id"](f)
                         else:
-                            nss[c]["after"](0, lambda: None)
+                            SEEN["the timer fired at node c"] = fired
+                            nss[c]["after"](0, lambda: setattr(fired, "n", fired.n + 1))
                     finally:
                         at[0] = None
                     if callee != "after":
@@ -675,9 +802,11 @@ def suppressed_entry_v2(toy, off):
             live[0] = mode
             try:
                 self.ns["on_iwant"](p, None)
+                happened = "returned"
             except Planted:
-                pass
+                happened = "raised"
             SEEN["node s"] = int(self.id)
+            SEEN[f"entry {PLANTED[0]}"] = happened      # what the call did, not what was asked of it
             SEEN[f"supp after the {mode}"] = st["supp"]
             SEEN["bare s N"] = TR[0].bare.get(f"{int(self.id)} N", 0)
         return _w(self, p)
@@ -689,10 +818,11 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
           "--alias-message", "--defer-chain", "--replaced", "--false-wrapper", "--stale-id", "--level1-in-cell",
           "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
           "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2", "--raw-chunk-id-v2",
-          "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2", "--rebound-scanned-v2")
+          "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2", "--rebound-scanned-v2",
+          "--rebind-tape-v2", "--rebind-view-v2", "--stale-id-bare-v2", "--close-keyerror-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
-          "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2")
+          "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--hdr-read-v2", "--hdr-read-v2-raw")
 HAND5 = ["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -728,6 +858,16 @@ def main(argv):
             other_node_tape_v2()
         elif fault == "--rebound-scanned-v2":
             rebound_scanned_v2()
+        elif fault == "--rebind-tape-v2":
+            rebind_tape_v2()
+        elif fault == "--rebind-view-v2":
+            rebind_view_v2()
+        elif fault == "--stale-id-bare-v2":
+            bare_in_question_v2(per_node=False, callee="stale-id")
+        elif fault == "--close-keyerror-v2":
+            close_keyerror_v2()
+        elif fault.startswith("--hdr-read-v2"):
+            hdr_read_v2(raw=fault.endswith("-raw"))
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
         args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault == "--bare-replaced-v2" else HAND5

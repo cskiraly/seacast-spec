@@ -119,7 +119,7 @@ class Scanner:
         self.off = set(off)         # clauses of the observer test that are off (the self-test's control)
         self.rows, self.funcs, self.methods = [], [], {}
         self.attr_captures = {}     # (file, attribute) -> the namespace name a node attribute was assigned from
-        self.traced = TRACED
+        self.traced, self.questions = TRACED, QUESTIONS_DOC
         self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
         self.imports = {}           # (file, local name) -> (module file, name), or (module file, None) for a module
 
@@ -319,7 +319,12 @@ class Scanner:
                 pairs = list(zip(t.elts, value.elts))
             for tt, vv in pairs:
                 if isinstance(tt, ast.Name):
-                    scope.order.append((st.lineno, tt.id))     # for a locals() export
+                    if (isinstance(vv, ast.Lambda) or self.resolve(vv, scope) is not None
+                            or (isinstance(vv, ast.Subscript) and is_ns(vv.value) and ns_key(vv))
+                            or (isinstance(vv, ast.Attribute) and isinstance(vv.value, ast.Name)
+                                and ((self.path.name, vv.value.id) in self.imports
+                                     or (self.path.name, vv.attr) in self.attr_captures))):
+                        scope.order.append((st.lineno, tt.id))     # a local that can be callable: a locals() export
                     if isinstance(vv, ast.Subscript) and is_ns(vv.value) and ns_key(vv):
                         scope.captures[tt.id] = ns_key(vv)
                     elif (isinstance(vv, ast.Attribute) and isinstance(vv.value, ast.Name)
@@ -383,14 +388,20 @@ class Scanner:
                 r["class"] = "own"
             else:
                 r["holds"] = held
-                split = self.closure_split(fn, name, held, r["v2_only"])
+                docs = ("v2",) if r["v2_only"] else ("protocol.md", "v2")     # the documents it runs under
+                split = self.closure_split(fn, name, held, docs[0])
                 if split is not None:       # its class per branch on a closure value (the node's, read later)
                     r["class"], r["closure"] = "closure-dependent", split
                 else:
-                    why = self.observer_test(fn, name, held, r["v2_only"])
-                    r["class"] = "observer" if why is None else "layer"
-                    if why:
-                        r["why"] = why
+                    by = {d: self.observer_test(fn, name, held, d) for d in docs}
+                    if len({w is None for w in by.values()}) == 1:  # one class under each document
+                        why = next(iter(by.values()))
+                        r["class"] = "observer" if why is None else "layer"
+                        if why:
+                            r["why"] = why
+                    else:                   # an observer under one, not the other
+                        r["class"] = "per-document"
+                        r["by_document"] = {d: "observer" if w is None else f"layer ({w})" for d, w in by.items()}
         self.rows.append(r)
 
     def in_v2(self, scope, line):
@@ -467,23 +478,34 @@ class Scanner:
             pos, kwo, var, kw = params_of(node)
             for p in pos + kwo + [x.arg for x in (var, kw) if x is not None]:
                 s.captures[p] = "<table>" if p in tables else None
-        for n in self.walk_no_nested(node):
-            if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
-                v, t = n.value, n.targets[0].id
-                if isinstance(v, ast.Subscript) and is_ns(v.value) and ns_key(v):
-                    s.captures[t] = ns_key(v)
-                elif isinstance(v, ast.Name) and s.lookup(v.id, "captures") not in (None,):
-                    s.captures[t] = s.lookup(v.id, "captures")
+        assigns = sorted((n for n in self.walk_no_nested(node) if isinstance(n, ast.Assign)),
+                         key=lambda n: (n.lineno, n.col_offset))
+        for n in assigns:                   # in source order: an alias of an alias is one
+            for t in n.targets:
+                pairs = (list(zip(t.elts, n.value.elts)) if isinstance(t, ast.Tuple) and isinstance(n.value, ast.Tuple)
+                         and len(t.elts) == len(n.value.elts) else [(t, n.value)])
+                for tt, v in pairs:
+                    if not isinstance(tt, ast.Name):
+                        continue
+                    if isinstance(v, ast.Subscript) and is_ns(v.value) and ns_key(v):
+                        s.captures[tt.id] = ns_key(v)
+                    elif isinstance(v, ast.Name) and s.lookup(v.id, "captures") is not None:
+                        s.captures[tt.id] = s.lookup(v.id, "captures")
+                    elif self.ns_rooted(v, s, bare=True):     # a row or a field of a table: an alias into it
+                        s.captures[tt.id] = "<table>"
         return s
 
-    def observer_test(self, fn, name, held, v2_only):
-        """None for an observer, or why it is not one."""
+    def observer_test(self, fn, name, held, doc):
+        """None for an observer, or why it is not one, under one document's namespace ("protocol.md" or "v2": its
+        questions, its traced names, and whether its function of that name returns a value)."""
         if name in BY_NAME and "by-name" not in self.off:
             return None
-        self.traced = TRACED_V2 if v2_only else TRACED
-        defs_first = (DEFS_V2, RETURNS_V2) if v2_only else (DEFS_DOC, RETURNS_DOC)
-        defs_other = (DEFS_DOC, RETURNS_DOC) if v2_only else (DEFS_V2, RETURNS_V2)
-        self.returns = defs_first[1] if name in defs_first[0] else defs_other[1]
+        self.questions = QUESTIONS_V2 if doc == "v2" else QUESTIONS_DOC
+        self.traced = TRACED_V2 if doc == "v2" else TRACED
+        if doc == "v2":                     # v2's namespace: its own function of the name, else protocol.md's
+            self.returns = RETURNS_V2 if name in DEFS_V2 else RETURNS_DOC
+        else:
+            self.returns = RETURNS_DOC if name in DEFS_DOC else RETURNS_V2
         own = self.own_scope(fn.node, fn.qual, fn.scope)
         return self.names_and_writes(fn.node, own, name, held, set()) or self.paths(fn.node, own, name, held)
 
@@ -501,7 +523,7 @@ class Scanner:
             elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id != held:
                 k = scope.lookup(n.id, "captures")
             if k is not None and k != name:
-                if k in QUESTIONS and "question" not in self.off:
+                if k in self.questions and "question" not in self.off:
                     return f"names the question {k}"
                 if k in self.traced and "traced" not in self.off:
                     return f"names the traced function {k}"
@@ -534,12 +556,13 @@ class Scanner:
                 m = self.methods.get((self.path.name, "Node", n.func.attr))
                 if m is not None:
                     callee, clause = (m, None, f"Node.{n.func.attr}"), "node-method"
-            elif isinstance(n.func, ast.Attribute):
-                continue                # a method of a value (a table's handled above)
-            if callee is not None:
+            elif isinstance(n.func, ast.Attribute) and self.ns_rooted(n.func.value, scope, bare=True):
+                continue                # a table's own method (a mutating one handled above)
+            if callee is not None:      # (any other object's method, or a module's function: unfollowed, below)
                 if clause in self.off:
                     continue
-                tables = {p for p, a in zip(params_of(callee[0])[0], n.args) if self.ns_rooted(a, scope, bare=True)}
+                params = params_of(callee[0])[0][1 if clause == "node-method" else 0:]     # after the receiver
+                tables = {p for p, a in zip(params, n.args) if self.ns_rooted(a, scope, bare=True)}
                 tables |= {kw.arg for kw in n.keywords if kw.arg and self.ns_rooted(kw.value, scope, bare=True)}
                 key = (id(callee[0]), frozenset(tables))
                 if key in seen:
@@ -566,7 +589,7 @@ class Scanner:
             e = e.value
         if isinstance(e, ast.Name) and (bare or e is not top):
             k = scope.lookup(e.id, "captures")
-            return k is not None and k not in QUESTIONS | self.traced | CALLABLES
+            return k is not None and k not in self.questions | self.traced | CALLABLES
         return bare and isinstance(top, ast.Subscript) and is_ns(top.value)
 
     def args_ok(self, call, node, params):
@@ -628,9 +651,13 @@ class Scanner:
         return None
 
     def note_assigns(self, s, st):
+        """The names a statement may assign: each counts as rebound, and the result variable is no longer the
+        earlier binding's result."""
         for n in self.walk_no_nested(s):
             if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
                 st["assigned"].add(n.id)
+                if n.id == st["res"]:
+                    st["res"] = None
 
     def walk(self, stmts, st, held, params, rv):
         """Walk a statement list on every path; (why, whether every path through it has returned)."""
@@ -654,7 +681,8 @@ class Scanner:
                 live = [x for x, e in ((a, ea), (b, eb)) if not e]
                 if len({x["count"] for x in live}) > 1 and "branch" not in self.off:
                     return f"calls {held} on some paths only", False
-                st.update(count=live[0]["count"], res=live[0]["res"],
+                st.update(count=live[0]["count"],       # only what every live path shares: a result variable
+                          res=live[0]["res"] if len({x["res"] for x in live}) == 1 else None,     # held on all
                           assigned=set().union(*(x["assigned"] for x in live)))
                 continue
             if isinstance(s, (ast.For, ast.AsyncFor, ast.While)):
@@ -673,6 +701,10 @@ class Scanner:
                 if any(isinstance(n, (ast.Return, ast.Raise)) for h in s.handlers for b in h.body
                        for n in self.walk_no_nested(b)):
                     return "returns or raises in a handler", False
+                if any(self.is_held(n, held) for h in s.handlers for b in h.body for n in ast.walk(b)):
+                    return f"calls {held} in a handler", False
+                for h in s.handlers:            # a handler may run: what it assigns is assigned
+                    self.note_assigns(ast.Module(body=h.body, type_ignores=[]), st)
                 for part in (s.body, s.orelse):
                     why, ended = self.walk(part, st, held, params, rv)
                     if why or ended:
@@ -684,6 +716,8 @@ class Scanner:
                     why = self.calls_in(it.context_expr, st, held, params)
                     if why:
                         return why, False
+                    if it.optional_vars is not None:    # `with … as x` assigns x
+                        self.note_assigns(ast.Expr(value=it.optional_vars), st)
                 why, ended = self.walk(s.body, st, held, params, rv)
                 if why or ended:
                     return why, ended
@@ -704,17 +738,24 @@ class Scanner:
                 if not rv and (v is None or (isinstance(v, ast.Constant) and v.value is None)):
                     return None, True
                 return f"does not return {held}'s result", True
+            if any(isinstance(c, ast.stmt) for c in ast.iter_child_nodes(s)):   # a compound statement the walk
+                if any(self.is_held(n, held) or isinstance(n, (ast.Return, ast.Raise))  #   does not follow
+                       for n in self.walk_no_nested(s)):
+                    return f"a {type(s).__name__} statement the test cannot follow holds the call or a return", False
+                self.note_assigns(s, st)
+                continue
             why = self.calls_in(s, st, held, params)
             if why:
                 return why, False
-            if (isinstance(s, ast.Assign) and self.is_held(s.value, held) and len(s.targets) == 1
-                    and isinstance(s.targets[0], ast.Name)):
-                st["res"] = s.targets[0].id
-            elif st["res"] is not None and any(isinstance(n, ast.Name) and n.id == st["res"]
-                                               and isinstance(n.ctx, ast.Store) for n in ast.walk(s)):
-                if "result" not in self.off:
-                    return f"changes {held}'s result before it returns it", False
+            defines = (isinstance(s, ast.Assign) and self.is_held(s.value, held) and len(s.targets) == 1
+                       and isinstance(s.targets[0], ast.Name))
+            if (not defines and st["res"] is not None and "result" not in self.off
+                    and any(isinstance(n, ast.Name) and n.id == st["res"] and isinstance(n.ctx, ast.Store)
+                            for n in ast.walk(s))):
+                return f"changes {held}'s result before it returns it", False
             self.note_assigns(s, st)
+            if defines:
+                st["res"] = s.targets[0].id
         return None, False
 
     @staticmethod
@@ -752,7 +793,7 @@ class Scanner:
                 if isinstance(v, ast.AST):
                     yield from Scanner.every_path(v)
 
-    def closure_split(self, fn, name, held, v2_only):
+    def closure_split(self, fn, name, held, doc):
         """A layer whose first statement branches on a closure value alone (no parameter of its own): its class per
         branch, as {"on": the test's text, "true": class, "false": class}, or None. Such a layer is
         classified per node by that value; the scan gives both, and the node's own value is read where classes are."""
@@ -761,6 +802,8 @@ class Scanner:
             return None
         test = node.body[0].test
         own = set(params_of(node)[0] + params_of(node)[1])
+        if any(isinstance(n, (ast.Attribute, ast.Call, ast.Subscript, ast.NamedExpr, ast.Await)) for n in ast.walk(test)):
+            return None                 # a field, a call or an element: state or an effect, no construction value
         names = {n.id for n in ast.walk(test) if isinstance(n, ast.Name)}
         if not names or names & own or any(fn.scope.lookup(x, "captures") for x in names):
             return None
@@ -796,11 +839,11 @@ class Scanner:
             f2 = Func(alt, fn.qual, fn.scope, self.src, self.path)
             h = self.held(f2, name)
             out[str(truth).lower()] = "own" if h is None else (
-                "observer" if self.observer_test(f2, name, h, v2_only) is None else "layer")
+                "observer" if self.observer_test(f2, name, h, doc) is None else "layer")
         return out if out["true"] != out["false"] else None
 
 
-QUESTIONS, TRACED, TRACED_V2, CALLABLES = set(), set(), set(), set()
+QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, CALLABLES = set(), set(), set(), set(), set()
 DEFS_DOC, DEFS_V2, RETURNS_DOC, RETURNS_V2 = set(), set(), set(), set()
 BUILTIN_NAMES = set(dir(__import__("builtins")))
 
@@ -857,13 +900,14 @@ def load_names(toy):
     CALLABLES.update(doc, v2)
     RETURNS_DOC.update(returning(doc))
     RETURNS_V2.update(returning({**doc, **v2}))
-    QUESTIONS.update(T.TAPE)
+    QUESTIONS_DOC.update(T.TAPE)
+    QUESTIONS_V2.update(T.TAPE)
     # protocol-v2.md's questions: the names its functions call that no document defines, and that the toy binds in
     # code that runs under v2 alone (type_of_group, send, choice); the toy's helpers bound for both documents (group,
     # group_index) are computed in place, as under protocol.md, and are no questions. Provisional until the twin's
     # question registry for v2 is read
     v2_bound = {r["name"] for r in scan(toy).rows if r["v2_only"]}
-    QUESTIONS.update(questions_of(v2, set(doc) | set(v2)) & v2_bound)
+    QUESTIONS_V2.update(questions_of(v2, set(doc) | set(v2)) & v2_bound)
     TRACED.update(T.BLOCK)
     TRACED_V2.update(n for n in T.v2_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
     return T, N
@@ -980,6 +1024,9 @@ class Node:
     def meth(self, x):
         self.ns["tbl"].clear()
 
+    def edit(self, t):
+        t.clear()
+
     def plant(self, ns):
         def helper(t):
             t.pop(0)
@@ -988,6 +1035,57 @@ class Node:
         d_twice, d_branch, d_args, d_result = ns["c_twice"], ns["c_branch"], ns["c_args"], ns["c_result"]
         d_extra, d_fallthrough, d_arms, d_plain = ns["c_extra"], ns["c_fallthrough"], ns["c_arms"], ns["c_plain"]
         d_none, d_mid = ns["c_none"], ns["message_id"]
+        d_qualified, d_aliasrow, d_methodarg, d_brres = ns["c_qualified"], ns["c_aliasrow"], ns["c_methodarg"], ns["c_brres"]
+        d_finally, d_handler, d_with, d_effect, d_v2q = ns["c_finally"], ns["c_handler"], ns["c_with"], ns["c_effect"], ns["c_v2q"]
+
+        def c_qualified(x):
+            foreign.process(ns["tbl"])
+            return d_qualified(x)
+
+        def c_aliasrow(x):
+            r = ns["tbl"][x]
+            del r[x]
+            return d_aliasrow(x)
+
+        def c_methodarg(x):
+            self.edit(ns["tbl"])
+            return d_methodarg(x)
+
+        def c_brres(x):
+            if x:
+                r = d_brres(x)
+            else:
+                d_brres(x)
+                r = 0
+            return r
+
+        def c_finally(x):
+            try:
+                r = d_finally(x)
+            finally:
+                r = 0
+            return r
+
+        def c_handler(x):
+            try:
+                pass
+            except ValueError:
+                x = 0
+            return d_handler(x)
+
+        def c_with(x):
+            with ctx() as x:
+                pass
+            return d_with(x)
+
+        def c_effect(x):
+            if ns["askq"]():
+                return 0
+            return d_effect(x)
+
+        def c_v2q(x):
+            ns["v2q"](x)
+            return d_v2q(x)
 
         def c_question(x):
             ns["askq"](x)
@@ -1065,7 +1163,9 @@ class Node:
         ns.update(c_question=c_question, c_traced=c_traced, c_assign=c_assign, c_delete=c_delete, c_mutate=c_mutate,
                   c_unfollowed=c_unfollowed, c_localfn=c_localfn, c_method=c_method, c_twice=c_twice,
                   c_branch=c_branch, c_args=c_args, c_result=c_result, c_extra=c_extra, c_fallthrough=c_fallthrough,
-                  c_arms=c_arms, c_plain=c_plain, c_none=c_none, message_id=message_id)
+                  c_arms=c_arms, c_plain=c_plain, c_none=c_none, message_id=message_id, c_qualified=c_qualified,
+                  c_aliasrow=c_aliasrow, c_methodarg=c_methodarg, c_brres=c_brres, c_finally=c_finally,
+                  c_handler=c_handler, c_with=c_with, c_effect=c_effect, c_v2q=c_v2q)
 
     def closure(self, ns, on):
         d_closed = ns["c_closed"]
@@ -1079,8 +1179,11 @@ class Node:
 BREAKS = {"c_question": "question", "c_traced": "traced", "c_assign": "assign", "c_delete": "delete",
           "c_mutate": "mutate", "c_unfollowed": "unfollowed", "c_localfn": "local-fn", "c_method": "node-method",
           "c_twice": "twice", "c_branch": "branch", "c_args": "arguments", "c_result": "result",
-          "c_extra": "arguments", "c_fallthrough": "result"}
+          "c_extra": "arguments", "c_fallthrough": "result", "c_qualified": "unfollowed", "c_aliasrow": "delete",
+          "c_methodarg": "node-method", "c_brres": "result", "c_finally": "result", "c_handler": "arguments",
+          "c_with": "arguments"}
 PASSES = ("c_arms", "c_plain", "c_none", "message_id")
+NOT_SPLIT = ("c_effect",)               # a branch on a call's answer: no construction value, so no class per branch
 
 
 def self_test():
@@ -1110,10 +1213,11 @@ def self_test():
         moved = sorted(k for k in before if after.get(k) != before[k])
         report("a changed observer body: its row's hash alone moved, the rows the same",
                moved == [("subscript", "a", 7)] and set(before) == set(after), f"moved {moved}")
-    saved = [set(s) for s in (QUESTIONS, TRACED, DEFS_DOC, RETURNS_DOC)]
-    for s, v in zip((QUESTIONS, TRACED, DEFS_DOC, RETURNS_DOC),
-                    ({"askq"}, {"trf"}, set(BREAKS) | set(PASSES) | {"c_closed"},
-                     (set(BREAKS) | {"c_arms", "c_plain", "c_closed"}))):
+    sets = (QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, DEFS_DOC, RETURNS_DOC)
+    saved = [set(s) for s in sets]
+    names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_v2q"}
+    for s, v in zip(sets, ({"askq"}, {"askq", "v2q"}, {"trf"}, {"trf"}, names,
+                           names - {"c_none", "message_id"})):
         s.clear()
         s.update(v)
     try:
@@ -1132,13 +1236,21 @@ def self_test():
                 report(f"{name} an observer", cls(rows, name) == "observer", f"got {cls(rows, name)}")
             c = cls(scan(d, off=("by-name",)).rows, "message_id")
             report("control: message_id with the rule by name off a layer", c == "layer", f"got {c}")
+            for name in NOT_SPLIT:
+                report(f"{name} not split, a layer", cls(rows, name) == "layer", f"got {cls(rows, name)}")
+            got = [r for r in rows if r["name"] == "c_v2q"]
+            ok = (len(got) == 1 and got[0]["class"] == "per-document"
+                  and got[0]["by_document"]["protocol.md"] == "observer"
+                  and got[0]["by_document"]["v2"].startswith("layer"))
+            report("c_v2q per document: an observer under protocol.md, a layer under v2 (a v2 question)", ok,
+                   f"got {[(r['class'], r.get('by_document')) for r in got]}")
             got = [r for r in rows if r["name"] == "c_closed"]
             ok = (len(got) == 1 and got[0]["class"] == "closure-dependent"
                   and got[0]["closure"] == {"on": "not on", "true": "own", "false": "observer"})
             report("c_closed closure-dependent: own where `not on`, an observer where not", ok,
                    f"got {[(r['class'], r.get('closure')) for r in got]}")
     finally:
-        for s, v in zip((QUESTIONS, TRACED, DEFS_DOC, RETURNS_DOC), saved):
+        for s, v in zip(sets, saved):
             s.clear()
             s.update(v)
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")

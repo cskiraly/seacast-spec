@@ -203,29 +203,49 @@ replay_of() {           # $1: a trace, without its .jsonl.gz: replayed to $1.rep
 }
 digest_of() { sed -n '/^digest /{s/^digest \(.\{16\}\).*/\1/p;q}' "$1"; }
 bare_none() { [ "$(cat "$1.bare.json" 2> /dev/null)" = "{}" ]; }     # $1: a v2 trace: its run counted no bare call
-extra_records() {       # $1: a trace; $2: another; $3: a node; $4: a function; $5: k: the second's body is the first's
-  $PY - "$@" <<'EOF'    #   with exactly k more records, each of that function at that node, and its trailer counts them
-import gzip
+extra_records() {       # $1: a trace; $2: another; $3: a node; $4: a function; $5: k: the second's body is the first's,
+  $PY - "$@" <<'EOF'    #   in order, with exactly k records inserted, each of that function at that node, and its
+import gzip             #   trailer the first's with those k counted, nothing else changed
 import json
 import sys
-from collections import Counter
 a_p, b_p, node, fn, k = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], int(sys.argv[5])
 
 
-def body(p):
+def body(p):            # an unreadable file (a CRC error too) raises here, and the check fails
     with gzip.open(p, "rt") as f:
         lines = f.read().splitlines()[1:]
     return lines[:-1], json.loads(lines[-1])["trailer"]
 
 
+def inserted(line):
+    try:
+        r = json.loads(line)
+    except ValueError:
+        return False
+    return isinstance(r, dict) and r.get("fn") == fn and int(r.get("n", -1)) == node
+
+
 a, ta = body(a_p)
 b, tb = body(b_p)
-extra, missing = Counter(b) - Counter(a), Counter(a) - Counter(b)
-recs = [json.loads(x) for x in extra.elements()]
-ok = (not missing and len(recs) == k and all(r.get("fn") == fn and int(r.get("n", -1)) == node for r in recs)
-      and tb["records"] == ta["records"] + k and tb["by_fn"].get(fn, 0) == ta["by_fn"].get(fn, 0) + k)
-print("ok" if ok else f"{len(recs)} lines more, {sum(missing.values())} fewer, records {ta['records']} then {tb['records']}")
-sys.exit(0 if ok else 1)
+i = extra = 0
+why = None
+for line in b:          # b is a, in order, with lines inserted that are records of fn at node
+    if i < len(a) and line == a[i]:
+        i += 1
+    elif inserted(line):
+        extra += 1
+    else:
+        why = f"line {i + extra + 2} is neither the first trace's next line nor an inserted record of {fn} at node {node}"
+        break
+want = dict(ta, records=ta["records"] + k, by_fn=dict(ta["by_fn"], **{fn: ta["by_fn"].get(fn, 0) + k}))
+if why is None and i != len(a):
+    why = f"{len(a) - i} of the first trace's lines missing"
+if why is None and extra != k:
+    why = f"{extra} records inserted, not {k}"
+if why is None and tb != want:
+    why = f"the trailer is not the first's with {k} more {fn}"
+print("ok" if why is None else why)
+sys.exit(0 if why is None else 1)
 EOF
 }
 PIDS=
@@ -340,8 +360,8 @@ EOF_SELF
   else no "the guard did not report a lab citation planted in README.md's copy ($lc/labcites.txt)"; fi
   # the scan's lists beside trace3.py's hand-kept ones: exactly the one known difference, the observer the
   # peer-promise mode binds over close_promises (not listed: that mode is refused under v2 today)
-  $PY "$T/scan_bindings.py" "$TOY" --lists > "$OUT/scan-lists.txt" 2>&1
-  if [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 1 ] \
+  $PY "$T/scan_bindings.py" "$TOY" --lists > "$OUT/scan-lists.txt" 2>&1; local lrc=$?
+  if [ "$lrc" = 1 ] && [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 1 ] \
       && has -x "observer close_promises Node._peer_promise.<locals>.close_promises: NOT in WRAPPERS" "$OUT/scan-lists.txt" \
       && has -x "1 differences from trace3.py's lists" "$OUT/scan-lists.txt"; then
     echo "  the scan's lists: trace3.py's, but the one known observer (scan-lists.txt)"
@@ -544,6 +564,8 @@ s_cells() {
 s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2.txt's; the records are protocol.md's names
   $PY "$T/trace3.py" --self-test-v2 > "$OUT/v2-self-test.txt" 2>&1 || no "the tracer's self-test of v2's kept names (v2-self-test.txt)"
   if [ -z "$CELLS" ]; then echo "  no v2 cell (a rehearsal)"; echo ok > "$OUT/cells-v2.txt"; return; fi
+  local c
+  for c in $CELLS; do rm -f "$OUT/v2/$c.jsonl.gz.bare.json"; done     # no count left from an earlier run counts
   # shellcheck disable=SC2086
   $PY "$T/cells3.py" "$TOY" "$OUT/v2" -j "$J" --doc v2 --replay "$REPLAY" $CELLS > "$OUT/cells-v2.txt" 2>&1 || no "a v2 cell (cells-v2.txt)"
   has -x ok "$OUT/cells-v2.txt" || no "no verdict on the v2 cells"
@@ -552,7 +574,7 @@ s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2
 }
 small() {               # $1: a name; $2: its directory; $3: the tracer's environment setting, or ""; the rest: run.py's arguments
   local name=$1 dir=$2 setting=$3 got plain; shift 3
-  rm -f "$OUT/$dir/$name.jsonl.gz" "$OUT/$dir/$name.replay"
+  rm -f "$OUT/$dir/$name.jsonl.gz" "$OUT/$dir/$name.jsonl.gz.bare.json" "$OUT/$dir/$name.replay"
   (cd "$TOY" && env $setting $PY "$T/trace3.py" . "$OUT/$dir/$name.jsonl.gz" "$@" --digest > "$OUT/$dir/$name.out" 2> "$OUT/$dir/$name.err") || return 1
   replay_of "$dir/$name"
   (cd "$TOY" && $PYPLAIN run.py "$@" --digest > "$OUT/$dir/$name.plain" 2>&1)
@@ -762,8 +784,11 @@ s_tracercontrols() {
   else no "the tracer stopped on an unlogged assignment for another reason (c-unlogged.err)"; fi
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2; do
     case $f in
+      rebind-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under v2 must be the namespace's last binding" ;;
+      rebind-view-v2) want="^trace3: node [0-9]*: offers was bound again after the tracer was installed, which under v2 must be the namespace's last binding: a OfferMap" ;;
+      close-keyerror-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs" ;;
       rebound-scanned-v2) want="^trace3: node [0-9]*: popcount_again is bound to a function of the toy's that the scan of its bindings does not name: popcount \(bits\.py:[0-9]*\)" ;;
       other-node-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes is called while node [0-9]*'s record is open and no question runs" ;;
       raw-chunk-id-v2) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
@@ -796,8 +821,8 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 25 ] || no "not 25 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 25 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 29 ] || no "not 29 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 29 planted faults stop the tracer with their own words"
   # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
@@ -805,20 +830,26 @@ s_tracercontrols() {
   # the plain one with exactly its extra records of N at the named node, its trailer counting them
   : > "$OUT/c-tracerplants.txt"; bad=0
   local plain line node k want why
-  for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2; do
-    case $f in
+  for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2 hdr-read-v2 hdr-read-v2-raw; do
+    case $f in     # k: the control's extra records of N; - for a plant read by its line alone (its read adds to a record)
       bare-in-question-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c N: 1$" ;;
       bare-in-question-v2-per-node) plain=v2/hand5; k=1; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; records inside: 1; bare c N: 0$" ;;
-      suppressed-entry-v2) plain=v2/hand5-own; k=0; line=", planted 2 times; node s: [0-9]+; supp after the return: 0; bare s N: 2; supp after the raise: 0$" ;;
-      suppressed-entry-v2-off) plain=v2/hand5-own; k=2; line=", planted 2 times; records inside: 2; node s: [0-9]+; supp after the return: 0; bare s N: 0; supp after the raise: 0$" ;;
-      bare-replaced-v2) plain=v2/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c on_iwant: 1$" ;;
-      bare-timer-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+$" ;;
+      suppressed-entry-v2) plain=v2/hand5-own; k=0; line=", planted 2 times; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 2; entry 2: raised; supp after the raise: 0$" ;;
+      suppressed-entry-v2-off) plain=v2/hand5-own; k=2; line=", planted 2 times; records inside: 2; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 0; entry 2: raised; supp after the raise: 0$" ;;
+      bare-replaced-v2) plain=v2/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the replaced body ran: 1; bare c on_iwant: 1$" ;;
+      bare-timer-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer fired at node c: 1$" ;;
+      hdr-read-v2) plain=v2/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read logged: 1$" ;;
+      hdr-read-v2-raw) plain=v2/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read logged: 0$" ;;
     esac
+    rm -f "$OUT/c-tp-$f.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz.bare.json"    # nothing left from an earlier run counts
     if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$f" . "$OUT/c-tp-$f.jsonl.gz" > "$OUT/c-tp-$f.out" 2> "$OUT/c-tp-$f.err"); then
       echo "$f: the run did not end with 0  <-- it must" >> "$OUT/c-tracerplants.txt"; bad=1; continue
     fi
     if ! has -E "^tracerfaults3: $f$line" "$OUT/c-tp-$f.err"; then
       echo "$f: its line is not as written  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
+    fi
+    if ! gzip -t "$OUT/c-tp-$f.jsonl.gz" 2> /dev/null || ! gzip -t "$OUT/$plain.jsonl.gz" 2> /dev/null; then
+      echo "$f: its trace or $plain's does not decompress whole  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
     fi
     node=$(sed -n -E 's/.*(node a, node c: [0-9]+, |node s: )([0-9]+).*/\2/p' "$OUT/c-tp-$f.err" | head -n 1)
     case $f in      # the .bare.json, exactly
@@ -830,8 +861,10 @@ s_tracercontrols() {
     if [ "$(cat "$OUT/c-tp-$f.jsonl.gz.bare.json" 2> /dev/null)" != "$want" ]; then
       echo "$f: its .bare.json is not $want  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
     fi
-    if [ "$k" = 0 ]; then           # a plant: the plain trace's body
-      if [ -s "$OUT/$plain.jsonl.gz" ] && cmp -s <(zcat "$OUT/c-tp-$f.jsonl.gz" | tail -n +2) <(zcat "$OUT/$plain.jsonl.gz" | tail -n +2); then
+    if [ "$k" = - ]; then           # read by its line alone
+      echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want" >> "$OUT/c-tracerplants.txt"
+    elif [ "$k" = 0 ]; then         # a plant: the plain trace's body
+      if cmp -s <(zcat "$OUT/c-tp-$f.jsonl.gz" | tail -n +2) <(zcat "$OUT/$plain.jsonl.gz" | tail -n +2); then
         echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want; the body $plain's" >> "$OUT/c-tracerplants.txt"
       else echo "$f: the body not $plain's  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
     elif why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "$node" N "$k"); then
@@ -842,9 +875,39 @@ s_tracercontrols() {
   if bare_none "$OUT/c-tp-bare-in-question-v2.jsonl.gz"; then
     echo "control: the check of no bare call passes the plant's count  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
   else echo "control: the check of no bare call fails on the plant's count, as it must" >> "$OUT/c-tracerplants.txt"; fi
+  # extra_records' own controls, on traces made from the plain v2/hand5: itself with k 0 passes; two record lines
+  # swapped, the trailer's rest changed, another function's count changed: each refused
+  $PY - "$OUT/v2/hand5.jsonl.gz" "$OUT/c-er" <<'EOF_ER'
+import gzip
+import json
+import sys
+src, out = sys.argv[1], sys.argv[2]
+with gzip.open(src, "rt") as f:
+    lines = f.read().splitlines()
+recs = [j for j, x in enumerate(lines) if x.startswith('{"n"')]
+t = json.loads(lines[-1])
+other = next(fn for fn in t["trailer"]["by_fn"] if fn != "N")
+cases = {"swapped": lines[:recs[0]] + [lines[recs[1]], lines[recs[0]]] + lines[recs[1] + 1:]}
+for name, change in (("rest", lambda d: d["trailer"].update(rest=d["trailer"]["rest"] + 1)),
+                     ("other", lambda d: d["trailer"]["by_fn"].update({other: d["trailer"]["by_fn"][other] + 1}))):
+    d = json.loads(lines[-1])
+    change(d)
+    cases[name] = lines[:-1] + [json.dumps(d, separators=(",", ":"))]
+for name, ls in cases.items():
+    with gzip.open(f"{out}-{name}.jsonl.gz", "wt") as f:
+        f.write("\n".join(ls) + "\n")
+EOF_ER
+  if extra_records "$OUT/v2/hand5.jsonl.gz" "$OUT/v2/hand5.jsonl.gz" 1 N 0 > /dev/null; then
+    echo "control: extra_records passes a trace against itself, as it must" >> "$OUT/c-tracerplants.txt"
+  else echo "control: extra_records refuses a trace against itself  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+  for c in swapped rest other; do
+    if extra_records "$OUT/v2/hand5.jsonl.gz" "$OUT/c-er-$c.jsonl.gz" 1 N 0 > /dev/null; then
+      echo "control: extra_records passes the planted $c  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
+    else echo "control: extra_records refuses the planted $c, as it must" >> "$OUT/c-tracerplants.txt"; fi
+  done
   [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
-  [ "$(grep -c ': as it must: ' "$OUT/c-tracerplants.txt")" = 6 ] || no "not 6 plants under v2 as written (c-tracerplants.txt)"
-  echo "  $(grep -c ': as it must: ' "$OUT/c-tracerplants.txt") of 6 plants under v2 as written (four, and two controls), and the bare check's control"
+  [ "$(grep -c ': as it must: ' "$OUT/c-tracerplants.txt")" = 8 ] || no "not 8 plants under v2 as written (c-tracerplants.txt)"
+  echo "  $(grep -c ': as it must: ' "$OUT/c-tracerplants.txt") of 8 plants under v2 as written (five, and three controls), and the checks' controls"
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool

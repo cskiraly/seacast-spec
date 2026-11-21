@@ -754,18 +754,21 @@ class Tracer3(Tracer):
                 raise SystemExit(f"trace3: node {nd.id}: {name} is bound to a function of the toy's that the scan of "
                                  f"its bindings does not name: {key[2]} ({key[0]}:{key[1]})")
 
-    def repoint_aliases(self, nd, ns):
+    def repoint_aliases(self, nd, ns, pre):
         """Under v2, after the install at the end of construction: two names the toy bound to the raw
         objects before the install are pointed at the installed ones, `hdr` at the view of `desc` (`_v2`'s
         `hdr=ns["desc"]`) and `chunk_id` at the installed `message_id` (`_v2` binds the toy's `message_id` wrapper
         to it), and the identities are checked: a raw `hdr` would make every `hdr[g]` read unlogged. Before the
         re-pointing, each alias must be there and bound as the toy binds it (`hdr` the raw `desc` object, `chunk_id`
-        the toy's `message_id`, the function the tracer's wrapper of it holds): an alias bound to anything else was
-        bound by something else, and is refused, not overwritten."""
+        the toy's `message_id`, as `pre` holds them, taken before the install, so that a name the install leaves alone
+        compares as well as a wrapped one): an alias bound to anything else was bound by something else, and is
+        refused, not overwritten."""
         for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
-            raw = F.unwrap(ns[name]) if alias == "hdr" else getattr(ns.get(name), "__wrapped__", None)
+            raw = pre.get(name)
             if alias not in ns:
                 raise SystemExit(f"trace3: node {nd.id}: {alias} is missing under v2")
+            if raw is None or name not in ns:
+                raise SystemExit(f"trace3: node {nd.id}: {name} is missing under v2")
             if ns[alias] is not raw:
                 raise SystemExit(f"trace3: node {nd.id}: {alias} is not the toy's {name} before the install")
             ns[alias] = ns[name]
@@ -781,12 +784,16 @@ class Tracer3(Tracer):
         not held so: a question rebound later is missing from a tape, which the replay refuses, and under v2 the toy
         rebinds several that no kept function asks.
 
-        Under v2 the install is at the end of the node's construction, the namespace's last binding: a traced name
-        must be the tracer's own wrapper, no listed wrapper over it (one there means an install before the toy's
-        bindings), and the two aliases must still be the installed objects (`repoint_aliases`)."""
+        Under v2 the install is at the end of the node's construction, the namespace's last binding: every installed
+        slot is held, a traced name to the tracer's own wrapper (no listed wrapper over it: one there means an install
+        before the toy's bindings), a tape name to its question adapter and a table to its view (so that a slot the toy
+        writes back, as `_repair_bias` writes its captured `shuffled`, or a view replaced by its raw table, is seen);
+        and the two aliases must still be the installed objects (`repoint_aliases`)."""
         for nd, ns, bound in self.bound:
             if self.doc_v2:                     # both aliases there and still the installed objects
                 for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
+                    if name not in ns:
+                        raise SystemExit(f"trace3: node {nd.id}: {name} is missing under v2")
                     if alias not in ns or ns[alias] is not ns[name]:
                         raise SystemExit(f"trace3: node {nd.id}: {alias} is not the installed {name}")
             for name, w in bound.items():
@@ -796,7 +803,7 @@ class Tracer3(Tracer):
                 if self.doc_v2:
                     code = getattr(now, "__code__", None)
                     where = (f"{getattr(now, '__qualname__', '?')} ({Path(code.co_filename).name}:{code.co_firstlineno})"
-                             if code is not None else repr(now))
+                             if code is not None else f"a {type(now).__name__}")    # a table or a value: its type
                     raise SystemExit(f"trace3: node {nd.id}: {name} was bound again after the tracer was installed, "
                                      f"which under v2 must be the namespace's last binding: {where}")
                 held = []
@@ -1671,8 +1678,9 @@ def main(argv):
 
         def __init__(self, *a, **kw):
             orig_init(self, *a, **kw)
-            tr.install(self, self.ns)
-            tr.repoint_aliases(self, self.ns)
+            pre = {name: self.ns.get(name) for name in ("desc", "message_id")}    # the aliases' targets as the toy
+            tr.install(self, self.ns)                                           #   left them, before the install
+            tr.repoint_aliases(self, self.ns, pre)
 
         tr.N.Node.__init__ = __init__
     else:               # under protocol.md, inside _override, as before
@@ -1689,8 +1697,8 @@ def main(argv):
     except BaseException:               # a stop (or any error) in flight: close the trace, but a later check at the
         try:                            #   close must not replace the first reason, which is the one raised
             tr.close()
-        except SystemExit as later:
-            print(f"trace3: (at the close, after the stop above) {later}", file=sys.stderr)
+        except BaseException as later:  # a stop or any other error at the close: a note
+            print(f"trace3: (at the close, after the stop above) {type(later).__name__}: {later}", file=sys.stderr)
         raise
     tr.close()
     print(f"trace3: {sum(tr.counts.values())} records, {dict(sorted(tr.counts.items()))}", file=sys.stderr)
