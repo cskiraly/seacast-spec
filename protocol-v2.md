@@ -9,16 +9,16 @@
 Elastic). The protocol has had this name since 2026-10-19; v0.4 was published as Informed
 Diffusion, which now names SEACAST's diffusion part (§0, "The parts").*
 
-*This is draft 1, of 2026-10-07. It is a sibling of [`protocol.md`](protocol.md), which it
-contains as one setting (§6.1). That document was draft v0.3 when this was written and has been
-v0.10.11 since 2026-11-21, with the same section numbers. Below, `protocol.md` means that document
-as it is now, and "v0.3" means draft v0.3 itself, for its own rules.*
+*This document began as draft 1, of 2026-10-07. It is a sibling of [`protocol.md`](protocol.md),
+which it contains as one setting (§6.1). That document was draft v0.3 when this was written and has
+been v0.10.11 since 2026-11-21, with the same section numbers. Below, `protocol.md` means that
+document as it is now, and "v0.3" means draft v0.3 itself, for its own rules.*
 
 *Each later version of `protocol.md` is carried into this document in the same way; §5 maps what
 carries over, and [`protocol-v2-decisions.md`](protocol-v2-decisions.md) lists the versions
 carried.*
 
-*This draft defines the notions, the messages, the state and the event handlers; the scheduling
+*This document defines the notions, the messages, the state and the event handlers; the scheduling
 that tier 4 (§6.2) measured carries over unchanged where §5 says so. Every design decision is
 marked `[D1]` … `[D12]`, and [`protocol-v2-decisions.md`](protocol-v2-decisions.md) records where
 each bites and what was decided (§8). The toy runs this document on top of `protocol.md`'s
@@ -27,8 +27,8 @@ the tier 4 setting is checked against its own recorded cells, which §6.1 compar
 `protocol.md`'s. Draft 0 (2026-10-06) was written without running; draft 1 is what executing it
 changed.*
 
-*[`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind this draft's reasons,
-each with its conditions.*
+*[`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind this document's
+reasons, each with its conditions.*
 
 ## 0. How to read this
 
@@ -3450,9 +3450,9 @@ section says what every binding provides, and what the rules do where a binding 
 - *Whole messages, in order:* what a node writes to a peer arrives as whole messages, in the order
   written for each object type at least (Waggle's framing has a stream per type). How a binding
   marks where each ends is its own: its frames. This holds on every binding but the native QUIC
-  binding, a draft, which does not order a chunk with any other message; which rules rely on that
-  order, the source's holding just ahead of its first push among them (§4.7), is one of its open
-  questions (`protocol-v2-bindings.md` §7.9).
+  binding, a draft, which does not order a chunk with any other message. Which rules rely on that
+  order is one of its open questions (`protocol-v2-bindings.md` §7.9); the source's holding just
+  ahead of its first push (§4.7) is one of them.
 - *The queue and the write:*
   - `send(p, msg, urgent)` puts a message into the per-peer queue (§3), or reports that a full queue
     refused it;
@@ -3491,7 +3491,7 @@ Rendezvous and discovery are outside the bindings (§0).
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
 | a chunk ordered with the messages written before and after it | yes (on Waggle, within its type) | yes, between frames | yes, between frames | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
-| a chunk's lost packet leaves the peer's other messages ungapped | no on the libp2p stream binding; on Waggle over QUIC, only the chunk's type waits | no | no | yes: the other chunks and the control stream do not wait for it | a lost packet holds up every later frame on its stream until it is resent, and on TCP every later frame on the connection; on every binding, loss also slows the connection's sending (congestion control) |
+| a chunk's lost packet holds up none of the peer's other messages | no on the libp2p stream binding; on Waggle over QUIC, only the chunk's type waits | no | no | yes: the other chunks and the control stream do not wait for it | a lost packet holds up every later frame on its stream until it is resent, and on TCP every later frame on the connection; on every binding, loss also slows the connection's sending (congestion control) |
 
 **Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
 interest without subscription, a push relation per family and colour with a floor and a direction,

@@ -1,9 +1,9 @@
 # SEACAST's next version: its decisions
 
-This is the decision record of [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next
-version (v2). It lists the design decisions `[D1]` to `[D12]` and the others that the draft took:
-when each was decided, what was not taken and why, and the runs behind it. It also lists the
-versions of [`protocol.md`](protocol.md) that the draft has carried. `protocol-v2.md` states the
+This is the decision record of [`protocol-v2.md`](protocol-v2.md), SEACAST's next version (v2). It
+lists the design decisions `[D1]` to `[D12]` and the others that v2 took: when each was decided,
+what was not taken and why, and the runs behind it. It also lists the versions of
+[`protocol.md`](protocol.md) that v2 has carried. `protocol-v2.md` states the
 rules and gives their reasons; the comments in its code cite these labels where each decision bites.
 
 In this file, a section number (§) without the name of a document refers to `protocol-v2.md`'s

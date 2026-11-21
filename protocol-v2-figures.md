@@ -1,7 +1,7 @@
 # SEACAST's next version: its figures
 
-This file holds the figures behind [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next
-version, and behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).
+This file holds the figures behind [`protocol-v2.md`](protocol-v2.md), SEACAST's next version, and
+behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).
 Both documents state the rules and their reasons in words, and they point here for the numbers, as
 `(protocol-v2-figures.md, §4.1)`, or as `(protocol-v2-figures.md, §4.6, "The probe")` for a part of
 an entry. The entries are grouped by the section that cites them, under that section's number and
@@ -36,11 +36,12 @@ transport, which takes every write at once (`--send-buffer 0`), unless they name
 
 **Each entry gives its own conditions:** the network and its size, the degree, the messages, the
 seeds, the operating point (the setting, the source's uplink, the faults), the transport, the
-baseline, and the rules it ran on. The rules are the draft's on the date of the run. An entry gives
-that date and the commit on this repository's main line that first wrote the figure into the text; a
-commit off the main line is named by its date. It names the later changes of the rules that its
-figures predate, where it can point to them; the versions of `protocol.md` carried since are listed
-in `protocol-v2-decisions.md` ("The versions of `protocol.md` carried"). A condition that the run's
+baseline, and the rules it ran on. The rules are those of `protocol-v2.md` on the date of the run;
+below, the draft of a date means `protocol-v2.md` as it was on that date. An entry gives that date
+and the commit on this repository's main line that first wrote the figure into the text; a commit
+off the main line is named by its date. It names the later changes of the rules that its figures
+predate, where it can point to them; the versions of `protocol.md` carried since are listed in
+`protocol-v2-decisions.md` ("The versions of `protocol.md` carried"). A condition that the run's
 record does not give is called unknown.
 
 ## §1.3 Links, joins and relations
