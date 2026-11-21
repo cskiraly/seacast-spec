@@ -3449,9 +3449,9 @@ section says what every binding provides, and what the rules do where a binding 
   end §3's per-connection lifetimes.
 - *Whole messages, in order:* what a node writes to a peer arrives as whole messages, in the order
   written for each object type at least (Waggle's framing has a stream per type). How a binding
-  marks where each ends is its own: its frames. The native QUIC binding, a draft, orders a chunk
-  with nothing, and which rules rely on the order is one of its Opens (`protocol-v2-bindings.md`
-  §7).
+  marks where each ends is its own: its frames. The native QUIC binding, a draft, does not order a
+  chunk with any other message, and which rules rely on that order is one of its open questions
+  (`protocol-v2-bindings.md` §7.9).
 - *The queue and the write:*
   - `send(p, msg, urgent)` puts a message into the per-peer queue (§3), or reports that a full queue
     refused it;
@@ -3488,7 +3488,7 @@ Rendezvous and discovery are outside the bindings (§0).
 | how a cell's header travels (§2), in the form the object type's definition fixes (`protocol-v2-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`protocol-v2-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`protocol-v2-bindings.md` §4); the toy charges no header there, as in (a) | as on the libp2p stream binding; (c) on the control stream, before the group's first chunk stream (`protocol-v2-bindings.md` §7.2) | – |
 | an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | yes, where the implementation orders streams (`protocol-v2-bindings.md` §7.4) | the writer's urgent lane alone, as one stream per peer gives |
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
-| a chunk ordered with the messages written after it | yes | yes | yes | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7) |
+| a chunk ordered with the messages written after it | yes | yes | yes | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
 | a lost packet delays only its own chunk | no | no | no | yes | a lost packet delays every later frame on its stream until it is resent |
 

@@ -315,13 +315,13 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   same three are open on the libp2p stream, Waggle and gossipsub bindings; the partial-messages
   binding carries form (b), by the partial columns' own rule. Not taken: one form for every object
   type, since whether a block comes before its cells differs between applications.
-- **The native QUIC binding, as a draft** (§7 there). It carries SEACAST directly on QUIC: a
+- **The native QUIC binding, as a draft** (§7 there). It carries SEACAST directly on QUIC, with a
   control stream, a stream per chunk, cancel by a stream's reset, and the control stream first where
   the implementation orders streams. It is for study, and not normative. *Open:* whether it runs
   beside libp2p on libp2p's port, beside it on a port of its own, or alone; the choice waits on how
-  the host's queue treats a flow of its own, and on one flow or two on a real stack. Not taken in
-  this version: datagrams for chunks, since a cell never fits one and small payload chunks in
-  datagrams were slower in the toy.
+  the host's queue treats a flow of its own, and on how one flow compares with two on a real stack.
+  Not taken in this version: datagrams for chunks, since a cell never fits one and small payload
+  chunks in datagrams were slower in the toy.
 
 ## The versions of `protocol.md` carried
 

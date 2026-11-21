@@ -34,7 +34,7 @@ names how SEACAST diffuses.
   `protocol-v2.md`, whose §7 says what every binding provides. It defines SEACAST's message
   encoding, the libp2p stream binding (`/seacast/2.0.0`) and the Waggle binding to the byte, and the
   gossipsub and partial-messages bindings to the field, with the gossipsub binding's extra fields to
-  the byte, and the native QUIC binding as a draft.
+  the byte. It also defines the native QUIC binding, as a draft.
 - [`protocol-v2-decisions.md`](protocol-v2-decisions.md): the next version's decision record, a
   companion of `protocol-v2.md`: each design decision, when it was decided, what was not taken and
   the runs behind it, and the versions of `protocol.md` the draft has carried.

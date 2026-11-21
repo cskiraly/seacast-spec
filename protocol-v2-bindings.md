@@ -38,7 +38,7 @@ peer takes.
   - in Waggle's framing, it is one `ObjectPieces`, which Waggle length-prefixes itself (§3);
   - on gossipsub's wires, it is gossipsub's protobuf `RPC`, which can carry several messages;
   - on the native QUIC binding, it is a length prefix and one encoded message on the control stream,
-    and one chunk's stream (§7.2).
+    or a chunk's whole stream (§7.2).
 
   It is not a frame of the layers below (QUIC's, or a stream multiplexer's), which carry these
   frames as bytes. `protocol-v2.md`'s rules speak of messages; its §7 names frames only to say that
@@ -55,7 +55,7 @@ peer takes.
 The sizes in §1.5 are informative.
 
 **At a glance**, the table below shows the bindings message by message (`M`: `protocol-v2.md` §1.4).
-The native QUIC binding's are in §7.2.
+The native QUIC binding is not in it: §7.2 shows that binding message by message.
 
 | message | the libp2p stream and Waggle bindings (§1 to §3) | the gossipsub binding (§4) | the partial-messages binding (§5) |
 |---|---|---|---|
@@ -499,19 +499,21 @@ names no sample (`protocol-v2.md` §1.2).
 
 ## 7. The native QUIC binding (draft)
 
-> **Draft:** for study; no client speaks it. The toy has measured a stream per chunk under packet
-> loss, the priorities, small chunks in datagrams and a stream per chunk on libp2p streams beside
-> it. Those figures, and the toy options that produced them, come in a later release.
+> **Draft.** This section is for study, and no client speaks the binding. The toy has measured a
+> stream per chunk under packet loss, priorities between streams, small chunks in datagrams, and a
+> stream per chunk on libp2p's streams, compared with the native binding. Those figures, and the toy
+> options that produced them, come in a later release.
 
-The native QUIC binding carries SEACAST directly on QUIC (RFC 9000). It uses the message encoding of
-§1 and keeps every rule of `protocol-v2.md`, as the libp2p stream binding (§2) does. It adds what
-libp2p does not give at no cost: a stream per chunk with no protocol negotiation, stream credit
-under its own control, and priorities between streams.
+The native QUIC binding carries SEACAST directly on QUIC (RFC 9000), on a QUIC connection of its
+own: the *native connection*. It uses the message encoding of §1 and keeps every rule of
+`protocol-v2.md`, as the libp2p stream binding (§2) does. It adds three things that libp2p does not
+give for free: a stream per chunk with no protocol negotiation, stream credit under its own
+control, and priorities between streams.
 
 ### 7.1 The connection
 
 - **The ALPN is `seacast/2`.** QUIC's TLS handshake names the application protocol by ALPN. An
-  incompatible change of these rules or of the encoding moves the number.
+  incompatible change of these rules or of the encoding changes the number.
 - **The link.** The link (`protocol-v2.md` §3) opens when the native connection's handshake
   completes, and closes when the native connection closes.
 - **The stream credit.** A node grants its peer enough unidirectional streams (QUIC's
@@ -519,22 +521,22 @@ under its own control, and priorities between streams.
   on each for one chunk at its kind's bound (§1.4).
 - **The peer id and TLS.** Where libp2p runs beside the binding, the native connection's TLS
   certificate is the one libp2p's TLS specification defines, made with the node's libp2p key, so
-  the connection authenticates the same peer id as libp2p's. A node alone, with no libp2p, needs an
-  identity rule of its own, which is part of the Open below.
+  the connection authenticates the same peer id as libp2p's. A node that runs the binding alone,
+  with no libp2p, needs an identity rule of its own, which is part of the Open below.
 - **Open: beside libp2p or alone.** The binding does not yet decide how its connection relates to
   libp2p. Three models are considered:
-  1. *Beside libp2p, on its port.* The native connection shares the UDP port of libp2p's QUIC
+  1. *Beside libp2p, on libp2p's port.* The native connection shares the UDP port of libp2p's QUIC
      transport, and the ALPN tells the two apart. libp2p's peer choice, gating, scoring and identity
-     are reused, and the host's queue sees one flow. This is the model the rest of this section
-     was drafted in.
+     are reused, and the host's queue sees one flow. The rest of this section is written in this
+     model.
   2. *Beside libp2p, on a port of its own.* A new ENR field gives the port, and the native
      connection is a flow of its own at the host's queue.
   3. *Alone, with no libp2p.* The binding must then define who counts as a peer (its limits and
      gating), its identity and authentication, how a node is found and dialed, and its scoring.
 
-  The choice waits on two studies: how the host's queue treats a flow of its own, and one flow or
-  two on a real stack. In every model, the ALPN, the link's open and close, the stream credit and
-  the streams (§7.2) are as this section gives them.
+  The choice waits on two studies: how the host's queue treats a flow of its own, and how one flow
+  compares with two on a real stack. In every model, the ALPN, the link's open and close, the stream
+  credit and the streams (§7.2) are as this section gives them.
 
 ### 7.2 The streams
 
@@ -548,20 +550,22 @@ under its own control, and priorities between streams.
 - **The control stream.** Each node opens one unidirectional stream to its peer first, and writes
   on it every message except a chunk. Frames are as on the libp2p stream binding: a length, then
   the encoded message (§2.2). They go in the order the writer chooses them (`protocol-v2.md`
-  §4.12), each written whole. A node reads the peer's messages on the first unidirectional stream
-  the peer opened: stream 2 from the dialer, stream 3 from the listener (RFC 9000 §2.1). The
-  control stream stays open while the connection does: a node that sees it end or reset closes the
-  connection.
+  §4.12), each written whole. A node reads the peer's control messages on the first unidirectional
+  stream that the peer opened: stream 2 from the dialer, stream 3 from the listener (RFC 9000 §2.1).
+  The control stream stays open while the connection does: a node that sees it end or reset closes
+  the connection.
 - **A stream per chunk.** Each chunk goes on a unidirectional stream of its own. The stream carries
   the encoded message (§1.1) and ends after it, so it needs no length.
-- **The bound on a chunk stream.** A receiver reads at most its kind's bound (§1.4, with snappy's
-  worst case for the compressed kinds). A chunk stream longer than its bound, or one that ends
-  before a whole message, is a violation: it is penalised, and the connection closed.
+- **The bound on a chunk stream.** A receiver reads at most the bound of the chunk's kind (§1.4,
+  with snappy's worst case for the compressed kinds). A chunk stream longer than its bound, or one
+  that ends before a whole message, is a violation: the receiver penalises the peer and closes the
+  connection.
 - **Chunks before the JOIN.** A receiver reads a chunk stream's kind and group, and reads the rest
   only once it has read the peer's JOIN for the group's object type. Until then the stream waits
   unread, and QUIC's flow control holds the sender.
-- **The order.** Messages on the control stream arrive in the order written. A chunk stream is
-  ordered with nothing: a chunk can arrive before or after the control messages written after it.
+- **The order.** Messages on the control stream arrive in the order written. A chunk stream is not
+  ordered with any other stream: a chunk can arrive before or after the control messages written
+  after it.
 - **The writer and the transport.** A writer writes one chunk stream at a time, and starts the next
   when the last write has returned. This keeps `protocol.md` §7.3's rule (less than one chunk
   unsent per connection) as one stream per peer keeps it.
@@ -574,7 +578,7 @@ under its own control, and priorities between streams.
 ### 7.3 Cancel by reset
 
 - **A sender resets a chunk stream that has become useless.** When `filter_entry`
-  (`protocol-v2.md`) would drop a queued chunk because the peer has said it holds it (cancel,
+  (`protocol-v2.md` §4.6) would drop a queued chunk because the peer has said it holds it (cancel,
   `[c8]`), the sender resets the chunk's stream if the chunk is already written. QUIC then sends
   none of the stream's remaining bytes, and resends none of those lost (RFC 9000 §3.1, §13.3). An
   answer to the peer's probe is exempt, as it is from cancel.
@@ -600,22 +604,22 @@ This version sends no datagrams (RFC 9221). Two uses are considered:
 - **Holdings as datagrams.** A holding names every chunk the node holds of the group (`send_have`),
   so a later holding supersedes a lost one. The last holding of a group has no successor and would
   also go on the control stream.
-- **Payload chunks as datagrams,** where an encoded chunk fits the path's datagram room. A datagram
-  is never fragmented, so the room is the path's packet size less QUIC's overhead: about 1 160 to
-  1 410 bytes on the internet. A cell never fits (2 140 bytes). A payload chunk fits only with a
-  builder's unit far below the default, beyond `protocol.md`'s `MAX_CHUNKS`. A chunk pushed in a
-  datagram that is lost would count as a push that did not happen: offered to the peer when its
-  room times out (`window_timeout`).
+- **Payload chunks as datagrams,** where an encoded chunk fits in one. A datagram is never
+  fragmented, so the largest one a path carries is its packet size less QUIC's overhead: about
+  1 160 to 1 410 bytes on the internet. A cell never fits (2 140 bytes). A payload chunk fits only
+  with a builder's unit far below the default, beyond what `protocol.md`'s `MAX_CHUNKS` allows. A
+  chunk pushed in a datagram that is lost would count as a push that did not happen: the sender
+  would offer it to the peer when its room in the window times out (`window_timeout`).
 
 Datagrams count against the connection's congestion window like any data (RFC 9221 §5.4).
 
 ### 7.6 A fetch outside the links
 
 - **Its connection.** A node fetches a sample from a node of the known node set that is not a link
-  (`protocol-v2.md` §7, `[D12]`) over a native connection opened for the fetch, with the same ALPN
+  (`protocol-v2.md` §7, `[D12]`). It opens a native connection for the fetch, with the same ALPN
   and identity.
 - **Its messages.** The WANT goes on the control stream, and the answer comes on a chunk stream. On
-  a connection opened for a fetch a WANT is answered without a JOIN. The fetch's privacy rule and
+  a connection opened for a fetch, a WANT is answered without a JOIN. The fetch's privacy rule and
   the serving limits apply as `protocol-v2.md` §7 says.
 - **Its end.** The connection closes once the answer has come, or after the WANT's wait.
 - **The server's limits.** A server admits connections for fetches up to a limit of its own, and
@@ -641,27 +645,42 @@ And three new rows:
 - **Standard QUIC as it is** (RFC 9000, RFC 9001): ALPN, unidirectional streams, `RESET_STREAM` and
   `STOP_SENDING`, flow control and stream credit. §7.1 to §7.3 and §7.6 need nothing more.
 - **An implementation feature the standard allows:** priorities between streams (§7.4). quic-go
-  has them from v0.62.0. Without them the binding still works, with the implementation's own
-  sharing.
+  has them from v0.62.0. Without them the binding still works, and the implementation shares the
+  connection between streams in its own way.
 - **An optional standard extension:** datagrams (RFC 9221), for §7.5.
 - **No TCP form.** The libp2p stream binding over TCP stays the fallback.
 
-#### Rationale
+### 7.9 What is open
+
+This draft leaves these questions open:
+- beside libp2p or alone (§7.1);
+- which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written after
+  it;
+- how many chunk streams a receiver should grant: in the toy, more to one peer at once than
+  go-libp2p's defaults allow, in the custody and row settings;
+- how a node learns that a peer speaks this binding: by trying it, which costs a round trip when
+  refused, or by an ENR entry;
+- whether a reset should also follow projection (`[c12]`), with the chunk offered instead;
+- 0-RTT for the fetch, and what a replayed WANT costs a server;
+- whether the libp2p stream binding should offer a stream per chunk, under the conditions in the
+  Rationale below.
+
+### Rationale
 
 **Beside libp2p, or alone.** Beside libp2p (models 1 and 2), peer management, scoring and
 connection limits stay libp2p's, and the native connection only carries SEACAST's messages. The
 price is a second connection per peer, and so a second congestion controller. Against other
-traffic the two connections take more than one would. Between themselves they share the
-bottleneck without regard to what either carries. A node that runs the binding alone (model 3)
-has one connection per peer, but the binding must then define what libp2p gives the other models.
-Model 1 was drafted first; whether a node that speaks this binding also runs libp2p on the same
-port is not settled, and so the model is open.
+traffic, the two connections together take a larger share than one connection would. Between
+themselves they share the bottleneck without regard to what either carries. A node that runs the
+binding alone (model 3) has one connection per peer, but the binding must then define what libp2p
+gives the other models. The choice between the models stays open because it is not settled whether
+a node that speaks this binding also runs libp2p on the same port.
 
 **A stream per chunk.** A lost packet delays only its own chunk. On one stream per peer, every later
 chunk to that peer waits for QUIC to resend the lost packet. Cancel also reaches a chunk already
 written. In the toy, a stream per chunk recovered much of what packet loss costs one stream per
-peer, on every seed. The alternative is a stream per group and peer: fewer streams, with the wait
-behind a lost packet confined to the group's chunks.
+peer, on every seed. The alternative is a stream per group and peer, which needs fewer streams and
+confines the wait behind a lost packet to the group's chunks.
 
 **A stream per chunk on libp2p would keep most of the gain.** libp2p's streams on its QUIC
 connection are QUIC streams, and a reset of one is QUIC's reset. In the toy, a stream per chunk on
@@ -677,20 +696,21 @@ libp2p streams kept nearly all of the native binding's gain, under three conditi
   the chunk streams open at once to one peer often exceeded go-libp2p's defaults.
 
 **What the native binding adds over a stream per chunk on libp2p:**
-- no negotiation per chunk: 72 bytes of a cell's 2 140 under lazy negotiation;
+- no negotiation per chunk, where lazy negotiation takes 72 bytes of a cell's 2 140;
 - no dependence on identify;
 - stream credit under its own control (§7.1), rather than libp2p's resource manager and its
   transport's fixed limit per connection;
 - the fetch outside the links on a short connection of its own (§7.6).
 
-**The control stream first, where it costs nothing.** A holding or an ask written while a chunk is
-being sent then skips at most the rest of that chunk: about 2 ms per hop for a payload chunk at
-50 Mbps. In the toy, giving the control stream priority made no measurable difference, so the
-binding does not depend on it (§7.4).
+**The control stream first, where it costs nothing.** With the control stream first, a holding or an
+ask written while a chunk is being sent saves at most the rest of that chunk: about 2 ms per hop for
+a payload chunk at 50 Mbps. In the toy, giving the control stream priority made no measurable
+difference, so the binding does not depend on it (§7.4).
 
 **No datagrams for chunks, in this version.** A cell is larger than any datagram the internet
-carries. Payload chunks small enough would be eight to twelve times as many. With a proof in each,
-a third of every datagram would be header and proof. A small-chunk mode would need two changes:
+carries. Payload chunks small enough to fit would be eight to twelve times as many as with the
+default unit. With a proof in each, a third of every datagram would be header and proof. A
+small-chunk mode would need two changes:
 - the group's hashes sent once per group, in place of a proof per chunk;
 - holdings sent less often than one per chunk claimed, since each names the whole bitmap.
 
@@ -700,19 +720,7 @@ with both changes.
 **SEACAST's datagrams on the libp2p connection** were the alternative to a second connection.
 go-libp2p negotiates datagrams on its QUIC connections and can hand out the QUIC connection, so a
 client could send holdings as datagrams there. That is a convention outside libp2p's
-specifications, and it does not reach priorities between streams.
-
-**Open:**
-- beside libp2p or alone (§7.1);
-- which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written after
-  it;
-- how many chunk streams a receiver should grant: in the toy, more to one peer at once than
-  go-libp2p's defaults allow, in the custody and row settings;
-- how a node learns that a peer speaks this binding: by trying it, which costs a round trip when
-  refused, or by an ENR entry;
-- whether a reset should also follow projection (`[c12]`), with the chunk offered instead;
-- 0-RTT for the fetch, and what a replayed WANT costs a server;
-- whether the libp2p stream binding should offer a stream per chunk, under the conditions above.
+specifications, and it does not give priorities between streams.
 
 ## 8. A fetch outside the links: its transports
 
