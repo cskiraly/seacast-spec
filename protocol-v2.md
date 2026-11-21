@@ -1066,16 +1066,18 @@ have arrived (§4.7). `merge_waiting(p, h)` is the binding's, used only where th
 (`MERGE_HOLDINGS`, §6.3, permitted): if a holding of `h.group` to `p` is still in our queue, it now
 names its own bits and `h`'s, with `h`'s claims, and the call returns True.
 
-**A second copy of a received index goes no further,** axis by axis. A copy under an id the node
-has seen is acknowledged if that id was stored (`on_chunk`). One under an id it has not seen goes
+**A second copy of a received index goes no further,** axis by axis. A copy under an id the node has
+seen is acknowledged if that id was stored (`on_chunk`). One under an id it has not seen goes
 through level 1; where it passes, on an axis whose index the node has already received it is
 acknowledged there (`fill`, which also answers a waiting probe) and not forwarded there, as
 `protocol.md` §4.2 does with "a second copy of an index under another id". `on_validated` forwards
 only on the live axes, with duty `FORWARD`, whose index it had not received before the copy, and the
 copy is kept for heartbeat gossip only if it is forwarded on some axis. An index held only as
 rebuilt, or one the node published, is not received, so a copy of it is forwarded. A network arrival
-sets every live axis received at once, so an axis left without the index beside one that has it
-received is one expired or dropped at that arrival, which `on_validated` does not act on.
+sets every live axis received at once, but for an axis that already held the index as rebuilt: there
+`fill` acknowledges the copy and leaves the axis as it was, and `on_validated` still forwards on it.
+Any other axis left without the index beside one that has it received is one expired or dropped at
+that arrival, which `on_validated` does not act on.
 
 The gate is the object type's. For the payload, it is the installed block (its descriptor comes
 from the bid; `validate_chunk` returns DEFER before it); for cells, it is a validated header, which
@@ -1402,17 +1404,17 @@ def may_be_asked(p, g, i, routed=False) -> bool:       # (P7) scoring reads inte
 ```
 
 **A node serves what it holds**, received or rebuilt, to anyone who asks, within the serving limit
-per peer and group `[R6]`, whatever the asker's duty. An ask may go to a peer that offered the
-index or whose derived interest includes it (a custodian can be asked without offering, PeerDAS's
-"knows exactly what a peer should be able to respond to"); an ask outside both is a violation,
-unless it is a routed request and goes to a peer with duty `FORWARD` (below). A promise is made by
-an offer, and a broken one parks the peer for the group (`protocol.md` §6.1). A `DECLARED` peer's
-WANT is also its interest: `want_p[p][g]` is set from it before the asks are answered, and what the
-peer does not hold yet is kept as a standing request (§4.10), which is why derived interest makes
-no promise with a timer: the custodian answers when it can. A standing request is answered when the
-chunk is stored, received or rebuilt (`serve_standing`, from `fill` and `decode_group`). Standing
-requests live with the group's state (`GROUP_TTL`) and count against the serving limit when
-answered.
+per peer and group `[R6]`, whatever the asker's duty. An ask may go to a peer that offered the index
+or whose derived interest includes it (a custodian can be asked without offering, PeerDAS's "knows
+exactly what a peer should be able to respond to"); an ask outside both is a violation, unless it is
+a routed request and goes to a peer with duty `FORWARD` (below). A promise is made by an offer, and
+a broken one parks the peer for the group (`protocol.md` §6.1). A `DECLARED` peer's WANT is also its
+interest: `want_p[p][g]` is set from it before the asks are answered, and what the peer does not
+hold yet is kept as a standing request (§4.10). An ask by derived interest makes no promise with a
+timer either: an ask sent as a WANT starts none, a claim's probe apart (`filter_entry`, §4.6), and
+the custodian answers when it can. A standing request is answered when the chunk is stored, received
+or rebuilt (`serve_standing`, from `fill` and `decode_group`). Standing requests live with the
+group's state (`GROUP_TTL`) and count against the serving limit when answered.
 
 **A routed sample request** (a WANT with `hops` above zero, §4.10) may also go to a peer with duty
 `FORWARD` that neither offered the index nor custodies it `[D12]`. That peer answers it from what it
