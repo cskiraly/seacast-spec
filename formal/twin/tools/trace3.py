@@ -510,11 +510,16 @@ class Tracer3(Tracer):
         self.bare = Counter()
         # under v2, the toy's functions a namespace may hold: those the scan of its bindings names (scan_bindings.py),
         # by file, first line and qualified name; checked at each install (unscanned_check)
-        self.scanned = None
-        if self.doc_v2:
+        self.scanned, self.aliases = None, None     # by slot: the functions the scan binds there, and the slots
+        if self.doc_v2:                             #   it holds the value of (chunk_id = ns["message_id"])
             import scan_bindings                # noqa: E402: this directory's
-            self.scanned = {(r["value"]["file"], r["value"]["line"], r["value"]["qual"])
-                            for r in scan_bindings.scan(self.toy).rows if isinstance(r["value"], dict)}
+            self.scanned, self.aliases = {}, {}
+            for r in scan_bindings.scan(self.toy).rows:
+                if isinstance(r["value"], dict):
+                    self.scanned.setdefault(r["name"], set()).add(
+                        (r["value"]["file"], r["value"]["line"], r["value"]["qual"]))
+                if r.get("alias_of"):
+                    self.aliases.setdefault(r["name"], set()).add(r["alias_of"])
         # the toy's command line (cli: this script's own main) is read as the toy's parser reads it (toy_args); a
         # directed set's arguments are no command line of the toy's, and are read by their words
         if (toy_reads_a_dump(argv) if cli else any(a.split("=")[0] in ("--xcheck", "--topology") for a in argv)):
@@ -733,9 +738,10 @@ class Tracer3(Tracer):
 
     def unscanned_check(self, nd, ns):
         """Under v2, at the install: every namespace name bound to a function of the toy's (its code in the toy's
-        directory; a bound method by its function) is one the scan of the toy's bindings names. One it does not name
-        was bound by a form the scan does not read, and nothing classes it. The documents' functions, the tracer's and
-        a fixture's (in this directory) are not the toy's."""
+        directory; a bound method by its function) is one the scan of the toy's bindings binds in that slot, or in a
+        slot that slot is an alias of (`chunk_id = ns["message_id"]`). One it does not name there was bound by a form
+        the scan does not read, or moved to another slot, and nothing classes it. The documents' functions, the
+        tracer's and a fixture's (in this directory) are not the toy's."""
         for name, v in ns.items():
             fn = getattr(v, "__func__", v)
             code = getattr(fn, "__code__", None)
@@ -744,7 +750,7 @@ class Tracer3(Tracer):
                     or Path(code.co_filename).resolve().parent != self.toy):  #   directory, the working one)
                 continue
             key = (Path(code.co_filename).name, code.co_firstlineno, getattr(fn, "__qualname__", "?"))
-            if key not in self.scanned:
+            if not any(key in self.scanned.get(s, ()) for s in {name} | self.aliases.get(name, set())):
                 raise SystemExit(f"trace3: node {nd.id}: {name} is bound to a function of the toy's that the scan of "
                                  f"its bindings does not name: {key[2]} ({key[0]}:{key[1]})")
 

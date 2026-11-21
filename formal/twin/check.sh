@@ -27,9 +27,10 @@
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders,
-#             keptcopy.py's, labcites.py's and scan_bindings.py's); and no line of the twin's sources (the build's copy), of its
-#             tools or of the prose beside them (every *.md but out/'s and record/'s) cites the notes beside
-#             which they were developed (labcites.py), a citation planted in README.md's copy reported
+#             keptcopy.py's, labcites.py's and scan_bindings.py's); and no line of the twin's sources (the
+#             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
+#             cites the notes beside which they were developed (labcites.py), a citation planted in
+#             README.md's copy reported
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
 #             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
 #             (footprint_test.py)
@@ -337,6 +338,14 @@ EOF_SELF
      && head -n 1 "$lc/labcites.txt" | grep -q -F -e "$lc/README.md:$n: "; then
     echo "  control, a lab citation planted in README.md's copy: reported, as it must be"
   else no "the guard did not report a lab citation planted in README.md's copy ($lc/labcites.txt)"; fi
+  # the scan's lists beside trace3.py's hand-kept ones: exactly the one known difference, the observer the
+  # peer-promise mode binds over close_promises (not listed: that mode is refused under v2 today)
+  $PY "$T/scan_bindings.py" "$TOY" --lists > "$OUT/scan-lists.txt" 2>&1
+  if [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 1 ] \
+      && has -x "observer close_promises Node._peer_promise.<locals>.close_promises: NOT in WRAPPERS" "$OUT/scan-lists.txt" \
+      && has -x "1 differences from trace3.py's lists" "$OUT/scan-lists.txt"; then
+    echo "  the scan's lists: trace3.py's, but the one known observer (scan-lists.txt)"
+  else no "the scan's lists differ from trace3.py's otherwise than by the one known observer (scan-lists.txt)"; fi
 }
 s_tables() {
   { $PY "$T/gen/gen.py" --check "$OUT/twin" && $PY "$T/gen/makers.py" --check "$OUT/twin"; } > "$OUT/tables.txt" 2>&1 \
@@ -753,8 +762,9 @@ s_tracercontrols() {
   else no "the tracer stopped on an unlogged assignment for another reason (c-unlogged.err)"; fi
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2; do
     case $f in
+      rebound-scanned-v2) want="^trace3: node [0-9]*: popcount_again is bound to a function of the toy's that the scan of its bindings does not name: popcount \(bits\.py:[0-9]*\)" ;;
       other-node-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes is called while node [0-9]*'s record is open and no question runs" ;;
       raw-chunk-id-v2) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
       hdr-other-v2) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
@@ -786,8 +796,8 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 24 ] || no "not 24 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 24 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 25 ] || no "not 25 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 25 planted faults stop the tracer with their own words"
   # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)

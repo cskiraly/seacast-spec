@@ -18,15 +18,25 @@ one imported from another of the toy's modules (`from bits import popcount`, `wi
 method of the enclosing class (`self.m`, `node.m`).
 
 Each function bound has a class:
-- **observer**: it holds the earlier binding of its name (a closure variable assigned from `ns[name]` before it)
-  and passes the observer test: its code names no question (CALLS) and no traced function but the earlier binding,
-  assigns, deletes or mutates no table nor rebinds a namespace name (following the local functions and node methods
-  it calls), and calls the earlier binding once on every path with its own parameters, returning its result, or
-  nothing where the document's function returns nothing. `message_id`'s cache is an observer by name (it skips the
-  call on a hit).
+- **observer**: it holds the earlier binding of its name (a closure variable assigned from `ns[name]` before it, or
+  a node attribute so assigned, `self._doc_x = ns["x"]`) and passes the observer test: its code names no question
+  (trace3.py's TAPE, and protocol-v2.md's: the names its functions call that no document defines and that the toy
+  binds under v2 alone) and no traced function but the earlier binding; it assigns, deletes or mutates no table,
+  through its own aliases too, following the local functions and node methods it calls with the tables it hands
+  them, and hands no table to a call the test cannot follow; it rebinds no namespace name (a scalar too: a layer
+  that changes a node constant around the call, as the peer promise's `filter_entry` sets PROMISE, is a changing
+  layer); and it calls the earlier binding once on every path (branches, `try`, `with`, loops walked),
+  with its own parameters unchanged and nothing more, returning its result, or nothing where the document's
+  function returns nothing (a least fixpoint over both documents: `return f(...)` of a function that returns nothing
+  returns nothing). `message_id`'s cache is an observer by name (it skips the call on a hit).
 - **layer**: it holds the earlier binding and fails the test (the reason is given);
+- **closure-dependent**: its first statement branches on a value the node is made with (no parameter of its own,
+  no state): its class per branch is given (`owed_missing`'s `--member-check`: `not on`, own; else, observer), and
+  the node's own value is read where classes are first read;
 - **own**: any other function (a lambda included);
-- **value**: anything else (a table, a constant, a class, an expression).
+- **value**: anything else (a table, a constant, a class, an expression); a name that holds another slot's value
+  (`chunk_id = ns["message_id"]`) is marked as its alias.
+Each clause of the test can be switched off (`scan(…, off=…)`), so that the self-test shows each one doing its part.
 A binding in a method that `Node.__init__` calls only under `if self.v2` (and in what such a method calls), or inside
 such a branch of `__init__`, is marked v2-only: under protocol.md it never runs.
 """
@@ -104,9 +114,12 @@ def params_of(fn):
 
 
 class Scanner:
-    def __init__(self, skip=()):
+    def __init__(self, skip=(), off=()):
         self.skip = set(skip)       # forms whose reader is off (the self-test's control)
+        self.off = set(off)         # clauses of the observer test that are off (the self-test's control)
         self.rows, self.funcs, self.methods = [], [], {}
+        self.attr_captures = {}     # (file, attribute) -> the namespace name a node attribute was assigned from
+        self.traced = TRACED
         self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
         self.imports = {}           # (file, local name) -> (module file, name), or (module file, None) for a module
 
@@ -116,6 +129,16 @@ class Scanner:
         tree = ast.parse(src)
         mod = Scope(tree, "", None)
         toy = {p.name for p in path.parent.glob("*.py")}
+        for n in ast.walk(tree):            # node attributes assigned from the namespace (self._doc_x = ns["x"])
+            if isinstance(n, ast.Assign):
+                for t in n.targets:
+                    pairs = (list(zip(t.elts, n.value.elts)) if isinstance(t, ast.Tuple) and isinstance(n.value, ast.Tuple)
+                             and len(t.elts) == len(n.value.elts) else [(t, n.value)])
+                    for tt, vv in pairs:
+                        if (isinstance(tt, ast.Attribute) and isinstance(tt.value, ast.Name)
+                                and tt.value.id in ("self", "node") and isinstance(vv, ast.Subscript)
+                                and is_ns(vv.value) and ns_key(vv)):
+                            self.attr_captures[(path.name, tt.attr)] = ns_key(vv)
         for st in tree.body:
             if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 self.globals[(path.name, st.name)] = Func(st, st.name, mod, src, path)
@@ -184,7 +207,7 @@ class Scanner:
             else:                       # a class made inside a function: a local (callable, so a locals() export)
                 qual = f"{scope.qual}.<locals>.{st.name}"
                 scope.funcs[st.name] = None
-                scope.order.append((i, st.name))
+                scope.order.append((st.lineno, st.name))
             self.body(st.body, Scope(st, qual, scope), cls=st.name)
             return
         if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -198,7 +221,7 @@ class Scanner:
             self.funcs.append(f)
             if not isinstance(scope.node, (ast.Module, ast.ClassDef)):
                 scope.funcs[st.name] = f
-                scope.order.append((i, st.name))
+                scope.order.append((st.lineno, st.name))
             inner = Scope(st, qual, scope)
             self.body(st.body, inner, cls=None)
             return
@@ -242,7 +265,9 @@ class Scanner:
             if kw.arg is not None and "update-keyword" not in self.skip:
                 self.row(call, "update-keyword", kw.arg, kw.value, scope)
         for a in call.args:
-            if isinstance(a, ast.Dict) and "update-dict" not in self.skip:
+            if isinstance(a, ast.Dict):     # a dict's keys read here alone (its reader off: no row of it at all)
+                if "update-dict" in self.skip:
+                    continue
                 for k, v in zip(a.keys, a.values):
                     if isinstance(k, ast.Constant) and isinstance(k.value, str):
                         self.row(call, "update-dict", k.value, v, scope)
@@ -277,10 +302,9 @@ class Scanner:
                 if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr == "startswith"
                         and n.args and isinstance(n.args[0], ast.Constant) and n.args[0].value == "_"):
                     no_underscore = True
-        here = next((i for i, s in enumerate(scope.node.body) if s is st or any(x is st for x in ast.walk(s))), None)
-        out = []
-        for i, name in scope.order:
-            if here is not None and i >= here:
+        out = []                        # every local made before the statement (by line): a def, a class, a
+        for ln, name in scope.order:    #   lambda, or any name assigned (an alias as chunk_id, a class as Ask)
+            if ln >= st.lineno or name in out:
                 continue
             if name in excluded or (no_underscore and name.startswith("_")):
                 continue
@@ -295,14 +319,22 @@ class Scanner:
                 pairs = list(zip(t.elts, value.elts))
             for tt, vv in pairs:
                 if isinstance(tt, ast.Name):
+                    scope.order.append((st.lineno, tt.id))     # for a locals() export
                     if isinstance(vv, ast.Subscript) and is_ns(vv.value) and ns_key(vv):
                         scope.captures[tt.id] = ns_key(vv)
+                    elif (isinstance(vv, ast.Attribute) and isinstance(vv.value, ast.Name)
+                          and vv.value.id in ("self", "node") and (self.path.name, vv.attr) in self.attr_captures):
+                        scope.captures[tt.id] = self.attr_captures[(self.path.name, vv.attr)]   # x = self._doc_x
                     if isinstance(vv, ast.Lambda):
                         scope.funcs[tt.id] = Func(vv, f"{scope.qual}.<locals>.<lambda>", scope, self.src, self.path)
-                        scope.order.append((i, tt.id))
+                    elif isinstance(vv, (ast.Name, ast.Attribute)) and self.resolve(vv, scope) is not None:
+                        scope.funcs[tt.id] = self.resolve(vv, scope)    # another name of a function (x = topic_peers)
                     if ((isinstance(vv, ast.Call) and isinstance(vv.func, ast.Name) and vv.func.id == "Obj")
                             or (isinstance(vv, ast.Attribute) and vv.attr == "params")):
                         scope.params_objs.add(tt.id)
+                elif (isinstance(tt, ast.Attribute) and isinstance(tt.value, ast.Name) and tt.value.id in ("self", "node")
+                      and isinstance(vv, ast.Subscript) and is_ns(vv.value) and ns_key(vv)):
+                    self.attr_captures[(self.path.name, tt.attr)] = ns_key(vv)   # self._doc_x = ns["x"]
         # the bindings: the namespace's own making (ns = {...}), then the targets
         if "namespace-literal" not in self.skip and isinstance(value, ast.Dict):
             for t in targets:
@@ -342,18 +374,23 @@ class Scanner:
         if fn is None:
             r["value"] = ast.unparse(value)[:80] if value is not None else None
             r["class"] = "value"
+            if isinstance(value, ast.Name) and scope.lookup(value.id, "captures"):     # x = ns["y"]; ns["z"] = x
+                r["alias_of"] = scope.lookup(value.id, "captures")
         else:
             r["value"] = {"qual": fn.qual, "file": fn.path.name, "line": fn.line, "sha256": fn.sha}
-            self.traced = TRACED_V2 if r["v2_only"] else TRACED     # the traced names where the binding runs
             held = self.held(fn, name)
             if held is None:
                 r["class"] = "own"
             else:
                 r["holds"] = held
-                why = self.observer_test(fn, name, held)
-                r["class"] = "observer" if why is None else "layer"
-                if why:
-                    r["why"] = why
+                split = self.closure_split(fn, name, held, r["v2_only"])
+                if split is not None:       # its class per branch on a closure value (the node's, read later)
+                    r["class"], r["closure"] = "closure-dependent", split
+                else:
+                    why = self.observer_test(fn, name, held, r["v2_only"])
+                    r["class"] = "observer" if why is None else "layer"
+                    if why:
+                        r["why"] = why
         self.rows.append(r)
 
     def in_v2(self, scope, line):
@@ -402,30 +439,72 @@ class Scanner:
         return closure(v2) - closure(outside), lines     # reached outside every v2 branch too: not v2-only
 
     # -- the observer test ------------------------------------------------------------------------------------
+    # the observer test, clause by clause; each clause can be switched off (`self.off`), for the self-test's controls
+    CLAUSES = ("question", "traced", "assign", "delete", "mutate", "unfollowed", "local-fn", "node-method", "twice",
+               "branch", "arguments", "result", "by-name")
+
+    def is_held(self, n, held):
+        return isinstance(n, ast.Call) and ast.unparse(n.func) == held
+
     def held(self, fn, name):
-        """The closure variable holding the earlier binding of `name`, if the function's code calls one."""
+        """The earlier binding of `name` the function calls, as its call's text: a closure variable assigned from
+        `ns[name]` before it, or a node attribute so assigned (`self._doc_push_rebuilt = ns["push_rebuilt"]`)."""
         for n in ast.walk(fn.node):
             if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
                 if fn.scope.lookup(n.func.id, "captures") == name:
                     return n.func.id
+            if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
+                    and n.func.value.id in ("self", "node")
+                    and self.attr_captures.get((self.path.name, n.func.attr)) == name):
+                return ast.unparse(n.func)
         return None
 
-    def observer_test(self, fn, name, held):
-        if name in BY_NAME:
+    def own_scope(self, node, qual, parent, tables=()):
+        """A function's own scope for the test: its parameters shadow the enclosing captures, except those named in
+        `tables` (a followed callee's parameters given a table); its local aliases of a table are captures too."""
+        s = Scope(node, qual, parent)
+        if not isinstance(node, ast.Lambda):
+            pos, kwo, var, kw = params_of(node)
+            for p in pos + kwo + [x.arg for x in (var, kw) if x is not None]:
+                s.captures[p] = "<table>" if p in tables else None
+        for n in self.walk_no_nested(node):
+            if isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name):
+                v, t = n.value, n.targets[0].id
+                if isinstance(v, ast.Subscript) and is_ns(v.value) and ns_key(v):
+                    s.captures[t] = ns_key(v)
+                elif isinstance(v, ast.Name) and s.lookup(v.id, "captures") not in (None,):
+                    s.captures[t] = s.lookup(v.id, "captures")
+        return s
+
+    def observer_test(self, fn, name, held, v2_only):
+        """None for an observer, or why it is not one."""
+        if name in BY_NAME and "by-name" not in self.off:
             return None
-        why = self.names_and_writes(fn.node, fn.scope, name, held, seen=set())
-        return why or self.calls_once(fn, name, held)
+        self.traced = TRACED_V2 if v2_only else TRACED
+        defs_first = (DEFS_V2, RETURNS_V2) if v2_only else (DEFS_DOC, RETURNS_DOC)
+        defs_other = (DEFS_DOC, RETURNS_DOC) if v2_only else (DEFS_V2, RETURNS_V2)
+        self.returns = defs_first[1] if name in defs_first[0] else defs_other[1]
+        own = self.own_scope(fn.node, fn.qual, fn.scope)
+        return self.names_and_writes(fn.node, own, name, held, set()) or self.paths(fn.node, own, name, held)
+
+    def table_arg(self, call, scope):
+        return next((a for a in list(call.args) + [k.value for k in call.keywords]
+                     if self.ns_rooted(a, scope, bare=True)), None)
 
     def names_and_writes(self, node, scope, name, held, seen):
-        for n in ast.walk(node):
+        """Why the code names a question or a traced function, or writes, deletes or mutates a table, following the
+        local functions and node methods it calls (with the tables it hands them); or None."""
+        for n in self.walk_no_nested(node):
+            k = None
             if isinstance(n, ast.Subscript) and is_ns(n.value):
                 k = ns_key(n)
-                if k is not None and k != name and (k in QUESTIONS or k in self.traced):
-                    return f"names {'the question' if k in QUESTIONS else 'the traced function'} {k}"
-            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id != held:
+            elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id != held:
                 k = scope.lookup(n.id, "captures")
-                if k is not None and k != name and (k in QUESTIONS or k in self.traced):
-                    return f"names {'the question' if k in QUESTIONS else 'the traced function'} {k} (as {n.id})"
+            if k is not None and k != name:
+                if k in QUESTIONS and "question" not in self.off:
+                    return f"names the question {k}"
+                if k in self.traced and "traced" not in self.off:
+                    return f"names the traced function {k}"
             targets = []
             if isinstance(n, (ast.Assign, ast.Delete)):
                 targets = n.targets
@@ -433,32 +512,53 @@ class Scanner:
                 targets = [n.target]
             for t in targets:
                 for tt in (t.elts if isinstance(t, ast.Tuple) else [t]):
-                    if self.ns_rooted(tt, scope):
-                        return f"writes {ast.unparse(tt)[:60]}"
-            if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS:
+                    clause = "delete" if isinstance(n, ast.Delete) else "assign"
+                    if clause not in self.off and self.ns_rooted(tt, scope):
+                        return f"{'deletes' if clause == 'delete' else 'writes'} {ast.unparse(tt)[:60]}"
+            if not isinstance(n, ast.Call):
+                continue
+            if isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS and "mutate" not in self.off:
                 if self.ns_rooted(n.func.value, scope, bare=True):
                     return f"mutates {ast.unparse(n.func.value)[:60]} by {n.func.attr}"
-            # following the local functions and node methods it calls
-            if isinstance(n, ast.Call):
-                callee = None
-                if isinstance(n.func, ast.Name):
-                    callee = scope.lookup(n.func.id, "funcs")
-                    callee = (callee.node, callee.scope) if callee is not None and not isinstance(callee.node, ast.Lambda) else None
-                elif (isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
-                      and n.func.value.id in ("self", "node")):
-                    m = self.methods.get((self.path.name, "Node", n.func.attr))
-                    callee = (m, Scope(m, f"Node.{n.func.attr}", None)) if m is not None else None
-                if callee is not None and id(callee[0]) not in seen:
-                    seen.add(id(callee[0]))
-                    why = self.names_and_writes(callee[0], callee[1], name, held, seen)
-                    if why:
-                        return f"{why}, in {getattr(callee[0], 'name', '?')}"
+            if self.is_held(n, held):
+                continue
+            callee, clause = None, None
+            if isinstance(n.func, ast.Name):
+                f = scope.lookup(n.func.id, "funcs")
+                if f is not None and not isinstance(f.node, ast.Lambda):
+                    callee, clause = (f.node, f.scope, f.qual), "local-fn"
+                elif f is None and (n.func.id in BUILTIN_NAMES or scope.lookup(n.func.id, "captures") is not None):
+                    continue            # a builtin, or a namespace function (named, and so checked, above)
+            elif (isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
+                  and n.func.value.id in ("self", "node")):
+                m = self.methods.get((self.path.name, "Node", n.func.attr))
+                if m is not None:
+                    callee, clause = (m, None, f"Node.{n.func.attr}"), "node-method"
+            elif isinstance(n.func, ast.Attribute):
+                continue                # a method of a value (a table's handled above)
+            if callee is not None:
+                if clause in self.off:
+                    continue
+                tables = {p for p, a in zip(params_of(callee[0])[0], n.args) if self.ns_rooted(a, scope, bare=True)}
+                tables |= {kw.arg for kw in n.keywords if kw.arg and self.ns_rooted(kw.value, scope, bare=True)}
+                key = (id(callee[0]), frozenset(tables))
+                if key in seen:
+                    continue
+                seen.add(key)
+                inner = self.own_scope(callee[0], callee[2], callee[1], tables)
+                why = self.names_and_writes(callee[0], inner, name, held, seen)
+                if why:
+                    return f"{why}, in {getattr(callee[0], 'name', '?')}"
+            elif "unfollowed" not in self.off:
+                a = self.table_arg(n, scope)
+                if a is not None:
+                    return f"hands {ast.unparse(a)[:40]} to {ast.unparse(n.func)[:40]}, which the test does not follow"
         return None
 
     def ns_rooted(self, e, scope, bare=False):
         """Whether an expression reaches into a namespace name: `ns[...]` itself or anything under it, or anything
-        under a closure variable assigned from `ns[...]` that is no function (a captured table). With `bare`, the
-        captured variable itself counts too (the receiver of a mutating method)."""
+        under a variable that holds a table (captured from `ns[...]`, aliased, or a followed callee's parameter given
+        one). With `bare`, the variable itself counts too (a method's receiver, a call's argument)."""
         top = e
         while isinstance(e, (ast.Subscript, ast.Attribute)):
             if isinstance(e, ast.Subscript) and is_ns(e.value):
@@ -466,60 +566,156 @@ class Scanner:
             e = e.value
         if isinstance(e, ast.Name) and (bare or e is not top):
             k = scope.lookup(e.id, "captures")
-            return k is not None and k not in QUESTIONS | TRACED | CALLABLES
-        return False
+            return k is not None and k not in QUESTIONS | self.traced | CALLABLES
+        return bare and isinstance(top, ast.Subscript) and is_ns(top.value)
 
-    def calls_once(self, fn, name, held):
-        node = fn.node
-        if isinstance(node, ast.Lambda):
-            body = [ast.Return(value=node.body)]
-        else:
-            body = node.body
-        sites = [n for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id == held]
-        if len(sites) != 1:
-            return f"calls {held} {len(sites)} times"
-        call = sites[0]
-        pos, kwo, var, kw = params_of(node)     # each own parameter passed once, by position or as `k=k`
+    def args_ok(self, call, node, params):
+        """Why the earlier binding's call does not pass the function's own parameters exactly, or None."""
+        pos, kwo, var, kw = params_of(node)
         given = [a.id if isinstance(a, ast.Name) else None for a in call.args if not isinstance(a, ast.Starred)]
-        named = [k.arg for k in call.keywords if k.arg is not None
-                 and isinstance(k.value, ast.Name) and k.value.id == k.arg]
-        args_ok = (given == pos[:len(given)] and len(named) == len([k for k in call.keywords if k.arg is not None])
-                   and sorted(given + named) == sorted(pos + kwo))
-        if var is not None:
-            args_ok = args_ok and any(isinstance(a, ast.Starred) and isinstance(a.value, ast.Name)
-                                      and a.value.id == var.arg for a in call.args)
-        if kw is not None:
-            args_ok = args_ok and any(k.arg is None and isinstance(k.value, ast.Name) and k.value.id == kw.arg
-                                      for k in call.keywords)
-        if not args_ok:
-            return f"calls {held} with other arguments than its own: {ast.unparse(call)[:60]}"
-        top = self.top_statement(body, call)
-        if top is None:
-            return f"calls {held} on some paths only"
-        idx, path = top
-        for st in body[:idx]:
-            if any(isinstance(n, (ast.Return, ast.Raise)) for n in ast.walk(st)):
-                return f"returns or raises before it calls {held}"
-        stmt = path[-1]
-        returns = [n for st in body for n in self.walk_no_nested(st) if isinstance(n, ast.Return) and n.value is not None]
-        if isinstance(stmt, ast.Return) and stmt.value is call:
-            return None
-        if isinstance(stmt, ast.Assign) and stmt.value is call and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
-            r = stmt.targets[0].id
-            later = body[idx + 1:]
-            if any(isinstance(n, ast.Name) and n.id == r and isinstance(n.ctx, ast.Store)
-                   for st in later for n in ast.walk(st)):
-                return f"changes {held}'s result before it returns it"
-            if returns and all(isinstance(x.value, ast.Name) and x.value.id == r for x in returns):
-                return None
-            if not returns and not self.doc_returns(name):
-                return None
-            return f"does not return {held}'s result"
-        if isinstance(stmt, ast.Expr) and stmt.value is call:
-            if not returns and not self.doc_returns(name):
-                return None
-            return f"drops {held}'s result" if self.doc_returns(name) else f"returns a value of its own"
-        return f"calls {held} inside {type(stmt).__name__}"
+        stars = [a for a in call.args if isinstance(a, ast.Starred)]
+        named = [k for k in call.keywords if k.arg is not None]
+        dstar = [k for k in call.keywords if k.arg is None]
+        ok = (given == pos[:len(given)]
+              and all(isinstance(k.value, ast.Name) and k.value.id == k.arg for k in named)
+              and sorted(given + [k.arg for k in named]) == sorted(pos + kwo)
+              and len(stars) == (var is not None) and all(isinstance(s.value, ast.Name) and s.value.id == var.arg
+                                                          for s in stars)
+              and len(dstar) == (kw is not None) and all(isinstance(d.value, ast.Name) and d.value.id == kw.arg
+                                                         for d in dstar))
+        return None if ok else f"calls it with other arguments than its own: {ast.unparse(call)[:60]}"
+
+    def paths(self, node, scope, name, held):
+        """Why the earlier binding is not called once on every path with the function's own parameters, its result
+        returned (or nothing returned where the document's function returns nothing), or None."""
+        body = [ast.Return(value=node.body)] if isinstance(node, ast.Lambda) else node.body
+        pos, kwo, var, kw = params_of(node)
+        params = set(pos + kwo + [x.arg for x in (var, kw) if x is not None])
+        if "arguments" not in self.off:
+            for c in [n for n in ast.walk(node) if self.is_held(n, held)]:
+                why = self.args_ok(c, node, params)
+                if why:
+                    return why
+        st = {"count": 0, "res": None, "assigned": set()}
+        why, ended = self.walk(body, st, held, params, name in self.returns)
+        if why:
+            return why
+        if not ended:
+            if st["count"] == 0 and "branch" not in self.off:
+                return f"calls {held} on some paths only"
+            if st["count"] > 1 and "twice" not in self.off:
+                return f"calls {held} {st['count']} times on a path"
+            if name in self.returns and "result" not in self.off and st["count"]:    # a path with no call has no
+                                                                                    #   result to drop (the branch's)
+                return f"drops {held}'s result"
+        return None
+
+    def calls_in(self, node, st, held, params):
+        """Count the earlier binding's calls a statement or expression makes on every path through it; why, if one is
+        made on some paths only, a second time, or after a parameter is rebound."""
+        always = set(id(n) for n in self.own_exprs(node)) if isinstance(node, ast.stmt) else set(
+            id(n) for n in self.every_path(node))
+        for n in ast.walk(node):
+            if not self.is_held(n, held):
+                continue
+            if id(n) not in always and "branch" not in self.off:
+                return f"calls {held} on some paths only"
+            if st["count"] and "twice" not in self.off:
+                return f"calls {held} twice"
+            if st["assigned"] & params and "arguments" not in self.off:
+                return f"rebinds its parameter {sorted(st['assigned'] & params)[0]} before it calls {held}"
+            st["count"] += 1
+        return None
+
+    def note_assigns(self, s, st):
+        for n in self.walk_no_nested(s):
+            if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store):
+                st["assigned"].add(n.id)
+
+    def walk(self, stmts, st, held, params, rv):
+        """Walk a statement list on every path; (why, whether every path through it has returned)."""
+        for s in stmts:
+            if isinstance(s, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                continue
+            if isinstance(s, ast.If):
+                why = self.calls_in(s.test, st, held, params)
+                if why:
+                    return why, False
+                a = {"count": st["count"], "res": st["res"], "assigned": set(st["assigned"])}
+                b = {"count": st["count"], "res": st["res"], "assigned": set(st["assigned"])}
+                wa, ea = self.walk(s.body, a, held, params, rv)
+                if wa:
+                    return wa, False
+                wb, eb = self.walk(s.orelse, b, held, params, rv)
+                if wb:
+                    return wb, False
+                if ea and eb:
+                    return None, True
+                live = [x for x, e in ((a, ea), (b, eb)) if not e]
+                if len({x["count"] for x in live}) > 1 and "branch" not in self.off:
+                    return f"calls {held} on some paths only", False
+                st.update(count=live[0]["count"], res=live[0]["res"],
+                          assigned=set().union(*(x["assigned"] for x in live)))
+                continue
+            if isinstance(s, (ast.For, ast.AsyncFor, ast.While)):
+                if any(self.is_held(n, held) for n in ast.walk(s)) and "branch" not in self.off:
+                    return f"calls {held} in a loop", False
+                if any(isinstance(n, (ast.Return, ast.Raise)) for n in self.walk_no_nested(s)):
+                    return "returns or raises inside a loop", False
+                self.note_assigns(s, st)
+                continue
+            if isinstance(s, ast.Try):
+                if s.handlers and any(self.is_held(n, held) for b in s.body for n in ast.walk(b)):
+                    return f"calls {held} inside a try with handlers", False
+                if any(self.is_held(n, held) or isinstance(n, (ast.Return, ast.Raise))
+                       for b in s.finalbody for n in self.walk_no_nested(b)):
+                    return "calls, returns or raises in a finally", False
+                if any(isinstance(n, (ast.Return, ast.Raise)) for h in s.handlers for b in h.body
+                       for n in self.walk_no_nested(b)):
+                    return "returns or raises in a handler", False
+                for part in (s.body, s.orelse):
+                    why, ended = self.walk(part, st, held, params, rv)
+                    if why or ended:
+                        return why, ended
+                self.note_assigns(ast.Module(body=s.finalbody, type_ignores=[]), st)
+                continue
+            if isinstance(s, (ast.With, ast.AsyncWith)):
+                for it in s.items:
+                    why = self.calls_in(it.context_expr, st, held, params)
+                    if why:
+                        return why, False
+                why, ended = self.walk(s.body, st, held, params, rv)
+                if why or ended:
+                    return why, ended
+                continue
+            if isinstance(s, ast.Raise):
+                return "raises", False
+            if isinstance(s, ast.Return):
+                v = s.value
+                why = self.calls_in(v, st, held, params) if v is not None else None
+                if why:
+                    return why, False
+                if st["count"] == 0 and "branch" not in self.off:
+                    return f"returns before it calls {held}", False
+                if "result" in self.off:
+                    return None, True
+                if self.is_held(v, held) or (isinstance(v, ast.Name) and v.id == st["res"]):
+                    return None, True
+                if not rv and (v is None or (isinstance(v, ast.Constant) and v.value is None)):
+                    return None, True
+                return f"does not return {held}'s result", True
+            why = self.calls_in(s, st, held, params)
+            if why:
+                return why, False
+            if (isinstance(s, ast.Assign) and self.is_held(s.value, held) and len(s.targets) == 1
+                    and isinstance(s.targets[0], ast.Name)):
+                st["res"] = s.targets[0].id
+            elif st["res"] is not None and any(isinstance(n, ast.Name) and n.id == st["res"]
+                                               and isinstance(n.ctx, ast.Store) for n in ast.walk(s)):
+                if "result" not in self.off:
+                    return f"changes {held}'s result before it returns it", False
+            self.note_assigns(s, st)
+        return None, False
 
     @staticmethod
     def walk_no_nested(st):
@@ -532,35 +728,10 @@ class Scanner:
                     todo.append(c)
 
     @staticmethod
-    def top_statement(body, call):
-        """(index in body, the statements from the top one to the one holding the call) where the call runs on every
-        path: reached through the body of a `try` or a `with` only, never a branch, a loop or a handler."""
-        for i, st in enumerate(body):
-            path = Scanner.find(st, call)
-            if path is not None:
-                return i, path
-        return None
-
-    @staticmethod
-    def find(st, call):
-        if any(n is call for n in Scanner.own_exprs(st)):
-            return [st]
-        if isinstance(st, (ast.Try, ast.With)):
-            for s in st.body:
-                p = Scanner.find(s, call)
-                if p is not None:
-                    return [st] + p
-        return None
-
-    @staticmethod
-    def own_exprs(st):
-        """The expressions a statement evaluates on every path through it: not its nested statements, and not inside
-        a branch of a conditional expression, a short-circuit operand after the first, a comprehension or a lambda."""
-        todo = []
-        for field, val in ast.iter_fields(st):
-            if field in ("body", "orelse", "finalbody", "handlers"):
-                continue
-            todo += [v for v in (val if isinstance(val, list) else [val]) if isinstance(v, ast.AST)]
+    def every_path(e):
+        """The sub-expressions an expression evaluates on every path: not a branch of a conditional expression, a
+        short-circuit operand after the first, a comprehension or a lambda."""
+        todo = [e]
         while todo:
             n = todo.pop()
             yield n
@@ -571,36 +742,135 @@ class Scanner:
             elif not isinstance(n, (ast.Lambda, ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)):
                 todo += list(ast.iter_child_nodes(n))
 
-    def doc_returns(self, name):
-        """Whether the document's function of that name returns a value (protocol-v2.md's for a v2-only binding is
-        not told apart here: both documents' are read, and either returning a value counts)."""
-        return name in DOC_RETURNS
+    @staticmethod
+    def own_exprs(st):
+        """The expressions a statement evaluates on every path through it (not its nested statements)."""
+        for field, val in ast.iter_fields(st):
+            if field in ("body", "orelse", "finalbody", "handlers"):
+                continue
+            for v in (val if isinstance(val, list) else [val]):
+                if isinstance(v, ast.AST):
+                    yield from Scanner.every_path(v)
+
+    def closure_split(self, fn, name, held, v2_only):
+        """A layer whose first statement branches on a closure value alone (no parameter of its own): its class per
+        branch, as {"on": the test's text, "true": class, "false": class}, or None. Such a layer is
+        classified per node by that value; the scan gives both, and the node's own value is read where classes are."""
+        node = fn.node
+        if isinstance(node, ast.Lambda) or not node.body or not isinstance(node.body[0], ast.If):
+            return None
+        test = node.body[0].test
+        own = set(params_of(node)[0] + params_of(node)[1])
+        names = {n.id for n in ast.walk(test) if isinstance(n, ast.Name)}
+        if not names or names & own or any(fn.scope.lookup(x, "captures") for x in names):
+            return None
+        s = fn.scope                    # a value the node is made with, not state: no name of the test bound to a
+        while s is not None:            #   container or mutated by a method in an enclosing function
+            if isinstance(s.node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                for n in self.walk_no_nested(s.node):
+                    if isinstance(n, ast.Assign):
+                        for t in n.targets:
+                            pairs = (list(zip(t.elts, n.value.elts)) if isinstance(t, ast.Tuple)
+                                     and isinstance(n.value, ast.Tuple) and len(t.elts) == len(n.value.elts)
+                                     else [(t, n.value)])
+                            for tt, vv in pairs:
+                                if isinstance(tt, ast.Name) and tt.id in names and (
+                                        isinstance(vv, (ast.List, ast.Dict, ast.Set, ast.ListComp, ast.DictComp,
+                                                        ast.SetComp))
+                                        or (isinstance(vv, ast.Call) and isinstance(vv.func, ast.Name) and vv.func.id
+                                            in ("list", "dict", "set", "deque", "Counter", "defaultdict"))):
+                                    return None
+                    if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS
+                            and isinstance(n.func.value, ast.Name) and n.func.value.id in names):
+                        return None
+            s = s.parent
+        out = {"on": ast.unparse(test)}
+        for truth in (True, False):
+            branch = node.body[0].body if truth else node.body[0].orelse
+            ends = bool(branch) and isinstance(branch[-1], (ast.Return, ast.Raise))   # the rest is not reached
+            alt = ast.FunctionDef(name=node.name, args=node.args,
+                                  body=(list(branch) if ends else list(branch) + node.body[1:]) or [ast.Pass()],
+                                  decorator_list=[], returns=None, type_comment=None, type_params=[])
+            ast.copy_location(alt, node)
+            ast.fix_missing_locations(alt)
+            f2 = Func(alt, fn.qual, fn.scope, self.src, self.path)
+            h = self.held(f2, name)
+            out[str(truth).lower()] = "own" if h is None else (
+                "observer" if self.observer_test(f2, name, h, v2_only) is None else "layer")
+        return out if out["true"] != out["false"] else None
 
 
-QUESTIONS, TRACED, TRACED_V2, CALLABLES, DOC_RETURNS = set(), set(), set(), set(), set()
+QUESTIONS, TRACED, TRACED_V2, CALLABLES = set(), set(), set(), set()
+DEFS_DOC, DEFS_V2, RETURNS_DOC, RETURNS_V2 = set(), set(), set(), set()
+BUILTIN_NAMES = set(dir(__import__("builtins")))
+
+
+def returning(defs):
+    """The functions of `defs` (name -> FunctionDef, in one namespace) that return a value: a least fixpoint, where
+    `return f(...)` of a function of `defs` returns a value only if `f` does, and `return` or `return None` none."""
+    rv, changed = set(), True
+    while changed:
+        changed = False
+        for name, d in defs.items():
+            if name in rv:
+                continue
+            for n in Scanner.walk_no_nested(d):
+                if not isinstance(n, ast.Return) or n.value is None:
+                    continue
+                v = n.value
+                if isinstance(v, ast.Constant) and v.value is None:
+                    continue
+                if isinstance(v, ast.Call) and isinstance(v.func, ast.Name) and v.func.id in defs and v.func.id not in rv:
+                    continue
+                rv.add(name)
+                changed = True
+                break
+    return rv
+
+
+def questions_of(defs, defined):
+    """The names a document's functions call that no document defines, no builtin is, and no function binds locally:
+    the questions the environment answers (protocol-v2.md's `type_of_group`, `send`, `choice`, ...)."""
+    out = set()
+    for d in defs.values():
+        local = {a.arg for a in d.args.args + d.args.kwonlyargs + [x for x in (d.args.vararg, d.args.kwarg) if x]}
+        local |= {n.id for n in ast.walk(d) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Store)}
+        for n in ast.walk(d):
+            if isinstance(n, ast.Call) and isinstance(n.func, ast.Name):
+                x = n.func.id
+                if x not in defined and x not in BUILTIN_NAMES and x not in local:
+                    out.add(x)
+    return out
 
 
 def load_names(toy):
-    """The questions (trace3.py's CALLS), the traced names (BLOCK; under v2 its kept ones, as trace3.py's), the
-    documents' functions, and which of them return a value."""
+    """The questions (trace3.py's TAPE, and protocol-v2.md's calls of names no document defines), the traced names
+    (BLOCK; under v2 its kept ones, as trace3.py's), the documents' functions, and which of them return a value."""
     sys.path.insert(0, str(HERE))
     import trace3 as T                  # noqa: E402
     sys.path.insert(0, str(Path(toy).resolve()))
     import node as N                    # noqa: E402: the pinned toy's
-    QUESTIONS.update(T.CALLS)
+    doc = {d.name: d for d in ast.parse(N.SPEC_SRC).body if isinstance(d, ast.FunctionDef)}
+    v2 = {d.name: d for d in ast.parse(N.generate(N.DOC2)).body if isinstance(d, ast.FunctionDef)}
+    DEFS_DOC.update(doc)
+    DEFS_V2.update(v2)
+    CALLABLES.update(doc, v2)
+    RETURNS_DOC.update(returning(doc))
+    RETURNS_V2.update(returning({**doc, **v2}))
+    QUESTIONS.update(T.TAPE)
+    # protocol-v2.md's questions: the names its functions call that no document defines, and that the toy binds in
+    # code that runs under v2 alone (type_of_group, send, choice); the toy's helpers bound for both documents (group,
+    # group_index) are computed in place, as under protocol.md, and are no questions. Provisional until the twin's
+    # question registry for v2 is read
+    v2_bound = {r["name"] for r in scan(toy).rows if r["v2_only"]}
+    QUESTIONS.update(questions_of(v2, set(doc) | set(v2)) & v2_bound)
     TRACED.update(T.BLOCK)
     TRACED_V2.update(n for n in T.v2_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
-    for src in (N.SPEC_SRC, N.generate(N.DOC2)):
-        for d in ast.parse(src).body:
-            if isinstance(d, ast.FunctionDef):
-                CALLABLES.add(d.name)
-                if any(isinstance(n, ast.Return) and n.value is not None for n in ast.walk(d)):
-                    DOC_RETURNS.add(d.name)
     return T, N
 
 
-def scan(toy, skip=()):
-    sc = Scanner(skip)
+def scan(toy, skip=(), off=()):
+    sc = Scanner(skip, off)
     files = sorted(Path(toy).glob("*.py"))
     for f in files:                     # every module's own functions and imports first, then the bindings
         sc.prepass(f)
@@ -654,6 +924,11 @@ def lists(sc, T):
         else:
             other += 1
             out.append(f"replaceable {n}: NOT replaced by the toy")
+    for n in T.REPLACEABLE_WHOLE:       # the other direction: a whole-state-only name is replaceable, and no cell's
+        if n not in T.REPLACEABLE or n in repl:     #   toy replaces it
+            other += 1
+            out.append(f"REPLACEABLE_WHOLE {n}: NOT " + ("in REPLACEABLE" if n not in T.REPLACEABLE else
+                                                         "the directed sets' alone: the toy replaces it"))
     for n in repl:
         if n not in T.REPLACEABLE:
             sites = [f"{r['in']}:{r['line']}{' v2-only' if r['v2_only'] else ''}" for r in rows
@@ -697,34 +972,175 @@ WANT = {"subscript": ("a", 7, "observer"), "tuple": ("b", 8, "own"), "update-key
         "namespace-literal": ("i", 22, "own")}
 
 
+# one planted layer per clause of the observer test (each breaks that clause alone), the cases that must pass, and a
+# layer branching on a closure value; the names: askq a question, trf a traced function, tbl a table; every c_* name
+# a function of the document that returns a value, but c_none
+LAYERS = '''\
+class Node:
+    def meth(self, x):
+        self.ns["tbl"].clear()
+
+    def plant(self, ns):
+        def helper(t):
+            t.pop(0)
+        d_question, d_traced, d_assign, d_delete = ns["c_question"], ns["c_traced"], ns["c_assign"], ns["c_delete"]
+        d_mutate, d_unfollowed, d_localfn, d_method = ns["c_mutate"], ns["c_unfollowed"], ns["c_localfn"], ns["c_method"]
+        d_twice, d_branch, d_args, d_result = ns["c_twice"], ns["c_branch"], ns["c_args"], ns["c_result"]
+        d_extra, d_fallthrough, d_arms, d_plain = ns["c_extra"], ns["c_fallthrough"], ns["c_arms"], ns["c_plain"]
+        d_none, d_mid = ns["c_none"], ns["message_id"]
+
+        def c_question(x):
+            ns["askq"](x)
+            return d_question(x)
+
+        def c_traced(x):
+            ns["trf"](x)
+            return d_traced(x)
+
+        def c_assign(x):
+            ns["tbl"][x] = 1
+            return d_assign(x)
+
+        def c_delete(x):
+            o = ns["tbl"]
+            del o[x]
+            return d_delete(x)
+
+        def c_mutate(x):
+            ns["tbl"].add(x)
+            return d_mutate(x)
+
+        def c_unfollowed(x):
+            foreign(ns["tbl"])
+            return d_unfollowed(x)
+
+        def c_localfn(x):
+            helper(ns["tbl"])
+            return d_localfn(x)
+
+        def c_method(x):
+            self.meth(x)
+            return d_method(x)
+
+        def c_twice(x):
+            d_twice(x)
+            return d_twice(x)
+
+        def c_branch(x):
+            if x:
+                return d_branch(x)
+
+        def c_args(x):
+            x = x + 1
+            return d_args(x)
+
+        def c_result(x):
+            d_result(x)
+
+        def c_extra(x):
+            return d_extra(x, 2)
+
+        def c_fallthrough(x):
+            r = d_fallthrough(x)
+            if r:
+                return r
+
+        def c_arms(x):
+            if x:
+                return d_arms(x)
+            else:
+                return d_arms(x)
+
+        def c_plain(x):
+            v = d_plain(x)
+            return v
+
+        def c_none(x):
+            d_none(x)
+
+        def message_id(f):
+            if f:
+                return d_mid(f)
+            return 0
+        ns.update(c_question=c_question, c_traced=c_traced, c_assign=c_assign, c_delete=c_delete, c_mutate=c_mutate,
+                  c_unfollowed=c_unfollowed, c_localfn=c_localfn, c_method=c_method, c_twice=c_twice,
+                  c_branch=c_branch, c_args=c_args, c_result=c_result, c_extra=c_extra, c_fallthrough=c_fallthrough,
+                  c_arms=c_arms, c_plain=c_plain, c_none=c_none, message_id=message_id)
+
+    def closure(self, ns, on):
+        d_closed = ns["c_closed"]
+
+        def c_closed(x):
+            if not on:
+                return 0
+            return d_closed(x)
+        ns["c_closed"] = c_closed
+'''
+BREAKS = {"c_question": "question", "c_traced": "traced", "c_assign": "assign", "c_delete": "delete",
+          "c_mutate": "mutate", "c_unfollowed": "unfollowed", "c_localfn": "local-fn", "c_method": "node-method",
+          "c_twice": "twice", "c_branch": "branch", "c_args": "arguments", "c_result": "result",
+          "c_extra": "arguments", "c_fallthrough": "result"}
+PASSES = ("c_arms", "c_plain", "c_none", "message_id")
+
+
 def self_test():
     bad = 0
-    QUESTIONS.clear(); TRACED.clear()
+
+    def report(what, ok, got=""):
+        nonlocal bad
+        bad += not ok
+        print(f"scan_bindings self-test, {what}: {'ok' if ok else f'{got}  <-- FAIL'}")
+
     with tempfile.TemporaryDirectory() as d:
         p = Path(d) / "planted.py"
         p.write_text(PLANTED)
         sc = scan(d)
         for form, (name, ln, cls) in WANT.items():
             got = [r for r in sc.rows if r["form"] == form and r["name"] == name and r["line"] == ln]
-            ok = len(got) == 1 and got[0]["class"] == cls
-            bad += not ok
-            print(f"scan_bindings self-test, the form {form}: {name} at line {ln}, {cls}: "
-                  f"{'ok' if ok else f'got {[line(r) for r in got]}  <-- FAIL'}")
-        for form, (name, ln, cls) in WANT.items():      # the control: each form's reader off, its row missing
-            off = scan(d, skip=(form,))
-            gone = not [r for r in off.rows if r["form"] == form and r["name"] == name and r["line"] == ln]
-            bad += not gone
-            print(f"scan_bindings self-test, control: the reader of {form} off, its planted row "
-                  f"{'missing, as it must be' if gone else 'still reported  <-- FAIL'}")
+            report(f"the form {form}: {name} at line {ln}, {cls}", len(got) == 1 and got[0]["class"] == cls,
+                   f"got {[line(r) for r in got]}")
+        for form, (name, ln, cls) in WANT.items():      # the control: each form's reader off, no row at its line
+            left = [r for r in scan(d, skip=(form,)).rows if r["line"] == ln]
+            report(f"control: the reader of {form} off, no row at line {ln}", not left,
+                   f"still {[line(r) for r in left]}")
         before = {(r["form"], r["name"], r["line"]): r["value"]["sha256"] for r in sc.rows if isinstance(r["value"], dict)}
         p.write_text(PLANTED.replace("            return doc_a(x)\n", "            x = x\n            return doc_a(x)\n"))
-        sc2 = scan(d)
         after = {(r["form"], r["name"], r["line"] - (1 if r["line"] > 6 else 0)): r["value"]["sha256"]
-                 for r in sc2.rows if isinstance(r["value"], dict)}
+                 for r in scan(d).rows if isinstance(r["value"], dict)}
         moved = sorted(k for k in before if after.get(k) != before[k])
-        ok = moved == [("subscript", "a", 7)]
-        bad += not ok
-        print(f"scan_bindings self-test, a changed observer body: {'its row alone moved' if ok else f'moved {moved}  <-- FAIL'}")
+        report("a changed observer body: its row's hash alone moved, the rows the same",
+               moved == [("subscript", "a", 7)] and set(before) == set(after), f"moved {moved}")
+    saved = [set(s) for s in (QUESTIONS, TRACED, DEFS_DOC, RETURNS_DOC)]
+    for s, v in zip((QUESTIONS, TRACED, DEFS_DOC, RETURNS_DOC),
+                    ({"askq"}, {"trf"}, set(BREAKS) | set(PASSES) | {"c_closed"},
+                     (set(BREAKS) | {"c_arms", "c_plain", "c_closed"}))):
+        s.clear()
+        s.update(v)
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "layers.py").write_text(LAYERS)
+
+            def cls(rows, name):
+                got = [r for r in rows if r["name"] == name and r["form"] in ("update-keyword", "subscript")]
+                return got[0]["class"] if len(got) == 1 else f"{len(got)} rows"
+            rows = scan(d).rows
+            for name, clause in BREAKS.items():         # each a layer, and an observer with its clause off
+                report(f"{name} (breaks {clause}) a layer", cls(rows, name) == "layer", f"got {cls(rows, name)}")
+                c = cls(scan(d, off=(clause,)).rows, name)
+                report(f"control: {name} with the clause {clause} off an observer", c == "observer", f"got {c}")
+            for name in PASSES:
+                report(f"{name} an observer", cls(rows, name) == "observer", f"got {cls(rows, name)}")
+            c = cls(scan(d, off=("by-name",)).rows, "message_id")
+            report("control: message_id with the rule by name off a layer", c == "layer", f"got {c}")
+            got = [r for r in rows if r["name"] == "c_closed"]
+            ok = (len(got) == 1 and got[0]["class"] == "closure-dependent"
+                  and got[0]["closure"] == {"on": "not on", "true": "own", "false": "observer"})
+            report("c_closed closure-dependent: own where `not on`, an observer where not", ok,
+                   f"got {[(r['class'], r.get('closure')) for r in got]}")
+    finally:
+        for s, v in zip((QUESTIONS, TRACED, DEFS_DOC, RETURNS_DOC), saved):
+            s.clear()
+            s.update(v)
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 

@@ -456,6 +456,14 @@ def alias_missing_v2():
     before_install_v2(plant)
 
 
+def rebound_scanned_v2():
+    """Under v2: a function the scan names in one slot (`popcount`) bound, before the install, in another slot that no
+    binding of the toy's names (`popcount_again`). The install check is by slot and function together: it must stop."""
+    def plant(ns):
+        ns["popcount_again"] = ns["popcount"]
+    before_install_v2(plant)
+
+
 def unscanned_layer_v2(toy):
     """Under v2: a layer over `on_frame` that claims to be the toy's (its code compiled as node.py's, at a line where
     no binding is) and holds the bound `on_frame` in a closure cell, so that the namespace check, which follows the
@@ -681,7 +689,7 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
           "--alias-message", "--defer-chain", "--replaced", "--false-wrapper", "--stale-id", "--level1-in-cell",
           "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
           "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2", "--raw-chunk-id-v2",
-          "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2")
+          "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2", "--rebound-scanned-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2")
@@ -718,6 +726,8 @@ def main(argv):
             bare_in_question_v2(per_node=False, callee="after")
         elif fault == "--other-node-tape-v2":
             other_node_tape_v2()
+        elif fault == "--rebound-scanned-v2":
+            rebound_scanned_v2()
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
         args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault == "--bare-replaced-v2" else HAND5
