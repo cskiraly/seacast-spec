@@ -320,7 +320,8 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   the implementation orders streams. It is for study, and not normative. *Open:* whether it runs
   beside libp2p on libp2p's port, beside it on a port of its own, or alone; two studies bear on it
   (§7.1 there), and neither chooses a model. Not taken in this version: datagrams for chunks, since
-  a cell never fits one and small payload chunks in datagrams were slower in the toy.
+  a cell does not fit one at the study's packet sizes unless it compresses well, and small payload
+  chunks in datagrams were slower in the toy.
 
 ## The versions of `protocol.md` carried
 
