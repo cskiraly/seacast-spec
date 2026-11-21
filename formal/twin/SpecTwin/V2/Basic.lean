@@ -296,7 +296,9 @@ instance {m : Type → Type} {ρ : Type} [Monad m] [V2Later m] : V2Later (Reader
 by `ask_scale()` at load time. -/
 structure ConstsV2 where
   ANSWERS_FIRST : Bool
-  ASK_UPLINK : Bool
+  /-- §4.13's uplink, in bits per second, at and above which `IWANT_WINDOW` keeps `protocol.md`'s value; 0 never
+  scales (the toy's `--ask-uplink 0`) -/
+  ASK_UPLINK : Float
   MERGE_HOLDINGS : Bool
   SOURCE_OFFERS : Bool
   IWANT_WINDOW : Float
