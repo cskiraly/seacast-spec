@@ -7,6 +7,8 @@ import SpecTwin.V2.Probe
 import SpecTwin.V2.Decode
 import SpecTwin.V2.Receive
 import SpecTwin.V2.Sample
+import SpecTwin.V2.Replay
+import SpecTwin.V2.ReplayKnown
 
 /-! # The twin of protocol-v2.md: its modules
 

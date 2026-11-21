@@ -121,7 +121,8 @@ structure Record where
   tape : List TapeItem
   ret : Json
   raises : Option String
-  raisesKey : Option Nat                  -- a `KeyError`'s missing key: where the Python raised
+  raisesKey : Option String               -- a `KeyError`'s missing key, as the twin's crash names it: where the
+                                          --   Python raised
   reached : List String                   -- the traced functions the call reached, itself among them
   tables : List String                    -- the own tables its reads, scans and writes name
 
@@ -270,7 +271,18 @@ def ownKeys (t : String) (path : Array Json) (ks : Json) : Except String Entry :
     return .owedKeys (← nat p) l
   | _, _ => throw s!"not a level whose order the twin asks: {t} {(Json.arr path).compress}"
 
-def entry (j : Json) : Except String Entry := do
+/-- What reading a record takes from its trace's document. The defaults are `protocol.md`'s; protocol-v2.md's replay
+passes its own (`V2/Replay.lean`).
+- `entry`: a reader of the document's own tape entries, asked first: `some` for an entry it reads, `none` to leave
+  the entry to `entry`'s.
+- `raisesKey`: a `KeyError`'s key, as the twin's crash names it. Under `protocol.md` it is a peer, a natural
+  number. -/
+structure Doc where
+  entry : Json → Option (Except String Entry) := fun _ => none
+  raisesKey : Json → Except String String := fun j => do return toString (← nat j)
+
+def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
+  if let some e := doc.entry j then return ← e
   if let .ok #[.str "read", .str table, path, v] := j.getArr? then return ← foreignRead table path v
   if let .ok #[.str "keys", .str "queue", .arr #[], ks] := j.getArr? then return .queueKeys (← peerList "keys of queue" ks)
   if let .ok #[.str "keys", .str t, .arr path, ks] := j.getArr? then return ← ownKeys t path ks
@@ -345,7 +357,7 @@ def entry (j : Json) : Except String Entry := do
 
 /-- A tape's item: an entry, and fourth and last, for a call that touched the twin's tables, `{"cr": [...], "cw": [...]}`.
 A call's entry is its name, its arguments and its answer; the log is a fourth member, never the answer. -/
-def tapeItem (j : Json) : Except String TapeItem := do
+def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
   let a ← j.getArr?
   match (if a.size == 4 then a.back? else none) with
   | some o@(.obj _) =>
@@ -356,8 +368,8 @@ def tapeItem (j : Json) : Except String TapeItem := do
     let cr ← cells "cr" cr
     let cw ← cells "cw" cw
     if cr.isEmpty && cw.isEmpty then throw s!"a call's log that is empty: {j.compress}"
-    return (← entry (.arr a.pop), some { cr, cw })
-  | _ => return (← entry j, none)
+    return (← entry (.arr a.pop) doc, some { cr, cw })
+  | _ => return (← entry j doc, none)
 
 def recordFields : List String :=
   ["n", "t", "fn", "args", "reads", "scans", "writes", "rest", "tape", "ret", "raises", "raises_key", "reached",
@@ -377,7 +389,7 @@ def tablesOf (j : Json) : Except String (List String) := do
     | .ok (.str t) => pure t
     | _ => throw s!"an entry without its table's name: {e.compress}"
 
-def record (j : Json) : Except String Record := do
+def record (j : Json) (doc : Doc := {}) : Except String Record := do
   let .ok kvs := j.getObj? | throw s!"not a record: {j.compress}"
   if let some f := kvs.keys.find? (!recordFields.contains ·) then throw s!"not a field of a record: {f}"
   let some n := field j "n" | throw "no n"
@@ -393,7 +405,7 @@ def record (j : Json) : Except String Record := do
     | some x => throw s!"not an exception's name: {x.compress}"
     | none => pure none
   let raisesKey ← match field j "raises_key" with
-    | some x => some <$> nat x
+    | some x => some <$> doc.raisesKey x
     | none => pure none
   if (raises == some "KeyError") != raisesKey.isSome then      -- the place a KeyError was raised, always
     throw "raises_key goes with a KeyError, and with nothing else"
@@ -421,7 +433,7 @@ def record (j : Json) : Except String Record := do
   if let some (c, _) := rest.find? fun (c, _) => reads.any (·.1 == c) then
     throw s!"an entry both read and in the rest: {reprStr c}"
   return { n := ← nat n, t := ← bits64 t, fn, args, reads, scans, writes := ← cells "writes" writes, rest,
-           tape := ← (← arr tape).mapM tapeItem, ret := ret?.getD .null, raises, raisesKey, reached, tables }
+           tape := ← (← arr tape).mapM (tapeItem · doc), ret := ret?.getD .null, raises, raisesKey, reached, tables }
 
 /-- What a record's line says, at its very end, of the functions reached and the tables touched: the text after
 `,"reached":[`, which must be the names, `],"tables":[`, the names, `]}`. None if the line does not end so. A
@@ -865,6 +877,33 @@ def reachedOk (traced : List String) (r : Record) (rs : RSt) : Except String Uni
   if got != r.reached then
     throw s!"reached: the twin entered {got}, the record has {r.reached}"
 
+/-- The verdict on one replayed record, from the twin's run (its state and whether its return value is the toy's,
+or its error) and the replay's state after it: the branches taken and how many of the Python's reads the twin did
+not make, or the first difference. `run` and protocol-v2.md's `runV2` share it. -/
+def judge (traced : List String) (r : Record) (res : Except String (State × Bool)) (rs : RSt) :
+    Except String (Array String × Nat) := do
+  match r.raises, res with
+  | some x, .error e =>
+    -- the Python raised: the twin must raise the same, at the same place (a KeyError's key), with the tape used
+    -- up, and its state as the Python left it
+    let want : String := match r.raisesKey with
+      | some q => s!"crash: {x}: {q} ("
+      | none => s!"crash: {x}:"
+    if !e.startsWith want then throw s!"the Python raises {x}{(r.raisesKey.map (s!" on {·}")).getD ""}; the twin: {e}"
+    if !rs.tape.isEmpty then throw s!"the Python raises {x}; the twin raises it with tape left: {reprStr rs.tape}"
+    reachedOk traced r rs
+    (wholeState r rs).mapError (s!"at the raise ({x}): " ++ ·)
+    let fewer ← (footprint r rs).mapError (s!"at the raise ({x}): " ++ ·)
+    return (rs.marks.push s!"raises: {x}", fewer)
+  | some x, .ok _ => throw s!"the Python raises {x}; the twin returns"
+  | none, .error e => throw e
+  | none, .ok (_, retOk) =>
+    if !rs.tape.isEmpty then throw s!"tape: the toy asked more: {reprStr rs.tape}"
+    if !retOk then throw s!"return value: toy {r.ret.compress}"
+    reachedOk traced r rs
+    wholeState r rs                         -- the state first: what follows is then about the notes alone
+    return (rs.marks, ← footprint r rs)
+
 set_option maxHeartbeats 400000 in
 /-- What one replayed record gives: the branches it took and how many of the Python's reads the twin did not
 make, or the first difference. -/
@@ -1026,26 +1065,6 @@ def run (c : Consts) (replaced traced : List String) (r : Record) : Except Strin
       exec (buildGroup (← blob b)) fun (d, shards) =>
         return (Json.arr #[descriptorJson d, Json.arr (shards.map shardJson).toArray]).compress == r.ret.compress
     | f, _ => throw s!"not a function of the twin, or not its arguments: {f}"
-  match r.raises, res with
-  | some x, .error e =>
-    -- the Python raised: the twin must raise the same, at the same place (a KeyError's key), with the tape used
-    -- up, and its state as the Python left it
-    let want : String := match r.raisesKey with
-      | some q => s!"crash: {x}: {q} ("
-      | none => s!"crash: {x}:"
-    if !e.startsWith want then throw s!"the Python raises {x}{(r.raisesKey.map (s!" on {·}")).getD ""}; the twin: {e}"
-    if !rs.tape.isEmpty then throw s!"the Python raises {x}; the twin raises it with tape left: {reprStr rs.tape}"
-    reachedOk traced r rs
-    (wholeState r rs).mapError (s!"at the raise ({x}): " ++ ·)
-    let fewer ← (footprint r rs).mapError (s!"at the raise ({x}): " ++ ·)
-    return (rs.marks.push s!"raises: {x}", fewer)
-  | some x, .ok _ => throw s!"the Python raises {x}; the twin returns"
-  | none, .error e => throw e
-  | none, .ok (_, retOk) =>
-    if !rs.tape.isEmpty then throw s!"tape: the toy asked more: {reprStr rs.tape}"
-    if !retOk then throw s!"return value: toy {r.ret.compress}"
-    reachedOk traced r rs
-    wholeState r rs                         -- the state first: what follows is then about the notes alone
-    return (rs.marks, ← footprint r rs)
+  judge traced r res rs
 
 end SpecTwin.Replay
