@@ -24,8 +24,11 @@
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
-#             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, and gen/schema_v2.py's encoders)
-#   tables    the twin's generated files are the schema's (gen.py, makers.py); the views' own cases (footprint_test.py)
+#             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders, and
+#             keptcopy.py's)
+#   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
+#             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
+#             (footprint_test.py)
 #   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
 #             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused
 #   mutants   every mutant's text stands in the twin once (--places), and each type-checks alone against the build
@@ -256,15 +259,19 @@ against.py --self-test ^ok: every case as it must be$
 matrixdiff.py --self-test ^ok: every case as it must be$
 trace3.py --self-test-v2 ^ok:
 gen/schema_v2.py --self-test ^ok: every case as it must be$
+keptcopy.py --self-test ^ok: every case as it must be$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 9 ] || no "not 9 tools' self-tests passed"
-  echo "  $n of 9 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 10 ] || no "not 10 tools' self-tests passed"
+  echo "  $n of 10 tools' own cases as they must be (selftests.txt)"
 }
 s_tables() {
   { $PY "$T/gen/gen.py" --check "$OUT/twin" && $PY "$T/gen/makers.py" --check "$OUT/twin"; } > "$OUT/tables.txt" 2>&1 \
     || no "a generated file is not the schema's, or a Tables value is made elsewhere (tables.txt)"
   tail -n 1 "$OUT/tables.txt" | sed 's/^/  /'
+  $PY "$T/keptcopy.py" --twin "$OUT/twin" > "$OUT/keptcopy.txt" 2>&1 \
+    || no "a copy of protocol.md's Lean in V2/Kept.lean differs from its original beyond the named differences (keptcopy.txt)"
+  tail -n 1 "$OUT/keptcopy.txt" | sed 's/^/  /'
   $PY "$T/footprint_test.py" > "$OUT/views.txt" 2>&1 || no "the views' own cases (views.txt)"
   tail -n 1 "$OUT/views.txt" | sed 's/^/  /'
 }

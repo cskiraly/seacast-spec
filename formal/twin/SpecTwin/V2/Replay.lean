@@ -1,5 +1,6 @@
 import SpecTwin.Replay
 import SpecTwin.V2.Sample
+import SpecTwin.V2.Kept
 
 /-! # Replaying a record of a trace under protocol-v2.md
 
@@ -17,7 +18,8 @@ import SpecTwin.V2.Sample
 - **The orders.** An `order` or `keys` answer must be a permutation of the members the twin computed
   (`Replay.permOf`).
 - **The functions.** `runV2` runs v2's 68 functions by their Python names, hands a record of one of
-  `protocol.md`'s functions that v2 keeps (`keptV2`) to `Replay.run`, and refuses every other name,
+  `protocol.md`'s functions that v2 keeps (`keptV2`) to `Replay.run`, runs the two of them that call v2's
+  functions (`keptFormsV2`) in their v2 forms (`V2/Kept.lean`), and refuses every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
@@ -385,6 +387,10 @@ def keptV2 : List String :=
    "owe", "parked", "promise_due", "rarest", "retry_offer", "segment_length", "tie", "tie_room", "tied_to_root",
    "untried", "valid_descriptor", "validate_chunk", "held"]
 
+/-- The functions of `protocol.md` that a record under v2 may name and that call a name v2 redefines: the replay
+serves them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`. -/
+def keptFormsV2 : List String := ["on_pace_tick", "on_block_installed"]
+
 set_option maxHeartbeats 1600000 in
 /-- What one replayed record of a trace under protocol-v2.md gives: the branches it took and how many of the
 Python's reads the twin did not make, or the first difference. `params` are the types' parameters at the node;
@@ -486,6 +492,9 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "resample", #[g, i, q, b] => do
       exec (resample (← Replay.groupKey g) (← nat i) (← nat q) (← boolOf b)) none_
     | "sample", #[g, b] => do exec (sample (← Replay.groupKey g) (← nat b)) none_
+    -- protocol.md's two that call v2's functions, in their v2 forms
+    | "on_pace_tick", #[] => do exec onPaceTick none_
+    | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_
     | f, _ => throw s!"not a function of the twin under protocol-v2.md, or not its arguments: {f}"
   judge traced r res rs
 
