@@ -865,6 +865,7 @@ def reachedOk (traced : List String) (r : Record) (rs : RSt) : Except String Uni
   if got != r.reached then
     throw s!"reached: the twin entered {got}, the record has {r.reached}"
 
+set_option maxHeartbeats 400000 in
 /-- What one replayed record gives: the branches it took and how many of the Python's reads the twin did not
 make, or the first difference. -/
 def run (c : Consts) (replaced traced : List String) (r : Record) : Except String (Array String × Nat) := do

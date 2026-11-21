@@ -28,6 +28,15 @@ inductive Val where
   | desc (d : Descriptor)                 -- a group's descriptor
   | int (n : Int)                         -- a signed count, not zero (the window's `in_flight`)
   | ids (l : List Hex)                    -- a set of opaque ids as hex, sorted (`unwanted[p]`)
+  -- protocol-v2.md's (tools/gen/schema_v2.py)
+  | typeId (t : V2.TypeId)                -- an object type's id (`T_of`)
+  | ibits (b : V2.IBits)                  -- a bitmap that can be complemented (`interest`, `want_p`); 0 is a value
+  | join (m : V2.Join)                    -- a JOIN (`join_recv`, `join_sent`)
+  | colours (l : List Nat)                -- a set of colours, sorted; empty is no value
+  | relations (l : List V2.Relation)      -- relation messages in order (`owed_relations`); empty is no value
+  | verdict (v : Option Bool)             -- `probe_ok`'s verdict: true, false, or a stored None
+  | indices (l : List Nat)                -- indices in order (`rsample`); empty is no value
+  | gis (l : List GI)                     -- groups and indices in order (`held_samples`); empty is no value
   deriving BEq, Repr
 
 /-! ## Reading a record: strictly, so that an altered field cannot pass by wrapping or collapsing -/
@@ -217,6 +226,79 @@ def intOf (j : Json) : Except String Int := do
     if n == 0 then throw "not an integer of a record: minus zero"
     return -(n : Int)
   | j => return ((← nat j) : Int)
+
+/-! ### protocol-v2.md's keys and values (design §4.4; the tracer writes them so) -/
+
+/-- An object type's id: its string, as the toy names it (`"payload"`, `"column"`, `"row"`), not empty. -/
+def typeId (j : Json) : Except String V2.TypeId := do
+  let .str s := j | throw s!"not a type id: {j.compress}"
+  if s.isEmpty then throw "not a type id: the empty string"
+  return s
+
+/-- A block id: 64 lowercase hex digits (a block root, or a group's own id where the type has no blocks). -/
+def blockKey (j : Json) : Except String BlockId := rootKey j
+
+def boolOf (j : Json) : Except String Bool := do
+  let .bool b := j | throw s!"not a bool: {j.compress}"
+  return b
+
+/-- A direction, as the toy's string: `"OUT"`, `"IN"` or `"BOTH"`. -/
+def direction (j : Json) : Except String V2.Direction :=
+  match j with
+  | .str "OUT" => pure .outward
+  | .str "IN" => pure .inward
+  | .str "BOTH" => pure .both
+  | _ => throw s!"not a direction: {j.compress}"
+
+/-- `backoff`'s inner key: `[colour, direction]`. -/
+def colourDir (j : Json) : Except String ColourDir := do
+  let #[c, d] ← j.getArr? | throw s!"not a colour and a direction: {j.compress}"
+  return (← nat c, ← direction d)
+
+def interestKind (j : Json) : Except String V2.InterestKind :=
+  match j with
+  | .str "ALL" => pure .all
+  | .str "DERIVED" => pure .derived
+  | .str "DECLARED" => pure .declared
+  | _ => throw s!"not an interest: {j.compress}"
+
+def duty (j : Json) : Except String V2.Duty :=
+  match j with
+  | .str "FORWARD" => pure .forward
+  | .str "NONE" => pure .none
+  | _ => throw s!"not a duty: {j.compress}"
+
+/-- A JOIN: `["join", T, interest, custody_count, duty, colours]`. -/
+def joinMsg (j : Json) : Except String V2.Join := do
+  let #[.str "join", t, i, c, d, k] ← j.getArr? | throw s!"not a JOIN: {j.compress}"
+  return { objectType := ← typeId t, interest := ← interestKind i, custodyCount := ← nat c, duty := ← duty d,
+           colours := ← nat k }
+
+/-- A relation message: a JOIN, `["graft", T, family, colour, direction, answer]` or
+`["prune", T, family, colour, direction]`; a family in the signed form. -/
+def relation (j : Json) : Except String V2.Relation := do
+  match ← j.getArr? with
+  | #[.str "join", _, _, _, _, _] => return .join (← joinMsg j)
+  | #[.str "graft", t, f, c, d, a] =>
+    return .graft { objectType := ← typeId t, family := ← intOf f, colour := ← nat c, direction := ← direction d,
+                    answer := ← boolOf a }
+  | #[.str "prune", t, f, c, d] =>
+    return .prune { objectType := ← typeId t, family := ← intOf f, colour := ← nat c, direction := ← direction d }
+  | _ => throw s!"not a relation message: {j.compress}"
+
+def relationList (j : Json) : Except String (List V2.Relation) := do (← arr j).mapM relation
+
+/-- `probe_ok`'s value: `true`, `false`, or `["none"]` for a stored None. -/
+def probeVerdict (j : Json) : Except String (Option Bool) :=
+  match j with
+  | .bool b => pure (some b)
+  | .arr #[.str "none"] => pure none
+  | _ => throw s!"not a probe's verdict: {j.compress}"
+
+def natList (j : Json) : Except String (List Nat) := do (← arr j).mapM nat
+
+/-- Groups and indices in order: `[[group, index], ...]`. -/
+def giList (j : Json) : Except String (List GI) := do (← arr j).mapM chunk
 
 /-- The window's one-entry tables' names in a record's path: `"count"`, `"line"`. -/
 def countKey (j : Json) : Except String CountKey :=

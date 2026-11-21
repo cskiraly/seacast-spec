@@ -101,13 +101,6 @@ notes/spec-lean/v2-layer/design.md §1.2, §5 and §5.1. A type is its id; its m
 are functions are questions with the id first. The helpers the document does not write out are questions too,
 and what they read and write of the twin's tables are their `cr` and `cw` notes on the tape. -/
 
-/-- A chunk's place: a group and an index. -/
-abbrev GI := Group × Nat
-
-/-- `BlockId` (§3): the block a cell group belongs to, as the tracer writes it, or the group itself for a type
-without blocks (`block_of`). -/
-abbrev BlockId := String
-
 /-- A record of a node that could be linked, or of a link: `cover_candidates`' and `floor_candidates`' records
 and `link_cover`'s answer (design §5.1). Each has the fields its helper gives it, and a read of one it lacks
 crashes as the toy's `AttributeError`: `link_cover`'s has no id, `floor_candidates`' no flag. -/

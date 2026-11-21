@@ -34,6 +34,16 @@ inductive GroupState where
 /-- A chunk: its group and its index. -/
 abbrev Chunk := Group × Nat
 
+/-- A chunk's place under `protocol-v2.md`: a group and an index (an ask by index, `probe_asks`' members). -/
+abbrev GI := Group × Nat
+
+/-- `BlockId` (`protocol-v2.md` §3): the block a cell group belongs to, or the group itself for a type without
+blocks (`block_of`); 64 lowercase hex digits. -/
+abbrev BlockId := String
+
+/-- `backoff`'s inner key (`protocol-v2.md` §3): a colour and a direction. -/
+abbrev ColourDir := Nat × V2.Direction
+
 /-- A set of chunk indices: bit `i` is index `i`. -/
 abbrev Bits := Nat
 

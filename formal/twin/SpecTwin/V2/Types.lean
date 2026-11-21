@@ -41,7 +41,7 @@ inductive Direction where
   | outward
   | inward
   | both
-  deriving BEq, Repr, Inhabited
+  deriving BEq, Repr, Inhabited, Hashable
 
 /-- `AnnounceWidth`: the Python's `ALL_JOINED`, `SAMPLE`, `NONE` (§1.1's `ANNOUNCE_EXTRA`). -/
 inductive AnnounceWidth where

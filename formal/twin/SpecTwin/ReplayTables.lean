@@ -3,8 +3,9 @@ import SpecTwin.ReplayBase
 
 /-! # The replay's reading and comparing of the twin's state, table by table (generated)
 
-This file is written whole by `tools/gen/gen.py` from `gen/schema.py`, one entry there per
-table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema, or the generator.
+This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_v2.py`, one
+entry there per table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema,
+or the generator.
 
 How an entry and a level are read from a record (`cell`, `val`, `level`), and how a state is looked up, changed
 and listed entry by entry (`valueAt`, `put`, `drop`, `entries`, `under`, `covers`). The kinds of value (`Val`)
@@ -62,28 +63,64 @@ def cell (table : String) (path : Json) : Except String Cell := do
   | "waiters", #[e] => return .waiters (← lineKey e)
   | "sent", #[k] => return .sent (← sendKey k)
   | "unwanted", #[p] => return .unwanted (← nat p)
+  | "join_recv", #[p, T] => return .joinRecv (← nat p) (← typeId T)
+  | "join_sent", #[p, T] => return .joinSent (← nat p) (← typeId T)
+  | "push_out", #[p, T, fam] => return .pushOut (← nat p) (← typeId T) (← intOf fam)
+  | "push_in", #[p, T, fam] => return .pushIn (← nat p) (← typeId T) (← intOf fam)
+  | "grafted_out", #[p, T, fam] => return .graftedOut (← nat p) (← typeId T) (← intOf fam)
+  | "grafted_in", #[p, T, fam] => return .graftedIn (← nat p) (← typeId T) (← intOf fam)
+  | "owed_relations", #[p] => return .owedRelations (← nat p)
+  | "backoff", #[p, T, fam, cd] => return .backoff (← nat p) (← typeId T) (← intOf fam) (← colourDir cd)
+  | "T_of", #[g] => return .tOf (← groupKey g)
+  | "rebuilt", #[g] => return .rebuilt (← groupKey g)
+  | "interest", #[g] => return .interest (← groupKey g)
+  | "known_at", #[g] => return .knownAt (← groupKey g)
+  | "standing", #[g, i] => return .standing (← groupKey g) (← nat i)
+  | "claims", #[g] => return .claims (← groupKey g)
+  | "reconsider_at", #[g] => return .reconsiderAt (← groupKey g)
+  | "deferred", #[g] => return .deferred (← groupKey g)
+  | "duty_at", #[g] => return .dutyAt (← groupKey g)
+  | "waited", #[g] => return .waited (← groupKey g)
+  | "probe", #[g] => return .probe (← groupKey g)
+  | "probed", #[g] => return .probed (← groupKey g)
+  | "probe_asks", #[a] => return .probeAsk (← chunk a)
+  | "probe_sent", #[g] => return .probeSent (← groupKey g)
+  | "probe_ok", #[g] => return .probeOk (← groupKey g)
+  | "rsample", #[g] => return .rsample (← groupKey g)
+  | "rsample_step", #[g] => return .rsampleStep (← groupKey g)
+  | "rsample_asked", #[g, i] => return .rsampleAsked (← groupKey g) (← nat i)
+  | "rsample_final", #[g] => return .rsampleFinal (← groupKey g)
+  | "served", #[p, g] => return .served (← nat p) (← groupKey g)
+  | "want_p", #[p, g] => return .wantP (← nat p) (← groupKey g)
+  | "probe_served", #[p, g] => return .probeServed (← nat p) (← groupKey g)
+  | "probe_answers", #[p, g] => return .probeAnswers (← nat p) (← groupKey g)
+  | "probe_waiting", #[g, p] => return .probeWaiting (← groupKey g) (← nat p)
+  | "sampled_from", #[b] => return .sampledFrom (← blockKey b)
+  | "samples_in_flight", #[b] => return .samplesInFlight (← blockKey b)
+  | "held_samples", #[b] => return .heldSamples (← blockKey b)
+  | "forwarded", #[p] => return .forwarded (← nat p)
   | _, _ => throw s!"not an entry of §6.1's tables: {table}{path.compress}"
 
 /-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. -/
 def val (c : Cell) (j : Json) : Except String (Option Val) := do
   if j == .null then return none
   match c with
-  | .askedAt _ | .tried .. | .promise .. | .park .. | .sent _ => return some (.time (← bits64 j))
+  | .askedAt _ | .tried .. | .promise .. | .park .. | .sent _ | .backoff .. | .knownAt _ | .reconsiderAt _ | .dutyAt _ => return some (.time (← bits64 j))
   | .offers _ | .waiters _ =>
     let l ← peers j
     if l.isEmpty then throw "an empty offer list as a value"
     return some (.peers l)
-  | .askedParked _ | .holders .. =>
+  | .askedParked _ | .holders .. | .rsampleAsked .. | .sampledFrom _ =>
     let l ← peers j
     if l.isEmpty then throw "an empty set as a value"
     if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a peer twice: {j.compress}"
     return some (.peers l)
-  | .offered .. | .received _ | .mine _ | .owedAnswers .. | .sentTo .. =>
+  | .offered .. | .received _ | .mine _ | .owedAnswers .. | .sentTo .. | .rebuilt _ | .probeAnswers .. =>
     let b ← nat j
     if b == 0 then throw "an empty bitmap as a value"
     return some (.bits b)
-  | .lrArmed _ | .pendingId _ => if j == .bool true then return some .flag else throw s!"not a set's member: {j.compress}"
-  | .ihaveFrames _ | .ihaveAsked _ | .serveCount .. =>
+  | .lrArmed _ | .pendingId _ | .probeAsk _ | .probeSent _ => if j == .bool true then return some .flag else throw s!"not a set's member: {j.compress}"
+  | .ihaveFrames _ | .ihaveAsked _ | .serveCount .. | .rsampleStep _ | .served .. | .forwarded _ =>
     let n ← nat j
     if n == 0 then throw "a count of zero as a value"
     return some (.count n)
@@ -95,8 +132,8 @@ def val (c : Cell) (j : Json) : Except String (Option Val) := do
     let l ← waitList j
     if l.isEmpty then throw "an empty list of waits as a value"
     return some (.waits l)
-  | .tieSlot .. => return some (.slot (← nat j))
-  | .slotHeld _ | .stopPull _ => if j == .bool true then return some .flag else throw s!"not a set's member: {j.compress}"
+  | .tieSlot .. | .probe _ | .probed _ | .probeWaiting .. => return some (.slot (← nat j))
+  | .slotHeld _ | .stopPull _ | .deferred _ | .waited _ | .rsampleFinal _ => if j == .bool true then return some .flag else throw s!"not a set's member: {j.compress}"
   | .peerHas .. => return some (.have (← haveEntry j))
   | .paceQueue _ =>
     let l ← jobList j
@@ -109,7 +146,7 @@ def val (c : Cell) (j : Json) : Except String (Option Val) := do
     return some (.peers l)
   | .pushed .. => return some (.push (← pushEntry j))
   | .desc _ => return some (.desc (← descriptor j))
-  | .inFlight _ =>
+  | .inFlight _ | .samplesInFlight _ =>
     let n ← intOf j
     if n == 0 then throw "a count of zero as a value"
     return some (.int n)
@@ -118,6 +155,32 @@ def val (c : Cell) (j : Json) : Except String (Option Val) := do
     if l.isEmpty then throw "an empty set as a value"
     if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with an id twice: {j.compress}"
     return some (.ids l)
+  | .tOf _ => return some (.typeId (← typeId j))
+  | .interest _ | .wantP .. => return some (.ibits (← intOf j))
+  | .joinRecv .. | .joinSent .. => return some (.join (← joinMsg j))
+  | .pushOut .. | .pushIn .. | .graftedOut .. | .graftedIn .. =>
+    let l ← natList j
+    if l.isEmpty then throw "an empty set of colours as a value"
+    if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a colour twice: {j.compress}"
+    return some (.colours l)
+  | .owedRelations _ =>
+    let l ← relationList j
+    if l.isEmpty then throw "an empty list of relations as a value"
+    return some (.relations l)
+  | .standing .. | .claims _ =>
+    let l ← peers j
+    if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a peer twice: {j.compress}"
+    return some (.peers l)
+  | .probeOk _ => return some (.verdict (← probeVerdict j))
+  | .probeServed .. => if j == .bool true then return some .flag else throw s!"not a flag's true: {j.compress}"
+  | .rsample _ =>
+    let l ← natList j
+    if l.isEmpty then throw "an empty list of indices as a value"
+    return some (.indices l)
+  | .heldSamples _ =>
+    let l ← giList j
+    if l.isEmpty then throw "an empty list of groups and indices as a value"
+    return some (.gis l)
   | .tiedRow _ | .tiedPeerRow .. | .queueRow _ | .owedRow _ | .plannedRow _ =>
     if j == .bool true then return some .flag else throw s!"not a row's presence: {j.compress}"
 
@@ -168,6 +231,43 @@ def level (j : Json) : Except String Level := do
   | "waiters", #[] => return .waiters
   | "sent", #[] => return .sent
   | "unwanted", #[] => return .unwanted
+  | "join_recv", #[] => return .joinRecvAll
+  | "join_sent", #[] => return .joinSentAll
+  | "push_out", #[] => return .pushOutAll
+  | "push_in", #[] => return .pushInAll
+  | "grafted_out", #[] => return .graftedOutAll
+  | "grafted_in", #[] => return .graftedInAll
+  | "owed_relations", #[] => return .owedRelations
+  | "backoff", #[] => return .backoffAll
+  | "T_of", #[] => return .tOf
+  | "rebuilt", #[] => return .rebuilt
+  | "interest", #[] => return .interest
+  | "known_at", #[] => return .knownAt
+  | "standing", #[] => return .standingAll
+  | "claims", #[] => return .claims
+  | "reconsider_at", #[] => return .reconsiderAt
+  | "deferred", #[] => return .deferred
+  | "duty_at", #[] => return .dutyAt
+  | "waited", #[] => return .waited
+  | "probe", #[] => return .probe
+  | "probed", #[] => return .probed
+  | "probe_asks", #[] => return .probeAsk
+  | "probe_sent", #[] => return .probeSent
+  | "probe_ok", #[] => return .probeOk
+  | "rsample", #[] => return .rsample
+  | "rsample_step", #[] => return .rsampleStep
+  | "rsample_asked", #[] => return .rsampleAskedAll
+  | "rsample_final", #[] => return .rsampleFinal
+  | "served", #[] => return .servedAll
+  | "want_p", #[] => return .wantPAll
+  | "probe_served", #[] => return .probeServedAll
+  | "probe_answers", #[] => return .probeAnswersAll
+  | "probe_waiting", #[g] => return .probeWaiting (← groupKey g)
+  | "probe_waiting", #[] => return .probeWaitingAll
+  | "sampled_from", #[] => return .sampledFrom
+  | "samples_in_flight", #[] => return .samplesInFlight
+  | "held_samples", #[] => return .heldSamples
+  | "forwarded", #[] => return .forwarded
   | _, _ => throw s!"not a level of §6.1's tables: {j.compress}"
 
 /-- An entry's value in a state: none where it is missing or empty. -/
@@ -245,6 +345,72 @@ def valueAt (s : State) : Cell → Option Val
   | .unwanted p => match sortBy (· < ·) (s.unwanted.getD p {}).toList with
     | [] => none
     | l => some (.ids l)
+  | .joinRecv p T => ((s.joinRecv.getD p {}).get? T).map (.join ·)
+  | .joinSent p T => ((s.joinSent.getD p {}).get? T).map (.join ·)
+  | .pushOut p T fam => match sortBy (· < ·) (((s.pushOut.getD p {}).getD T {}).getD fam {}).toList with
+    | [] => none
+    | l => some (.colours l)
+  | .pushIn p T fam => match sortBy (· < ·) (((s.pushIn.getD p {}).getD T {}).getD fam {}).toList with
+    | [] => none
+    | l => some (.colours l)
+  | .graftedOut p T fam => match sortBy (· < ·) (((s.graftedOut.getD p {}).getD T {}).getD fam {}).toList with
+    | [] => none
+    | l => some (.colours l)
+  | .graftedIn p T fam => match sortBy (· < ·) (((s.graftedIn.getD p {}).getD T {}).getD fam {}).toList with
+    | [] => none
+    | l => some (.colours l)
+  | .owedRelations p => match s.owedRelations.getD p [] with
+    | [] => none
+    | l => some (.relations l)
+  | .backoff p T fam cd => ((((s.backoff.getD p {}).getD T {}).getD fam {}).get? cd).map (.time ·.toBits)
+  | .tOf g => (s.tOf.get? g).map (.typeId ·)
+  | .rebuilt g => match s.rebuilt.getD g 0 with
+    | 0 => none
+    | b => some (.bits b)
+  | .interest g => (s.interest.get? g).map (.ibits ·)
+  | .knownAt g => (s.knownAt.get? g).map (.time ·.toBits)
+  | .standing g i => ((s.standing.getD g {}).get? i).map (fun ps => .peers (sortBy (· < ·) ps.toList))
+  | .claims g => (s.claims.get? g).map (fun ps => .peers (sortBy (· < ·) ps.toList))
+  | .reconsiderAt g => (s.reconsiderAt.get? g).map (.time ·.toBits)
+  | .deferred g => if s.deferred.contains g then some .flag else none
+  | .dutyAt g => (s.dutyAt.get? g).map (.time ·.toBits)
+  | .waited g => if s.waited.contains g then some .flag else none
+  | .probe g => (s.probe.get? g).map (.slot ·)
+  | .probed g => (s.probed.get? g).map (.slot ·)
+  | .probeAsk a => if s.probeAsks.contains a then some .flag else none
+  | .probeSent g => if s.probeSent.contains g then some .flag else none
+  | .probeOk g => (s.probeOk.get? g).map (.verdict ·)
+  | .rsample g => match s.rsample.getD g [] with
+    | [] => none
+    | l => some (.indices l)
+  | .rsampleStep g => match s.rsampleStep.getD g 0 with
+    | 0 => none
+    | n => some (.count n)
+  | .rsampleAsked g i => match sortBy (· < ·) ((s.rsampleAsked.getD g {}).getD i {}).toList with
+    | [] => none
+    | l => some (.peers l)
+  | .rsampleFinal g => if s.rsampleFinal.contains g then some .flag else none
+  | .served p g => match (s.served.getD p {}).getD g 0 with
+    | 0 => none
+    | n => some (.count n)
+  | .wantP p g => ((s.wantP.getD p {}).get? g).map (.ibits ·)
+  | .probeServed p g => if (s.probeServed.getD p {}).getD g false then some .flag else none
+  | .probeAnswers p g => match (s.probeAnswers.getD p {}).getD g 0 with
+    | 0 => none
+    | b => some (.bits b)
+  | .probeWaiting g p => ((s.probeWaiting.getD g {}).get? p).map (.slot ·)
+  | .sampledFrom b => match sortBy (· < ·) (s.sampledFrom.getD b {}).toList with
+    | [] => none
+    | l => some (.peers l)
+  | .samplesInFlight b => match s.samplesInFlight.getD b 0 with
+    | 0 => none
+    | n => some (.int n)
+  | .heldSamples b => match s.heldSamples.getD b [] with
+    | [] => none
+    | l => some (.gis l)
+  | .forwarded p => match s.forwarded.getD p 0 with
+    | 0 => none
+    | n => some (.count n)
 
 /-- A state with one more entry: how a record's `reads` become the twin's state. -/
 def put (s : State) (c : Cell) (v : Val) : Except String State :=
@@ -290,6 +456,42 @@ def put (s : State) (c : Cell) (v : Val) : Except String State :=
   | .waiters e, .peers l => pure { s with waiters := s.waiters.insert e l }
   | .sent k, .time t => pure { s with sent := s.sent.insert k (Float.ofBits t) }
   | .unwanted p, .ids l => pure { s with unwanted := s.unwanted.insert p (l.foldl (·.insert ·) {}) }
+  | .joinRecv p T, .join m => pure { s with joinRecv := s.joinRecv.insert p ((s.joinRecv.getD p {}).insert T m) }
+  | .joinSent p T, .join m => pure { s with joinSent := s.joinSent.insert p ((s.joinSent.getD p {}).insert T m) }
+  | .pushOut p T fam, .colours l => pure { s with pushOut := s.pushOut.insert p ((s.pushOut.getD p {}).insert T (((s.pushOut.getD p {}).getD T {}).insert fam (l.foldl (·.insert ·) {}))) }
+  | .pushIn p T fam, .colours l => pure { s with pushIn := s.pushIn.insert p ((s.pushIn.getD p {}).insert T (((s.pushIn.getD p {}).getD T {}).insert fam (l.foldl (·.insert ·) {}))) }
+  | .graftedOut p T fam, .colours l => pure { s with graftedOut := s.graftedOut.insert p ((s.graftedOut.getD p {}).insert T (((s.graftedOut.getD p {}).getD T {}).insert fam (l.foldl (·.insert ·) {}))) }
+  | .graftedIn p T fam, .colours l => pure { s with graftedIn := s.graftedIn.insert p ((s.graftedIn.getD p {}).insert T (((s.graftedIn.getD p {}).getD T {}).insert fam (l.foldl (·.insert ·) {}))) }
+  | .owedRelations p, .relations l => pure { s with owedRelations := s.owedRelations.insert p l }
+  | .backoff p T fam cd, .time t => pure { s with backoff := s.backoff.insert p ((s.backoff.getD p {}).insert T (((s.backoff.getD p {}).getD T {}).insert fam ((((s.backoff.getD p {}).getD T {}).getD fam {}).insert cd (Float.ofBits t)))) }
+  | .tOf g, .typeId x => pure { s with tOf := s.tOf.insert g x }
+  | .rebuilt g, .bits b => pure { s with rebuilt := s.rebuilt.insert g b }
+  | .interest g, .ibits b => pure { s with interest := s.interest.insert g b }
+  | .knownAt g, .time t => pure { s with knownAt := s.knownAt.insert g (Float.ofBits t) }
+  | .standing g i, .peers l => pure { s with standing := s.standing.insert g ((s.standing.getD g {}).insert i (l.foldl (·.insert ·) {})) }
+  | .claims g, .peers l => pure { s with claims := s.claims.insert g (l.foldl (·.insert ·) {}) }
+  | .reconsiderAt g, .time t => pure { s with reconsiderAt := s.reconsiderAt.insert g (Float.ofBits t) }
+  | .deferred g, .flag => pure { s with deferred := s.deferred.insert g }
+  | .dutyAt g, .time t => pure { s with dutyAt := s.dutyAt.insert g (Float.ofBits t) }
+  | .waited g, .flag => pure { s with waited := s.waited.insert g }
+  | .probe g, .slot n => pure { s with probe := s.probe.insert g n }
+  | .probed g, .slot n => pure { s with probed := s.probed.insert g n }
+  | .probeAsk a, .flag => pure { s with probeAsks := s.probeAsks.insert a }
+  | .probeSent g, .flag => pure { s with probeSent := s.probeSent.insert g }
+  | .probeOk g, .verdict v => pure { s with probeOk := s.probeOk.insert g v }
+  | .rsample g, .indices l => pure { s with rsample := s.rsample.insert g l }
+  | .rsampleStep g, .count n => pure { s with rsampleStep := s.rsampleStep.insert g n }
+  | .rsampleAsked g i, .peers l => pure { s with rsampleAsked := s.rsampleAsked.insert g ((s.rsampleAsked.getD g {}).insert i (l.foldl (·.insert ·) {})) }
+  | .rsampleFinal g, .flag => pure { s with rsampleFinal := s.rsampleFinal.insert g }
+  | .served p g, .count n => pure { s with served := s.served.insert p ((s.served.getD p {}).insert g n) }
+  | .wantP p g, .ibits b => pure { s with wantP := s.wantP.insert p ((s.wantP.getD p {}).insert g b) }
+  | .probeServed p g, .flag => pure { s with probeServed := s.probeServed.insert p ((s.probeServed.getD p {}).insert g true) }
+  | .probeAnswers p g, .bits b => pure { s with probeAnswers := s.probeAnswers.insert p ((s.probeAnswers.getD p {}).insert g b) }
+  | .probeWaiting g p, .slot n => pure { s with probeWaiting := s.probeWaiting.insert g ((s.probeWaiting.getD g {}).insert p n) }
+  | .sampledFrom b, .peers l => pure { s with sampledFrom := s.sampledFrom.insert b (l.foldl (·.insert ·) {}) }
+  | .samplesInFlight b, .int n => pure { s with samplesInFlight := s.samplesInFlight.insert b n }
+  | .heldSamples b, .gis l => pure { s with heldSamples := s.heldSamples.insert b l }
+  | .forwarded p, .count n => pure { s with forwarded := s.forwarded.insert p n }
   | c, v => throw s!"not a value of {reprStr c}: {reprStr v}"
 
 /-- A state without an entry: how a record's erasing write is applied. -/
@@ -335,6 +537,42 @@ def drop (s : State) : Cell → State
   | .waiters e => { s with waiters := s.waiters.erase e }
   | .sent k => { s with sent := s.sent.erase k }
   | .unwanted p => { s with unwanted := s.unwanted.erase p }
+  | .joinRecv p T => { s with joinRecv := s.joinRecv.insert p ((s.joinRecv.getD p {}).erase T) }
+  | .joinSent p T => { s with joinSent := s.joinSent.insert p ((s.joinSent.getD p {}).erase T) }
+  | .pushOut p T fam => { s with pushOut := s.pushOut.insert p ((s.pushOut.getD p {}).insert T (((s.pushOut.getD p {}).getD T {}).erase fam)) }
+  | .pushIn p T fam => { s with pushIn := s.pushIn.insert p ((s.pushIn.getD p {}).insert T (((s.pushIn.getD p {}).getD T {}).erase fam)) }
+  | .graftedOut p T fam => { s with graftedOut := s.graftedOut.insert p ((s.graftedOut.getD p {}).insert T (((s.graftedOut.getD p {}).getD T {}).erase fam)) }
+  | .graftedIn p T fam => { s with graftedIn := s.graftedIn.insert p ((s.graftedIn.getD p {}).insert T (((s.graftedIn.getD p {}).getD T {}).erase fam)) }
+  | .owedRelations p => { s with owedRelations := s.owedRelations.erase p }
+  | .backoff p T fam cd => { s with backoff := s.backoff.insert p ((s.backoff.getD p {}).insert T (((s.backoff.getD p {}).getD T {}).insert fam ((((s.backoff.getD p {}).getD T {}).getD fam {}).erase cd))) }
+  | .tOf g => { s with tOf := s.tOf.erase g }
+  | .rebuilt g => { s with rebuilt := s.rebuilt.erase g }
+  | .interest g => { s with interest := s.interest.erase g }
+  | .knownAt g => { s with knownAt := s.knownAt.erase g }
+  | .standing g i => { s with standing := s.standing.insert g ((s.standing.getD g {}).erase i) }
+  | .claims g => { s with claims := s.claims.erase g }
+  | .reconsiderAt g => { s with reconsiderAt := s.reconsiderAt.erase g }
+  | .deferred g => { s with deferred := s.deferred.erase g }
+  | .dutyAt g => { s with dutyAt := s.dutyAt.erase g }
+  | .waited g => { s with waited := s.waited.erase g }
+  | .probe g => { s with probe := s.probe.erase g }
+  | .probed g => { s with probed := s.probed.erase g }
+  | .probeAsk a => { s with probeAsks := s.probeAsks.erase a }
+  | .probeSent g => { s with probeSent := s.probeSent.erase g }
+  | .probeOk g => { s with probeOk := s.probeOk.erase g }
+  | .rsample g => { s with rsample := s.rsample.erase g }
+  | .rsampleStep g => { s with rsampleStep := s.rsampleStep.erase g }
+  | .rsampleAsked g i => { s with rsampleAsked := s.rsampleAsked.insert g ((s.rsampleAsked.getD g {}).erase i) }
+  | .rsampleFinal g => { s with rsampleFinal := s.rsampleFinal.erase g }
+  | .served p g => { s with served := s.served.insert p ((s.served.getD p {}).erase g) }
+  | .wantP p g => { s with wantP := s.wantP.insert p ((s.wantP.getD p {}).erase g) }
+  | .probeServed p g => { s with probeServed := s.probeServed.insert p ((s.probeServed.getD p {}).erase g) }
+  | .probeAnswers p g => { s with probeAnswers := s.probeAnswers.insert p ((s.probeAnswers.getD p {}).erase g) }
+  | .probeWaiting g p => { s with probeWaiting := s.probeWaiting.insert g ((s.probeWaiting.getD g {}).erase p) }
+  | .sampledFrom b => { s with sampledFrom := s.sampledFrom.erase b }
+  | .samplesInFlight b => { s with samplesInFlight := s.samplesInFlight.erase b }
+  | .heldSamples b => { s with heldSamples := s.heldSamples.erase b }
+  | .forwarded p => { s with forwarded := s.forwarded.erase p }
 
 /-- Every entry a state holds, empty ones left out: what two states are compared by. -/
 def entries (s : State) : List (Cell × Val) :=
@@ -380,6 +618,42 @@ def entries (s : State) : List (Cell × Val) :=
     ++ s.waiters.toList.map (fun (e, _) => .waiters e)
     ++ s.sent.toList.map (fun (k, _) => .sent k)
     ++ s.unwanted.toList.map (fun (p, _) => .unwanted p)
+    ++ s.joinRecv.toList.flatMap (fun (p, m) => m.toList.map fun (T, _) => .joinRecv p T)
+    ++ s.joinSent.toList.flatMap (fun (p, m) => m.toList.map fun (T, _) => .joinSent p T)
+    ++ s.pushOut.toList.flatMap (fun (p, m) => m.toList.flatMap fun (T, m) => m.toList.map fun (fam, _) => .pushOut p T fam)
+    ++ s.pushIn.toList.flatMap (fun (p, m) => m.toList.flatMap fun (T, m) => m.toList.map fun (fam, _) => .pushIn p T fam)
+    ++ s.graftedOut.toList.flatMap (fun (p, m) => m.toList.flatMap fun (T, m) => m.toList.map fun (fam, _) => .graftedOut p T fam)
+    ++ s.graftedIn.toList.flatMap (fun (p, m) => m.toList.flatMap fun (T, m) => m.toList.map fun (fam, _) => .graftedIn p T fam)
+    ++ s.owedRelations.toList.map (fun (p, _) => .owedRelations p)
+    ++ s.backoff.toList.flatMap (fun (p, m) => m.toList.flatMap fun (T, m) => m.toList.flatMap fun (fam, m) => m.toList.map fun (cd, _) => .backoff p T fam cd)
+    ++ s.tOf.toList.map (fun (g, _) => .tOf g)
+    ++ s.rebuilt.toList.map (fun (g, _) => .rebuilt g)
+    ++ s.interest.toList.map (fun (g, _) => .interest g)
+    ++ s.knownAt.toList.map (fun (g, _) => .knownAt g)
+    ++ s.standing.toList.flatMap (fun (g, m) => m.toList.map fun (i, _) => .standing g i)
+    ++ s.claims.toList.map (fun (g, _) => .claims g)
+    ++ s.reconsiderAt.toList.map (fun (g, _) => .reconsiderAt g)
+    ++ s.deferred.toList.map (fun g => .deferred g)
+    ++ s.dutyAt.toList.map (fun (g, _) => .dutyAt g)
+    ++ s.waited.toList.map (fun g => .waited g)
+    ++ s.probe.toList.map (fun (g, _) => .probe g)
+    ++ s.probed.toList.map (fun (g, _) => .probed g)
+    ++ s.probeAsks.toList.map (fun a => .probeAsk a)
+    ++ s.probeSent.toList.map (fun g => .probeSent g)
+    ++ s.probeOk.toList.map (fun (g, _) => .probeOk g)
+    ++ s.rsample.toList.map (fun (g, _) => .rsample g)
+    ++ s.rsampleStep.toList.map (fun (g, _) => .rsampleStep g)
+    ++ s.rsampleAsked.toList.flatMap (fun (g, m) => m.toList.map fun (i, _) => .rsampleAsked g i)
+    ++ s.rsampleFinal.toList.map (fun g => .rsampleFinal g)
+    ++ s.served.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .served p g)
+    ++ s.wantP.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .wantP p g)
+    ++ s.probeServed.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .probeServed p g)
+    ++ s.probeAnswers.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .probeAnswers p g)
+    ++ s.probeWaiting.toList.flatMap (fun (g, m) => m.toList.map fun (p, _) => .probeWaiting g p)
+    ++ s.sampledFrom.toList.map (fun (b, _) => .sampledFrom b)
+    ++ s.samplesInFlight.toList.map (fun (b, _) => .samplesInFlight b)
+    ++ s.heldSamples.toList.map (fun (b, _) => .heldSamples b)
+    ++ s.forwarded.toList.map (fun (p, _) => .forwarded p)
   all.filterMap fun c => (valueAt s c).map fun v => (c, v)
 
 /-- Whether a level read as a whole holds an entry. -/
@@ -434,6 +708,43 @@ def under (c : Cell) (l : Level) : Bool :=
   | .waiters, .waiters _ => true
   | .sent, .sent _ => true
   | .unwanted, .unwanted _ => true
+  | .joinRecvAll, .joinRecv .. => true
+  | .joinSentAll, .joinSent .. => true
+  | .pushOutAll, .pushOut .. => true
+  | .pushInAll, .pushIn .. => true
+  | .graftedOutAll, .graftedOut .. => true
+  | .graftedInAll, .graftedIn .. => true
+  | .owedRelations, .owedRelations _ => true
+  | .backoffAll, .backoff .. => true
+  | .tOf, .tOf _ => true
+  | .rebuilt, .rebuilt _ => true
+  | .interest, .interest _ => true
+  | .knownAt, .knownAt _ => true
+  | .standingAll, .standing .. => true
+  | .claims, .claims _ => true
+  | .reconsiderAt, .reconsiderAt _ => true
+  | .deferred, .deferred _ => true
+  | .dutyAt, .dutyAt _ => true
+  | .waited, .waited _ => true
+  | .probe, .probe _ => true
+  | .probed, .probed _ => true
+  | .probeAsk, .probeAsk _ => true
+  | .probeSent, .probeSent _ => true
+  | .probeOk, .probeOk _ => true
+  | .rsample, .rsample _ => true
+  | .rsampleStep, .rsampleStep _ => true
+  | .rsampleAskedAll, .rsampleAsked .. => true
+  | .rsampleFinal, .rsampleFinal _ => true
+  | .servedAll, .served .. => true
+  | .wantPAll, .wantP .. => true
+  | .probeServedAll, .probeServed .. => true
+  | .probeAnswersAll, .probeAnswers .. => true
+  | .probeWaiting g, .probeWaiting g' _ => g == g'
+  | .probeWaitingAll, .probeWaiting .. => true
+  | .sampledFrom, .sampledFrom _ => true
+  | .samplesInFlight, .samplesInFlight _ => true
+  | .heldSamples, .heldSamples _ => true
+  | .forwarded, .forwarded _ => true
   | _, _ => false
 
 /-- Whether a level holds another: itself, or a table's whole against one of its rows. -/
@@ -447,6 +758,7 @@ def covers (l₁ l₂ : Level) : Bool :=
   | .tiedRoot r, .tiedPeer r' _ => r == r'
   | .owedAll, .owed _ => true
   | .owedAnswersAll, .owedAnswers _ => true
+  | .probeWaitingAll, .probeWaiting _ => true
   | _, _ => false
 
 end SpecTwin.Replay

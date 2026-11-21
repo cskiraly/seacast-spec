@@ -79,6 +79,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # an isolated Python (-I) puts no directory there itself
 from schema import PARSE, STATE_ORDER, TABLES, VALUES     # noqa: E402
+import schema_v2                                            # noqa: E402
+
+# protocol-v2.md's tables after protocol.md's, in one State and one Cell (schema_v2.py). The lists are new objects:
+# schema.py's own, which the tracer reads, stay protocol.md's
+TABLES = TABLES + schema_v2.TABLES_V2
+VALUES = {**VALUES, **schema_v2.VALUES_V2}
+PARSE = {**PARSE, **schema_v2.PARSE_V2}
+V2_NAMES = frozenset(t.name for t in schema_v2.TABLES_V2)
 
 WIDTH = 120
 NOT_SOURCES = (".lake", "tools", "record", "__pycache__")    # what is not the twin's sources (as ../layout.py's)
@@ -456,6 +464,34 @@ def replay():
         elif kind == "jobs":                        # an empty pace queue is no value
             out += [f"  | {pats} =>", f"    let l ← {v['parse']} j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
                     "    return some (.jobs l)"]
+        # protocol-v2.md's kinds (schema_v2.py)
+        elif kind == "typeid":
+            out.append(f"  | {pats} => return some (.typeId (← typeId j))")
+        elif kind == "ibits":                       # a stored 0 is a value
+            out.append(f"  | {pats} => return some (.ibits (← intOf j))")
+        elif kind == "join":
+            out.append(f"  | {pats} => return some (.join (← {v['parse']} j))")
+        elif kind == "colours":                     # a set of colours, sorted; empty is no value
+            out += [f"  | {pats} =>", "    let l ← natList j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
+                    '    if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a colour twice: {j.compress}"',
+                    "    return some (.colours l)"]
+        elif kind == "relations":                   # relation messages in order; empty is no value
+            out += [f"  | {pats} =>", f"    let l ← {v['parse']} j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
+                    "    return some (.relations l)"]
+        elif kind == "opeerset":                    # there and empty is []: a value
+            out += [f"  | {pats} =>", "    let l ← peers j",
+                    '    if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a peer twice: {j.compress}"',
+                    "    return some (.peers l)"]
+        elif kind == "verdict":                     # true, false, or a stored None
+            out.append(f"  | {pats} => return some (.verdict (← {v['parse']} j))")
+        elif kind == "bool":                        # false is no value
+            out.append(f'  | {pats} => if j == .bool true then return some .flag else throw s!"not a flag\'s true: {{j.compress}}"')
+        elif kind == "indices":                     # indices in order; empty is no value
+            out += [f"  | {pats} =>", "    let l ← natList j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
+                    "    return some (.indices l)"]
+        elif kind == "gis":                         # groups and indices in order; empty is no value
+            out += [f"  | {pats} =>", f"    let l ← {v['parse']} j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
+                    "    return some (.gis l)"]
         else:
             raise SystemExit(f"gen.py: no `val` arm is written for the kind of value {kind!r}")
     rows = [rowpat(t, n) for t in TABLES for n in range(1, len(t.rows or []) + 1)]
@@ -548,6 +584,37 @@ def replay():
         elif t.value == "desc":
             va.append(f"  | {c} => {got_opt}.map (.desc ·)")
             put.append(f"  | {c}, .desc d => pure {{ s with {f} := {ins('d')} }}")
+        # protocol-v2.md's kinds (schema_v2.py)
+        elif t.value == "typeid":
+            va.append(f"  | {c} => {got_opt}.map (.typeId ·)")
+            put.append(f"  | {c}, .typeId x => pure {{ s with {f} := {ins('x')} }}")
+        elif t.value == "ibits":                   # a stored 0 is a value
+            va.append(f"  | {c} => {got_opt}.map (.ibits ·)")
+            put.append(f"  | {c}, .ibits b => pure {{ s with {f} := {ins('b')} }}")
+        elif t.value == "join":
+            va.append(f"  | {c} => {got_opt}.map (.join ·)")
+            put.append(f"  | {c}, .join m => pure {{ s with {f} := {ins('m')} }}")
+        elif t.value == "colours":                 # empty is no value
+            va += [f"  | {c} => match sortBy (· < ·) ({got_def}).toList with", "    | [] => none", "    | l => some (.colours l)"]
+            put.append(f"  | {c}, .colours l => pure {{ s with {f} := {ins('(l.foldl (·.insert ·) {})')} }}")
+        elif t.value == "relations":               # empty is no value
+            va += [f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.relations l)"]
+            put.append(f"  | {c}, .relations l => pure {{ s with {f} := {ins('l')} }}")
+        elif t.value == "opeerset":                # there and empty is a value
+            va.append(f"  | {c} => {got_opt}.map (fun ps => .peers (sortBy (· < ·) ps.toList))")
+            put.append(f"  | {c}, .peers l => pure {{ s with {f} := {ins('(l.foldl (·.insert ·) {})')} }}")
+        elif t.value == "verdict":                 # a stored None is a value
+            va.append(f"  | {c} => {got_opt}.map (.verdict ·)")
+            put.append(f"  | {c}, .verdict v => pure {{ s with {f} := {ins('v')} }}")
+        elif t.value == "bool":                    # false is no value
+            va.append(f"  | {c} => if {got_def} then some .flag else none")
+            put.append(f"  | {c}, .flag => pure {{ s with {f} := {ins('true')} }}")
+        elif t.value == "indices":                 # empty is no value
+            va += [f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.indices l)"]
+            put.append(f"  | {c}, .indices l => pure {{ s with {f} := {ins('l')} }}")
+        elif t.value == "gis":                     # empty is no value
+            va += [f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.gis l)"]
+            put.append(f"  | {c}, .gis l => pure {{ s with {f} := {ins('l')} }}")
         else:
             raise SystemExit(f"gen.py: no `valueAt` and `put` arms are written for the kind of value {t.value!r}")
         drop.append(f"  | {c} => {{ s with {f} := {ers} }}")
@@ -586,8 +653,9 @@ def replay():
     return r
 
 
-GENERATED = ("This file is written whole by `tools/gen/gen.py` from `gen/schema.py`, one entry there per\n"
-             "table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema, or the generator.")
+GENERATED = ("This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_v2.py`, one\n"
+             "entry there per table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema,\n"
+             "or the generator.")
 
 
 def wrapped(items, indent, width=WIDTH):
@@ -642,7 +710,11 @@ def state_file():
         "",
         "/-- The twin's own tables, by the names a trace's header and its records give them, in the schema's order. -/",
         "def ownTables : List String :=",
-        *wrapped([f'"{t.name}"' for t in TABLES], "  "),
+        *wrapped([f'"{t.name}"' for t in TABLES if t.name not in V2_NAMES], "  "),
+        "",
+        "/-- `protocol-v2.md`'s tables (`gen/schema_v2.py`), by the names its records give them, in the schema's order. -/",
+        "def v2Tables : List String :=",
+        *wrapped([f'"{t.name}"' for t in TABLES if t.name in V2_NAMES], "  "),
         "",
         "end SpecTwin",
         "",
@@ -779,7 +851,7 @@ FILES = {"SpecTwin/State.lean": state_file, "SpecTwin/Tables.lean": tables_file,
          "SpecTwin/ReplayTables.lean": replay_tables_file}
 # the names the three files declare, which no other file of the twin may declare (the tripwire). `lift` and
 # `instReaderT` are left out: `Node61` has a `lift` of its own, by hand.
-NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "Tables", "ofState",
+NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "v2Tables", "Tables", "ofState",
          "cell", "val", "level", "valueAt", "put", "drop", "entries", "under", "covers")
 DECL = re.compile(r"^\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?"
                   r"(?:(?:private|protected|partial|noncomputable|unsafe|nonrec|public|scoped|local)\s+)*"

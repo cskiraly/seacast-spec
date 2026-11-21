@@ -24,7 +24,7 @@
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
-#             matrixdiff.py, and trace3.py's of the names protocol-v2.md keeps)
+#             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, and gen/schema_v2.py's encoders)
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); the views' own cases (footprint_test.py)
 #   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
 #             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused
@@ -254,11 +254,12 @@ commentsonly.py --self-test ^self-test: ([0-9]+) of \1 known answers
 fullid.py --self-test ^ok: every case as it must be$
 against.py --self-test ^ok: every case as it must be$
 matrixdiff.py --self-test ^ok: every case as it must be$
-trace3.py --self-test-v2 ^ok: 
+trace3.py --self-test-v2 ^ok:
+gen/schema_v2.py --self-test ^ok: every case as it must be$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 8 ] || no "not 8 tools' self-tests passed"
-  echo "  $n of 8 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 9 ] || no "not 9 tools' self-tests passed"
+  echo "  $n of 9 tools' own cases as they must be (selftests.txt)"
 }
 s_tables() {
   { $PY "$T/gen/gen.py" --check "$OUT/twin" && $PY "$T/gen/makers.py" --check "$OUT/twin"; } > "$OUT/tables.txt" 2>&1 \
