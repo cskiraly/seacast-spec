@@ -35,6 +35,9 @@ names how SEACAST diffuses.
   protocol (`/seacast/2.0.0`), is defined to the byte, on a stream of its own or in Waggle's framing.
   The bindings onto gossipsub's wires, with the Partial Messages Extension and v0.3's, are defined to
   the field.
+- [`protocol-v2-decisions.md`](protocol-v2-decisions.md): the next version's decision record, a
+  companion of `protocol-v2.md`: each design decision, when it was decided, what was not taken and
+  the runs behind it, and the versions of `protocol.md` the draft has carried.
 - [`toy/`](toy/): runs every `python` block of `protocol.md`, once per node, on a simulated
   network. It shows that the document is complete enough to run, and is a place to try a rule
   before implementing it. Its numbers are not measurements.

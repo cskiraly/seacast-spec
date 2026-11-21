@@ -1,0 +1,371 @@
+# SEACAST's next version (draft): its decisions
+
+This is the decision record of [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next version. It lists
+the design decisions `[D1]` to `[D12]` and the others the draft took: when each was decided, what was not taken
+and why, and the runs behind it. It also lists the versions of [`protocol.md`](protocol.md) the draft has carried.
+`protocol-v2.md` states the rules and gives their reasons; its code's comments cite these labels where each
+decision bites.
+
+In this file, a section number (§) without a document's name is `protocol-v2.md`'s, and "this document" and "this
+draft" mean `protocol-v2.md`. The figures are the toy's, under the conditions `protocol-v2.md` §0 states.
+
+## The decisions, and where they bite
+
+| decision | where in `protocol-v2.md` |
+|---|---|
+| `[D1]` identity and bindings (decided: a protocol of its own, carried by three bindings, in their own document since 2026-11-17; a bridge to the stock path is outside this version) | §7, `protocol-v2-bindings.md`; §0's "what is assumed" |
+| `[D2]` two bitmaps, WANT per recipient, no need bitmap (decided, as written) | §2 `Want`, `on_want`, `wants_from_me` |
+| `[D3]` two claims (decided, as written) | §2 `Have`, §1.5, §4.6 |
+| `[D4]` repair's parameters (decided: EIP-8371's phases, rebuilt cells pushed to the custodians lacking them, `DEFER_WINDOW` 1 s, `REPAIR_BUDGET` an option, off; the repair floor at least one link to a custodian of each column) | `TypeParams.DECODE_AT_K`, `DECODE_LATER`, `REPAIR_TO`, `DEFER_WINDOW`; §6.3's `REPAIR_SAMPLE`, `REBUILT_SEEN`, `ALARM_WAIT`; §4.6 `check_completion`, `reconsider`, `push_rebuilt` |
+| `[D5]` the announce relation's width (decided: `ALL_JOINED` for columns and rows; `NONE` permitted for columns, never for rows) | `TypeParams.ANNOUNCE_EXTRA`, §4.4 `announce_extra`, §4.8 `send_gossip` |
+| `[D6]` the payload's consistency route (decided: none in this version; the `EVIDENCE` hook stays) | `TypeParams.EVIDENCE`, §4.6 `decode_group`, the payload's leaf rule in §1.1's table |
+| `[D7]` groups per column and per row, cross-fill (decided, as written) | `ObjectType.project`, `family`, §4.2 `on_validated`, §4.4 `forward` |
+| `[D8]` the row pull delay (decided: 1 s; shorter at a cost under liars) | `TypeParams.START_DELAY`, §4.3 `on_offer` |
+| `[D9]` one document or a sibling (decided: a sibling) | `protocol-v2.md`; §6.1 is the merge path |
+| `[D10]` colours (decided: a parameter, with no default) | `TypeParams.M`, `F_LO`, `F_HI`, `D_OUT`, `SYMMETRIC`, §1.4, §4.1 |
+| `[D11]` join = (interest, duty); topics as rendezvous (decided: the join as written; the rendezvous gossipsub topics per family, with the ENR beside them) | §2 `Join`, §1.2, `protocol-v2-bindings.md` §0's rendezvous row |
+| `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_OUTSTANDING`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
+| the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | v0.3 §6.1's `PROMISE`; §6.3's `PROMISE` row |
+| a source's links in a family it does not custody (decided: it never waits for links; three layers on top of its fanout; a refused push to a fallback link owed) | §4.7 `source_pool`, `candidates_for_source`, `origin_acked`, `unpush`; §6.3's `SOURCE_FLOOR` row |
+| the probe of a claim (R5) (decided: the claimant judged by its own copy; the probe marked and answered whatever the asker holds, once per asker and group; the asker's queue keeps it; its cell drawn at random) | §2 `Want.probe`; §4.2 `on_chunk`, `fill`; §4.5 `on_want`; §4.6 `reconsider`, `defer_on_claim`, `settle_probe`, `probe_answer`, `probe_promise`, `probe_waits`, `probe_of_claim`, `serve_probe`, `filter_entry`; `protocol-v2-bindings.md` §0's WANT row |
+
+**Decided on 2026-11-13.** Six of the decisions above were chosen, each with what was not taken:
+- **`[D1]` identity and bindings.** v2 is a protocol of its own, defined on its own messages and
+  carried by three bindings, defined in their own document (`protocol-v2-bindings.md`, since
+  2026-11-17): the standalone one, the binding onto gossipsub's Partial Messages Extension, and v0.3's
+  wire. §7 states what every binding provides and the capabilities each gives up. Not taken: the
+  extension alone, which gives up interest without subscription and the push relation's floor and
+  direction (§7);
+  and deciding after a paired cell of the signalling cost on both wires, which neither
+  implementation here can run, since neither speaks the extension's wire. A bridge between a
+  binding and the stock path, which a mixed network needs, is a deployment question no measurement
+  here settles; it is outside this version.
+- **`[D4]` the repair floor.** A node that may rebuild keeps at least `REPAIR_FLOOR` links, at
+  least 1, to custodians of each column it does not custody (§4.6). Without it, five of thirteen
+  runs of the toy's withheld row cell left custodians short, each by a missing link; with 1, all
+  thirteen completed. Not taken: opening a link only when a rebuilt cell has nowhere to go (§4.6),
+  kept as an option.
+- **`[D6]` the payload's consistency route.** None in this version: the payload's consistency is
+  left to level 2 and the application, and `EVIDENCE` stays a hook that an object type may fill.
+  Not taken here, each needing work outside this document: a fraud proof over the current code,
+  which changes the leaf rule and needs a condition on the consensus side, and stays the route that
+  changes neither the code nor the commitment scheme; the payload in blobs, a change to the bid;
+  and a layout in two dimensions.
+- **`[D9]` one document or a sibling.** A sibling. `protocol.md` is the published and measured
+  protocol, and this document contains it as one setting (§6.1), which is the merge path if one
+  document is ever wanted. The cost is that each version of `protocol.md` is carried in here (§5).
+  Not taken: one document, whose case is that the payload and the general rules are the same code;
+  folding `protocol.md` into these notions would rewrite text without changing behaviour.
+- **`[D10]` colours.** `M` is a parameter with no default. It is measured at 1 (tier 4, v0.3) and
+  at N (variant C); 1 < M < N is for later study, which needs colour negotiation and a floor per
+  colour in the toy first. Not taken: a measured default before release.
+- **`[D11]` the rendezvous.** Gossipsub topics per family, in every binding, with the ENR beside
+  them. This keeps the stock path, and a network that mixes it with the bindings. Not taken: the
+  ENR alone, an option the standalone binding could run.
+
+The others were confirmed as the toy runs them, and the research harness's Go build where named.
+Nothing measured argues against them.
+- **`[D2]`:** two bitmaps, the WANT per recipient, and no bitmap for need (§2), as the RowDAS
+  design has it. `[D12]` added the WANT's `standing` and `hops`.
+- **`[D3]`:** the two claims, `claim_all` and `complete` (§2, §1.5). They are unverified, and a
+  claim not followed by the chunks it implies counts against the claimant.
+- **`[D4]`, the rest of repair's parameters:**
+  - who decodes and when, EIP-8371's phases;
+  - rebuilt cells pushed to the custodians lacking them;
+  - `DEFER_WINDOW` 1 s;
+  - `REPAIR_BUDGET` an option, off.
+
+  Their values are §6.3's, the same in both implementations.
+- **`[D7]`:** groups per column and per row, with a rebuilt chunk filling its other groups
+  (`project`, `cross`, R4).
+- **`[D11]`, the join:** a JOIN per link and object type, carrying interest and duty (§2, §4.1).
+
+**The promise's length.** §4.13 stretches the ask window on thin links and keeps the promise at
+400 ms, so a peer that does not answer is parked as in v0.3, and a slow honest peer can be parked
+too before the asker has moved on. The option is a promise per peer that follows the times its
+answers took: `max(PROMISE, srtt + 4 · rttvar)`, smoothed as TCP's retransmission timer (RFC 6298),
+a peer that never answered keeping the floor. In the toy, in the research harness's setting at
+12.5 Mbps (seeds 7 to 9): with the same completion times and bytes as §4.13's form, it parked 283
+to 360 honest (peer, group) pairs per run instead of 503 to 642 (v0.3: 584 to 702), and parked the
+withholders of a 30 % withholding network as before. What it buys is the honest peers' standing
+(and whatever scoring reads from broken promises), not time; it needs per-peer state and a sample
+on every answered ask. Not measured in the harness. A promise stretched with the window, the
+other form, is rejected (§4.13).
+- **Decided on 2026-11-13:** 400 ms stays the default, and the per-peer promise is permitted as
+  local policy, as `MERGE_HOLDINGS` is. The promise is the asker's own timer: it changes whom the
+  asker parks, and so whom it asks next, not what either end means.
+- **Not taken:** the per-peer promise as the default, which would first want the research harness
+  at ten seeds.
+
+**A source's links in a family it does not custody** (decided 2026-11-13, §4.7). A source never
+waits for links: it publishes at once to the links it has, and with no relation in a family for a
+chunk's colour its fanout uses its links whose interest holds the chunk, and a push to one of them
+that a full queue refuses is owed, as to a relation peer (decided 2026-11-14). Three layers keep its
+chunks moving on top: links kept to custodians of each family it will publish (`SOURCE_FLOOR`, a
+parameter with no default), a hunt through the binding when a chunk has nowhere to go, and the code
+as the backstop. In the toy the fallback never yields a peer, since its proposer has a relation with
+every custodian it links to, and the hunt is not measured. Not taken: holding the publish until the
+links are there, which would delay every family for one that the code can recover; and for a refused
+push, an offer at the chunk's acknowledgement, which, when every copy was refused, waits for a
+holding that names the chunk or a later copy's timeout.
+
+**The window's unit** (X3, decided 2026-11-13): bytes, as §4.11 runs it, a chunk taking its own
+length of the window. The column cells gain in the toy (one seed, §4.11): at 500 nodes the custody
+block completes in 531 ms at the median and 680 at the tail, against 1 011 and 1 207 with slots.
+Tier 4 moves within 15 ms (§4.11). Not taken: v0.3's slots of `CHUNK_BYTES`, and slots per object
+type, which leave the same capacity question at every boundary between types (§4.11).
+
+**Decided on 2026-11-14.** Two decisions after their runs, and §4.12's rule. The runs are toy
+checks (`toy/run.py --doc v2`, the flags `--col-announce`, `--row-announce` and `--row-delay`),
+each setting read against the value every earlier measurement ran, paired by seed. A value is
+*close* if it leaves no more nodes short, and none on a seed where the other left none, and moves
+the custodians' median and 99th percentile, and in the row settings a row member's 64th cell, by
+at most +20 ms at the median over the seeds.
+- **`[D5]` the announce relation's width.** `ALL_JOINED` for columns and rows, as every measurement
+  ran it. `NONE`, offers to the relations only, is permitted for columns, never for rows.
+  - *At 60 nodes* (seeds 7 to 16), the columns' `NONE` is close in custody at 50 Mbps and with a
+    1 Gbps proposer, in custody and in rows with half the columns withheld, and in the honest rows.
+    It sends 19 to 30 % fewer offers, and 0.00 to 0.06 fewer copies. With a fifth of the nodes
+    lying about their row holdings (`claim20`) it is not close: on one seed a custodian is short in
+    two blocks, where with `ALL_JOINED` one was short in one, and on another a row member is short
+    where none was.
+  - *At 500 nodes* (seeds 7 to 9, two blocks): close in custody, with 7 % fewer offers and 0.03
+    fewer copies of 1.81; close in rows with half the columns withheld and a 1 Gbps proposer, with
+    28 % fewer offers and 0.15 fewer copies of 2.3. With liars it is close only by the letter
+    without withheld columns (the custodians' median +19 ms on the middle seed, +31 on another),
+    and not close with half withheld (+40 ms); no node short in either. Three seeds show a pass or
+    a fail, not a comparison, and do not show the 60-node shortfall gone.
+  - *The rows' `NONE`* left row members short on every seed in every row setting: the rows need
+    the offers to every joined peer.
+  - *The columns' `SAMPLE`* (the heartbeat's paced gossip) was close where `NONE` was but in the
+    500-node rows with half withheld (the custodians' 99th percentile +26 ms on the middle seed).
+    The rows' `SAMPLE` runs as `NONE`, since a cell is published under its column and the
+    heartbeat offers it there.
+  - Not taken: `NONE` as the columns' default. Its saving is mostly control; its failures are under
+    liars, where the offers beyond the relation are the fallback; and its passes at 500 nodes rest
+    on three seeds.
+- **`[D8]` the row pull delay.** 1 s, as every measurement of the toy and the research harness ran
+  it: a secondary axis waits for the column path (R7). In the toy at 60 nodes (seeds 7 to 16; honest
+  rows, rows with a fifth of the nodes lying about their row holdings, rows with half the columns
+  withheld), 2 s costs the column path: the custodians complete 147 to 386 ms later at the median.
+  - *It can be shorter, at a cost.* 0.5 s and 0 s keep the custodians within 10 ms at the median.
+    0.5 s brings a row member's 64th cell 24 to 80 ms sooner at the median. But with liars both
+    leave row members short on every seed: 154 at 0.5 s and 219 at 0 s over the ten seeds, counted
+    once per block they are short in, against one at 1 s; 0 s also leaves a custodian short in one block more.
+    Without liars neither leaves any short. Why was not traced.
+  - Not taken: 2 s, which fails R7; and a delay under 1 s as the default.
+- **A source's own chunks go first** (§4.12), under X3's window in bytes. In the toy, with a 50 Mbps
+  proposer, at 60 nodes over three seeds, the custody block completes 247 ms sooner at the median
+  and 430 ms sooner at the tail; single-group cells run as under v0.3's order. Not taken: v0.3's
+  order, and dropping the source's offers or queueing them after the block's pushes, which cost a
+  fast proposer 7 to 355 ms at the median.
+
+**The probe of a claim** (R5, decided 2026-11-15, §4.6). The probe judges the claimant by its own
+copy of the probed cell only, an answer or a push. Three rules make that fair to an honest claimant
+and hard to meet for a dishonest one: the probe's WANT is marked (`probe`, §2), and the claimant
+answers it whatever the asker's holdings say, once per asker and group, the exemption taken by the
+answer and spent when it is written; the asker's queue keeps its marked WANT while the probe waits;
+and the probed cell is drawn at random among those the member lacks. In the toy's rows (60 nodes,
+three blocks, `--send-buffer 0`), over five cells and three seeds, no honest or hoarding claimant
+failed its probe (none of 1 281 verdicts with the rules as they stand, none of 1 298 with those of
+2026-11-16; before them, 3 of 1 289 failed without the mark and the kept WANT), and liars passed 1,
+0 and 65 times in the three liar cells. Since 2026-11-16, the probe's wait starts at its write, a probe not written when the duty
+next fires gets no verdict unless the claimant's own copy came first, and is not written later, a
+claimant still decoding keeps the first probe per asker and group and answers it once when the cell
+is stored, and a claimant that leaves before the verdict gets none; without a verdict, the member's
+own repair is reconsidered at the duty's own time, at once if that has passed; and once the probe
+is settled, a promise under its key is a plain ask's, which any copy closes. Not taken: any peer's
+copy passing the claimant, which let liars pass whenever another peer brought the cell (at least 57,
+115 and 558 times in the same cells, measured before 2026-11-16); hiding the probed cell from the
+claimant in the asker's holdings while the probe waits, which changes what a node announces and
+cannot hide a cell already named before the probe; and the lowest lacked index, which a claimant can
+read from the member's holdings. The random index's purpose, against a claimant that keeps only the
+cell it expects to be asked, is not measured: the toy's liars do not aim. The standalone binding
+carries `standing` and `probe` in one `Bitvector[8]`, its other bits zero when sent and ignored when
+received, so that a later flag fits without breaking older readers (`protocol-v2-bindings.md` §1.3).
+Not taken there: a byte of
+its own for the mark, which every WANT would pay, and a message of its own for the probe, which
+every binding would have to carry.
+
+**The repair's options** `[D4]` (decided 2026-11-01). The repair sample and rebuilt cells marked
+seen stay options. They are on together where a node defends against hoarding claimants, and the
+second is never on alone (§4.6). The custodian's alarm stays an option for networks without an
+honest supernode.
+
+**Dropped: biasing the repair sample** toward the columns the member check cannot vouch for, those
+that no member of the row's subnet custodies, by drawing half of each step's new cells from them.
+- *What the node knows.* It knows only the members it is linked to. From those, 38 to 50 of the
+  about 60 cells a member lacks look uncovered, so the bias barely narrows the draw.
+- *The odds.* In a network model of the toy's 500-node rows, seed 11's hoarders repair the members'
+  cells and leave 5 columns unrepaired. The chance that every honest member of the subnet passes,
+  so that the row stays short, is 0.52 with the uniform sample and 0.38 with the bias over linked
+  members. It is 0.06 only with every member known, a view the node does not have.
+- *Where hoarders mark their rebuilt cells seen,* the uniform sample already catches them: below
+  0.001 in the model. Beside that option, three seeds showed nothing from the bias.
+
+**A sampler's reach** `[D12]`, decided (2026-11-03). The steady state is a coverage floor built
+for diversity (§1.3). Its size is `SAMPLE_COVER`, a parameter of the object type with a bound of at
+least 1, set at two links per family; `COVER_HIGH` is set at 1 (§6.3). Routed sample requests
+take what the floor misses, one forwarding step by default (§4.10, `ROUTE_HOPS` 1). Both run on
+LiteDAS's two phases: one sample per peer, with peers of high custody as the second phase's
+fallback. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT` and
+`SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
+60-node cells and its 500-node cells at ten seeds (§6.3). Kept as options: one cover
+(`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours (`ROUTE_FLOOR`), and the
+fetch outside the links (§7). For later study:
+- *Why diversity, not the fewest links.* Three reasons. One node that holds a sampler's whole
+  sample can release exactly those cells to it: Al-Bassam, Sonnino and Buterin's selective share
+  disclosure ("If a block producer selectively releases shares as light clients ask for them, up to
+  (k + 1)² shares, they can violate the soundness property", their §5.4), defeated only where "the
+  network would not be able to link different per-share sample requests to the same clients".
+  Custody counts are self-declared, so a node that claims every column would attract every
+  sampler's floor and samples. And the load would concentrate on the nodes of high custody. In the
+  toy's honest 60-node cell before this rule (floor and routed requests, degree 30, seed 7), the
+  proposer, which holds every column, was asked for 28 of 288 samples, up to 5 of one sampler's 8
+  in a block, where no other peer was asked for more than 2; with it, for none, and no peer for
+  more than one.
+- *The floor's size* (decided: `SAMPLE_COVER` set at 2, a parameter of the object type). On the
+  toy's graphs, eight samples find eight distinct serving links in 99.77 % or more of draws with
+  two covers, against 64 to 86 % at 16 links and 97 % at 70 with one (§6.3). In the toy's 500-node
+  cells (seeds 7 to 16, 2 000 sampler-blocks per network), two covers confirmed every sampler in
+  every block, honest and under 30 % withholders, at 70 links and at 16. One cover did as well at
+  70 links. At 16 it cost the honest tail (the samples' 99th percentile 2.2 s against 0.7 s), and
+  under withholders 7 sampler-blocks did not confirm. Two covers add 8 links on top of 70 and 29 on
+  top of 16; one cover adds 2 and 13. Three covers (99.99 %, and the floor that holds for sixteen
+  samples) would add 17 to 20 and 47 to 49. How many sampling-only links a custodian accepts is a
+  bound, each node's within it (§6.3); the serving load they bring it is not measured.
+- *The floor's lifetime.* Kept across slots, chosen from custody alone; whether and how often it
+  rotates, and what churn costs it (not measured).
+- *The route and its privacy.* Without routing neighbours a first hop is any link with duty
+  `FORWARD`. Where custodians keep a floor per column of their own (§1.4, as PeerDAS's subnet
+  peering), one step on random links left 1.8 % of (sampler, column) pairs unreached at 16 links in
+  the toy's graphs, and 0.05 % at 70; without such a floor, 19 % at 16 links (§4.10). The routing
+  rules (§1.3, `ROUTE_FLOOR`) are for networks without it; the Kademlia-style rule is the cheaper,
+  and its 4.1 % of pairs at three hops is the case for `ROUTE_HOPS` above one. A first hop drawn at
+  random is not measured. What a forwarder learns, one sample of one sampler, is measured nowhere
+  yet, nor is a forwarder colluding with the proposer, nor the time a routed sample takes.
+- *The hunt's cost.* A sample nobody holds is asked of one fresh peer after another until none is
+  left, each peer at most once per block, so the asks per block are bounded by the node's links.
+  With half the columns withheld (60 nodes, degree 30, seed 7): 1.3 to 1.7 asks per sample without
+  routed requests, 3.0 with them and 4.2 to 5.2 with the floor of one or two covers as well, 380 to
+  704 requests passed on over two blocks (11 to 12 asks per sample, 1 813 to 2 042 passed on, before
+  one sample per peer). A
+  bound on the first hops a sample tries, or the application's deadline ending the hunt, is open.
+- *The cost of one sample per peer.* Under 30 % withholders (the toy, the floor with routed
+  requests, one cover, seed 8), every sample still arrived, at a median of 2.7 to 3.7 s and a 99th
+  percentile up to 7.7 s, against 2.2 to 2.7 s and 4.9 s when a peer could be asked again: the
+  second phase must find a fresh peer each time.
+- *Small networks.* The floor covers only the families some node other than a source custodies;
+  in the toy's 60-node cells seven of 128 columns had no custodian but the proposer, and routed
+  requests reached it for them.
+- *Rows as a second axis.* A row member holds a cell of its row once it has it, and serves it to
+  anyone who asks; `serves` counts columns only. In the toy's graphs at 70 links
+  (`toy/sampler_graph.py e`), counting half rows (the draft's members stop at 64 of 128) takes the
+  samplers left with a sample no link serves from 17 % to 7.5 % with 32 row subnets and to 13.5 %
+  with 128; whole rows (FullDAS's two-dimensional code), to 3.2 % and 11.0 %. At 16 links rows
+  barely help.
+- *LiteDAS's slot start.* A group id names the block, so a WANT waits for the block's header; a
+  request keyed by slot would let it go at slot start, as LiteDAS's does. Not proposed.
+- *LiteDAS's extensions.* A holdings list in the reply, and a NACK by which a custodian that lacks
+  the cell asks the sampler to pass it on once it has it (feeding custody): not proposed.
+- *Outside the links.* A fetch from a node of the known node set that is not a link (§7), over an
+  ephemeral libp2p connection, plain UDP, a fast QUIC connection or discv5: the binding's.
+- *Rejected:* narrowing the sample to what the node's links serve (§4.10).
+
+## The versions of `protocol.md` carried
+
+**The versions carried.** Each later version of `protocol.md` comes in the same way. Its changes to
+functions this document does not redefine apply as written, and those to functions it does are
+carried into them, with the date each was carried where it came later than the version.
+- v0.4 (2026-10-13): its one change of behaviour, the source's HAVE paced by its sends [P4],
+  since 2026-10-21 (§4.2 `send_have`, §4.7 `publish`, §4.11 `next_to_send`).
+- v0.5 (2026-10-21, the fixes from a model check of v0.4): §4.3 `on_offer`, §4.4 `forward` and
+  `announce`, §4.5 `serve_standing`, §4.6 `decode_group` and the repair, §4.7 `publish`, §4.11
+  `next_to_send`.
+- v0.6 (2026-10-21) released this document's draft and changed nothing in `protocol.md`. v0.6.1
+  changed only its §9.
+- v0.7 (2026-10-25):
+  - The live window and the group's key apply as written; §6.1 gives how the cells moved.
+  - Gossipsub's IHAVE limits are carried since 2026-10-27 (§4 `on_frame`, §4.3 `on_offer`,
+    §4.8).
+  - Its single offer at the source (`protocol.md` §5.1) is carried since 2026-11-04 (§4.7
+    `publish`): a chunk is offered only to the peers of its pool not chosen to be pushed it, so a
+    push its queue refused, owed already, is not offered a second time.
+- v0.8 (2026-10-26):
+  - A peer that joins the mesh is announced what the node holds: §4.1's `join_push`, at a GRAFT
+    the node accepts and, since 2026-11-04, at the yes to its own (§4.1).
+  - Ties, and the cells released at the header (§4.2).
+  - No second ask of a peer at once (§4.3).
+  - A rebuilt chunk names its sources' block (§4.6).
+  - Since 2026-10-28: an ask goes with its announcer's offers (§4.2), and relabelled copies are
+    open (§4.6).
+- v0.9 (2026-11-10):
+  - The source's holding grows at a chunk's acknowledgement, not at its write (§4.3 `on_holding`,
+    §4.7 `origin_acked`, §4.11 `window_timeout` and `next_to_send`), at `SOURCE_OFFERS = ACK`, the
+    default since 2026-11-18 (§4.7).
+  - Its offers wait for the acknowledgement too, at `ACK`, for every object type a source pushes; a
+    pull-only type's source pushes nothing and offers every chunk at publish (§4.7).
+  - What the transport below the writer should hold, and the note for operators (its §7.3), apply
+    as written (§4.11).
+- v0.10 (2026-11-15):
+  - The toy's default transport keeps `protocol.md` §7.3's rule, one entry at a time per
+    connection, and both recordings were made again (§0's "Numbers", §6.1).
+  - What waits for a gate is carried where this document uses `protocol.md`'s functions: `tie`,
+    with `tie_room`'s limits, the limit of unknown groups and the slot it records (`tie_slot`);
+    `close_promises`, now code, from `fill` and `tie`; and `on_block_installed`, which drops at
+    installation a tied index the group, known by then, does not have, and whose level 1 for the
+    payload is `validate_chunk` with its new check of the copy's slot (`protocol.md` §3, §4.2).
+  - The announcers beyond a chunk's ordered list are tried in the node's own order, in
+    `protocol.md`'s ask path, which this document keeps (`protocol.md` §6.1).
+  - Carried since 2026-11-16 where this document has functions of its own (§4.2, §4.3, §4.8,
+    §1's table):
+    - its `defer` ignores a copy beyond its sender's limit of unknown groups, as `protocol.md`'s
+      does;
+    - its `on_heartbeat` calls `drop_stale_waits`, so what waits for a gate that never opens goes
+      at the live window's edge or the group's expiry;
+    - its `fill` calls `drop_beyond` when it opens a group, so offers, asks and ties of an index
+      beyond the group's count go;
+    - its `on_offer` holds an offer's bitmap to a holding's limits, as `protocol.md`'s `on_ihave`
+      holds an IHAVE's;
+    - its `on_header_validated` drops a tied index a cell group, known by then, does not have, and
+      removes a sender's `tie_slot` with its last tie under the root, as `on_block_installed` does;
+    - a cell's level 1 rejects a copy whose slot is not its header's, as `validate_chunk` does for
+      the payload against its block (decided 2026-11-16).
+- v0.10.1 (2026-11-15) and v0.10.2 (2026-11-16): `protocol.md`'s prose and comments rewritten,
+  its code the same, and the toy's tables made faster, the recorded cells' digests the same;
+  nothing to carry.
+- v0.10.3 (2026-11-18): `protocol.md`'s constants in three kinds, reference values for
+  gossipsub's two IHAVE limits, "frame" for what a peer writes on its stream, the source's HAVE
+  said as "acknowledged", and the source's choice of when it announces (`SOURCE_OFFERS`). This
+  draft carries them all: the rename (`on_frame`, `frame`, `ihave_frames`), §6.3's bounds in §8.3's
+  kinds, the IHAVE values (§4.3, §6.3), "acknowledged" (§4.7), and `SOURCE_OFFERS` (§4.7, §6.3).
+- v0.10.4 (2026-11-18): `protocol.md` says what heartbeat gossip tells of the source, names a chunk
+  that is never acknowledged as open, and keeps an IDONTWANT entry that is not a HAVE bitmap as
+  stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped group and in
+  its reading of bitmaps and ids. This draft runs on the same toy. It carries the IDONTWANT rule
+  onto v0.3's wire (`protocol-v2-bindings.md` §3), where the toy now keeps such an entry in
+  `unwanted[p]`. §4.7 already says that, for a type that gossips (`ANNOUNCE_EXTRA = SAMPLE`), the
+  source's heartbeat gossip draws on every chunk at either setting, and its open item on a chunk
+  that is never acknowledged is the one `protocol.md` §5.1 names.
+- v0.10.5 (2026-11-19): `protocol.md` is the same but for its version line, and the proofs in
+  `formal/veil/` move to Veil's release. The toy's `accepted` answers whether the id was stored, as
+  `protocol.md`'s helper list says, so under this draft a later copy of a copy that level 1 rejected
+  no longer passes the probe (R5), and a repeat of a copy under a second id, seen and not stored, is
+  not acknowledged (§4.2). This draft runs on the same toy; nothing else to carry.
+- v0.10.6 (2026-11-19): `protocol.md` names an open question in §1, whether the protocol fixes a
+  coded group's compressed bytes ("Open: the compressed bytes"); this draft points to it from §1.1's
+  `decode` row, and leaves where the descriptor travels open, as `protocol.md` §1 does.
+- v0.10.7 (2026-11-20): `protocol.md`'s window line (§7.1, §7.2): a free slot goes to the first
+  writer in line that can write, and a writer in line that writes control first wakes another that
+  can write. This draft carries both into its window in bytes (§4.11), with its own `wake_front`
+  over `W_BYTES`, and wakes on a third path it has, a control-only entry of the normal lane;
+  `line_stall_known.py --doc v2` shows the first.
+- v0.10.8 (2026-11-21): `protocol.md` is the same but for its version line, and the Lean twin's
+  record and a first piece of a refinement come into `formal/`; nothing to carry.
+- v0.10.9 (2026-11-21): `protocol.md`'s wake in the window's line moves to the moment a writer
+  starts to wait for its transport (§7.1, §7.2). In this draft, `write_waits` wakes the first writer
+  in line that can write if the waiting writer is in line and the window has room (§4.11). It
+  replaces the wake before the write on the three control paths, and `wake_front` loses `past`;
+  `write_wait_known.py --doc v2` checks it on all three.
+- v0.10.10 (2026-11-21): `protocol.md` is the same but for its version line, and the proofs in
+  `formal/veil/` take in four of its rules added after v0.8; nothing to carry.
