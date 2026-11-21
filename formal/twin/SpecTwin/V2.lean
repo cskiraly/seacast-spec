@@ -4,6 +4,7 @@ import SpecTwin.V2.Codecs
 import SpecTwin.V2.Relations
 import SpecTwin.V2.Announce
 import SpecTwin.V2.Probe
+import SpecTwin.V2.Decode
 
 /-! # The twin of protocol-v2.md: its modules
 
