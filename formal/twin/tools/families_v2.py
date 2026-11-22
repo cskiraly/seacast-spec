@@ -95,8 +95,16 @@ def main(argv):
         return 2
     mode, src, dst = argv
     fam = SIGNED if mode == "signed" else PLAIN
-    done, said = 0, []
+    done, said, at = 0, [], []
     with gzip.open(src, "rt") as f, gzip.open(dst, "wt", compresslevel=1) as out:
+        k = 0                           # the copy's lines written so far
+
+        def put(s, changed=False):
+            nonlocal k
+            out.write(s)
+            k += 1
+            if changed:
+                at.append(k)
         for line in f:
             if line.startswith('{"trailer"'):
                 if done != 2:
@@ -104,24 +112,25 @@ def main(argv):
                 tl = json.loads(line)
                 by = dict(tl["trailer"]["by_fn"], counted=tl["trailer"]["by_fn"].get("counted", 0) + 1)
                 tl["trailer"] = dict(tl["trailer"], records=tl["trailer"]["records"] + 1, by_fn=dict(sorted(by.items())))
-                out.write(json.dumps(tl, separators=(",", ":")) + "\n")
+                put(json.dumps(tl, separators=(",", ":")) + "\n")
                 continue
             if done >= 2 or not line.startswith('{"n":') or '"fn":"send_relation"' not in line:
-                out.write(line)
+                put(line)
                 continue
             r = json.loads(line)
             if r["fn"] != "send_relation":
-                out.write(line)
+                put(line)
                 continue
             kind = "graft" if done == 0 else "prune"
             edit(r, kind, fam)
-            out.write(json.dumps(r, separators=(",", ":")) + "\n")
+            put(json.dumps(r, separators=(",", ":")) + "\n", True)
             said.append(f"node {r['n']}'s send_relation to {r['args'][0]}: a {kind.upper()} of the −1 family")
             if done == 0:
-                out.write(json.dumps(counted(r["n"], r["t"], fam), separators=(",", ":")) + "\n")
+                put(json.dumps(counted(r["n"], r["t"], fam), separators=(",", ":")) + "\n", True)
                 said.append(f"a counted record put in after it, at node {r['n']}")
             done += 1
-    print(f"families_v2: {mode}: " + "; ".join(said) + "; the trailer counts the record put in")
+    print(f"families_v2: {mode}: " + "; ".join(said) + "; the trailer counts the record put in; the copy's lines "
+          + ", ".join(map(str, at)))
     return 0
 
 

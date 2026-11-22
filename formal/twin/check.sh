@@ -1415,6 +1415,118 @@ sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/
   else e3="carried 9, (s) or (t) not as it must be"; fi
   echo "  the carried cases: $e1; $e2; $e3"
 }
+f_cases() {             # piece F: S1-8a's count (carried), S1-8b in both halves, S1-C5's line; local, after carried
+  local churn=chains/custody-floor-churn1 nb r0 nsr m rc tl lines refused rows s8a s8b s5
+  local ok8a=0 okw=0 oks=0 okp=0 ok5=0
+  local tline="node [0-9]+'s send_relation to [0-9]+: a GRAFT of the −1 family; a counted record put in after it, at node [0-9]+; node [0-9]+'s send_relation to [0-9]+: a PRUNE of the −1 family; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
+  : > "$OUT/c-fcases.txt"
+  # S1-8a: no record of churn1 (carried's trace) names backoff among its tables. Its one reader, candidates, runs in
+  # maintain_relations, and its one writer is on_prune, neither a function the twin replays: carried until one is
+  # (V2/Codecs.lean's #guard refuses +inf as its leaf). A count above 0 fails, for the carried status must be read again
+  nb=$($PY - "$OUT/$churn.jsonl.gz" 2> /dev/null <<'EOF_BO'
+import gzip
+import json
+import sys
+n = 0
+with gzip.open(sys.argv[1], "rt") as f:
+    for line in f:
+        if line.startswith('{"n"') and "backoff" in (json.loads(line).get("tables") or ()):
+            n += 1
+print(n)
+EOF_BO
+)
+  if [ "$nb" = 0 ]; then
+    echo "S1-8a on custody-floor-churn1: as it must: 0 records read or write backoff; carried" >> "$OUT/c-fcases.txt"; ok8a=1
+  else echo "S1-8a on custody-floor-churn1: ${nb:-no count} records read or write backoff, not 0: the carried status must be read again  <-- NOT" >> "$OUT/c-fcases.txt"; fi
+  # S1-8b, the writer's half: --self-test-v2's four lines (its own run, for the selftests step keeps no output)
+  $PY "$T/trace3.py" --self-test-v2 > "$OUT/c-fcases-selftest.txt" 2>&1
+  if has -x "ok: every case as it must be" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b, a GRAFT with the −1 family, under v2: ok" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b, a PRUNE with the −1 family, under v2: ok" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b, counted's need with the −1 family, under v2: ok" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b's planted writer (the plain int): refuses exactly the 3 cases, ok" "$OUT/c-fcases-selftest.txt"; then
+    echo "S1-8b, the writer: as it must: the −1 family written [\"-\", 1] in a GRAFT, a PRUNE and counted's need; the plain-int writer refused in exactly the 3 cases" >> "$OUT/c-fcases.txt"; okw=1
+  else echo "S1-8b, the writer: --self-test-v2's S1-8b lines not as they must be (c-fcases-selftest.txt)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
+  # S1-8b, the reader's half, on churn1 (no trace at hand holds a PRUNE or a record of counted): families_v2.py's
+  # copies, signed and plain. Signed: every record ok, counted's among them; plain: the strict scan refuses exactly
+  # the three lines the tool changed, and the trailer then counts three records more than were read
+  r0=$(sed -n -E 's/^replay: ([0-9]+) records, .*/\1/p' "$OUT/$churn.replay" 2> /dev/null)
+  nsr=$(sed -n -E 's/^fn send_relation: ([0-9]+) records, .*/\1/p' "$OUT/$churn.replay" 2> /dev/null)
+  for m in signed plain; do
+    rm -f "$OUT/chains/fam-$m".*
+    if $PY "$T/families_v2.py" "$m" "$OUT/$churn.jsonl.gz" "$OUT/chains/fam-$m.jsonl.gz" > "$OUT/chains/fam-$m.out" 2>&1; then
+      replay_of "chains/fam-$m"; echo $? > "$OUT/chains/fam-$m.rc"
+    fi
+  done
+  if [ -z "$r0" ] || [ -z "$nsr" ]; then
+    echo "S1-8b, the reader: churn1's replay gives no record count  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif ! has -E "^families_v2: signed: $tline" "$OUT/chains/fam-signed.out" || [ "$(cat "$OUT/chains/fam-signed.rc" 2> /dev/null)" != 0 ]; then
+    echo "S1-8b, the reader, signed: the copy not made as written, or its replay did not end with 0  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif ! has -x "replay: $((r0 + 1)) records, $((r0 + 1)) ok, 0 mismatched" "$OUT/chains/fam-signed.replay" \
+      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/fam-signed.replay" \
+      || ! has -x "fn counted: 1 records, 1 ok" "$OUT/chains/fam-signed.replay" \
+      || ! has -x "fn send_relation: $nsr records, $nsr ok" "$OUT/chains/fam-signed.replay" \
+      || ! has -E "^content: as --content's, " "$OUT/chains/fam-signed.replay" \
+      || has -E '^(lines refused |trailer: )' "$OUT/chains/fam-signed.replay"; then
+    echo "S1-8b, the reader, signed: not every record ok: $(grep -m 1 '^replay: ' "$OUT/chains/fam-signed.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  else
+    echo "S1-8b, the reader, signed: as it must: $(grep -m 1 '^replay: ' "$OUT/chains/fam-signed.replay"); counted's record and the $nsr send_relation records ok" >> "$OUT/c-fcases.txt"; oks=1
+  fi
+  lines=$(sed -n -E "s/^families_v2: plain: $tline/\\1 \\2 \\3/p" "$OUT/chains/fam-plain.out" 2> /dev/null)
+  refused=$(sed -n -E 's/^line ([0-9]+): not a line the tracer writes: a number with a sign, at [0-9]+$/\1/p' "$OUT/chains/fam-plain.replay" 2> /dev/null | tr '\n' ' ' | sed 's/ $//')
+  if [ -z "$r0" ] || [ -z "$lines" ] || [ "$(cat "$OUT/chains/fam-plain.rc" 2> /dev/null)" = 0 ]; then
+    echo "S1-8b, the reader, plain: the copy not made as written, or its replay ended with 0  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ "$refused" != "$lines" ] || ! has -x "lines refused before they were parsed, or by the parser: 3" "$OUT/chains/fam-plain.replay"; then
+    echo "S1-8b, the reader, plain: the lines refused for a number with a sign are ${refused:-none}, not the copy's $lines  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif ! has -x "replay: $((r0 - 2)) records, $((r0 - 2)) ok, 0 mismatched" "$OUT/chains/fam-plain.replay" \
+      || ! has -x "trailer: $((r0 + 1)) records written, $((r0 - 2)) read" "$OUT/chains/fam-plain.replay"; then
+    echo "S1-8b, the reader, plain: the other records or the trailer's count not as they must be: $(grep -m 1 '^replay: ' "$OUT/chains/fam-plain.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  else
+    echo "S1-8b, the reader, plain: as it must: its lines $lines refused, each \"not a line the tracer writes: a number with a sign\"; $(grep -m 1 '^replay: ' "$OUT/chains/fam-plain.replay"); trailer: $((r0 + 1)) records written, $((r0 - 2)) read" >> "$OUT/c-fcases.txt"; okp=1
+  fi
+  # S1-C5 (cases 2 and 3 carried as unreachable from the document): v2/hand5 (the small step's) enters origin_acked
+  # 8 times, in its two branches, inside records that replay with 0 reads not made; and its non-leaf reads logged
+  # with the row absent, per table (the tape's row-absent form), by the schema's key counts
+  rows=$($PY - "$T/gen" "$OUT/v2/hand5.jsonl.gz" 2> /dev/null <<'EOF_RA'
+import gzip
+import json
+import sys
+from collections import Counter
+sys.path.insert(0, sys.argv[1])
+import schema                           # noqa: E402: the spec's gen/
+import schema_v2                        # noqa: E402
+depth = {t.name: len(t.keys) for t in schema.TABLES}
+depth.update({t.name: len(t.keys) for t in schema_v2.TABLES_V2})
+c = Counter()
+with gzip.open(sys.argv[2], "rt") as f:
+    for line in f:
+        if not line.startswith('{"n"'):
+            continue
+        for r in json.loads(line).get("reads") or ():
+            if (r and isinstance(r[0], str) and len(r) >= 3 and isinstance(r[1], list) and r[0] in depth
+                    and len(r[1]) < depth[r[0]] and r[2] is None):
+                c[r[0]] += 1
+print(", ".join(f"{t} {n}" for t, n in sorted(c.items())))
+EOF_RA
+)
+  if ! has -x "branch origin_acked: acknowledged before: 6" "$OUT/v2/hand5.replay" 2> /dev/null \
+      || ! has -x "branch origin_acked: the holding grows: 2" "$OUT/v2/hand5.replay" \
+      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/v2/hand5.replay"; then
+    echo "S1-C5 on v2/hand5: origin_acked's branches not 6 and 2, or a read not made, or no replay  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ "$rows" != "owed 87, planned 32, promises 2, queue 1" ]; then
+    echo "S1-C5 on v2/hand5: the reads with the row absent are ${rows:-none}, not owed 87, planned 32, promises 2, queue 1  <-- NOT" >> "$OUT/c-fcases.txt"
+  else
+    echo "S1-C5 on v2/hand5: as it must: origin_acked entered 8 times (6 acknowledged before, 2 the holding grows), 0 reads not made; the reads with the row absent: $rows" >> "$OUT/c-fcases.txt"; ok5=1
+  fi
+  if grep -q '<-- NOT' "$OUT/c-fcases.txt"; then no "F's three (c-fcases.txt)"; fi
+  s8a="S1-8a carried: no record of custody-floor-churn1 reads or writes backoff (no function the twin replays does)"
+  [ "$ok8a" = 1 ] || s8a="S1-8a not as it must be"
+  s8b="S1-8b: the writer writes the −1 family as [\"-\", 1] in a GRAFT, a PRUNE and need, and a plain-int writer is refused; on churn1 the reader replays the three ($((r0 + 1)) records, all ok) and refuses the plain int at their 3 lines"
+  [ "$okw$oks$okp" = 111 ] || s8b="S1-8b not as it must be"
+  s5="S1-C5: origin_acked entered 8 times on v2/hand5, 0 reads not made; the rows absent: $rows; cases 2 and 3 carried as unreachable"
+  [ "$ok5" = 1 ] || s5="S1-C5 not as it must be"
+  echo "  F's three: $s8a; $s8b; $s5"
+}
 s_tracercontrols() {
   local f want bad
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
@@ -1700,6 +1812,9 @@ EOF_ERC
   # node's question run bare, and its planted fault (r), a depth per node, whose record the replay accepts (a stated
   # limit); a replaced name entered outside every record on hand5-peer, and its plants (s) and (t) (c-carried.txt)
   carried
+  # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-v2) and reader (families_v2.py
+  # on churn1, signed and plain); S1-C5's line on v2/hand5 (c-fcases.txt)
+  f_cases
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
