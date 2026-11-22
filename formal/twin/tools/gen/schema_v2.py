@@ -347,7 +347,7 @@ def self_test():
     msg = lambda m: ["join", m.T, "ALL", 0, "NONE", 1]                   # noqa: E731: the tracer's, here a stand-in
     by = {t.name: t for t in python_tables_v2(F, key, fbits, msg)}
     names = [t.name for t in TABLES_V2]
-    case("v2's tables", len(names), 36)
+    case("v2's tables", len(names), 39)
     case("no name twice, none of protocol.md's", sorted(set(names) - {t.name for t in TABLES}) == sorted(names), True)
     g, row = bytes(range(32)), NS(id="row")
     case("a family below zero", signed(-1), ["-", 1])
