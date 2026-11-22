@@ -533,6 +533,125 @@ def chains_omit_v2():
     T.node_chains = node_chains
 
 
+# The chain cases' plants (check.sh's tracercontrols, "the chain cases"): each runs on the cell whose run.py arguments
+# follow OUT, and each must make the cases on that cell fail as check.sh writes.
+FILTER_ENTRY_PEER = ("node.py", "Node._peer_promise.<locals>.filter_entry", 1188)
+OWED_MISSING = ("node.py", "Node._member_check.<locals>.owed_missing", 500)
+
+
+def layer_classed_v2(key, kind):
+    """Under v2, a plant of the chain rule's lists: the layer `key` of LAYERS classed `kind` at every node, whatever its
+    listing says (a closure-dependent layer's cell no longer read). Counted once for each node where the name's layers
+    hold that layer."""
+    assert key in T.LAYERS, f"LAYERS lists no {key}: the toy moved"
+    name = T.LAYERS[key][0]
+    T.LAYERS[key] = (name, kind)
+    _nc = T.node_chains
+
+    @functools.wraps(_nc)
+    def node_chains(traced, ns, whole=False, lists=None, replaceable=None):
+        try:
+            ls = T.layers_of(name, ns.get(name))
+        except ValueError:
+            ls = []
+        PLANTED[0] += any(getattr(f, "__code__", None) is not None and T.layer_key(f) == key for f in ls)
+        return _nc(traced, ns, whole, lists, replaceable)
+
+    T.node_chains = node_chains
+
+
+class BoundLog(dict):
+    """A node's namespace that logs each binding of a function under a name while the node is built, in order (by
+    item, `update` or `setdefault`; the documents' own definitions too, which exec makes by item)."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.bound, self.logging = [], True
+
+    def __setitem__(self, k, v):
+        if self.logging and callable(v):
+            self.bound.append((k, v))
+        super().__setitem__(k, v)
+
+    def update(self, *a, **kw):
+        for k, v in dict(*a, **kw).items():
+            self[k] = v
+
+    def setdefault(self, k, v=None):
+        if k not in self:
+            self[k] = v
+        return self[k]
+
+
+def chains_bindings_v2(toy):
+    """Under v2, a plant of the chain rule's walk: each traced name's chain taken from the bindings of its slot while the
+    node was built, in binding order (each function bound after the last of the document's under that name, then
+    `doc`), instead of the closure walk. Where a layer was bound over another that it does not hold (--fault hoard's
+    lambda under a hoarder's push_rebuilt), that binding is in the chain. Only a chain the walk ends in `doc` is
+    taken so. Counted once for each chain the bindings change.
+
+    The namespace is the toy's, copied into a BoundLog; the closure cell of `Node._namespace` that holds it (its own
+    functions' `ns`) is pointed at the copy, so that the toy's code and the document's both run on the one object."""
+    sys.path.insert(0, str(Path(toy).resolve()))
+    import node as N                    # noqa: E402: the pinned toy's
+    _namespace = N.Node._namespace
+
+    @functools.wraps(_namespace)
+    def namespace(self):
+        old = _namespace(self)
+        new = BoundLog(old)
+        for v in old.values():
+            for cell in getattr(v, "__closure__", None) or ():
+                try:
+                    if cell.cell_contents is old:
+                        cell.cell_contents = new
+                except ValueError:
+                    continue
+        for v in old.values():          # no closure of the toy's left on the old dict
+            for cell in getattr(v, "__closure__", None) or ():
+                try:
+                    assert cell.cell_contents is not old, "a closure still holds the toy's first namespace"
+                except ValueError:
+                    continue
+        return new
+
+    N.Node._namespace = namespace
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        ns.logging = False              # the tracer's own bindings are not the node's
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+    _nc = T.node_chains
+
+    def doc_fn(name, f):
+        c = getattr(f, "__code__", None)
+        return c is not None and c.co_filename in (T.DOC_FILE, T.V2_FILE) and c.co_name == name
+
+    @functools.wraps(_nc)
+    def node_chains(traced, ns, whole=False, lists=None, replaceable=None):
+        replaced, chains = _nc(traced, ns, whole, lists, replaceable)
+        log = ns.bound
+        for name, chain in chains.items():
+            fs = [f for k, f in log if k == name]
+            last = max((j for j, f in enumerate(fs) if doc_fn(name, f)), default=None)
+            if last is None or chain[-1] != "doc":
+                continue
+            new = [getattr(f, "__qualname__", None) for f in fs[last + 1:]] + ["doc"]
+            if new != chain:
+                chains[name] = new
+                PLANTED[0] += 1
+        return replaced, chains
+
+    T.node_chains = node_chains
+
+
+CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-owed-observer-v2",
+                "--chain-owed-changing-v2")
+
+
 def hdr_read_v2(raw):
     """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
     g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
@@ -880,7 +999,7 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
-          "--hdr-read-v2-raw", "--chains-omit-v2")
+          "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS
 HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -932,12 +1051,27 @@ def main(argv):
             hdr_read_v2(raw=fault.endswith("-raw"))
         elif fault == "--chains-omit-v2":
             chains_omit_v2()
+        elif fault == "--chain-filter-observer-v2":
+            layer_classed_v2(FILTER_ENTRY_PEER, T.OBSERVER)
+        elif fault == "--chain-bindings-v2":
+            chains_bindings_v2(rest[0])
+        elif fault == "--chain-owed-observer-v2":
+            layer_classed_v2(OWED_MISSING, T.OBSERVER)
+        elif fault == "--chain-owed-changing-v2":
+            layer_classed_v2(OWED_MISSING, T.CHANGING)
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
-        args = (HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault in ("--bare-replaced-v2", "--chains-omit-v2")
-                else HAND5)
+        if fault in CHAIN_PLANTS:       # the cell's own arguments, after OUT, --doc v2 among them
+            args = rest[2:]
+            if not any(args[j:j + 2] == ["--doc", "v2"] for j in range(len(args))):
+                print("tracerfaults3: a chain plant runs under v2: its cell's arguments need --doc v2", file=sys.stderr)
+                return 2
+        else:
+            args = (HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault in ("--bare-replaced-v2",
+                                                                                         "--chains-omit-v2")
+                    else HAND5) + ["--doc", "v2"]
         try:                            # the arguments as check.sh's v2/hand5 and v2/hand5-own have them
-            T.main([rest[0], rest[1], *args, "--doc", "v2", "--digest"])
+            T.main([rest[0], rest[1], *args, "--digest"])
         finally:
             seen = "".join(f"; {k}: {v}" for k, v in SEEN.items())
             print(f"tracerfaults3: {fault[2:]}, planted {PLANTED[0]} time{'s' if PLANTED[0] != 1 else ''}{seen}",
