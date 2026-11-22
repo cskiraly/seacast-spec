@@ -186,8 +186,8 @@ OWN_V2 = tuple(t.name for t in schema_v2.TABLES_V2)
 # toy binds both names to one dict (repoint_aliases points `hdr` at desc's view)
 ALIASES_V2 = {"hdr": "desc"}
 # A table of schema_v2.py's that protocol-v2.md's §3 does not declare, with why it is a table all the same. The §3
-# scan stops on one that §3 declares after all: the exception is then dropped
-UNDECLARED_V2 = {"want_p": "read and written by protocol-v2.md's code (§4.1, §4.5), declared in no line of §3"}
+# scan stops on one that §3 declares after all: the exception is then dropped (want_p's was, at v0.11.1's §3)
+UNDECLARED_V2 = {}
 
 
 # the calls the block makes on the tape: each a question, answered from the trace, whoever defines it (install's
@@ -254,22 +254,72 @@ def v2_kept(names, p_src, v2_src, cut=TAPE):
     return tuple(n for n in names if n not in gone)
 
 
-def sec3_names(text):
-    """The names protocol-v2.md's §3 declares: each line `name: …` of its code block, in order."""
+def sec3_block(text):
+    """The code block of protocol-v2.md's §3."""
     s = text.index("\n## 3. State\n")
     a = text.index("```python\n", s) + len("```python\n")
-    b = text.index("\n```", a)
-    return [m.group(1) for m in re.finditer(r"^([A-Za-z_]\w*):", text[a:b], re.M)]
+    return text[a:text.index("\n```", a)]
 
 
-def sec3_check(names, v2=OWN_V2, undeclared=UNDECLARED_V2):
+def sec3_names(text):
+    """The names protocol-v2.md's §3 declares: each line `name: …` of its code block, in order."""
+    return [m.group(1) for m in re.finditer(r"^([A-Za-z_]\w*):", sec3_block(text), re.M)]
+
+
+def split_top(s):
+    """`A, B[C, D], E` split at its top-level commas."""
+    out, depth, cur = [], 0, ""
+    for ch in s:
+        depth += (ch == "[") - (ch == "]")
+        if ch == "," and depth == 0:
+            out.append(cur.strip())
+            cur = ""
+        else:
+            cur += ch
+    return out + [cur.strip()]
+
+
+def key_count(ann):
+    """The keys a table of §3 is read by, from its annotation: each `Dict[K, V]` level is one key, a tuple K
+    included, and a `Set[X]` table at the top is keyed by its member. A Set or a List inside the value adds
+    nothing. (A schema row may keep a tuple as one key, as backoff's (colour, direction), or split it, as promises':
+    the split ones are named, KEYS_SPLIT_V2.)"""
+    ann = ann.strip()
+    if ann.startswith("Set["):
+        return 1
+    n = 0
+    while ann.startswith(("Dict[", "DefaultDict[")):
+        n, ann = n + 1, split_top(ann[ann.index("[") + 1:-1])[1]
+    return n
+
+
+def sec3_keys(text):
+    """Each name §3 declares, with its key count (key_count over its annotation, the comment cut off)."""
+    return {m.group(1): key_count(m.group(2).split("#")[0])
+            for m in re.finditer(r"^([A-Za-z_]\w*):\s*(.*)$", sec3_block(text), re.M)}
+
+
+SCHEMA_KEYS = {t.name: len(t.keys) for t in tuple(schema.TABLES) + tuple(schema_v2.TABLES_V2)}
+# A table whose schema row splits a tuple key of §3 into its members: (its keys in §3, in its schema row, why). A
+# change to either count gives the scan's usual line
+KEYS_SPLIT_V2 = {"promises": (1, 2, "protocol.md's (§6.1), unchanged: its schema row reads the (ask, peer) tuple as "
+                                    "two keys, the ask and the peer")}
+
+
+def sec3_check(names, v2=OWN_V2, undeclared=UNDECLARED_V2, keys=None, arity=None, split=KEYS_SPLIT_V2):
     """§3's names against the tables' lists (schema.py's, schema_v2.py's, FOREIGN, the aliases): what differs, as
     one line each. A name of §3 in no list; a name of schema_v2.py's not in §3, unless it is named in `undeclared`;
-    and a named one that §3 declares after all."""
+    a named one that §3 declares after all; and, given §3's key counts (`keys`, sec3_keys), a table of the schemas
+    that §3 declares with another count of keys than its schema row's (`arity`, by default SCHEMA_KEYS), since a
+    table whose shape changes keeps its name; a table named in `split` must have its two counts there."""
     known = set(OWN) | set(v2) | set(FOREIGN) | set(ALIASES_V2)
     out = [f"{n}: in §3, in no list" for n in names if n not in known]
     out += [f"{n}: in schema_v2.py, not in §3" for n in v2 if n not in names and n not in undeclared]
     out += [f"{n}: named as not in §3, and §3 declares it" for n in undeclared if n in names]
+    arity = SCHEMA_KEYS if arity is None else arity
+    out += [f"{n}: {k} key{'' if k == 1 else 's'} in §3, {arity[n]} in its schema row"
+            for n, k in (keys or {}).items()
+            if n in arity and (split[n][:2] != (k, arity[n]) if n in split else arity[n] != k)]
     return out
 
 
@@ -462,51 +512,51 @@ SWAPPED_DRAW, DURING_CALL = "swapped draw", "bound during a call"
 ClosureKind = namedtuple("ClosureKind", "cell if_true if_false")
 DRAWS = ("choice", "sample_without_replacement", "shuffled")    # the draws a toy's layer may swap (K13)
 LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),  # counts
-          ("node.py", "Node._namespace.<locals>.held", 700): ("held", NODE_HELPER),         # the asks held back
-          ("node.py", "Node._override.<locals>.message_id", 940): ("message_id", OBSERVER),     # a cache: it skips
-          ("node.py", "Node._override.<locals>.add_offer", 954): ("add_offer", OBSERVER),       #   the call on a hit
-          ("node.py", "Node._override.<locals>.may_ask", 961): ("may_ask", OBSERVER),           # these three keep the
-          ("node.py", "Node._override.<locals>.close_promises", 966): ("close_promises", OBSERVER),   # toy's index
-          ("node.py", "Node._faults.<locals>.<lambda>", 1099): ("on_iwant", CHANGING),     # a withholder's: no answer
-          ("node.py", "Node._peer_promise.<locals>.close_promises", 1174): ("close_promises", OBSERVER),  # answer times
-          ("node.py", "Node._v2.<locals>.promise_due", 1697): ("promise_due", OBSERVER),   # notes a broken promise
+          ("node.py", "Node._namespace.<locals>.held", 703): ("held", NODE_HELPER),         # the asks held back
+          ("node.py", "Node._override.<locals>.message_id", 943): ("message_id", OBSERVER),     # a cache: it skips
+          ("node.py", "Node._override.<locals>.add_offer", 957): ("add_offer", OBSERVER),       #   the call on a hit
+          ("node.py", "Node._override.<locals>.may_ask", 964): ("may_ask", OBSERVER),           # these three keep the
+          ("node.py", "Node._override.<locals>.close_promises", 969): ("close_promises", OBSERVER),   # toy's index
+          ("node.py", "Node._faults.<locals>.<lambda>", 1102): ("on_iwant", CHANGING),     # a withholder's: no answer
+          ("node.py", "Node._peer_promise.<locals>.close_promises", 1177): ("close_promises", OBSERVER),  # answer times
+          ("node.py", "Node._v2.<locals>.promise_due", 1765): ("promise_due", OBSERVER),   # notes a broken promise
           # over v2's covered names. Observers: a count or a note after the call (--alarm's, the member check's, the
           # peer promise's sender, the measurement point, the reach report)
           ("node.py", "Node._hoard_column.<locals>.defer_on_claim", 274): ("defer_on_claim", OBSERVER),
-          ("node.py", "Node._member_check.<locals>.repair_verdict", 509): ("repair_verdict", OBSERVER),
-          ("node.py", "Node._peer_promise.<locals>.fill", 1167): ("fill", OBSERVER),
-          ("node.py", "Node._v2.<locals>.check_completion", 1653): ("check_completion", OBSERVER),
-          ("node.py", "Node._v2.<locals>.fill", 1688): ("fill", OBSERVER),
+          ("node.py", "Node._member_check.<locals>.repair_verdict", 511): ("repair_verdict", OBSERVER),
+          ("node.py", "Node._peer_promise.<locals>.fill", 1170): ("fill", OBSERVER),
+          ("node.py", "Node._v2.<locals>.check_completion", 1721): ("check_completion", OBSERVER),
+          ("node.py", "Node._v2.<locals>.fill", 1756): ("fill", OBSERVER),
           # swapped draws: the floor's draw on sim.floor_rng; the probed index's on a stream of its own
-          ("node.py", "Node._v2.<locals>.keep_floor", 1618): ("keep_floor", SWAPPED_DRAW),
-          ("node.py", "Node._v2.<locals>.defer_on_claim", 1707): ("defer_on_claim", SWAPPED_DRAW),
+          ("node.py", "Node._v2.<locals>.keep_floor", 1686): ("keep_floor", SWAPPED_DRAW),
+          ("node.py", "Node._v2.<locals>.defer_on_claim", 1775): ("defer_on_claim", SWAPPED_DRAW),
           # closure-dependent: --member-check off returns False without the document's call; on, it counts
-          ("node.py", "Node._member_check.<locals>.owed_missing", 500): ("owed_missing",
+          ("node.py", "Node._member_check.<locals>.owed_missing", 502): ("owed_missing",
                                                                          ClosureKind("on", OBSERVER, CHANGING)),
           # changing, over one of the eight names the twin asks where a node replaces it (ASKED_V2)
           ("node.py", "Node.__init__.<locals>.note_claim", 219): ("note_claim", CHANGING),        # a liar's
           ("node.py", "Node._hoard_column.<locals>.push_rebuilt", 256): ("push_rebuilt", CHANGING),   # a hoarder's
-          ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 524): ("push_rebuilt", CHANGING),
-          ("node.py", "Node._faults.<locals>.<lambda>", 1107): ("push_rebuilt", CHANGING),        # --fault's
-          ("node.py", "Node._rebuilt.<locals>.<lambda>", 1137): ("push_rebuilt", CHANGING),       # --rebuilt's
-          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1139): ("push_rebuilt", CHANGING),   #   variants
-          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1146): ("push_rebuilt", CHANGING),
-          ("node.py", "Node._v2.<locals>.<lambda>", 1740): ("push_rebuilt", CHANGING),            # --fault hoard's
-          ("node.py", "Node._v2.<locals>.push_rebuilt", 1742): ("push_rebuilt", CHANGING),        # hoardcol's
-          ("node.py", "Node._alarm.<locals>.serve_standing", 420): ("serve_standing", CHANGING),  # asks type_of_group
-          ("node.py", "Node._v2.<locals>.serve_standing", 1773): ("serve_standing", CHANGING),
-          ("node.py", "Node._repair_bias.<locals>.repair_verdict", 469): ("repair_verdict", CHANGING),
-          ("node.py", "Node._faults.<locals>.forward", 1103): ("forward", CHANGING),              # a silent node's
-          ("node.py", "Node._v2.<locals>.send_have", 1731): ("send_have", CHANGING),              # a liar's
+          ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 526): ("push_rebuilt", CHANGING),
+          ("node.py", "Node._faults.<locals>.<lambda>", 1110): ("push_rebuilt", CHANGING),        # --fault's
+          ("node.py", "Node._rebuilt.<locals>.<lambda>", 1140): ("push_rebuilt", CHANGING),       # --rebuilt's
+          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1142): ("push_rebuilt", CHANGING),   #   variants
+          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1149): ("push_rebuilt", CHANGING),
+          ("node.py", "Node._v2.<locals>.<lambda>", 1808): ("push_rebuilt", CHANGING),            # --fault hoard's
+          ("node.py", "Node._v2.<locals>.push_rebuilt", 1810): ("push_rebuilt", CHANGING),        # hoardcol's
+          ("node.py", "Node._alarm.<locals>.serve_standing", 422): ("serve_standing", CHANGING),  # asks type_of_group
+          ("node.py", "Node._v2.<locals>.serve_standing", 1841): ("serve_standing", CHANGING),
+          ("node.py", "Node._repair_bias.<locals>.repair_verdict", 471): ("repair_verdict", CHANGING),
+          ("node.py", "Node._faults.<locals>.forward", 1106): ("forward", CHANGING),              # a silent node's
+          ("node.py", "Node._v2.<locals>.send_have", 1799): ("send_have", CHANGING),              # a liar's
           # changing, over a name the manifest makes replaceable and the twin cannot ask (NOASK_V2): entered outside
           # every record alone (iface_of stops a record's own call of one)
-          ("node.py", "Node._alarm.<locals>.filter_entry", 349): ("filter_entry", CHANGING),
-          ("node.py", "Node._peer_promise.<locals>.filter_entry", 1188): ("filter_entry", CHANGING),
-          ("node.py", "Node._writer_variants.<locals>.choose", 1046): ("choose", CHANGING),
-          ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 437): ("decode_group", CHANGING),
+          ("node.py", "Node._alarm.<locals>.filter_entry", 350): ("filter_entry", CHANGING),
+          ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191): ("filter_entry", CHANGING),
+          ("node.py", "Node._writer_variants.<locals>.choose", 1049): ("choose", CHANGING),
+          ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 439): ("decode_group", CHANGING),
           # bound during a call: publish's announce under --source-offers off and late
-          ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 994): ("announce", DURING_CALL),
-          ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1012): ("announce", DURING_CALL)}
+          ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 997): ("announce", DURING_CALL),
+          ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1015): ("announce", DURING_CALL)}
 # Under v2: the replaceable names (the manifest's, and the directed sets' validate_chunk); the eight the twin asks as
 # questions where a node replaces them (its NodeV2, V2/Replay.lean); and those it cannot ask, which a record's own
 # code must not call where they are replaced: the manifest's replaceable covered names but the eight
@@ -1189,6 +1239,14 @@ def forms_self_test():
          "SystemExit: trace3: node 3: type row: EVIDENCE is an evidence type"),
         ("a parameter the tracer does not know", lambda: prm(NEW_ONE=1),
          "SystemExit: trace3: node 3: type row: NEW_ONE is a parameter the tracer does not know"),
+        ("MAX_RELATIONS +inf and MAX_INDICES 8192, checked and not written", lambda: prm(
+            M=1, MAX_RELATIONS=math.inf, MAX_INDICES=8192), {"M": 1}),
+        ("a MAX_INDICES of 0", lambda: prm(MAX_INDICES=0),
+         "SystemExit: trace3: node 3: type row: MAX_INDICES is no count of at least 1"),
+        ("a MAX_RELATIONS of True", lambda: prm(MAX_RELATIONS=True),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count of at least 1 nor +inf"),
+        ("SAMPLE_OUTSTANDING, the node's since v0.11.1, as a type's", lambda: prm(SAMPLE_OUTSTANDING=4),
+         "SystemExit: trace3: node 3: type row: SAMPLE_OUTSTANDING is a parameter the tracer does not know"),
     ]
     for what, f, want in pcases:
         try:
@@ -1198,6 +1256,53 @@ def forms_self_test():
         ok = same(got, want)
         bad += not ok
         print(f"forms self-test, a type's parameters, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    # the node's constants that protocol-v2.md adds (consts_v2), on a stub namespace; and its planted check, which
+    # writes SERVE_BUDGET by fbits as the other numbers are written, so that +inf is no longer null
+    def consts(**kw):
+        ns = dict(ANSWERS_FIRST=False, MERGE_HOLDINGS=True, ASK_UPLINK=0.0, SAMPLE_OUTSTANDING=4,
+                  SERVE_BUDGET=math.inf)
+        ns.update(kw)
+        return Tracer3.consts_v2(Nd, ns)
+    base = {"ANSWERS_FIRST": False, "MERGE_HOLDINGS": True, "ASK_UPLINK": fbits(0.0), "SAMPLE_OUTSTANDING": 4}
+    ccases = [
+        ("SERVE_BUDGET +inf, written null", lambda: consts(), dict(base, SERVE_BUDGET=None)),
+        ("SERVE_BUDGET 3, and a whole 2.0 as 2", lambda: [consts(SERVE_BUDGET=3)["SERVE_BUDGET"],
+                                                          consts(SERVE_BUDGET=2.0)["SERVE_BUDGET"]], [3, 2]),
+        ("SAMPLE_OUTSTANDING 1", lambda: consts(SAMPLE_OUTSTANDING=1)["SAMPLE_OUTSTANDING"], 1),
+    ] + [(f"SERVE_BUDGET {v!r}", (lambda v=v: consts(SERVE_BUDGET=v)),
+          f"SystemExit: trace3: node 3: SERVE_BUDGET is no count of at least 1 nor +inf: {v!r}")
+         for v in (0, True, 2.5, -math.inf)] + [
+        (f"SAMPLE_OUTSTANDING {v!r}", (lambda v=v: consts(SAMPLE_OUTSTANDING=v)),
+         f"SystemExit: trace3: node 3: SAMPLE_OUTSTANDING is no count of at least 1: {v!r}")
+        for v in (0, True, 2.0)]
+
+    def run_c(f):
+        try:
+            return f()
+        except SystemExit as e:
+            return f"SystemExit: {e}"
+    for what, f, want in ccases:
+        got = run_c(f)
+        ok = same(got, want)
+        bad += not ok
+        print(f"forms self-test, the node's v2 constants, {what}: "
+              f"{'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    _consts_v2 = Tracer3.__dict__["consts_v2"]
+
+    def planted(nd, ns):
+        out = _consts_v2.__func__(nd, dict(ns, SERVE_BUDGET=3))
+        out["SERVE_BUDGET"] = fbits(ns["SERVE_BUDGET"])
+        return out
+    Tracer3.consts_v2 = staticmethod(planted)
+    try:
+        failed = [what for what, f, want in ccases if not same(run_c(f), want)]
+    finally:
+        Tracer3.consts_v2 = _consts_v2
+    want_failed = [w for w, _, _ in ccases if w.startswith("SERVE_BUDGET")]
+    ok = failed == want_failed
+    bad += not ok
+    print(f"forms self-test, the node's v2 constants, the planted check (SERVE_BUDGET by fbits): "
+          f"{f'fails exactly the {len(failed)} SERVE_BUDGET cases, ok' if ok else f'fails {failed}  <-- FAIL'}")
     return bad
 
 
@@ -1348,20 +1453,39 @@ def views_self_test():
     def with_lines(*lines, drop=False):
         a, b = anchor.span()
         return text[:a] + ("" if drop else anchor.group(0)) + "".join(f"{x}\n" for x in lines) + text[b:]
-    part_g = ["served_hb: Dict[PeerId, int]", "offered_to: Dict[PeerId, Dict[GroupId, Bitmap]]",
-              "routed_standing: Dict[GroupId, Dict[int, Set[PeerId]]]"]
+
+    def line_of(name, new=None):        # §3 with one table's line replaced by `new`, or removed
+        m = re.search(rf"^{name}:.*\n", text, re.M)
+        return text[:m.start()] + ("" if new is None else new + "\n") + text[m.end():]
+
+    def scan(t, **kw):                  # the scan as install runs it: names and key counts
+        return sec3_check(sec3_names(t), keys=sec3_keys(t), **kw)
     scases = [
-        ("this repository's §3", lambda: sec3_check(sec3_names(text)), []),
-        ("§3 without rsample_final's line", lambda: sec3_check(sec3_names(with_lines(drop=True))),
+        ("this repository's §3", lambda: scan(text), []),
+        ("§3 without rsample_final's line", lambda: scan(with_lines(drop=True)),
          ["rsample_final: in schema_v2.py, not in §3"]),
-        ("§3 with a planted table", lambda: sec3_check(sec3_names(with_lines("planted_t: Dict[GroupId, int]"))),
+        ("§3 with a planted table", lambda: scan(with_lines("planted_t: Dict[GroupId, int]")),
          ["planted_t: in §3, in no list"]),
-        ("§3 with part G's three tables", lambda: sec3_check(sec3_names(with_lines(*part_g))),
-         ["served_hb: in §3, in no list", "offered_to: in §3, in no list", "routed_standing: in §3, in no list"]),
-        ("§3 declaring want_p, named as undeclared", lambda: sec3_check(sec3_names(with_lines(
-            "want_p: Dict[PeerId, Dict[GroupId, Bitmap]]"))), ["want_p: named as not in §3, and §3 declares it"]),
-        ("§3 declaring want_p, the exception dropped", lambda: sec3_check(sec3_names(with_lines(
-            "want_p: Dict[PeerId, Dict[GroupId, Bitmap]]")), undeclared={}), []),
+        ("§3 without served_hb's line", lambda: scan(line_of("served_hb")),
+         ["served_hb: in schema_v2.py, not in §3"]),
+        ("forwarded's schema row planted back at one key, [P]", lambda: scan(text, arity=dict(SCHEMA_KEYS,
+                                                                                          forwarded=1)),
+         ["forwarded: 2 keys in §3, 1 in its schema row"]),
+        ("§3's forwarded line planted at Dict[PeerId, int]",
+         lambda: scan(line_of("forwarded", "forwarded: Dict[PeerId, int]")),
+         ["forwarded: 1 key in §3, 2 in its schema row"]),
+        ("§3's forwarded line planted at Dict[PeerId, int], the names alone (the scan before v0.11.1)",
+         lambda: sec3_check(sec3_names(line_of("forwarded", "forwarded: Dict[PeerId, int]"))), []),
+        ("want_p, which §3 declares, named as undeclared by a planted exception",
+         lambda: scan(text, undeclared={"want_p": "planted"}), ["want_p: named as not in §3, and §3 declares it"]),
+        ("promises' split named no more", lambda: scan(text, split={}),
+         ["promises: 1 key in §3, 2 in its schema row"]),
+        ("the key counts' rules: a Dict level (a tuple key one), a Set table, a Set or List in the value",
+         lambda: [key_count(a) for a in ("Dict[Tuple[Ask, PeerId], float]", "Set[Ask]",
+                                         "Dict[GroupId, Dict[int, Set[PeerId]]]",
+                                         "Dict[BlockId, List[Tuple[GroupId, int]]]", "Dict[PeerId, Dict[ObjectType, int]]",
+                                         "Dict[PeerId, Dict[TypeId, Dict[FamilyId, Dict[Tuple[int, Direction], float]]]]",
+                                         "int")], [1, 1, 2, 1, 2, 4, 0]),
     ]
     for what, f, want in scases:
         got = f()
@@ -1369,7 +1493,7 @@ def views_self_test():
         bad += not ok
         print(f"views self-test, the §3 scan, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
     print(f"views self-test, the §3 scan names as used and not declared in §3: "
-          f"{'; '.join(f'{n} ({why})' for n, why in UNDECLARED_V2.items())}")
+          f"{'; '.join(f'{n} ({why})' for n, why in UNDECLARED_V2.items()) or 'none'}")
     return bad
 
 
@@ -2565,7 +2689,8 @@ class Tracer3(Tracer):
             if Path(d).resolve() != self.toy.parent / Path(d).name:
                 raise SystemExit(f"trace3: the toy reads a document that is not beside it: {d}")
         if self.doc_v2:                 # §3's tables against the lists the views are made from (sec3_check)
-            off = sec3_check(sec3_names(Path(N.DOC2).read_text()))
+            doc2 = Path(N.DOC2).read_text()
+            off = sec3_check(sec3_names(doc2), keys=sec3_keys(doc2))
             if off:
                 raise SystemExit("trace3: protocol-v2.md's §3 and the tables' lists differ: " + "; ".join(off))
             off = manifest_check(None if self.only61 else self.traced)  # the lists the replay reads a v2 trace by
@@ -3276,11 +3401,22 @@ class Tracer3(Tracer):
             raise TypeError(f"trace3: not a verdict: {r!r}")
         return r
 
+    def admitted_v2(self, x, Have):
+        """What admitted(p, x) is asked of under v2: a HAVE (on_holding's and on_offer's) as a holding, ["holding",
+        group, bits, claim_all, complete], its claims as they are (an offer's both false); a chunk (defer's) as the
+        twin reads one. Anything else stops the tracer: the twin reads no other kind."""
+        if isinstance(x, Have):
+            return self.holding(x)
+        if all(hasattr(x, k) for k in ("group", "index", "slot", "beacon_block_root")):
+            return self.chunk(x)
+        raise SystemExit(f"trace3: admitted is asked of {type(x).__name__} under v2, which is neither a HAVE nor a "
+                         f"chunk: {x!r}")
+
     def questions_enc_v2(self, Have):
-        """Under v2, the namespace's questions that protocol-v2.md adds (24 of the 36; the other twelve are the object
-        types' and their parameters', type_enc_v2), each as [arguments, answer]; and valid_have and shuffled in
-        their v2 forms beside protocol.md's (a v2 HAVE; an (index, chunk) pair or a record as a member). `Have` is
-        the node's HAVE class."""
+        """Under v2, the namespace's questions that protocol-v2.md adds (25 of the 37; the other twelve are the object
+        types' and their parameters', type_enc_v2), each as [arguments, answer]; and valid_have, shuffled and
+        admitted in their v2 forms beside protocol.md's (a v2 HAVE; an (index, chunk) pair or a record as a member;
+        a HAVE as a holding). `Have` is the node's HAVE class."""
         t, g_, n, i_ = self.tid, (lambda g: g.hex()), self.nat, self.integer
         peers = lambda r: [n(q) for q in r]         # noqa: E731
         fams = lambda r: [i_(x) for x in r]         # noqa: E731
@@ -3308,6 +3444,10 @@ class Tracer3(Tracer):
             "open_group_source": lambda r, g, d: [[g_(g), self.hdr_v2(d)], nothing(r)],
             "open_link": lambda r, x, T: [[self.cover_v2(x), t(T)], nothing(r)],
             "open_sampling_link": lambda r, x, T: [[self.cover_v2(x), t(T)], nothing(r)],
+            # v0.11.1's: §3's helper, prose alone (the node's own code answers it), its writes in its log
+            "release_wanted_groups": lambda r: [[], nothing(r)],
+            # protocol.md §8.2's, asked under v2 by on_holding and on_offer of a HAVE, and by defer of a chunk
+            "admitted": lambda r, p, x: [[n(p), self.admitted_v2(x, Have)], boolean(r)],
             "choice": lambda r, xs: [[[self.member_v2(x) for x in xs]], self.member_v2(r)],
             "send": lambda r, p, m, urgent=False: [[n(p), self.msg_v2(m), self.flag(urgent, "send's urgent")],
                                                    boolean(r)],
@@ -3905,8 +4045,18 @@ class Tracer3(Tracer):
         return set(cls.TYPE_NATS) | set(cls.TYPE_BOOLS) | set(cls.TYPE_FLOATS) | {"ANNOUNCE_EXTRA", "EVIDENCE",
                                                                                   "REPAIR_SAMPLE"}
 
-    TYPE_NATS = ("M", "F_LO", "F_HI", "D_OUT", "D_OUT_FAST", "D_OUT_MAX", "SAMPLE_OUTSTANDING", "SAMPLE_COVER",
-                 "COVER_HIGH", "ROUTE_HOPS")
+    TYPE_NATS = ("M", "F_LO", "F_HI", "D_OUT", "D_OUT_FAST", "D_OUT_MAX", "SAMPLE_COVER", "COVER_HIGH", "ROUTE_HOPS")
+    # §1.1's parameters the tracer checks and does not write: no function on the twin's lists reads them, and the
+    # closure rule's schema (params_schema) leaves them out, so a covered function that read one would stop the
+    # tracer. Each: (its bound's test, the words of a value outside it, why it is not written)
+    TYPE_UNWRITTEN = {
+        "MAX_RELATIONS": (lambda v: (isinstance(v, float) and math.isinf(v) and v > 0)
+                          or (not isinstance(v, bool) and isinstance(v, int) and v >= 1),
+                          "no count of at least 1 nor +inf",
+                          "read by relation_room alone (§6.3), on none of the twin's lists"),
+        "MAX_INDICES": (lambda v: not isinstance(v, bool) and isinstance(v, int) and v >= 1,
+                        "no count of at least 1",
+                        "read by index_bound alone (§4.5), on none of the twin's lists")}
     TYPE_BOOLS = ("SYMMETRIC", "EAGER", "REPAIR_BUDGET", "REPAIR_REASK")
     TYPE_FLOATS = ("PRUNE_BACKOFF", "START_DELAY", "SAMPLE_RETRY", "SAMPLE_RETRY2", "DEFER_WINDOW", "SAMPLE_WAIT",
                    "SERVE_LIMIT", "FORWARD_LIMIT")
@@ -3922,6 +4072,11 @@ class Tracer3(Tracer):
         out = {}
         for name, v in sorted(vars(prm).items()):
             if name in self.TYPE_FUNCTIONS:
+                continue
+            if name in self.TYPE_UNWRITTEN:
+                ok, words, _ = self.TYPE_UNWRITTEN[name]
+                if not ok(v):
+                    stop(name, v, words)
                 continue
             if name in self.TYPE_NATS:
                 if isinstance(v, bool) or not isinstance(v, int) or v < 0 or (name == "M" and v == 0):
@@ -3955,6 +4110,39 @@ class Tracer3(Tracer):
                     out[name] = steps
             else:
                 stop(name, v, "a parameter the tracer does not know")
+        return out
+
+    @staticmethod
+    def consts_v2(nd, ns):
+        """The node's constants that protocol-v2.md adds, in the nodes line's order, as the namespace holds them after
+        load: ANSWERS_FIRST and MERGE_HOLDINGS (booleans); ASK_UPLINK (bits per second: finite, not negative, 0 never
+        scales); SAMPLE_OUTSTANDING (the second phase's asks in flight per block, across types: a count of at least
+        1); SERVE_BUDGET (answers to one peer a heartbeat: a count of at least 1, or +inf for none, written null).
+        Anything else stops the tracer, in the constant's words."""
+        out = {}
+        for c in ("ANSWERS_FIRST", "MERGE_HOLDINGS"):
+            if not isinstance(ns[c], bool):
+                raise SystemExit(f"trace3: node {nd.id}: {c} is no boolean: {ns[c]!r}")
+            out[c] = ns[c]
+        u = ns["ASK_UPLINK"]
+        if isinstance(u, bool) or not isinstance(u, (int, float)) or not math.isfinite(u) or u < 0:
+            raise SystemExit(f"trace3: node {nd.id}: ASK_UPLINK is no finite rate: {u!r}")
+        out["ASK_UPLINK"] = fbits(u)
+        s = ns["SAMPLE_OUTSTANDING"]
+        if isinstance(s, bool) or not isinstance(s, int) or s < 1:
+            raise SystemExit(f"trace3: node {nd.id}: SAMPLE_OUTSTANDING is no count of at least 1: {s!r}")
+        out["SAMPLE_OUTSTANDING"] = s
+        b = ns["SERVE_BUDGET"]          # as the client's limits are written (a whole float is its int), but a bool
+        if isinstance(b, float) and math.isinf(b) and b > 0:   # or a value below 1 stops
+            out["SERVE_BUDGET"] = None
+            return out
+        try:
+            whole = not isinstance(b, bool) and b >= 1 and b == int(b)
+        except (OverflowError, ValueError, TypeError):
+            whole = False
+        if not whole:
+            raise SystemExit(f"trace3: node {nd.id}: SERVE_BUDGET is no count of at least 1 nor +inf: {b!r}")
+        out["SERVE_BUDGET"] = int(b)
         return out
 
     def have_v2(self, e):
@@ -4002,17 +4190,13 @@ class Tracer3(Tracer):
             raise SystemExit(f"trace3: node {nd.id}: SOURCE_OFFERS is {ns['SOURCE_OFFERS']!r}")   # source announces
         consts["SOURCE_OFFERS"] = ns["SOURCE_OFFERS"]
         types = None
-        if self.doc_v2:     # v2's three more, as the namespace holds them after load; and the node's object types
-            for c in ("ANSWERS_FIRST", "MERGE_HOLDINGS"):
-                if not isinstance(ns[c], bool):
-                    raise SystemExit(f"trace3: node {nd.id}: {c} is no boolean: {ns[c]!r}")
-                consts[c] = ns[c]
-            u = ns["ASK_UPLINK"]            # bits per second: finite, not negative (0 never scales)
-            if isinstance(u, bool) or not isinstance(u, (int, float)) or not math.isfinite(u) or u < 0:
-                raise SystemExit(f"trace3: node {nd.id}: ASK_UPLINK is no finite rate: {u!r}")
-            consts["ASK_UPLINK"] = fbits(u)
-            # the closure rule's lists held to what the node runs: the nodes line's constants and the enumerations
-            off = closure_v2.consts_keys_check(consts) + closure_v2.enum_check(ns)
+        if self.doc_v2:     # v2's five more, as the namespace holds them after load; and the node's object types
+            # the closure rule's lists held to what the node runs: first the enumerations, which a namespace before
+            # `_v2` lacks, as it lacks the constants `_v2` binds (SAMPLE_OUTSTANDING); then the nodes line's constants
+            off = closure_v2.enum_check(ns)
+            if not off:
+                consts.update(self.consts_v2(nd, ns))
+                off = closure_v2.consts_keys_check(consts)
             if off:
                 raise SystemExit(f"trace3: node {nd.id}: the closure rule's lists and the node differ: " + "; ".join(off))
             types = self.types_v2(nd, ns)

@@ -535,8 +535,8 @@ def chains_omit_v2():
 
 # The chain cases' plants (check.sh's tracercontrols, "the chain cases"): each runs on the cell whose run.py arguments
 # follow OUT, and each must make the cases on that cell fail as check.sh writes.
-FILTER_ENTRY_PEER = ("node.py", "Node._peer_promise.<locals>.filter_entry", 1188)
-OWED_MISSING = ("node.py", "Node._member_check.<locals>.owed_missing", 500)
+FILTER_ENTRY_PEER = ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191)
+OWED_MISSING = ("node.py", "Node._member_check.<locals>.owed_missing", 502)
 
 
 def layer_classed_v2(key, kind):
@@ -985,7 +985,7 @@ def timers_note_per_index_v2(toy):
     N.Node.__init__ = init
 
 
-SILENT_FORWARD =("node.py", "Node._faults.<locals>.forward", 1103)    # LAYERS' key of the silent node's forward
+SILENT_FORWARD =("node.py", "Node._faults.<locals>.forward", 1106)    # LAYERS' key of the silent node's forward
 
 
 def layer_missing_v2(toy):
@@ -1095,8 +1095,10 @@ CELL_PLANTS_V2 = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-ch
 
 
 def hdr_read_v2(raw):
-    """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
-    g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
+    """Under v2: at the first read of a table other than `desc` inside a record at node a (no question running), a read
+    through `hdr` (`hdr[g]`, g a group node a holds a descriptor of and the record has not touched). Not at a read of
+    `desc` itself: a record whose first read is `desc[g]` (v0.11.1's drop_wants_beyond) holds that read whatever the
+    plant does, and the control could not tell. With `hdr` re-pointed at the installed
     view, the record as written holds the read of `desc` at g: the line says "desc read in its record: 1". With `raw`
     (the control), that one read goes through `hdr` as the toy bound it, the raw table (kept from before the tracer
     re-pointed it), while `hdr` is re-pointed everywhere else, as in a plain run: the read goes unlogged, "desc read
@@ -1121,6 +1123,9 @@ def hdr_read_v2(raw):
 
         T.Tracer3.repoint_aliases = repoint_aliases
     want, inrec = [None, None], Count()     # the open record and the read's path; whether the record holds it
+    own, pg, planting = Count(), [None], [False]    # the control's premise: the record's own reads of desc[g] (by
+    #                                                 any route: a read or a scan) after the plant, the planted read
+    #                                                 itself kept out; the planted group; the planted read running
     _write = T.Tracer3.write
 
     @functools.wraps(_write)
@@ -1135,18 +1140,34 @@ def hdr_read_v2(raw):
     @functools.wraps(_read)
     def read(self, t, p):
         st = TR[0].vst if TR else None
-        if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"]:
+        if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"] and t.name != "desc":
             a = st["node"]
             g = next((x for x in F.unwrap(nss[a]["desc"]) if ("desc", (x,)) not in self.first), None)
             if g is not None:
                 PLANTED[0] += 1
                 want[:] = [st["cur"], self.roots["desc"][0].path((g,))]
-                (toy_hdr[a] if raw else nss[a]["hdr"])[g]
+                pg[0], planting[0] = g, True
+                try:
+                    (toy_hdr[a] if raw else nss[a]["hdr"])[g]
+                finally:
+                    planting[0] = False
                 SEEN["node a"] = a
                 SEEN["desc read in its record"] = inrec
+                SEEN["the record's own reads of it"] = own
         return _read(self, t, p)
 
     F.Recorder.read = read
+    _touch1 = F.Recorder._touch1
+
+    @functools.wraps(_touch1)
+    def touch1(self, t, p, rw):
+        st = TR[0].vst if TR else None
+        if (PLANTED[0] and not planting[0] and rw == "r" and t.name == "desc" and tuple(p) == (pg[0],)
+                and st and st["cur"] is want[0]):
+            own.n += 1
+        return _touch1(self, t, p, rw)
+
+    F.Recorder._touch1 = touch1
 
 
 def unscanned_layer_v2(toy):

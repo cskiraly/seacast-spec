@@ -481,8 +481,8 @@ s_tables() {
   local rv=$OUT/twin/SpecTwin/V2/Replay.lean c why said
   (cd "$T" && $PY records_v2.py "$rv") > "$OUT/arities.txt" 2>&1 \
     || no "a record writer's arity is not runV2's case's (arities.txt)"
-  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_v2: 70 covered names, 0 difference(s)" ] \
-    || no "the arity check's last line is not 70 covered names and no difference (arities.txt)"
+  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_v2: 72 covered names, 0 difference(s)" ] \
+    || no "the arity check's last line is not 72 covered names and no difference (arities.txt)"
   tail -n 1 "$OUT/arities.txt" | sed 's/^/  /'
   for c in forward on_chunk; do
     why=$(cd "$T" && $PY - "$rv" "$c" "$T" <<'EOF'
@@ -1216,7 +1216,7 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
   hand=$(sed -n -E 's/.*reach keep_floor: ([0-9]+) rows.*/\1/p' "$OUT/c-draws-hand5.rows")
   if [ "${hand:-0}" -ge 1 ]; then echo "v2/hand5: $(cut -c13- "$OUT/c-draws-hand5.rows")" >> "$OUT/c-draws.txt"
   else echo "v2/hand5: no keep_floor draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
-  # defer_on_claim@1707's: das-samplers-mcoff (the chain cases' trace), the records that reach defer_on_claim
+  # defer_on_claim@1775's: das-samplers-mcoff (the chain cases' trace), the records that reach defer_on_claim
   if [ -z "$NODAS" ]; then
     if [ -f "$OUT/chains/das-samplers-mcoff.replay" ] && replay_clean chains/das-samplers-mcoff > /dev/null; then
       $PY "$T/chaincases.py" --rows choice "$OUT/chains/das-samplers-mcoff.jsonl.gz" defer_on_claim > "$OUT/c-draws-samplers.rows"
@@ -1394,7 +1394,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   [ "$stopped" = 1 ] || bias="the bias cell not stopped as it must be"
   if [ -n "$NODAS" ]; then
     echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said (--no-das: the six DAS names and the bias cell skipped)"
-  else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:455, :491)"; fi
+  else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
 }
 stops() {               # piece D: point 5's stop, plant (p), and its control; point 6's stop (D3), with its entry check
   #                       removed (q), and with both checks removed (D5's control); every cell local
@@ -1681,11 +1681,11 @@ h4_plant() {            # H4's plant (n): trace3.py's LAYERS without the silent 
     no "H4's plant (n): not planted once, or the tracer wrote its trace to its end (c-h4.err)"
     echo "  H4's plant (n): not as it must be"
   elif [ "$(grep -c '^tracerfaults3: scan: .*NOT' "$f.err")" != 1 ] \
-      || ! has -x -F "tracerfaults3: scan: layer forward Node._faults.<locals>.forward@1103: changing, NOT so in LAYERS" "$f.err" \
+      || ! has -x -F "tracerfaults3: scan: layer forward Node._faults.<locals>.forward@1106: changing, NOT so in LAYERS" "$f.err" \
       || ! has -x -F "tracerfaults3: scan: 1 differences from trace3.py's lists" "$f.err"; then
     no "H4's plant (n): the scan's lists do not name the layer left out, alone (c-h4.err)"
     echo "  H4's plant (n): not as it must be"
-  elif ! has -x -F "trace3: node 3: forward: a layer in none of the tracer's lists: Node._faults.<locals>.forward (node.py:1103)" "$f.err"; then
+  elif ! has -x -F "trace3: node 3: forward: a layer in none of the tracer's lists: Node._faults.<locals>.forward (node.py:1106)" "$f.err"; then
     no "H4's plant (n): the tracer stopped without the words it must give (c-h4.err)"
     echo "  H4's plant (n): not as it must be"
   else
@@ -1959,8 +1959,8 @@ s_tracercontrols() {
       bare-replaced-v2) plain=v2/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the replaced body ran: 1; bare c on_iwant: 1$" ;;
       bare-timer-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 1; fired from the simulator, outside the question: 1$" ;;
       bare-timer-v2-now) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 0; fired from the simulator, outside the question: 0$" ;;
-      hdr-read-v2) plain=v2/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1$" ;;
-      hdr-read-v2-raw) plain=v2/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0$" ;;
+      hdr-read-v2) plain=v2/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1; the record's own reads of it: 0$" ;;
+      hdr-read-v2-raw) plain=v2/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0; the record's own reads of it: 0$" ;;
       # the simulator's guard off (the control of the planted fault observer-timer-v2): a timer armed at each
       # assignment of a node's completed, and the body v2/hand5's; one assignment for each group completed
       observer-timer-v2-off) plain=v2/hand5; k=0; line=", planted [1-9][0-9]* times?; completions: [1-9][0-9]*$" ;;

@@ -328,6 +328,9 @@ TABLE = {
     # protocol.md's two that call v2's functions, in their v2 forms
     "on_pace_tick": ("", lambda tr: [], none),
     "on_block_installed": ("root", lambda tr, root: [root_key(root)], none),
+    # v0.11.1's two, on on_holding's path and fill's: [p, T] and [g]
+    "joined": ("p, T", lambda tr, p, T: [peer(tr, p), type_id(T)], boolean),
+    "drop_wants_beyond": ("g", g_only, none),
 }
 
 if set(TABLE) != set(manifest_v2.COVERED):
@@ -473,6 +476,7 @@ def stand_in():
         "choose": (one(queue), 0), "ask_sample": (one(g, 1) + one(g, 1, first=True) + one(g, 1, False), None),
         "resample": (one(g, 1, 4, True), None), "sample": (one(g, Bits(6)), None),
         "on_pace_tick": (one(), None), "on_block_installed": (one(root), None),
+        "joined": (one(4, T), True), "drop_wants_beyond": (one(g), None),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_v2: the check's stubs are not the table's names: "
