@@ -1076,9 +1076,15 @@ def lists(sc, T):
             out.append(f"{r['class']} {r['name']} {r['value']['qual']}: NOT one class, which trace3.py's lists need "
                        f"({r['file']}:{r['line']})")
     hand_obs = sorted(T.WRAPPERS.items())
+    layers = getattr(T, "LAYERS", None)     # under v2, the chain rule's lists: the toy's layers by qualified name and
+    v2_obs = {(r["name"], r["value"]["qual"]) for r in rows     # first line, with their kinds
+              if layers is not None and r["v2_only"] and r["class"] == "observer"
+              and layers.get((r["value"]["qual"], r["value"]["line"])) == (r["name"], T.OBSERVER)}
     for x in obs:
         if x in hand_obs:
             out.append(f"observer {x[0]} {x[1]}: as WRAPPERS")
+        elif x in v2_obs:
+            out.append(f"observer {x[0]} {x[1]}: v2-only, an observer in LAYERS (the chain rule's)")
         else:
             other += 1
             out.append(f"observer {x[0]} {x[1]}: NOT in WRAPPERS")
@@ -1112,6 +1118,26 @@ def lists(sc, T):
             sites = [f"{r['in']}:{r['line']}{' v2-only' if r['v2_only'] else ''}" for r in rows
                      if r["name"] == n and r["class"] in ("own", "layer")]
             out.append(f"replaced {n}, not REPLACEABLE (the tracer stops a trace where it is replaced): {', '.join(sites)}")
+    if layers is not None:  # LAYERS against every node.py binding of a name traced under v2, function by function:
+        kind = {"observer": T.OBSERVER, "own": T.CHANGING, "layer": T.CHANGING}     # an observer; the node's own
+        want = {}                                                                   #   helper; any other is changing
+        for r in sc.rows:
+            if r["file"] != "node.py" or r["name"] not in TRACED_V2 or not isinstance(r["value"], dict):
+                continue
+            k = T.NODE_HELPER if r["class"] == "own" and r["name"] not in defined else kind.get(r["class"])
+            if k is not None:           # a class of more than one kind is named above
+                want[(r["value"]["qual"], r["value"]["line"])] = (r["name"], k)
+        for (q, ln), v in sorted(want.items(), key=lambda kv: kv[0][1]):
+            if layers.get((q, ln)) == v:
+                out.append(f"layer {v[0]} {q}@{ln}: {v[1]}, as LAYERS")
+            else:
+                other += 1
+                out.append(f"layer {v[0]} {q}@{ln}: {v[1]}, NOT so in LAYERS"
+                           + (f" (there {layers[(q, ln)]})" if (q, ln) in layers else ""))
+        for (q, ln), v in sorted(layers.items(), key=lambda kv: kv[0][1]):
+            if (q, ln) not in want:
+                other += 1
+                out.append(f"LAYERS {v[0]} {q}@{ln}: NOT a binding the scan finds of a name traced under v2")
     return out, other
 
 

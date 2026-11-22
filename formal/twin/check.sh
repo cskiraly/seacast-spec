@@ -107,9 +107,6 @@
 # replays and headers read; its pass is "check.sh: PASS (with v2cells, schemacontrols, viewcontrols and
 # tracercontrols)". Without it the steps and the traces are the quick check's.
 #
-# No record from a head with step 2's interim chains writer: with --record, check.sh stops before any step while
-# tools/trace3.py holds the writer's marker, a line that starts "# INTERIM: ", which step 3's chain rule (R3) removes.
-#
 # It prints "check.sh: PASS" and exits 0 only if every step ran and showed what it must.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd) || exit 2
@@ -151,11 +148,6 @@ TOY=$(cd "$TOY" 2> /dev/null && pwd) || { echo "check.sh: no toy at $TOY"; exit 
 [ -f "$TOY/run.py" ] || { echo "check.sh: no toy at $TOY (no run.py there)"; exit 2; }
 export SPEC_TOY=$TOY
 [ -z "$RECORD" ] || { ALL=$RECORD_ALL; [ "$OUT" != "$HERE/out/check" ] || OUT=$HERE/out/record; }
-if [ -n "$RECORD" ] && grep -q '^# INTERIM: ' "$T/trace3.py"; then
-  echo "check.sh: no record from a head with step 2's interim chains writer: tools/trace3.py holds its" \
-       "'# INTERIM: ' line, which step 3's chain rule (R3) removes"
-  exit 2
-fi
 if [ -n "$AGAINST" ]; then
   [ -n "$RECORD" ] || { echo "check.sh: --against goes with --record"; exit 2; }
   AGAINST=$(cd "$AGAINST" 2> /dev/null && pwd) || { echo "check.sh: no record at the directory given with --against"; exit 2; }

@@ -503,16 +503,16 @@ def close_keyerror_v2():
 
 
 def chains_omit_v2():
-    """Under v2, a plant for the replay: the nodes line's chains walked as trace3.py's interim writer walks them, and
-    written without any replaced name's chain. The trace is written to the end; the twin's reader must refuse it
-    ("nodes: chains: a replaced name with no chain")."""
+    """Under v2, a plant for the replay: the nodes line's chains walked as trace3.py's writer walks them (the chain
+    rule), and written without any replaced name's chain. The trace is written to the end; the twin's reader must
+    refuse it ("nodes: chains: a replaced name with no chain")."""
     _nc = T.node_chains
 
     @functools.wraps(_nc)
-    def node_chains(replaced, ns):
-        _nc(replaced, ns)
+    def node_chains(traced, ns, whole=False, lists=None):
+        replaced, chains = _nc(traced, ns, whole, lists)
         PLANTED[0] += len(replaced)
-        return {}
+        return replaced, {n: c for n, c in chains.items() if n not in replaced}
 
     T.node_chains = node_chains
 

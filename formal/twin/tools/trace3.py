@@ -427,6 +427,23 @@ REPLACEABLE = ("forward",               # a node that forwards nothing (silent, 
 # directed sets of §4.2 draw its result (a sequence of DEFERs with the block there, a REJECT of a chunk whose proof
 # nobody made) to reach on_validated's and defer's paths, as they did while validate_chunk was a question.
 REPLACEABLE_WHOLE = ("validate_chunk",)
+# The chain rule's lists, under --doc v2 (chain_rule): every layer the toy binds over a traced name, by its qualified
+# name and its first line in node.py, with the name it is listed for and its kind. A qualified name alone does not
+# tell layers apart: lambdas share `<lambda>`, and a class's method may make two locals of one name. An observer
+# calls the function it holds once, with its own arguments, and returns its result, changing no table and no
+# constant (scan_bindings.py's observer test); the node's own helper is a traced name the documents do not define
+# (NODE_OWN); a changing layer changes the function on some path, so that the name is a question at that node. Each
+# read in toy/node.py, and held to the scan of the toy's bindings by scan_bindings.py --lists.
+OBSERVER, NODE_HELPER, CHANGING = "observer", "node's own", "changing"
+LAYERS = {("Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),   # counts the asks
+          ("Node._namespace.<locals>.held", 700): ("held", NODE_HELPER),                        #   held back
+          ("Node._override.<locals>.message_id", 940): ("message_id", OBSERVER),     # a cache: it skips the call on
+          ("Node._override.<locals>.add_offer", 954): ("add_offer", OBSERVER),       #   a hit, with the same answer
+          ("Node._override.<locals>.may_ask", 961): ("may_ask", OBSERVER),           # these three keep the toy's
+          ("Node._override.<locals>.close_promises", 966): ("close_promises", OBSERVER),    # index of ask keys
+          ("Node._faults.<locals>.<lambda>", 1099): ("on_iwant", CHANGING),          # a withholder's: answers nothing
+          ("Node._peer_promise.<locals>.close_promises", 1174): ("close_promises", OBSERVER),   # notes answer times
+          ("Node._v2.<locals>.promise_due", 1697): ("promise_due", OBSERVER)}        # notes a broken promise
 
 
 def own_code(name, fn):
@@ -484,24 +501,80 @@ def innermost(name, fn):
     return layers_of(name, fn)[-1]
 
 
-# INTERIM: step 2's `chains` writer, which step 3's R3 (the chain rule) replaces. It writes the replaced names'
-# chains alone; an observer (a listed wrapper) and the document's bare function have no key, and the replaced set
-# is own_code's, as at step 1. The reader's three checks pass with observers' chains empty, and until R3 nothing
-# checks an observer's chain.
-def chain_of(name, fn):
-    """A name's chain at a node: its layers (`layers_of`), outermost first, each by its qualified name, and `doc` in
-    place of a document's function of that name (protocol.md's or protocol-v2.md's) where the walk ends at one.
-    Raises layers_of's ValueErrors."""
-    ls = layers_of(name, fn)
+class ChainStop(Exception):
+    """The chain rule's stop: a traced name's layers at a node that the tracer's lists do not class."""
+
+
+def layer_where(f):
+    """A layer as the stops name it: its qualified name, file and first line."""
+    code = getattr(f, "__code__", None)
+    qual = getattr(f, "__qualname__", None) or type(f).__name__
+    return f"{qual} ({Path(code.co_filename).name}:{code.co_firstlineno})" if code is not None else qual
+
+
+def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
+    """Under --doc v2, a traced name's chain at a node and whether the node replaces it: (chain, replaced).
+
+    The chain is the name's layers (`layers_of`), outermost first, each by its qualified name, ending in `doc` where
+    the walk reaches the document's function of that name (protocol.md's or protocol-v2.md's). It is None where the
+    name is bound to the document's function itself, or to the node's own helper alone: such a name has no key in
+    `chains`. Each layer above `doc` must be listed in `lists` (LAYERS) for this name, by its qualified name and its
+    first line in node.py. The name is replaced where any layer is changing, and only a REPLACEABLE name may be. A
+    walk that does not reach `doc` ends in a changing layer, or is the node's own helper alone. In a trace of the
+    whole state, a REPLACEABLE_WHOLE name bound to a function outside node.py (a directed set's level 1) is changing.
+    Anything else raises ChainStop, naming the layer."""
+    lists = LAYERS if lists is None else lists
+    replaceable = REPLACEABLE if replaceable is None else replaceable
+    try:
+        ls = layers_of(name, fn)
+    except ValueError as e:
+        raise ChainStop(str(e)) from None
     code = getattr(ls[-1], "__code__", None)
     doc = code is not None and code.co_filename in (DOC_FILE, V2_FILE) and code.co_name == name
-    qual = [getattr(f, "__qualname__", None) or type(f).__name__ for f in ls]
-    return qual[:-1] + ["doc"] if doc else qual
+    above = ls[:-1] if doc else ls
+    if not above:
+        return None, False
+    kinds = []
+    for f in above:
+        c = getattr(f, "__code__", None)
+        if c is None:
+            raise ChainStop(f"{name}: a layer that is no Python function: {layer_where(f)}")
+        in_toy = Path(c.co_filename).name == "node.py"
+        if whole and name in REPLACEABLE_WHOLE and not in_toy:
+            kinds.append(CHANGING)
+            continue
+        listed = lists.get((getattr(f, "__qualname__", None), c.co_firstlineno)) if in_toy else None
+        if listed is None:
+            raise ChainStop(f"{name}: a layer in none of the tracer's lists: {layer_where(f)}")
+        if listed[0] != name:
+            raise ChainStop(f"{name}: a layer listed for {listed[0]}, not for {name}: {layer_where(f)}")
+        kinds.append(listed[1])
+    if NODE_HELPER in kinds:
+        if kinds != [NODE_HELPER] or doc:
+            raise ChainStop(f"{name}: the node's own helper with other layers: "
+                            + ", ".join(layer_where(f) for f in above))
+        return None, False
+    if not doc and kinds[-1] != CHANGING:
+        raise ChainStop(f"{name}: its layers end in {kinds[-1]} {layer_where(above[-1])}, which holds no function "
+                        f"of its name")
+    replaced = CHANGING in kinds
+    if replaced and name not in replaceable:
+        f = above[kinds.index(CHANGING)]
+        raise ChainStop(f"{name}: a changing layer, {layer_where(f)}, where no node may replace {name}")
+    return [getattr(f, "__qualname__", None) for f in above] + (["doc"] if doc else []), replaced
 
 
-def node_chains(replaced, ns):
-    """INTERIM (R3 replaces it): a v2 nodes entry's `chains`, the replaced names' alone."""
-    return {name: chain_of(name, ns.get(name)) for name in sorted(replaced)}
+def node_chains(traced, ns, whole=False, lists=None):
+    """Under --doc v2, a node's replaced names, sorted, and its nodes entry's `chains`, by name: the chain rule over
+    each traced name. Raises ChainStop."""
+    replaced, chains = [], {}
+    for name in traced:
+        chain, rep = chain_rule(name, ns.get(name), whole, lists)
+        if rep:
+            replaced.append(name)
+        if chain is not None:
+            chains[name] = chain
+    return sorted(replaced), dict(sorted(chains.items()))
 
 
 def group_nodes(nodes):
@@ -1036,81 +1109,226 @@ def manifest_self_test():
     return bad
 
 
-def chains_self_test():
-    """The interim `chains` writer (node_chains; step 3's R3 replaces it) on stub functions, and the nodes line's
-    grouping by it. The controls: a writer that walks but leaves out every replaced name's chain must fail exactly
-    the three chain cases and the grouping case; a writer that never writes `doc` must fail exactly the two cases
-    whose chain ends in it."""
-    g = {}
-    exec(compile("def on_iwant(p, iw):\n    return []\n\ndef message_id(f):\n    return b''\n", V2_FILE, "exec"), g)
-    doc, doc_mid = g["on_iwant"], g["message_id"]
-    own = lambda p, iw: []      # noqa: E731: a withholder's, holding nothing
+# The chain rule self-test's stub toy, compiled as node.py's: each function a layer the self-test lists, or leaves
+# out, by its qualified name and first line, as LAYERS lists the toy's.
+CHAIN_TOY = '''\
+def over(inner):
+    def message_id(f):
+        return inner(f)
+    return message_id
 
-    def make_layer(inner):
+
+def over_close(inner):
+    def close_promises(g, i, of=None):
+        return inner(g, i, of=of)
+    return close_promises
+
+
+def peer(inner):
+    def close_promises(g, i, of=None):
+        return inner(g, i, of=of)
+    return close_promises
+
+
+def pick(inner, skip):
+    if skip:
+        def on_iwant(p, iw):
+            return [] if p == 0 else inner(p, iw)
+    else:
         def on_iwant(p, iw):
             return inner(p, iw)
-        return on_iwant
-    layer = make_layer(doc)
-    outer = make_layer(make_layer(doc))
-    inner_q = outer.__closure__[0].cell_contents.__qualname__
+    return on_iwant
 
-    def make_two(a, b):
-        def on_iwant(p, iw):
-            return a(p, iw) + b(p, iw)
-        return on_iwant
 
-    def make_wrapper(spec):
-        def message_id(f):
-            return spec(f)
-        return message_id
-    two = make_two(doc, layer)
+def skipping(inner):
+    def on_iwant(p, iw):
+        return [] if inner else []
+    return on_iwant
+
+
+def both(a, b):
+    def on_iwant(p, iw):
+        return a(p, iw) + b(p, iw)
+    return on_iwant
+
+
+def withhold():
+    return lambda p, iw: []
+
+
+def helper():
+    def held(a):
+        return False
+    return held
+
+
+def lone(other):
+    def message_id(f):
+        return other(f)
+    return message_id
+'''
+
+
+def chains_self_test():
+    """The chain rule (chain_rule, node_chains) and the nodes line's grouping by `chains`, on stub layers compiled as
+    node.py's (CHAIN_TOY) and listed in stub lists by their qualified names and first lines. Each case runs as the
+    tracer has it; a case with a planted fault runs again with it, which must fail the case, and what the plant
+    gives is printed."""
+    doc, toy, lvl = {}, {}, {}
+    exec(compile("def message_id(f):\n    return b''\n\n\ndef on_iwant(p, iw):\n    return []\n\n\n"
+                 "def close_promises(g, i, of=None):\n    return None\n", DOC_FILE, "exec"), doc)
+    exec(compile(CHAIN_TOY, "node.py", "exec"), toy)
+    exec(compile("def validate_chunk(f):\n    return 'ACCEPT'\n", "directed.py", "exec"), lvl)
+    mid_obs, lone = toy["over"](doc["message_id"]), toy["lone"](lambda f: b"")
+    close_obs = toy["over_close"](doc["close_promises"])
+    close_peer = toy["peer"](close_obs)
+    iw_obs, iw_chg = toy["pick"](doc["on_iwant"], False), toy["pick"](doc["on_iwant"], True)
+    iw_skip, iw_own = toy["skipping"](doc["on_iwant"]), toy["withhold"]()
+    two, held = toy["both"](doc["on_iwant"], iw_obs), toy["helper"]()
+    key = lambda f: (f.__qualname__, f.__code__.co_firstlineno)    # noqa: E731
+    q = lambda *fs: [f.__qualname__ for f in fs]                   # noqa: E731
+    lists = {key(mid_obs): ("message_id", OBSERVER), key(lone): ("message_id", OBSERVER),
+             key(close_obs): ("close_promises", OBSERVER), key(close_peer): ("close_promises", OBSERVER),
+             key(iw_obs): ("on_iwant", OBSERVER), key(iw_chg): ("on_iwant", CHANGING),
+             key(iw_own): ("on_iwant", CHANGING), key(held): ("held", NODE_HELPER)}
+    unlisted = {k: v for k, v in lists.items() if k != key(iw_obs)}
+    as_changing = lambda f, name: {**lists, key(f): (name, CHANGING)}      # noqa: E731
+
+    def rule(r=chain_rule, wrap=lambda d: d):
+        def go(name, fn, whole=False, ls=None):
+            return r(name, fn, whole, wrap(lists if ls is None else ls))
+        return go
+
+    def W(traced, ns):
+        return node_chains(traced, ns, lists=lists)
+
+    # the plants
+    class ByQual(dict):         # lists keyed by qualified name alone: the first listed of that name answers
+        def get(self, k, d=None):
+            return next((v for (qual, _), v in self.items() if qual == k[0]), d)
+
+    class AnyName(str):         # listed for whatever name it is asked under
+        def __ne__(self, other):
+            return False
+
+    class Unlisted(dict):       # an unlisted layer classed as changing
+        def get(self, k, d=None):
+            return dict.get(self, k) or (AnyName("any"), CHANGING)
+
+    def innermost_only(name, fn, whole=False, lists=None):     # the kind read off the function the layers lead to
+        c = innermost(name, fn).__code__
+        if c.co_filename in (DOC_FILE, V2_FILE) and c.co_name == name:
+            return None, False
+        return chain_rule(name, fn, whole, lists)
+
+    def interim(traced, ns):    # the earlier writer: the replaced names' chains alone
+        rep, ch = W(traced, ns)
+        return rep, {n: c for n, c in ch.items() if n in rep}
+
+    def bound_alone(traced, ns):    # the bound layer alone, as own_code sees a name
+        rep, ch = W(traced, ns)
+        return rep, {n: q(ns[n]) for n in ch}
+
+    def literal(traced, ns):    # the interface's literal rule: a chain for each name not bound to the bare doc
+        out = {}
+        for n in traced:
+            ls = layers_of(n, ns[n])
+            c = ls[-1].__code__
+            d = c.co_filename in (DOC_FILE, V2_FILE) and c.co_name == n
+            if not (d and len(ls) == 1):
+                out[n] = q(*(ls[:-1] if d else ls)) + (["doc"] if d else [])
+        return [], out
+
+    def no_chains(nodes):       # grouping that ignores chains: an entry keeps its first node's
+        entries = []
+        for nid, consts, replaced, types, chains in nodes:
+            for e in entries:
+                if e["consts"] == consts and e["replaced"] == replaced and e.get("types") == types:
+                    e["n"].append(nid)
+                    break
+            else:
+                entries.append({"n": [nid], "consts": consts, "replaced": replaced, "chains": chains})
+        return entries
     c = {"R": 2}
 
-    def grouped(writer):
-        nodes = [(1, c, ["on_iwant"], {}, writer(["on_iwant"], {"on_iwant": own})),
-                 (2, c, ["on_iwant"], {}, writer(["on_iwant"], {"on_iwant": layer}))]
-        return [e["n"] for e in group_nodes(nodes)]
-
-    def run(writer, f):
-        try:
-            return f(writer)
-        except ValueError as e:
-            return f"ValueError: {e}"
-    cases = [
-        ("a replaced name bound to a function holding none of its name",
-         lambda w: w(["on_iwant"], {"on_iwant": own}), {"on_iwant": [own.__qualname__]}),
-        ("a replaced name whose layer holds the document's function",
-         lambda w: w(["on_iwant"], {"on_iwant": layer}), {"on_iwant": [layer.__qualname__, "doc"]}),
-        ("two layers over the document's function",
-         lambda w: w(["on_iwant"], {"on_iwant": outer}), {"on_iwant": [outer.__qualname__, inner_q, "doc"]}),
-        ("nothing replaced", lambda w: w([], {"on_iwant": doc}), {}),
-        ("nothing replaced, a listed wrapper bound (the stated limit: no observer's chain)",
-         lambda w: w([], {"message_id": make_wrapper(doc_mid)}), {}),
-        ("a layer holding two functions of its name",
-         lambda w: w(["on_iwant"], {"on_iwant": two}), "ValueError: a layer of on_iwant holds 2 functions of that name"),
-        ("two nodes alike but in their chains: two entries", grouped, [[1], [2]]),
+    def grouped(r, w, g):
+        nodes = [(nid, c, [], None, w(["close_promises"], {"close_promises": f})[1])
+                 for nid, f in ((1, close_peer), (2, close_obs))]
+        return [e["n"] for e in g(nodes)]
+    stop = lambda name, why, f: f"stop: {name}: {why}: {layer_where(f)}"     # noqa: E731
+    R = rule()
+    cases = [   # (what, run(rule, writer, grouping), what it must give, [(the plant, its rule, writer, grouping)])
+        ("the document's function bound bare: no chain, not replaced",
+         lambda r, w, g: r("message_id", doc["message_id"]), (None, False), []),
+        ("a listed observer over the document's message_id: its chain, not replaced",
+         lambda r, w, g: w(["message_id"], {"message_id": mid_obs}), ([], {"message_id": q(mid_obs) + ["doc"]}),
+         [("the earlier writer (the replaced names' chains alone)", R, interim, group_nodes)]),
+        ("two listed observers over close_promises: both in its chain, not replaced",
+         lambda r, w, g: w(["close_promises"], {"close_promises": close_peer}),
+         ([], {"close_promises": q(close_peer, close_obs) + ["doc"]}),
+         [("the bound layer alone, as own_code sees it", R, bound_alone, group_nodes)]),
+        ("held, the node's own helper: no chain",
+         lambda r, w, g: w(["held", "message_id"], {"held": held, "message_id": doc["message_id"]}), ([], {}),
+         [("the interface's literal rule, a chain for each name not bound to the bare doc", R, literal,
+           group_nodes)]),
+        ("one qualified name, two first lines, an observer and a changing layer",
+         lambda r, w, g: [r("on_iwant", iw_obs), r("on_iwant", iw_chg)],
+         [(q(iw_obs) + ["doc"], False), (q(iw_chg) + ["doc"], True)],
+         [("lists keyed by qualified name alone", rule(wrap=ByQual), W, group_nodes)]),
+        ("an unlisted layer stops the tracer",
+         lambda r, w, g: r("on_iwant", iw_obs, ls=unlisted),
+         stop("on_iwant", "a layer in none of the tracer's lists", iw_obs),
+         [("an unlisted layer classed as changing", rule(wrap=Unlisted), W, group_nodes)]),
+        ("a layer that holds the document's on_iwant and returns without calling it, unlisted: a stop",
+         lambda r, w, g: r("on_iwant", iw_skip), stop("on_iwant", "a layer in none of the tracer's lists", iw_skip),
+         [("the kinds read through innermost alone", rule(innermost_only), W, group_nodes)]),
+        ("the same layer listed as changing: replaced",
+         lambda r, w, g: r("on_iwant", iw_skip, ls=as_changing(iw_skip, "on_iwant")), (q(iw_skip) + ["doc"], True),
+         [("the kinds read through innermost alone", rule(innermost_only), W, group_nodes)]),
+        ("a changing function that holds nothing of its name: replaced, its chain without doc",
+         lambda r, w, g: r("on_iwant", iw_own), (q(iw_own), True), []),
+        ("two nodes alike but in their chains: two entries", grouped, [[1], [2]],
+         [("grouping that ignores chains", R, W, no_chains)]),
+        ("a layer listed for another name: a stop",
+         lambda r, w, g: r("message_id", mid_obs, ls={**lists, key(mid_obs): ("close_promises", OBSERVER)}),
+         stop("message_id", "a layer listed for close_promises, not for message_id", mid_obs), []),
+        ("a changing layer over a name no node may replace: a stop",
+         lambda r, w, g: r("message_id", mid_obs, ls=as_changing(mid_obs, "message_id")),
+         f"stop: message_id: a changing layer, {layer_where(mid_obs)}, where no node may replace message_id", []),
+        ("layers that end in an observer holding no function of its name: a stop",
+         lambda r, w, g: r("message_id", lone),
+         f"stop: message_id: its layers end in observer {layer_where(lone)}, which holds no function of its name", []),
+        ("a layer holding two functions of its name: a stop",
+         lambda r, w, g: r("on_iwant", two), "stop: a layer of on_iwant holds 2 functions of that name", []),
+        ("a layer that is no Python function: a stop",
+         lambda r, w, g: r("message_id", functools.partial(doc["message_id"])),
+         "stop: message_id: a layer that is no Python function: partial", []),
+        ("in a trace of the whole state, validate_chunk bound to a directed set's function: replaced",
+         lambda r, w, g: r("validate_chunk", lvl["validate_chunk"], whole=True), (["validate_chunk"], True), []),
+        ("the same outside a trace of the whole state: a stop",
+         lambda r, w, g: r("validate_chunk", lvl["validate_chunk"]),
+         stop("validate_chunk", "a layer in none of the tracer's lists", lvl["validate_chunk"]), []),
+        ("LAYERS' node's own helpers are NODE_OWN",
+         lambda r, w, g: {n: qual for (qual, _), (n, k) in LAYERS.items() if k == NODE_HELPER}, NODE_OWN, []),
     ]
+
+    def run(f, r, w, g):
+        try:
+            return f(r, w, g)
+        except ChainStop as e:
+            return f"stop: {e}"
     bad = 0
-    for what, f, want in cases:
-        got = run(node_chains, f)
+    for what, f, want, plants in cases:
+        got = run(f, R, W, group_nodes)
         ok = got == want
         bad += not ok
-        print(f"chains self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
-
-    def omits(replaced, ns):    # walks as node_chains does, and writes no replaced name's chain
-        node_chains(replaced, ns)
-        return {}
-
-    def no_doc(replaced, ns):   # the document's function by its qualified name, never `doc`
-        return {n: [getattr(f, "__qualname__", None) or type(f).__name__ for f in layers_of(n, ns.get(n))]
-                for n in sorted(replaced)}
-    for name, writer, must in (("leaves out every replaced name's chain", omits, [0, 1, 2, 6]),
-                               ("never writes doc", no_doc, [1, 2])):
-        fails = [k for k, (what, f, want) in enumerate(cases) if run(writer, f) != want]
-        ok = fails == must
-        bad += not ok
-        print(f"chains self-test, the control (a writer that {name}): cases {fails} fail, "
-              f"{'as they must' if ok else f'must be {must}  <-- FAIL'}")
+        print(f"chain rule self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+        for plant, r, w, g in plants:
+            pgot = run(f, r, w, g)
+            ok = pgot != want
+            bad += not ok
+            print(f"chain rule self-test, {what}, planted {plant}: "
+                  + (f"fails it, ok (it gives {pgot!r})" if ok else "passes it  <-- FAIL"))
     return bad
 
 
@@ -2668,9 +2886,14 @@ class Tracer3(Tracer):
             if off:
                 raise SystemExit(f"trace3: node {nd.id}: the closure rule's lists and the node differ: " + "; ".join(off))
             types = self.types_v2(nd, ns)
-        # what each traced name is at this node, and the node's own line
-        replaced = []
-        for name in self.traced:
+        # what each traced name is at this node, and the node's own line: under v2 by the chain rule over its layers
+        replaced, chains = [], None
+        if self.doc_v2:
+            try:
+                replaced, chains = node_chains(self.traced, ns, self.whole)
+            except ChainStop as e:
+                raise SystemExit(f"trace3: node {nd.id}: {e}")
+        for name in () if self.doc_v2 else self.traced:
             what, where = own_code(name, ns.get(name))
             if what == "replaced" and name in REPLACEABLE_WHOLE and not self.whole:
                 raise SystemExit(f"trace3: node {nd.id}: {name} is something else than the document's here ({where}), "
@@ -2683,12 +2906,6 @@ class Tracer3(Tracer):
         if self.nodes_written:
             raise SystemExit(f"trace3: node {nd.id} is installed after the trace's first record: its line cannot be "
                              f"written before its records")
-        chains = None
-        if self.doc_v2:     # INTERIM: the replaced names' chains alone (node_chains); step 3's R3 replaces it
-            try:
-                chains = node_chains(replaced, ns)
-            except ValueError as e:
-                raise SystemExit(f"trace3: node {nd.id}: {e}")
         self.nodes.append((int(nd.id), consts, sorted(replaced), types, chains))
         self.WAIT = ns["WAIT"]                                               # next_to_send's "in line" (§7.2)
         if self.doc_message_id is None:     # the document's function, from the toy's wrapper's closure (own_code
