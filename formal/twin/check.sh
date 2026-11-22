@@ -102,9 +102,13 @@
 # --rehearsal "M1 M2 …" with it: these mutants alone, on the hand traces and the directed sets alone (no cell):
 # a trial of the step and of the merge (`mutants3.py --merge … --rehearsal M1,M2,…`), never a part of a matrix.
 #
-# With --v2steps (not with --record or --matrix, which run both): the quick check and two of the record's steps,
-# v2cells and tracercontrols, with the 15 cells' v2 traces among those the steps replays and headers read; its pass
-# is "check.sh: PASS (with v2cells and tracercontrols)". Without it the steps and the traces are the quick check's.
+# With --v2steps (not with --record or --matrix, which run them all): the quick check and four of the record's steps,
+# v2cells, schemacontrols, viewcontrols and tracercontrols, with the 15 cells' v2 traces among those the steps
+# replays and headers read; its pass is "check.sh: PASS (with v2cells, schemacontrols, viewcontrols and
+# tracercontrols)". Without it the steps and the traces are the quick check's.
+#
+# No record from a head with step 2's interim chains writer: with --record, check.sh stops before any step while
+# tools/trace3.py holds the writer's marker, a line that starts "# INTERIM: ", which step 3's chain rule (R3) removes.
 #
 # It prints "check.sh: PASS" and exits 0 only if every step ran and showed what it must.
 set -u
@@ -147,14 +151,20 @@ TOY=$(cd "$TOY" 2> /dev/null && pwd) || { echo "check.sh: no toy at $TOY"; exit 
 [ -f "$TOY/run.py" ] || { echo "check.sh: no toy at $TOY (no run.py there)"; exit 2; }
 export SPEC_TOY=$TOY
 [ -z "$RECORD" ] || { ALL=$RECORD_ALL; [ "$OUT" != "$HERE/out/check" ] || OUT=$HERE/out/record; }
+if [ -n "$RECORD" ] && grep -q '^# INTERIM: ' "$T/trace3.py"; then
+  echo "check.sh: no record from a head with step 2's interim chains writer: tools/trace3.py holds its" \
+       "'# INTERIM: ' line, which step 3's chain rule (R3) removes"
+  exit 2
+fi
 if [ -n "$AGAINST" ]; then
   [ -n "$RECORD" ] || { echo "check.sh: --against goes with --record"; exit 2; }
   AGAINST=$(cd "$AGAINST" 2> /dev/null && pwd) || { echo "check.sh: no record at the directory given with --against"; exit 2; }
   ALL="$ALL against"
 fi
-if [ -n "$V2STEPS" ]; then     # the quick check, and the record's two steps of the tracer under protocol-v2.md
+if [ -n "$V2STEPS" ]; then     # the quick check, the record's two steps of the tracer under protocol-v2.md, and the
+  #                              schema's and the views' controls, in RECORD_ALL's order
   [ -z "$RECORD" ] || { echo "check.sh: --v2steps goes without --record or --matrix"; exit 2; }
-  ALL="build selftests tables scope mutants screen cells v2cells small directed replays headers picks controls perturbed tracercontrols"
+  ALL="build selftests tables scope mutants screen cells v2cells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols"
 fi
 if [ -n "$PART" ]; then
   case "$PART" in [1-8]/[1-8]) ;; *) echo "check.sh: --matrix K/N, with N from 1 to 8 and K from 1 to N"; exit 2 ;; esac
@@ -1228,8 +1238,8 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
   elif [ -n "$PART" ]; then echo "check.sh: PASS (part $PART of the matrix)"
   elif [ -n "$FEWCELLS" ]; then echo "check.sh: these steps passed ($STEPS): a rehearsal over the cells [$CELLS], not a record"
   elif [ -n "$RECORD" ]; then echo "check.sh: PASS (the record's run)"
-  elif [ -n "$V2STEPS" ]; then echo "check.sh: PASS (with v2cells and tracercontrols)"
+  elif [ -n "$V2STEPS" ]; then echo "check.sh: PASS (with v2cells, schemacontrols, viewcontrols and tracercontrols)"
   else echo "check.sh: PASS"; fi
 } 2>&1 | tee "$LOG"
-case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with v2cells and tracercontrols)") true ;; *) false ;; esac \
+case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with v2cells, schemacontrols, viewcontrols and tracercontrols)") true ;; *) false ;; esac \
   || { { [ "$STEPS" != "$ALL" ] || [ -n "$REHEARSAL" ] || [ -n "$SAMPLE" ] || [ -n "$FEWCELLS" ]; } && tail -n 1 "$LOG" | grep -q '^check.sh: these steps passed'; }
