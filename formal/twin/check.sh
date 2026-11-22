@@ -886,6 +886,11 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     das-samplers-mcoff) echo "$DAS30 --samplers 20 --member-check off" ;;  # das-samplers' delivery (its digest):
     #                     its one record that reaches owed_missing, and defer_on_claim's swapped draw
     das-samplers) echo "$DAS30 --samplers 20" ;;  # the member check on: the flipped answer's cell, (h) and (i)
+    # the replaced names' rows (R3-9): a cell for each name that only these runs replace inside a record
+    das-claim) echo "$DAS30 --fault claim10" ;;                # send_have, at the liars
+    das-keeper-ignore) echo "$DAS30 --keeper-claims ignore" ;; # note_claim, at the supernodes
+    das-hoardcol-bias) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16 --repair-bias 0.5" ;;
+    #                                                            repair_verdict, the bias layer outermost
   esac
 }
 chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.py's), one a line

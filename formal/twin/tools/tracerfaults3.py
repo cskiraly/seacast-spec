@@ -707,8 +707,29 @@ def owed_flipped_v2(kind):
     before_install_v2(plant)
 
 
+def known_replaced_v2():
+    """Under v2, R3-9's plant (j): a fixture for the rows of `known_in_scope`, which no layer of the toy's binds. At
+    every node, a layer of this tool's own over `known_in_scope`, bound before the install and holding the document's:
+    it calls it and returns its answer unchanged, and it is listed in LAYERS as changing. So the run is the cell's own
+    (the same digest), and each call of `known_in_scope` inside a record is a question, its answer on the tape as the
+    twin asks it. Counted once for each node (planted) and once for each call ("calls")."""
+    SEEN["calls"] = 0
+
+    def plant(ns):
+        inner = ns["known_in_scope"]
+
+        def known_in_scope(g):
+            SEEN["calls"] += 1
+            return inner(g)
+        T.LAYERS[T.layer_key(known_in_scope)] = ("known_in_scope", T.CHANGING)
+        ns["known_in_scope"] = known_in_scope
+
+    before_install_v2(plant)
+
+
 CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-owed-observer-v2",
-                "--chain-owed-changing-v2", "--owed-flipped-observer-v2", "--owed-flipped-changing-v2")
+                "--chain-owed-changing-v2", "--owed-flipped-observer-v2", "--owed-flipped-changing-v2",
+                "--known-replaced-v2")
 
 
 def hdr_read_v2(raw):
@@ -1123,6 +1144,8 @@ def main(argv):
             owed_flipped_v2(T.OBSERVER)
         elif fault == "--owed-flipped-changing-v2":
             owed_flipped_v2(T.CHANGING)
+        elif fault == "--known-replaced-v2":
+            known_replaced_v2()
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":

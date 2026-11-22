@@ -4,6 +4,7 @@
     python3 chaincases.py TRACE CASE [CASE ...]
     python3 chaincases.py --cut NAME TRACE OUT
     python3 chaincases.py --rows NAME TRACE [FN]
+    python3 chaincases.py --drop-arg NAME TRACE OUT
 
 A CASE is `NODE:NAME:replaced|kept:CHAIN`: at node NODE, NAME is in its entry's `replaced` (replaced) or not
 (kept), and its `chains` value is CHAIN, the layers' qualified names joined by commas, outermost first, ending in
@@ -18,6 +19,11 @@ in every entry whose chains hold NAME; nothing else changed. It says how many en
 `--rows`: the rows of the question NAME on the records' tapes, by the answer they hold (a row is [NAME, its
 arguments, its answer], and a fourth member, the question's log, where it touched the node's tables); with FN, on
 the tapes of the records whose `reached` holds FN alone.
+
+`--drop-arg`: a plant for the replay (R3-9). OUT is TRACE with the last argument of each row of the question NAME on
+the records' tapes left out, and nothing else changed: a record line without such a row is written as it was read,
+and one with it is written again in the tracer's form (compact JSON). It says how many rows in how many records;
+exit 2 where none, or where a row has no argument to leave out.
 """
 import gzip
 import json
@@ -145,13 +151,43 @@ def rows(name, trace, fn=None):
     return 0
 
 
+def drop_arg(name, trace, out):
+    lines = lines_of(trace)
+    k = recs = 0
+    for j, line in enumerate(lines):
+        if not line.startswith('{"n"'):
+            continue
+        d = json.loads(line)
+        rows = [row for row in d.get("tape") or () if row and row[0] == name]
+        if not rows:
+            continue
+        for row in rows:
+            if not isinstance(row[1], list) or not row[1]:
+                print(f"chaincases: a {name} row with no argument to leave out, in record line {j + 1}")
+                return 2
+            row[1] = row[1][:-1]
+        k += len(rows)
+        recs += 1
+        lines[j] = json.dumps(d, separators=(",", ":"))
+    if not k:
+        print(f"chaincases: no {name} row on the tapes")
+        return 2
+    with gzip.open(out, "wt", encoding="utf-8") as f:
+        f.write("\n".join(lines) + "\n")
+    print(f"chaincases: the last argument of {name} left out in {k} row{'s' if k != 1 else ''}, "
+          f"in {recs} record{'s' if recs != 1 else ''}")
+    return 0
+
+
 def main(argv):
     if len(argv) == 4 and argv[0] == "--cut":
         return cut(*argv[1:])
+    if len(argv) == 4 and argv[0] == "--drop-arg":
+        return drop_arg(*argv[1:])
     if len(argv) in (3, 4) and argv[0] == "--rows":
         return rows(*argv[1:])
     if len(argv) < 2 or argv[0].startswith("--"):
-        print("usage: " + "; ".join(x.strip() for x in __doc__.strip().splitlines()[2:5]))
+        print("usage: " + "; ".join(x.strip() for x in __doc__.strip().splitlines()[2:6]))
         return 2
     return cases(argv[0], argv[1:])
 
