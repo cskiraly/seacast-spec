@@ -116,7 +116,8 @@ private def validatedBody (p : Peer) (f : ChunkF) (result : Verdict) : M2 m Unit
     if (← NodeV2.dutyFor g) == .forward then
       fwd := true
       break
-  if fwd then forwardCall f p (some acting)                   -- on any axis we serve; never waits for level 2
+  -- on any axis we serve; never waits for level 2. f as a lane holds it, narrow (`ChunkF`), as protocol.md's call
+  if fwd then forwardCall f.narrow p (some acting)
   for (g, _) in ← NodeV2.project T f do
     checkCompletion g                                         -- §4.6
   branch "on_validated: filled"
