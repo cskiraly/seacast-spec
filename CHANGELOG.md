@@ -94,6 +94,14 @@ and the routed requests it passes on.
   `toy/graft_check.py` takes `joined` and `relation_room`; `toy/alarm_member_known.py` and
   `toy/v2_carried_known.py` cover links not joined.
 - `toy/README.md`: entries for the new known answers, and what the widened ones check.
+- `formal/twin/`: `on_have` asks `admitted` of a valid HAVE's group and bits, and `on_ihave` of an
+  offered id before it records the offer, as `protocol.md` §4.3, §4.4 now do; `admitted` takes a
+  chunk, a HAVE's group and bits, or an offered id (`Admit`).
+- `formal/twin/tools/`: `directed43.py` and `directed44.py` refuse a share of the groups, and
+  `mutants_c2.py` has seven mutants that skip a new check, ignore its answer or ask it out of order.
+- `formal/refine/`: the statements of the `twinstep`, `asking` and `carry` checks, recorded again
+  for `admitted`'s new argument.
+- `formal/twin/record/`: the twin's record made again from `f72cb4d`, its matrix run in full.
 
 ### Fixed
 - `protocol.md` §4.3, §4.4: `on_have` and `on_ihave` ignore a group beyond the peer's limit of
