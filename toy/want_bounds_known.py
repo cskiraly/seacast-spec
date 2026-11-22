@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.5's two bounds on a WANT: an index the group has not, once its count is
-known, and a group beyond the asker's limit of unknown groups (`admitted_group`, protocol.md §8.2's
+"""A known answer for seacast.md §4.5's two bounds on a WANT: an index the group has not, once its count is
+known, and a group beyond the asker's limit of unknown groups (`admitted_group`, seacast-lite.md §8.2's
 `MAX_PENDING_GROUPS`). Either is ignored without penalty, and keeps no standing request.
 
     python3 want_bounds_known.py
@@ -71,7 +71,7 @@ def kept(ns, g, i, p):
 
 def main():
     import wire as Wm
-    sim = build(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    sim = build(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     S = sim.nodes[2]
     ns = S.ns
     p = min(q for q in S.peers if q != 1)
@@ -184,7 +184,7 @@ def source_standing():
     got, spec_run = {}, R.run
     R.run = lambda cfg, out=None: got.setdefault("sim", SM.Sim(cfg))
     try:
-        R.main(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+        R.main(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     finally:
         R.run = spec_run
     sim = got["sim"]

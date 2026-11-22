@@ -6,7 +6,7 @@ all: card 16's guard asks whether a peer sent any HAVE for a group (`g not in pe
 note_push starts a clock at the first push, an installation releases the ties it finds (`tied`),
 and the writer takes an owed answer for each group it finds (`owed_answers`). LazyMap and LazyDict
 give both: a missing key reads as a fresh, detached entry, which inserts itself into the map the
-first time it is written to. Every table of protocol.md's and of protocol-v2.md's is one of them, or a
+first time it is written to. Every table of seacast-lite.md's and of seacast.md's is one of them, or a
 DefaultMap. AutoMap, which creates an entry on a read, no longer holds any of them.
 """
 
@@ -114,8 +114,8 @@ class _Lazy:
 
 
 class HaveEntry(_Lazy):
-    """peer_has[p][g]: the union of p's HAVE bitmaps for g, and its expiry (§4.3); v2 adds the two
-    claims a holding carries (protocol-v2.md §1.5)."""
+    """peer_has[p][g]: the union of p's HAVE bitmaps for g, and its expiry (§4.3); SEACAST adds the two
+    claims a holding carries (seacast.md §1.5)."""
     __slots__ = ("bits", "ttl", "claim_all", "complete")
 
     def __init__(self, home=None, key=None):
@@ -533,7 +533,7 @@ def lazy2(leaf):
 
 
 def lazy3(leaf):
-    """key -> key -> key -> leaf(home, key): a three-level table (protocol-v2.md's relations, by peer, type and
+    """key -> key -> key -> leaf(home, key): a three-level table (seacast.md's relations, by peer, type and
     family)."""
     return LazyDict(lambda h1, k1: LazyDict(lambda h2, k2: LazyDict(leaf, h2, k2), h1, k1))
 

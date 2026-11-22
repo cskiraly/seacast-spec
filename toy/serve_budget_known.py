@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.5's serving budget (`SERVE_BUDGET`, `served_hb`, `offered_to`): a node answers
+"""A known answer for seacast.md §4.5's serving budget (`SERVE_BUDGET`, `served_hb`, `offered_to`): a node answers
 one peer at most `SERVE_BUDGET` chunks a heartbeat across groups, not counting the answers to asks on its own offers or
 to a claim's probe; an ask over it is refused, and a standing request's answer dropped, without penalty; the budget
 starts again at each heartbeat. The node records its offers when its writer writes them (`noted`, `offers_in`), so an
@@ -62,7 +62,7 @@ def main():
     got, spec_run = {}, R.run
     R.run = lambda cfg, out=None: got.setdefault("sim", SM.Sim(cfg))
     try:
-        R.main(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+        R.main(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     finally:
         R.run = spec_run
     sim = got["sim"]
@@ -187,7 +187,7 @@ def across_types(R, SM, Wm):                        # (l): a cell asked through 
     got, spec_run = {}, R.run
     R.run = lambda cfg, out=None: got.setdefault("sim", SM.Sim(cfg))
     try:
-        R.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+        R.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     finally:
         R.run = spec_run
     sim = got["sim"]

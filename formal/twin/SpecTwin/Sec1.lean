@@ -1,8 +1,8 @@
 import SpecTwin.Basic
 
-/-! # The twin of protocol.md §1, "The payload, the code and the commitment" (v0.10.4, spec 34f60f8)
+/-! # The twin of seacast-lite.md §1, "The payload, the code and the commitment" (v0.10.4, spec 34f60f8)
 
-group_id, group_key, K, N, segment_length, valid_descriptor and build_group (protocol.md §1), line for line.
+group_id, group_key, K, N, segment_length, valid_descriptor and build_group (seacast-lite.md §1), line for line.
 
 - **What is asked, not computed:** `sha256`, `serialize`, `snappy_block_encode`,
   `pad_each`, `rs_parity`, `merkle_root`, `merkle_proof`. The toy's are stand-ins, so each is a question, asked

@@ -4,10 +4,10 @@ the node has not seen, at an index it has already received, is acknowledged and 
 forwarded and not kept for heartbeat gossip. A copy of an index the node holds only as rebuilt is still
 forwarded.
 
-    python3 second_id_known.py        # protocol.md, then protocol-v2.md on top of it
+    python3 second_id_known.py        # seacast-lite.md, then seacast.md on top of it
 
-`protocol.md`'s `on_validated` returns with the acknowledgement once `received[g]` has the index, before
-`forward`. `protocol-v2.md`'s `on_validated` (its §4.2) forwards on the axes whose index it had not received
+`seacast-lite.md`'s `on_validated` returns with the acknowledgement once `received[g]` has the index, before
+`forward`. `seacast.md`'s `on_validated` (its §4.2) forwards on the axes whose index it had not received
 before this copy. A copy of an index held only as rebuilt is new on its axis in both documents, so both forward
 it.
 
@@ -18,20 +18,20 @@ with `forward` and the gossip history's `put` counted:
   nor put in the gossip history;
 - after chunks 1 to 3 and the decode, chunk 4 (rebuilt, never received) arrives under its own id, which the node
   has not seen: it is forwarded (the control for the rebuilt case);
-- then chunk 4 under yet another id: `protocol.md` stored the copy before, so this one is a second copy of a
-  received index, not forwarded; `protocol-v2.md` stores no copy of a rebuilt index, so it forwards this one too
+- then chunk 4 under yet another id: `seacast-lite.md` stored the copy before, so this one is a second copy of a
+  received index, not forwarded; `seacast.md` stores no copy of a rebuilt index, so it forwards this one too
   (its §6.1, "more ids for a rebuilt index");
 - a repeat of chunk 4 under its own id, the rebuilt chunk's, is acknowledged in both;
 - chunk 5, rebuilt, comes first under an id not its own, and both forward it; a repeat of that copy is
-  acknowledged by `protocol.md`, which stored it, and ignored by `protocol-v2.md`, which stored none (`accepted`
+  acknowledged by `seacast-lite.md`, which stored it, and ignored by `seacast.md`, which stored none (`accepted`
   answers whether the id was stored, since v0.10.5's toy);
 - the reverse order, at chunk 6: under an id not its own first, then under its own, the rebuilt chunk's, which
-  `protocol.md` only acknowledges and `protocol-v2.md` forwards; a repeat under its own id is ignored by
-  `protocol.md`, which stored the other, and acknowledged by `protocol-v2.md`, which keeps the rebuilt one.
+  `seacast-lite.md` only acknowledges and `seacast.md` forwards; a repeat under its own id is ignored by
+  `seacast-lite.md`, which stored the other, and acknowledged by `seacast.md`, which keeps the rebuilt one.
 
 The toy's content id hashes the chunk's identity (`wire.content_id`), so the second id is made by changing what
 it hashes. Level 1 is taken as passed (`on_validated` with ACCEPT), as for a relabelled copy whose other block
-the node installed (`protocol.md` §4.6's open item). On `protocol-v2.md` before this rule, the second id's copy was
+the node installed (`seacast-lite.md` §4.6's open item). On `seacast.md` before this rule, the second id's copy was
 forwarded and put in the gossip history: the check fails there.
 """
 import copy
@@ -49,7 +49,7 @@ def check(doc):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "65536", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"])
     sim.publish(1)                                          # the block installs, its chunks exist; nothing delivered
@@ -112,7 +112,7 @@ def check(doc):
     f3.data.tag = ("another id", chunks[K].data.tag)
     f3.mid = None
     line(f"chunk {K} under another id, from peer 3 (forward, gossip put)",
-         arrive(Q, f3, validated=True)[:2], (1, 1) if doc == "v2" else (0, 0))
+         arrive(Q, f3, validated=True)[:2], (1, 1) if doc == "seacast" else (0, 0))
     line(f"a repeat of chunk {K} under its own id, the rebuilt chunk's, from peer 3 (forward, gossip put, HAVEs "
          "to it, penalties)", arrive(Q, chunks[K]), (0, 0, 1, 0))
     f5 = copy.copy(chunks[K + 1])                           # rebuilt, and first comes under an id not its own
@@ -122,7 +122,7 @@ def check(doc):
     line(f"chunk {K + 1}, rebuilt, first under an id not its own, from peer 3 (forward, gossip put)",
          arrive(Q, f5, validated=True)[:2], (1, 1))
     line(f"a repeat of that copy, from peer 3 (forward, gossip put, HAVEs to it, penalties)",
-         arrive(Q, f5), (0, 0, 0, 0) if doc == "v2" else (0, 0, 1, 0))
+         arrive(Q, f5), (0, 0, 0, 0) if doc == "seacast" else (0, 0, 1, 0))
     f6 = copy.copy(chunks[K + 2])                           # the reverse order: another id first, then the own id
     f6.data = copy.copy(chunks[K + 2].data)
     f6.data.tag = ("a first other id", chunks[K + 2].data.tag)
@@ -130,15 +130,15 @@ def check(doc):
     line(f"chunk {K + 2}, rebuilt, first under an id not its own (forward, gossip put)",
          arrive(Q, f6, validated=True)[:2], (1, 1))
     line(f"then under its own id, the rebuilt chunk's (forward, gossip put)",
-         arrive(Q, chunks[K + 2], validated=True)[:2], (1, 1) if doc == "v2" else (0, 0))
+         arrive(Q, chunks[K + 2], validated=True)[:2], (1, 1) if doc == "seacast" else (0, 0))
     line(f"a repeat under its own id (forward, gossip put, HAVEs to it, penalties)",
-         arrive(Q, chunks[K + 2]), (0, 0, 1, 0) if doc == "v2" else (0, 0, 0, 0))
+         arrive(Q, chunks[K + 2]), (0, 0, 1, 0) if doc == "seacast" else (0, 0, 0, 0))
     return bad
 
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         print(f"--doc {doc}:")
         bad += check(doc)
     print("ok" if not bad else "FAIL")

@@ -1,7 +1,7 @@
 import SpecTwin.Sec42
 import SpecTwin.Sec52
 
-/-! # The twin of protocol.md §6.4, "Heartbeat gossip and pacing" [c15] (v0.10.4, spec 34f60f8): `on_heartbeat`,
+/-! # The twin of seacast-lite.md §6.4, "Heartbeat gossip and pacing" [c15] (v0.10.4, spec 34f60f8): `on_heartbeat`,
 `on_pace_tick` and `send_gossip`
 
 - **`pace_queue` is the twin's own table:** one entry, `jobs`, whose value is the jobs in order, read and

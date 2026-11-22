@@ -9,7 +9,7 @@ them, and their reads go into a record's reads.
 - `held(a)` is the toy's (`toy/node.py`, `held` in `Node._namespace`: an ask's chunk is in `mine`):
   `group_index(a) is not None and mine[group].has(index)`. Every ask key has a group and an index (`Key`), so
   the first test always holds here.
-- `tied_to_root(p, a)` is protocol.md's (§4.2): `any(t[p][group(a)].has(index(a)) for t in tied.values())`.
+- `tied_to_root(p, a)` is seacast-lite.md's (§4.2): `any(t[p][group(a)].has(index(a)) for t in tied.values())`.
   The Python reads `tied` as a whole (`tied.values()`), then `t[p][group(a)]` for each root until one has the
   index. The twin reads the whole table once and decides from it: the same answer, and a subset of the Python's
   reads. A missing row or bitmap has no index. -/

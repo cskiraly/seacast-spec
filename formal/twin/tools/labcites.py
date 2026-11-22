@@ -82,7 +82,7 @@ def self_test():
         clean, planted = Path(d) / "clean", Path(d) / "planted"
         for t in (clean, planted):
             (t / "A").mkdir(parents=True)
-            (t / "A" / "x.lean").write_text("-- the receive path (protocol-v2.md §4.2)\ndef x := 1\n")
+            (t / "A" / "x.lean").write_text("-- the receive path (seacast.md §4.2)\ndef x := 1\n")
             (t / "A" / "v.lean").write_text("-- the twin's design\n-- of the receive path\ndef v := 1\n")
             (t / "t.py").write_text("# the notes of a function\nprint(1)\n")
             (t / ".lake").mkdir()

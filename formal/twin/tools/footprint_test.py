@@ -670,7 +670,7 @@ def main():
             raise
     ok &= case("Q11 one entry in two lanes: trace3.py's alias check refuses the run", alias, raises="AliasRefused",
                make=Q)
-    # ---- rows read on the way down (`row_reads`, the four tables under --doc v2): RR1 to RR16; their control:
+    # ---- rows read on the way down (`row_reads`, the four tables under --doc seacast): RR1 to RR16; their control:
     #      --broken-row-reads. RR12 to RR16 are the forms that log as in any table, and pass under the control too
     def rr(make):
         def f():
@@ -962,7 +962,7 @@ def main():
     ok &= case("W5 a failed acquisition (the window full, the peer in line): reads, no write",
                run("x = in_flight < W and (not waiters or waiters[0] == 7)\ny = 7 not in waiters"),
                reads=[CNT + [2], LN + [[5, 7]]], make=lambda: fresh_window(count=2))
-    ok &= case("W6 the count in a sum (v2's `in_flight + need <= W`): one read", run("x = in_flight + 1 <= W"),
+    ok &= case("W6 the count in a sum (SEACAST's `in_flight + need <= W`): one read", run("x = in_flight + 1 <= W"),
                reads=[CNT + [1]], make=fresh_window)
     ok &= case("W7 the line: `if waiters`, `waiters[0]`, `p in waiters`: one read",
                run("x = bool(waiters) and waiters[0] == 5 and 7 in waiters"), reads=[LN + [[5, 7]]], make=fresh_window)

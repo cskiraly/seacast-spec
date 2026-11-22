@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""A known answer for protocol.md §8.2's limit of unknown groups per peer (`MAX_PENDING_GROUPS`) on HAVEs and offers,
-in protocol.md §4.3's `on_have` and §4.4's `on_ihave`, and protocol-v2.md §4.3's `on_holding` and `on_offer`: a HAVE
-(under protocol-v2.md, a holding) or an offer of a group beyond the peer's limit is ignored, without penalty, before
+"""A known answer for seacast-lite.md §8.2's limit of unknown groups per peer (`MAX_PENDING_GROUPS`) on HAVEs and offers,
+in seacast-lite.md §4.3's `on_have` and §4.4's `on_ihave`, and seacast.md §4.3's `on_holding` and `on_offer`: a HAVE
+(under seacast.md, a holding) or an offer of a group beyond the peer's limit is ignored, without penalty, before
 it leaves any state.
 
     python3 unknown_groups_known.py
@@ -9,12 +9,12 @@ it leaves any state.
 The toy sets no such limit (its `admitted` is always true), so the check gives the node an `admitted` that refuses
 one group, G, and admits every other. On one node of a small network that is built and not run, from one peer,
 under each document:
-- a HAVE of G (under protocol-v2.md, a holding that claims G whole): nothing in `peer_has` or `holders`, and under
-  protocol-v2.md nothing in `claims`;
-- an offer of G (an IHAVE's bitmap; under protocol-v2.md, an offer): nothing in `offered` or `offers`, and no ask;
+- a HAVE of G (under seacast.md, a holding that claims G whole): nothing in `peer_has` or `holders`, and under
+  seacast.md nothing in `claims`;
+- an offer of G (an IHAVE's bitmap; under seacast.md, an offer): nothing in `offered` or `offers`, and no ask;
 - the controls, the same for H, a group the node admits: each leaves its state;
 - penalties: none.
-Under protocol.md, G and H are groups no block commits; under protocol-v2.md, two columns of the published block
+Under seacast-lite.md, G and H are groups no block commits; under seacast.md, two columns of the published block
 in the node's custody, not yet open at the node. On the documents before the rule, the HAVE and the offer of G
 leave state.
 """
@@ -49,9 +49,9 @@ def build(args):
 def check(doc):
     import wire as Wm
     from bits import bitmap
-    v2 = doc == "v2"
-    if v2:
-        sim = build(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1",
+    seacast = doc == "seacast"
+    if seacast:
+        sim = build(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1",
                      "--seed", "7"])
         sim.run(sim.cfg["first"])
         sim.publish(1)
@@ -60,7 +60,7 @@ def check(doc):
     node = sim.nodes[NODE]
     ns = node.ns
     p = min(q for q in node.peers if q != 1)
-    if v2:
+    if seacast:
         G, H = [g for g in sorted(sim.gcol, key=str) if g not in ns["T_of"]
                  and ns["our_interest_for"](p, g).has(1)][:2]   # in the node's custody: offers of it are kept
     else:
@@ -71,13 +71,13 @@ def check(doc):
     ns["admitted"] = lambda q, x: group_of(x) != G  # G beyond p's unknown groups; every other group admitted
 
     def have(g):
-        if v2:
+        if seacast:
             ns["on_holding"](p, ns["Have"](group=g, bits=bitmap({0}), offer=False, claim_all=True, complete=False))
         else:
             ns["on_have"](p, Wm.HaveBitmap(group=g, bits=bitmap({0})))
 
     def offer(g):
-        if v2:
+        if seacast:
             return ns["on_offer"](p, ns["Have"](group=g, bits=bitmap({1}), offer=True, claim_all=False,
                                                 complete=False))
         return ns["on_ihave"](p, Wm._IHave([Wm.HaveBitmap(group=g, bits=bitmap({1}))]))
@@ -85,7 +85,7 @@ def check(doc):
     def held_state(g):
         e = ns["peer_has"].get(p, {}).get(g)
         st = (e is not None and e.bits.has(0), p in ns["holders"].get(g, {}).get(0, ()))
-        return st + ((p in ns["claims"].get(g, ()),) if v2 else ())
+        return st + ((p in ns["claims"].get(g, ()),) if seacast else ())
 
     def offer_state(g):
         o = ns["offered"].get(p, {}).get(g)
@@ -96,18 +96,18 @@ def check(doc):
     have(H)
     asks = offer(G)
     offer(H)
-    yes = (True,) * (3 if v2 else 2)
-    what = "a holding claiming it whole" if v2 else "a HAVE"
-    line(f"{doc}: {what} of G, beyond p's unknown groups: in peer_has, holders" + (", claims" if v2 else ""),
+    yes = (True,) * (3 if seacast else 2)
+    what = "a holding claiming it whole" if seacast else "a HAVE"
+    line(f"{doc}: {what} of G, beyond p's unknown groups: in peer_has, holders" + (", claims" if seacast else ""),
          held_state(G), tuple(not x for x in yes))
     line(f"{doc}: an offer of G: in offered, offers; asks", (offer_state(G), asks), ((False, False), []))
-    line(f"{doc}: the controls, H admitted: {'the holding' if v2 else 'the HAVE'}'s state; the offer's state",
+    line(f"{doc}: the controls, H admitted: {'the holding' if seacast else 'the HAVE'}'s state; the offer's state",
          (held_state(H), offer_state(H)), (yes, (True, True)))
     line(f"{doc}: penalties", node.penalties - pen0, 0)
 
 
 def main():
-    for doc in ("protocol", "v2"):
+    for doc in ("lite", "seacast"):
         check(doc)
 
 

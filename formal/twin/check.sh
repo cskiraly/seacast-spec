@@ -19,36 +19,36 @@
 # here is given the line of this tree, made once at the start and once more at the end, which must be the same.
 #
 # The steps, and what each must show:
-#   build     a copy of the twin's sources, built from nothing with `lake build replay SpecTwin.V2` (SpecTwin.V2 for
-#             the guard modules, V2/*Known.lean, whose #guards hold only where they are built; a copy of one with a
+#   build     a copy of the twin's sources, built from nothing with `lake build replay SpecTwin.Seacast` (SpecTwin.Seacast for
+#             the guard modules, Seacast/*Known.lean, whose #guards hold only where they are built; a copy of one with a
 #             false #guard fails Lean, its control); twin-sources.txt: each
 #             source file of the twin, this script and record.sh by sha256 (a link among them is refused; a
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
-#             that list, and at the end of the run the sources and the copy still are; the forms of v2's
-#             questions, each row of tools/forms-v2-examples.tsv read and refused by `replay --forms`, with its
+#             that list, and at the end of the run the sources and the copy still are; the forms of SEACAST's
+#             questions, each row of tools/forms-seacast-examples.tsv read and refused by `replay --forms`, with its
 #             three controls (a copy with one wrong row fails, its control)
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
-#             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders,
+#             matrixdiff.py, trace3.py's of the names seacast.md keeps, gen/schema_seacast.py's encoders,
 #             keptcopy.py's, labcites.py's and scan_bindings.py's); and no line of the twin's sources (the
 #             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
 #             cites the notes beside which they were developed (labcites.py), a citation planted in
 #             README.md's copy reported
-#   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
+#   tables    the twin's generated files are the schema's (gen.py, makers.py); Seacast/Kept.lean's copies of seacast-lite.md's
 #             functions are their originals with the named differences alone (keptcopy.py); the record writers'
-#             arities are runV2's cases', each count a case takes given by a stub call (records_v2.py), with two
+#             arities are runSeacast's cases', each count a case takes given by a stub call (records_seacast.py), with two
 #             planted controls; the views' own cases (footprint_test.py)
-#   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
+#   scope     every function seacast-lite.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
 #             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused.
-#             And v2's part: every name protocol-v2.md's manifest covers has an `enter` in SpecTwin/V2/ and a case
-#             of runV2, and runV2 has no case the manifest does not cover but respond; two controls refused. And
-#             v2's questions, both ways: each name of the manifest's QUESTIONS is read by an askCall or a case of
-#             the tape reader, and each name the twin asks or reads as a call under protocol-v2.md is a question, a
+#             And SEACAST's part: every name seacast.md's manifest covers has an `enter` in SpecTwin/Seacast/ and a case
+#             of runSeacast, and runSeacast has no case the manifest does not cover but respond; two controls refused. And
+#             SEACAST's questions, both ways: each name of the manifest's QUESTIONS is read by an askCall or a case of
+#             the tape reader, and each name the twin asks or reads as a call under seacast.md is a question, a
 #             covered or cut function, or the replay's own (keys, order); three controls refused
 #   mutants   every mutant's text stands in the twin once (--places), and each type-checks alone against the build
 #   screen    every cell's header and nodes line, under both documents, read by the replay; a nodes line without a
 #             constant refused
 #   cells     `none`, traced and replayed: its digest is golden.txt's (the tracer perturbs nothing)
-#   small     hand5 (whole; §6.1's twelve alone; at PUBLISH), late16, and hand5 twice under protocol-v2.md: each
+#   small     hand5 (whole; §6.1's twelve alone; at PUBLISH), late16, and hand5 twice under seacast.md: each
 #             traced and replayed, its digest the untraced run's with the same arguments
 #   directed  the 22 directed sets, traced and replayed
 #   replays   every replay above read a trace that is not empty, to its trailer, with no record mismatched and no
@@ -64,14 +64,14 @@
 #
 # With --record (record.sh): the record's run, hours on a server. The same steps under the same contract, and:
 #   cells     every cell of the toy's check.py, not `none` alone: each digest golden.txt's, each replayed
-#   v2cells   every cell under protocol-v2.md: each digest golden-v2.txt's, each replayed (its records are of the
-#             names that are protocol.md's all the way down); the tracer's self-test of those names
+#   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of the
+#             names that are seacast-lite.md's all the way down); the tracer's self-test of those names
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
 #   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
 #             line after the verdict, a line on stderr, exit code 2) refused, the plain one taken
 #   tracercontrols   a tracer whose views let an assignment through unlogged, and 31 faults planted in the tracer:
-#             each must stop it, with its own words; under v2, ten plants that must not (five, and five controls),
+#             each must stop it, with its own words; under SEACAST, ten plants that must not (five, and five controls),
 #             each as written (a plant that replaces a function at a node: the nodes line with its chains set
 #             aside, that node's chain the plant's), and the controls of the checks' own helpers; and a nodes
 #             line without a replaced name's chain, which the replay must refuse with its words; and the chain
@@ -81,7 +81,7 @@
 #             must refuse each record it flipped; listed as changing, the control, it must replay; and the swapped
 #             draws: each layer's draws on the tape of a cell that enters it, and two plants on hand5 (the re-wrap
 #             off, which the replay must refuse; the swap left unrestored, which must stop the tracer); and a record
-#             writer whose arguments are not runV2's case's, on_chunk's without p, whose records the replay must
+#             writer whose arguments are not runSeacast's case's, on_chunk's without p, whose records the replay must
 #             refuse, each and no other. With
 #             --no-das: the DAS cells and the plants on them skipped, which each line says; the check is then a
 #             part, not a pass
@@ -92,7 +92,7 @@
 #             (fullid.py): none in a cell's trace under either document, where the nodes ask by index
 #   manifest  record-manifest.txt: the content line's sha256, the Python and the platform, each document's file
 #             sha256 (for provenance: the content line names the documents by their code), and the two hashes of
-#             each of the record's 55 traces (15 cells, three hand traces, 22 directed sets, 15 v2 cells)
+#             each of the record's 55 traces (15 cells, three hand traces, 22 directed sets, 15 SEACAST cells)
 # The steps `replays`, `headers` and the hashes then cover the record's traces.
 # With --against DIR too (a record: a directory with a run's record-manifest.txt and content.line), a last step:
 #   against   the run's manifest against the record's (against.py): as recorded; or another content and the same
@@ -100,7 +100,7 @@
 #
 # With --matrix K/N (record.sh --matrix K/N): the Kth of N parts of the mutants' matrix, hours on a server each.
 # The twin is built, the 15 cells, the hand traces and the 22 directed sets are traced and replayed as in the
-# record's run (no cell under protocol-v2.md: no mutant is replayed there), and then:
+# record's run (no cell under seacast.md: no mutant is replayed there), and then:
 #   matrix    every Nth mutant from the Kth (mutants3.py --part), each built and replayed on the records that
 #             reach its function or touch its table: first on the directed sets, where each must be told from
 #             the twin; then on the 15 cells with hand5 and hand5-publish. In matrix/out: the two reports, a line
@@ -116,8 +116,8 @@
 # a trial of the step and of the merge (`mutants3.py --merge … --rehearsal M1,M2,…`), never a part of a matrix.
 #
 # With --v2steps (not with --record or --matrix, which run them all): the quick check and four of the record's steps,
-# v2cells, schemacontrols, viewcontrols and tracercontrols, with the 15 cells' v2 traces among those the steps
-# replays and headers read; its pass is "check.sh: PASS (with v2cells, schemacontrols, viewcontrols and
+# seacastcells, schemacontrols, viewcontrols and tracercontrols, with the 15 cells' SEACAST traces among those the steps
+# replays and headers read; its pass is "check.sh: PASS (with seacastcells, schemacontrols, viewcontrols and
 # tracercontrols)". Without it the steps and the traces are the quick check's.
 #
 # It prints "check.sh: PASS" and exits 0 only if every step ran and showed what it must.
@@ -129,7 +129,7 @@ TOY=${SPEC_TOY:-$ROOT/toy}
 OUT=$HERE/out/check
 J=4
 ALL="build selftests tables scope mutants screen cells small directed replays headers picks controls perturbed"
-RECORD_ALL="build selftests tables scope mutants screen cells v2cells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols seeds sizes manifest"
+RECORD_ALL="build selftests tables scope mutants screen cells seacastcells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols seeds sizes manifest"
 MATRIX_ALL="build mutants cells small directed replays headers matrix"
 RECORD=
 PART=
@@ -168,10 +168,10 @@ if [ -n "$AGAINST" ]; then
   AGAINST=$(cd "$AGAINST" 2> /dev/null && pwd) || { echo "check.sh: no record at the directory given with --against"; exit 2; }
   ALL="$ALL against"
 fi
-if [ -n "$V2STEPS" ]; then     # the quick check, the record's two steps of the tracer under protocol-v2.md, and the
+if [ -n "$V2STEPS" ]; then     # the quick check, the record's two steps of the tracer under seacast.md, and the
   #                              schema's and the views' controls, in RECORD_ALL's order
   [ -z "$RECORD" ] || { echo "check.sh: --v2steps goes without --record or --matrix"; exit 2; }
-  ALL="build selftests tables scope mutants screen cells v2cells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols"
+  ALL="build selftests tables scope mutants screen cells seacastcells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols"
 fi
 if [ -n "$PART" ]; then
   case "$PART" in [1-8]/[1-8]) ;; *) echo "check.sh: --matrix K/N, with N from 1 to 8 and K from 1 to N"; exit 2 ;; esac
@@ -183,7 +183,7 @@ elif [ -n "$SAMPLE" ]; then echo "check.sh: --sample goes with --matrix K/N"; ex
 [ -n "$STEPS" ] || STEPS=$ALL
 for s in $STEPS; do case " $ALL " in *" $s "*) ;; *) echo "check.sh: no step $s (the steps: $ALL)"; exit 2 ;; esac; done
 if [ "$STEPS" = "$ALL" ]; then rm -rf "$OUT"; fi
-mkdir -p "$OUT/traces" "$OUT/directed" "$OUT/v2" || exit 2
+mkdir -p "$OUT/traces" "$OUT/directed" "$OUT/seacast" || exit 2
 OUT=$(cd "$OUT" && pwd)
 LOG=$OUT/check.txt
 REPLAY=$OUT/twin/.lake/build/bin/replay
@@ -208,7 +208,7 @@ dirtool() {             # a directed set's tool, and its own options
   esac
 }
 HAND5="--nodes 5 --degree 4 --msgs 1 --payload 16384 --seed 7"
-DAS30="--nodes 30 --degree 8 --msgs 1 --setting rows --supernodes 10 --blobs 4 --seed 7 --doc v2"   # the chain cases'
+DAS30="--nodes 30 --degree 8 --msgs 1 --setting rows --supernodes 10 --blobs 4 --seed 7 --doc seacast"   # the chain cases'
 LATE16="--nodes 16 --degree 8 --msgs 2 --seed 7 --late-block 30,400"
 CELLS="announce cap-wait dcb20 hold ihave-limits late-block loss-thin none push push-deep rr-stripe silent withholders without-a without-b"
 if [ -n "$FEWCELLS" ]; then
@@ -217,17 +217,17 @@ if [ -n "$FEWCELLS" ]; then
   CELLS=$CELLS_GIVEN
 fi
 SEEDCELLS=$(for c in withholders loss-thin; do case " $CELLS " in *" $c "*) echo "$c" ;; esac; done)   # traced twice
-SMALL="traces/late16 v2/hand5 v2/hand5-own v2/hand5-publish"         # the check's small traces that are not the record's
+SMALL="traces/late16 seacast/hand5 seacast/hand5-own seacast/hand5-publish"         # the check's small traces that are not the record's
 if [ -z "$RECORD" ]; then
-  TRACES="traces/none traces/hand5 traces/hand5-sec61 traces/late16 traces/hand5-publish v2/hand5 v2/hand5-own v2/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
-elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under protocol-v2.md
+  TRACES="traces/none traces/hand5 traces/hand5-sec61 traces/late16 traces/hand5-publish seacast/hand5 seacast/hand5-own seacast/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
+elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under seacast.md
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
   TRACES="$RTRACES $SMALL"
 else                    # the record's 55, then the three small ones
-  RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "v2/$c"; done)"
+  RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "seacast/$c"; done)"
   TRACES="$RTRACES $SMALL"
 fi
-[ -z "$V2STEPS" ] || TRACES="$TRACES $(for c in $CELLS; do echo "v2/$c"; done)"    # v2cells' traces, read too
+[ -z "$V2STEPS" ] || TRACES="$TRACES $(for c in $CELLS; do echo "seacast/$c"; done)"    # seacastcells' traces, read too
 
 replay_of() {           # $1: a trace, without its .jsonl.gz: replayed to $1.replay; the status is the replay's, kept in
   zcat "$OUT/$1.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/$1.replay" 2>&1      #   $1.replay.rc
@@ -239,7 +239,7 @@ parsed_whole() {        # $1: a replay's report: no line its strict reader or it
   [ -f "$1" ] && ! has -E '^(lines refused before they were parsed|line [0-9]+: not a line the tracer writes)' "$1"
 }
 digest_of() { sed -n '/^digest /{s/^digest \(.\{16\}\).*/\1/p;q}' "$1"; }
-bare_none() { [ "$(cat "$1.bare.json" 2> /dev/null)" = "{}" ]; }     # $1: a v2 trace: its run counted no bare call
+bare_none() { [ "$(cat "$1.bare.json" 2> /dev/null)" = "{}" ]; }     # $1: a SEACAST trace: its run counted no bare call
 extra_records() {       # $1: a trace; $2: another; $3: a node; $4: a function; $5: k: the second's body is the first's,
   $PY - "$@" <<'EOF'    #   in order, with exactly k records inserted, each of that function at that node, and its
 import gzip             #   trailer the first's with those k counted, nothing else changed. [$6 $7 $8: a node, a name
@@ -365,37 +365,37 @@ import layout
 shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns(*layout.NOT_SOURCES, "out"))
 EOF
   echo "  $(cd "$OUT/twin" && lean --version 2>&1 | head -n 1)"     # the Lean the build uses: elan resolves it by the copy's lean-toolchain
-  # SpecTwin.V2 too: it alone imports the guard modules (V2/*Known.lean), whose #guards hold only where they are built
-  (cd "$OUT/twin" && lake build replay SpecTwin.V2) > "$OUT/build.txt" 2>&1 || { grep -v '^✔' "$OUT/build.txt" | head -n 40; no "the build failed"; return; }
+  # SpecTwin.Seacast too: it alone imports the guard modules (Seacast/*Known.lean), whose #guards hold only where they are built
+  (cd "$OUT/twin" && lake build replay SpecTwin.Seacast) > "$OUT/build.txt" 2>&1 || { grep -v '^✔' "$OUT/build.txt" | head -n 40; no "the build failed"; return; }
   [ -x "$REPLAY" ] || { no "the build left no replay"; return; }
   twin_list "$OUT/twin" 2> /dev/null | cmp -s - "$OUT/twin-sources.txt" || { no "the copy that was built is not the twin's sources as listed"; return; }
   echo "  the twin's sources: $(wc -l < "$OUT/twin-sources.txt") files, the list's sha256 $(sha256sum < "$OUT/twin-sources.txt" | cut -c1-64) (twin-sources.txt)"
   echo "  the replay: sha256 $(sha256sum < "$REPLAY" | cut -c1-64)"
   local k g=()
-  for k in "$OUT"/twin/SpecTwin/V2/*Known.lean; do
+  for k in "$OUT"/twin/SpecTwin/Seacast/*Known.lean; do
     k=$(basename "$k" .lean)
-    grep -q -E "Built SpecTwin\.V2\.$k( |\$)" "$OUT/build.txt" || { no "the guard module $k was not built (build.txt)"; return; }
+    grep -q -E "Built SpecTwin\.Seacast\.$k( |\$)" "$OUT/build.txt" || { no "the guard module $k was not built (build.txt)"; return; }
     g+=("$k")
   done
-  [ ${#g[@]} -gt 0 ] || { no "no guard module under SpecTwin/V2"; return; }
-  echo "  the guards: ${#g[@]} modules of SpecTwin.V2 built, each #guard held (${g[*]})"
+  [ ${#g[@]} -gt 0 ] || { no "no guard module under SpecTwin/Seacast"; return; }
+  echo "  the guards: ${#g[@]} modules of SpecTwin.Seacast built, each #guard held (${g[*]})"
   # its control: a copy of a guard module with a false #guard, given to Lean beside the built copy, fails
   mkdir -p "$OUT/guard-control"
-  { cat "$OUT/twin/SpecTwin/V2/FuelKnown.lean"; printf '\n#guard false\n'; } > "$OUT/guard-control/FuelKnown.lean"
+  { cat "$OUT/twin/SpecTwin/Seacast/FuelKnown.lean"; printf '\n#guard false\n'; } > "$OUT/guard-control/FuelKnown.lean"
   if ! (cd "$OUT/twin" && lake env lean "$OUT/guard-control/FuelKnown.lean") > "$OUT/guard-control/lean.txt" 2>&1 \
      && grep -q -F 'did not evaluate to `true`' "$OUT/guard-control/lean.txt"; then
     echo "  control, a false #guard in a guard module: it fails, as it must"
   else no "control, a false #guard in a guard module: NOT failed (guard-control/lean.txt)"; fi
-  # the forms of v2's questions: each row of the tools' file read and refused by the replay, and the checker's
-  # three controls refused (replay --forms, V2/FormsRows.lean); a file that is not there fails, it is not skipped
-  local forms="$T/forms-v2-examples.tsv" rows
-  [ -f "$forms" ] || { no "no forms file (tools/forms-v2-examples.tsv)"; return; }
+  # the forms of SEACAST's questions: each row of the tools' file read and refused by the replay, and the checker's
+  # three controls refused (replay --forms, Seacast/FormsRows.lean); a file that is not there fails, it is not skipped
+  local forms="$T/forms-seacast-examples.tsv" rows
+  [ -f "$forms" ] || { no "no forms file (tools/forms-seacast-examples.tsv)"; return; }
   rows=$(grep -c . "$forms")
   "$REPLAY" --forms "$forms" > "$OUT/forms.txt" 2>&1 \
     || { grep -F 'FAIL' "$OUT/forms.txt" | head -n 10 | cut -c1-300; no "the forms: a row not read or not refused, or a control not refused (forms.txt)"; return; }
   [ "$(tail -n 1 "$OUT/forms.txt")" = "rows $rows, controls 3, failed 0" ] \
     || { no "the forms: not $rows rows and 3 controls with none failed (forms.txt)"; return; }
-  echo "  the forms: $rows rows read and refused, 3 controls refused (forms-v2-examples.tsv)"
+  echo "  the forms: $rows rows read and refused, 3 controls refused (forms-seacast-examples.tsv)"
   # its control: a copy of the file with the typeOf row's answer made 5 fails, naming that row
   $PY - "$forms" "$OUT/forms-control.tsv" <<'EOF' || { no "control, a wrong row in the forms: the copy could not be made"; return; }
 import json, sys
@@ -429,8 +429,8 @@ commentsonly.py --self-test ^self-test: ([0-9]+) of \1 known answers
 fullid.py --self-test ^ok: every case as it must be$
 against.py --self-test ^ok: every case as it must be$
 matrixdiff.py --self-test ^ok: every case as it must be$
-trace3.py --self-test-v2 ^ok:
-gen/schema_v2.py --self-test ^ok: every case as it must be$
+trace3.py --self-test-seacast ^ok:
+gen/schema_seacast.py --self-test ^ok: every case as it must be$
 keptcopy.py --self-test ^ok: every case as it must be$
 labcites.py --self-test ^labcites self-test, planted: (.*), must be \1$
 scan_bindings.py --self-test ^ok: every case as it must be$
@@ -459,7 +459,7 @@ EOF_SELF
     echo "  control, a lab citation planted in README.md's copy: reported, as it must be"
   else no "the guard did not report a lab citation planted in README.md's copy ($lc/labcites.txt)"; fi
   # the scan's lists beside trace3.py's hand-kept ones: no difference. The observer the peer-promise mode binds
-  # over close_promises, bound under v2 alone (_v2 calls _peer_promise), is held to LAYERS, which lists it
+  # over close_promises, bound under SEACAST alone (_seacast calls _peer_promise), is held to LAYERS, which lists it
   $PY "$T/scan_bindings.py" "$TOY" --lists > "$OUT/scan-lists.txt" 2>&1; local lrc=$?
   if [ "$lrc" = 0 ] && [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 0 ] \
       && has -x "observer close_promises Node._peer_promise.<locals>.close_promises: v2-only, an observer in LAYERS (the chain rule's)" "$OUT/scan-lists.txt" \
@@ -472,22 +472,22 @@ s_tables() {
     || no "a generated file is not the schema's, or a Tables value is made elsewhere (tables.txt)"
   tail -n 1 "$OUT/tables.txt" | sed 's/^/  /'
   $PY "$T/keptcopy.py" --twin "$OUT/twin" > "$OUT/keptcopy.txt" 2>&1 \
-    || no "a copy of protocol.md's Lean in V2/Kept.lean differs from its original beyond the named differences (keptcopy.txt)"
+    || no "a copy of seacast-lite.md's Lean in Seacast/Kept.lean differs from its original beyond the named differences (keptcopy.txt)"
   tail -n 1 "$OUT/keptcopy.txt" | sed 's/^/  /'
-  # the record writers' arities against runV2's cases (records_v2.py): each stub call's count one the case takes,
+  # the record writers' arities against runSeacast's cases (records_seacast.py): each stub call's count one the case takes,
   # each count the case takes given by a stub call; and its two controls, each a plant that must give exactly the
   # differences written here
-  local rv=$OUT/twin/SpecTwin/V2/Replay.lean c why said
-  (cd "$T" && $PY records_v2.py "$rv") > "$OUT/arities.txt" 2>&1 \
-    || no "a record writer's arity is not runV2's case's (arities.txt)"
-  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_v2: 72 covered names, 0 difference(s)" ] \
+  local rv=$OUT/twin/SpecTwin/Seacast/Replay.lean c why said
+  (cd "$T" && $PY records_seacast.py "$rv") > "$OUT/arities.txt" 2>&1 \
+    || no "a record writer's arity is not runSeacast's case's (arities.txt)"
+  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_seacast: 72 covered names, 0 difference(s)" ] \
     || no "the arity check's last line is not 72 covered names and no difference (arities.txt)"
   tail -n 1 "$OUT/arities.txt" | sed 's/^/  /'
   for c in forward on_chunk; do
     why=$(cd "$T" && $PY - "$rv" "$c" "$T" <<'EOF'
 import sys
 sys.path.insert(0, sys.argv[3])         # the tools' directory (isolated mode adds none)
-import records_v2 as R                  # noqa: E402
+import records_seacast as R                  # noqa: E402
 rv, c = sys.argv[1], sys.argv[2]
 if c == "forward":                      # forward's stub calls cut to the first, one(f, 4): its 3 is given by none
     stand_in = R.stand_in
@@ -498,12 +498,12 @@ if c == "forward":                      # forward's stub calls cut to the first,
         stubs["forward"] = (calls[:1], r)
         return tr, stubs
     R.stand_in = cut
-    want = ["forward: runV2's case takes 3 args, which no stub call gives"]
+    want = ["forward: runSeacast's case takes 3 args, which no stub call gives"]
 else:                                   # on_chunk's writer without p: a count of 1, and the case's 2 given by none
     params, _, ret = R.TABLE["on_chunk"]
     R.TABLE["on_chunk"] = (params, lambda tr, p, f: [tr.wchunk(f)], ret)
-    want = ["on_chunk: args_v2 gives 1 args, runV2's case takes 2",
-            "on_chunk: runV2's case takes 2 args, which no stub call gives"]
+    want = ["on_chunk: args_seacast gives 1 args, runSeacast's case takes 2",
+            "on_chunk: runSeacast's case takes 2 args, which no stub call gives"]
 got = R.arity_check(rv)
 print("as it must be" if got == want else f"not as written: {got}")
 EOF
@@ -516,8 +516,8 @@ EOF
   $PY "$T/footprint_test.py" > "$OUT/views.txt" 2>&1 || no "the views' own cases (views.txt)"
   tail -n 1 "$OUT/views.txt" | sed 's/^/  /'
 }
-s_scope() {             # the twin's scope held to the document: every `def` of protocol.md's code blocks, by name
-  $PY - "$(dirname "$TOY")/protocol.md" "$HERE/SpecTwin" > "$OUT/scope.txt" 2>&1 <<'EOF'
+s_scope() {             # the twin's scope held to the document: every `def` of seacast-lite.md's code blocks, by name
+  $PY - "$(dirname "$TOY")/seacast-lite.md" "$HERE/SpecTwin" > "$OUT/scope.txt" 2>&1 <<'EOF'
 import ast, re, sys
 from collections import Counter
 from pathlib import Path
@@ -558,59 +558,59 @@ gone = names[0]                              # the control: a twin with one name
 ctl = missing(entered - {gone}, cases)
 print(f"control, the twin without {gone}: {'refused, as it must be' if ctl and gone in ctl[0] else 'NOT refused  <-- FAIL'}")
 if bad or not ctl:
-    print(f"NOT every function of protocol.md's code blocks has its twin: {len(bad)} without")
+    print(f"NOT every function of seacast-lite.md's code blocks has its twin: {len(bad)} without")
     sys.exit(1)
-print(f"{len(names)} of {len(names)} functions of protocol.md's code blocks have their twin, by name")
+print(f"{len(names)} of {len(names)} functions of seacast-lite.md's code blocks have their twin, by name")
 EOF
-  [ $? = 0 ] || no "a function of protocol.md's code blocks without its twin, or the scope's control (scope.txt)"
-  # v2's part: every name the manifest covers has an `enter` in SpecTwin/V2/ and a case of runV2, and every case of
-  # runV2 is a covered name or the one kept form that is no covered name (respond)
+  [ $? = 0 ] || no "a function of seacast-lite.md's code blocks without its twin, or the scope's control (scope.txt)"
+  # SEACAST's part: every name the manifest covers has an `enter` in SpecTwin/Seacast/ and a case of runSeacast, and every case of
+  # runSeacast is a covered name or the one kept form that is no covered name (respond)
   $PY - "$T/gen" "$HERE/SpecTwin" >> "$OUT/scope.txt" 2>&1 <<'EOF'
 import re, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-import manifest_v2
+import manifest_seacast
 twin = Path(sys.argv[2])
-covered = list(manifest_v2.COVERED)
+covered = list(manifest_seacast.COVERED)
 entered = set()
-for f in sorted((twin / "V2").glob("*.lean")):
+for f in sorted((twin / "Seacast").glob("*.lean")):
     entered |= set(re.findall(r'enter "([A-Za-z_0-9]+)"', f.read_text()))
-text = (twin / "V2" / "Replay.lean").read_text()
-body = text[text.index("\ndef runV2 "):]                 # runV2's cases, not the tape reader's
+text = (twin / "Seacast" / "Replay.lean").read_text()
+body = text[text.index("\ndef runSeacast "):]                 # runSeacast's cases, not the tape reader's
 cases = set(re.findall(r'^\s*\| "([A-Za-z_0-9]+)", #\[', body, re.M))
 FORM_ALONE = {"respond"}
 
 def missing(entered, cases):
-    out = [f"{n}: {'no enter' if n not in entered else 'no case of runV2'}"
+    out = [f"{n}: {'no enter' if n not in entered else 'no case of runSeacast'}"
            for n in covered if n not in entered or n not in cases]
-    return out + [f"{c}: a case of runV2 the manifest does not cover" for c in sorted(cases - set(covered) - FORM_ALONE)]
+    return out + [f"{c}: a case of runSeacast the manifest does not cover" for c in sorted(cases - set(covered) - FORM_ALONE)]
 bad = missing(entered, cases)
 for b in bad:
-    print(f"v2, without its twin: {b}")
+    print(f"SEACAST, without its twin: {b}")
 gone = covered[0]                            # the controls: each must be refused
 ctl1 = missing(entered - {gone}, cases)
 ok1 = bool(ctl1) and ctl1[0].startswith(gone + ":")
-print(f"control, v2's twin without {gone}: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
+print(f"control, SEACAST's twin without {gone}: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
 ctl2 = missing(entered, cases | {"on_frame"})
-ok2 = "on_frame: a case of runV2 the manifest does not cover" in ctl2
-print(f"control, runV2 with a case named on_frame: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
+ok2 = "on_frame: a case of runSeacast the manifest does not cover" in ctl2
+print(f"control, runSeacast with a case named on_frame: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
 if bad or not ok1 or not ok2:
-    print(f"NOT every one of protocol-v2.md's covered functions has its twin, or runV2 has a case it does not cover: {len(bad)}")
+    print(f"NOT every one of seacast.md's covered functions has its twin, or runSeacast has a case it does not cover: {len(bad)}")
     sys.exit(1)
-print(f"{len(covered)} of {len(covered)} of protocol-v2.md's covered functions have their twin, by name")
+print(f"{len(covered)} of {len(covered)} of seacast.md's covered functions have their twin, by name")
 EOF
-  [ $? = 0 ] || no "a covered function of protocol-v2.md without its twin, a case of runV2 not covered, or v2's scope controls (scope.txt)"
-  # v2's questions, both ways: each name of the manifest's QUESTIONS is read by the twin (an askCall, or a case of
-  # the tape reader), and each name the twin asks or reads as a call under protocol-v2.md is a question, a covered
+  [ $? = 0 ] || no "a covered function of seacast.md without its twin, a case of runSeacast not covered, or SEACAST's scope controls (scope.txt)"
+  # SEACAST's questions, both ways: each name of the manifest's QUESTIONS is read by the twin (an askCall, or a case of
+  # the tape reader), and each name the twin asks or reads as a call under seacast.md is a question, a covered
   # or cut function, or one of the replay's own entries
   $PY - "$T/gen" "$HERE/SpecTwin" >> "$OUT/scope.txt" 2>&1 <<'EOF'
 import re, sys
 from pathlib import Path
 sys.path.insert(0, sys.argv[1])
-import manifest_v2
+import manifest_seacast
 twin = Path(sys.argv[2])
-questions = list(manifest_v2.QUESTIONS)
-OWN_ENTRIES = {"keys", "order"}               # the replay's own entries under v2: a table's keys, an iteration's order
+questions = list(manifest_seacast.QUESTIONS)
+OWN_ENTRIES = {"keys", "order"}               # the replay's own entries under SEACAST: a table's keys, an iteration's order
 ASK = re.compile(r'askCall[A-Za-z]* "([A-Za-z_0-9]+)"')
 CASE = re.compile(r'^\s*\| "([A-Za-z_0-9]+)", #\[', re.M)
 
@@ -628,43 +628,43 @@ def asks(files):                              # each name an askCall reads, with
                 out.setdefault(n, f"{f.relative_to(twin.parent)}:{k}")
     return out
 asked = asks(sorted(twin.rglob("*.lean")))
-entries = set(CASE.findall(body(twin / "Replay.lean", "entry"))) | set(CASE.findall(body(twin / "V2" / "Replay.lean", "entryV2")))
-# The reverse direction reads the names asked under V2/ and by v2's tape reader. A kept function asks through
-# Replay.lean's instance, shared with protocol.md's functions, so its questions are not told apart here; gen.py's
+entries = set(CASE.findall(body(twin / "Replay.lean", "entry"))) | set(CASE.findall(body(twin / "Seacast" / "Replay.lean", "entrySeacast")))
+# The reverse direction reads the names asked under Seacast/ and by SEACAST's tape reader. A kept function asks through
+# Replay.lean's instance, shared with seacast-lite.md's functions, so its questions are not told apart here; gen.py's
 # manifest_questions holds them, over the Python's closure of the covered and kept functions.
-asked_v2 = asks(sorted((twin / "V2").glob("*.lean")))
-calls_v2 = body(twin / "V2" / "Replay.lean", "callNamesV2").split(":=", 1)[1].split("\n\n")[0]
-for n in re.findall(r'"([A-Za-z_0-9]+)"', calls_v2) + sorted(CASE.findall(body(twin / "V2" / "Replay.lean", "entryV2"))):
-    asked_v2.setdefault(n, "SpecTwin/V2/Replay.lean's tape reader")
+asked_seacast = asks(sorted((twin / "Seacast").glob("*.lean")))
+calls_seacast = body(twin / "Seacast" / "Replay.lean", "callNamesSeacast").split(":=", 1)[1].split("\n\n")[0]
+for n in re.findall(r'"([A-Za-z_0-9]+)"', calls_seacast) + sorted(CASE.findall(body(twin / "Seacast" / "Replay.lean", "entrySeacast"))):
+    asked_seacast.setdefault(n, "SpecTwin/Seacast/Replay.lean's tape reader")
 
-def wrong(questions, asked_v2):
-    listed = set(questions) | set(manifest_v2.COVERED) | set(manifest_v2.CUT) | OWN_ENTRIES
+def wrong(questions, asked_seacast):
+    listed = set(questions) | set(manifest_seacast.COVERED) | set(manifest_seacast.CUT) | OWN_ENTRIES
     out = [f"{n}: in QUESTIONS, read by no askCall and no tape entry of the twin"
            for n in questions if n not in asked and n not in entries]
-    return out + [f"{n}: asked by the twin under protocol-v2.md ({p}), in no list of the manifest"
-                  for n, p in sorted(asked_v2.items()) if n not in listed]
-bad = wrong(questions, asked_v2)
+    return out + [f"{n}: asked by the twin under seacast.md ({p}), in no list of the manifest"
+                  for n, p in sorted(asked_seacast.items()) if n not in listed]
+bad = wrong(questions, asked_seacast)
 for b in bad:
-    print(f"v2's questions: {b}")
+    print(f"SEACAST's questions: {b}")
 by_ask = sum(n in asked for n in questions)
-ctl1 = wrong([n for n in questions if n != "links"], asked_v2)
-ok1 = any(c.startswith("links: asked by the twin under protocol-v2.md (") for c in ctl1)
+ctl1 = wrong([n for n in questions if n != "links"], asked_seacast)
+ok1 = any(c.startswith("links: asked by the twin under seacast.md (") for c in ctl1)
 print(f"control, QUESTIONS without links: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
-ctl2 = wrong(questions, {**asked_v2, "made_up": "a planted askCall"})
-ok2 = "made_up: asked by the twin under protocol-v2.md (a planted askCall), in no list of the manifest" in ctl2
-print(f"control, an askCall of made_up under V2/: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
-ctl3 = wrong(questions + ["made_up"], asked_v2)
+ctl2 = wrong(questions, {**asked_seacast, "made_up": "a planted askCall"})
+ok2 = "made_up: asked by the twin under seacast.md (a planted askCall), in no list of the manifest" in ctl2
+print(f"control, an askCall of made_up under Seacast/: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
+ctl3 = wrong(questions + ["made_up"], asked_seacast)
 ok3 = "made_up: in QUESTIONS, read by no askCall and no tape entry of the twin" in ctl3
 print(f"control, QUESTIONS with made_up: {'refused, as it must be' if ok3 else 'NOT refused  <-- FAIL'}")
 if bad or not (ok1 and ok2 and ok3) or not questions:
-    print(f"NOT every one of protocol-v2.md's questions is read by the twin, or the twin asks one the manifest does not list: {len(bad)}")
+    print(f"NOT every one of seacast.md's questions is read by the twin, or the twin asks one the manifest does not list: {len(bad)}")
     sys.exit(1)
-print(f"{len(questions)} of {len(questions)} of protocol-v2.md's questions are read by the twin: {by_ask} by an askCall, "
+print(f"{len(questions)} of {len(questions)} of seacast.md's questions are read by the twin: {by_ask} by an askCall, "
       f"{len(questions) - by_ask} by a tape entry alone")
-print(f"the {len(asked_v2)} names the twin asks or reads as calls under protocol-v2.md are each a question, a covered "
+print(f"the {len(asked_seacast)} names the twin asks or reads as calls under seacast.md are each a question, a covered "
       f"function, a cut one or the replay's own ({', '.join(sorted(OWN_ENTRIES))})")
 EOF
-  [ $? = 0 ] || no "a question of protocol-v2.md the twin does not read, a name the twin asks that the manifest does not list, or the questions' controls (scope.txt)"
+  [ $? = 0 ] || no "a question of seacast.md the twin does not read, a name the twin asks that the manifest does not list, or the questions' controls (scope.txt)"
   sed 's/^/  /' "$OUT/scope.txt"
 }
 s_mutants() {
@@ -676,7 +676,7 @@ s_mutants() {
 }
 s_screen() {
   local f doc
-  for doc in v03 v2; do
+  for doc in lite seacast; do
     f=$OUT/nodeslines-$doc.txt
     $PY "$T/cells3.py" "$TOY" "$OUT/nodeslines-$doc" -j "$J" --replay "$REPLAY" --doc "$doc" --nodes-lines > "$f" 2>&1 || no "a header or a nodes line refused under $doc ($f)"
     has -x ok "$f" || no "no verdict under $doc"
@@ -700,16 +700,16 @@ s_cells() {
     echo "  $(grep -c ', digest as golden.txt, ' "$OUT/cells.txt") of $(echo $CELLS | wc -w) cells: digest as golden.txt, replayed (cells.txt)"
   fi
 }
-s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2.txt's; the records are protocol.md's names
-  $PY "$T/trace3.py" --self-test-v2 > "$OUT/v2-self-test.txt" 2>&1 || no "the tracer's self-test of v2's kept names (v2-self-test.txt)"
-  if [ -z "$CELLS" ]; then echo "  no v2 cell (a rehearsal)"; echo ok > "$OUT/cells-v2.txt"; return; fi
+s_seacastcells() {            # every cell under seacast.md: its digest golden-seacast.txt's; the records are seacast-lite.md's names
+  $PY "$T/trace3.py" --self-test-seacast > "$OUT/seacast-self-test.txt" 2>&1 || no "the tracer's self-test of SEACAST's kept names (seacast-self-test.txt)"
+  if [ -z "$CELLS" ]; then echo "  no SEACAST cell (a rehearsal)"; echo ok > "$OUT/cells-seacast.txt"; return; fi
   local c
-  for c in $CELLS; do rm -f "$OUT/v2/$c.jsonl.gz.bare.json" "$OUT/v2/$c.jsonl.gz.calls.json"; done     # no count left from an earlier run counts
+  for c in $CELLS; do rm -f "$OUT/seacast/$c.jsonl.gz.bare.json" "$OUT/seacast/$c.jsonl.gz.calls.json"; done     # no count left from an earlier run counts
   # shellcheck disable=SC2086
-  $PY "$T/cells3.py" "$TOY" "$OUT/v2" -j "$J" --doc v2 --replay "$REPLAY" $CELLS > "$OUT/cells-v2.txt" 2>&1 || no "a v2 cell (cells-v2.txt)"
-  has -x ok "$OUT/cells-v2.txt" || no "no verdict on the v2 cells"
-  [ "$(grep -c ', digest as golden-v2.txt, ' "$OUT/cells-v2.txt")" = "$(echo $CELLS | wc -w)" ] || no "not every v2 cell's digest is golden-v2.txt's"
-  echo "  $(grep -c ', digest as golden-v2.txt, ' "$OUT/cells-v2.txt") of $(echo $CELLS | wc -w) v2 cells: digest as golden-v2.txt, replayed (cells-v2.txt)"
+  $PY "$T/cells3.py" "$TOY" "$OUT/seacast" -j "$J" --doc seacast --replay "$REPLAY" $CELLS > "$OUT/cells-seacast.txt" 2>&1 || no "a SEACAST cell (cells-seacast.txt)"
+  has -x ok "$OUT/cells-seacast.txt" || no "no verdict on the SEACAST cells"
+  [ "$(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt")" = "$(echo $CELLS | wc -w)" ] || no "not every SEACAST cell's digest is golden-seacast.txt's"
+  echo "  $(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt") of $(echo $CELLS | wc -w) SEACAST cells: digest as golden-seacast.txt, replayed (cells-seacast.txt)"
 }
 small() {               # $1: a name; $2: its directory; $3: the tracer's environment setting, or ""; the rest: run.py's arguments
   local name=$1 dir=$2 setting=$3 got plain; shift 3
@@ -727,11 +727,11 @@ s_small() {
     par small hand5-sec61 traces TRACE3_ONLY=sec61 $HAND5
     par small late16 traces "" $LATE16
     par small hand5-publish traces "" $HAND5 --source-offers publish
-    par small hand5 v2 "" $HAND5 --doc v2
-    par small hand5-own v2 "" $HAND5 --rebuilt none --fault sil30 --doc v2
-    par small hand5-publish v2 "" $HAND5 --doc v2 --source-offers publish; }   # H7b: the source's offers at publish
+    par small hand5 seacast "" $HAND5 --doc seacast
+    par small hand5-own seacast "" $HAND5 --rebuilt none --fault sil30 --doc seacast
+    par small hand5-publish seacast "" $HAND5 --doc seacast --source-offers publish; }   # H7b: the source's offers at publish
   par_end || no "a small cell was not traced, or its digest is not the untraced run's"
-  cat "$OUT"/traces/*.digest "$OUT"/v2/*.digest 2> /dev/null | tee "$OUT/digests.txt" | sed 's/^/  /'
+  cat "$OUT"/traces/*.digest "$OUT"/seacast/*.digest 2> /dev/null | tee "$OUT/digests.txt" | sed 's/^/  /'
   [ "$(grep -c ': the same$' "$OUT/digests.txt")" = 7 ] || no "not seven digests the same"
 }
 one_directed() {
@@ -750,7 +750,7 @@ s_directed() {
   echo "  $(ls "$OUT"/directed/*.jsonl.gz 2> /dev/null | wc -l) of 22 directed sets traced"
 }
 by_cells3() {           # $1: a trace of TRACES: replayed by cells3.py, as a cell of check.py, whose verdict requires the
-  case $1 in traces/*|v2/*) case " $CELLS none " in *" ${1#*/} "*) return 0 ;; esac ;; esac   #   replay's code 0
+  case $1 in traces/*|seacast/*) case " $CELLS none " in *" ${1#*/} "*) return 0 ;; esac ;; esac   #   replay's code 0
   return 1
 }
 s_replays() {
@@ -766,7 +766,7 @@ s_replays() {
     parsed_whole "$f" || { no "$t: the parser refused a line of it"; continue; }
     has -E '^replay: [1-9][0-9]* records, [1-9][0-9]* ok, 0 mismatched$' "$f" || { no "$t: a record mismatched, or none read"; continue; }
     has -x "reads of the Python's that the twin did not make: 0" "$f" || { no "$t: a read of the Python's not made"; continue; }
-    case $t in v2/*) bare_none "$OUT/$t.jsonl.gz" || { no "$t: its run counted bare calls ($t.jsonl.gz.bare.json)"; continue; } ;; esac
+    case $t in seacast/*) bare_none "$OUT/$t.jsonl.gz" || { no "$t: its run counted bare calls ($t.jsonl.gz.bare.json)"; continue; } ;; esac
     has -E "^content: as --content's, [0-9]+ names\$" "$f" || { no "$t: its content line was not compared, or is not this tree's"; continue; }
     if grep -E '^(content|header|nodes|trailer|consts|subset): ' "$f" | grep -v -e '^header: {' -e "^content: as --content's, " | grep -q .; then no "$t: the replay refused a line of the envelope"; continue; fi
     n=$((n + 1))
@@ -778,19 +778,19 @@ s_headers() {
   $PY "$T/header3.py" "$TOY" $(for t in $TRACES; do echo "$OUT/$t.jsonl.gz"; done) > "$OUT/headers.txt" 2>&1 || no "a header is not these tools' and these documents' (headers.txt)"
   [ "$(grep -c "tracing §6.1's 12 alone\$" "$OUT/headers.txt")" = 1 ] && has -E "/hand5-sec61\.jsonl\.gz: .*tracing §6.1's 12 alone\$" "$OUT/headers.txt" \
     || no "hand5-sec61 alone must be of §6.1's twelve"
-  [ "$(grep -c -E "/v2/hand5(-own)?\.jsonl\.gz: .*tracing v2's kept and covered, " "$OUT/headers.txt")" = 2 ] || no "the two small v2 traces must be of v2's kept and covered names"
-  [ "$(grep -c -E "/v2/[a-z0-9-]+\.jsonl\.gz: .*tracing v2's kept and covered, " "$OUT/headers.txt")" = "$(grep -c -E '/v2/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a v2 trace is not of v2's kept and covered names"
+  [ "$(grep -c -E "/seacast/hand5(-own)?\.jsonl\.gz: .*tracing SEACAST's kept and covered, " "$OUT/headers.txt")" = 2 ] || no "the two small SEACAST traces must be of SEACAST's kept and covered names"
+  [ "$(grep -c -E "/seacast/[a-z0-9-]+\.jsonl\.gz: .*tracing SEACAST's kept and covered, " "$OUT/headers.txt")" = "$(grep -c -E '/seacast/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a SEACAST trace is not of SEACAST's kept and covered names"
   echo "  $(grep -c . "$OUT/headers.txt") headers read (headers.txt)"
-  # the question writers' example rows (tools/forms-v2-examples.tsv, which the build step's replay --forms reads),
-  # made again by the writers from this run's v2/hand5: so that the file cannot drift from the writers
-  if [ -s "$OUT/v2/hand5.jsonl.gz" ]; then
-    $PY "$T/forms_v2_examples.py" "$OUT/v2/hand5.jsonl.gz" > "$OUT/forms-v2-examples.tsv" 2> "$OUT/forms-v2-examples.err" \
-      || no "the example rows were not made from v2/hand5 (forms-v2-examples.err)"
-    [ "$(sha256sum < "$OUT/forms-v2-examples.tsv")" = "$(sha256sum < "$T/forms-v2-examples.tsv")" ] \
-      || no "the example rows made from v2/hand5 differ from tools/forms-v2-examples.tsv (forms-v2-examples.tsv)"
-    echo "  the example rows made again from v2/hand5: $(grep -c . "$OUT/forms-v2-examples.tsv"), as tools/forms-v2-examples.tsv"
+  # the question writers' example rows (tools/forms-seacast-examples.tsv, which the build step's replay --forms reads),
+  # made again by the writers from this run's seacast/hand5: so that the file cannot drift from the writers
+  if [ -s "$OUT/seacast/hand5.jsonl.gz" ]; then
+    $PY "$T/forms_seacast_examples.py" "$OUT/seacast/hand5.jsonl.gz" > "$OUT/forms-seacast-examples.tsv" 2> "$OUT/forms-seacast-examples.err" \
+      || no "the example rows were not made from seacast/hand5 (forms-seacast-examples.err)"
+    [ "$(sha256sum < "$OUT/forms-seacast-examples.tsv")" = "$(sha256sum < "$T/forms-seacast-examples.tsv")" ] \
+      || no "the example rows made from seacast/hand5 differ from tools/forms-seacast-examples.tsv (forms-seacast-examples.tsv)"
+    echo "  the example rows made again from seacast/hand5: $(grep -c . "$OUT/forms-seacast-examples.tsv"), as tools/forms-seacast-examples.tsv"
   else
-    no "no v2/hand5 to make the example rows from"
+    no "no seacast/hand5 to make the example rows from"
   fi
   # each trace's two hashes, by its name under --out: two runs of one tree, on any machine, give the same file
   # shellcheck disable=SC2046
@@ -805,7 +805,7 @@ s_picks() {
   [ "$(grep -c . "$OUT/picks.txt")" = 4 ] || no "not four lines in picks.txt"
   sed 's/^/  /' "$OUT/picks.txt" | cut -c1-200
 }
-cut_controls() {        # a trace cut short: no trailer, so no pass; and a line the parser refuses: v2/hand5 with one
+cut_controls() {        # a trace cut short: no trailer, so no pass; and a line the parser refuses: seacast/hand5 with one
   #                       line that is not JSON just before its trailer, which the replay counts and exits 1 on, and
   #                       which replay_clean refuses by the replay's status, and by the parser's line where the status
   #                       reads 0
@@ -814,14 +814,14 @@ cut_controls() {        # a trace cut short: no trailer, so no pass; and a line 
   if [ "$rc" = 1 ] && has -E '^trailer: ' "$OUT/c-cut.replay" && parsed_whole "$OUT/c-cut.replay"; then echo "  control, a trace cut short: refused, as it must be: $(grep -m 1 '^trailer: ' "$OUT/c-cut.replay" | cut -c1-120)"
   else no "control, a trace cut short: rc=$rc, and no line about the trailer, or a line the parser refused"; fi
   rm -f "$OUT"/c-refused.*
-  n=$(zcat "$OUT/v2/hand5.jsonl.gz" | wc -l)
-  zcat "$OUT/v2/hand5.jsonl.gz" | awk -v n="$n" 'NR == n { print "not JSON" } { print }' | gzip -n > "$OUT/c-refused.jsonl.gz"
-  cp "$OUT/v2/hand5.jsonl.gz.bare.json" "$OUT/c-refused.jsonl.gz.bare.json" 2> /dev/null
+  n=$(zcat "$OUT/seacast/hand5.jsonl.gz" | wc -l)
+  zcat "$OUT/seacast/hand5.jsonl.gz" | awk -v n="$n" 'NR == n { print "not JSON" } { print }' | gzip -n > "$OUT/c-refused.jsonl.gz"
+  cp "$OUT/seacast/hand5.jsonl.gz.bare.json" "$OUT/c-refused.jsonl.gz.bare.json" 2> /dev/null
   replay_of c-refused; rc=$?
   w1=$(replay_clean c-refused)
   echo 0 > "$OUT/c-refused.replay.rc"
   w2=$(replay_clean c-refused)
-  r=$(sed -n -E 's/^replay: ([0-9]+) records, [0-9]+ ok, 0 mismatched$/\1/p' "$OUT/v2/hand5.replay" 2> /dev/null)
+  r=$(sed -n -E 's/^replay: ([0-9]+) records, [0-9]+ ok, 0 mismatched$/\1/p' "$OUT/seacast/hand5.replay" 2> /dev/null)
   if [ "$rc" = 1 ] && [ -n "$r" ] && [ "$(zcat "$OUT/c-refused.jsonl.gz" | wc -l)" = $((n + 1)) ] \
       && has -x "replay: $r records, $r ok, 0 mismatched" "$OUT/c-refused.replay" \
       && has -E "^line $n: not a line the tracer writes: " "$OUT/c-refused.replay" \
@@ -843,7 +843,7 @@ s_controls() {
   #    (the traces in the order altered3.py takes them: each group of its controls is of one set's records)
   # shellcheck disable=SC2046
   SPEC_TWIN_REPLAY=$REPLAY $PY "$T/altered3.py" "$OUT/traces/hand5-sec61.jsonl.gz" "$OUT/c-altered" "$OUT/directed/directed.jsonl.gz" "$OUT/traces/hand5.jsonl.gz" \
-      "$OUT/directed/directed44.jsonl.gz" "$OUT/directed/directed42.jsonl.gz" "$OUT/v2/hand5.jsonl.gz" \
+      "$OUT/directed/directed44.jsonl.gz" "$OUT/directed/directed42.jsonl.gz" "$OUT/seacast/hand5.jsonl.gz" \
       $(for d in directed4b directed7 directed1 directed6o directed64 directed64h directed46 directed43 directed41 directed46d directed3v directed52 directed53 directed54 directed7p; do echo "$OUT/directed/$d.jsonl.gz"; done) \
       "$OUT/traces/hand5-publish.jsonl.gz" "$OUT/directed/directed71.jsonl.gz" "$OUT/directed/directed51.jsonl.gz" > "$OUT/c-altered.txt" 2>&1; rc=$?
   if [ "$rc" = 0 ] && ! has -E 'wrong$|<-- ' "$OUT/c-altered.txt" && [ "$(grep -c '^ok: every control of ' "$OUT/c-altered.txt")" -ge 1 ]; then
@@ -959,7 +959,7 @@ EOF_VIEWS
 }
 chain_args() {          # $1: a cell of the chain cases: run.py's arguments
   case $1 in
-    hand5-peer) echo "$HAND5 --doc v2 --promise-mode peer" ;;
+    hand5-peer) echo "$HAND5 --doc seacast --promise-mode peer" ;;
     das-hoardcol-w16) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16" ;;
     das-samplers-mcoff) echo "$DAS30 --samplers 20 --member-check off" ;;  # das-samplers' delivery (its digest):
     #                     its one record that reaches owed_missing, and defer_on_claim's swapped draw
@@ -971,13 +971,13 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     #                     control (m): the bias layer restores a shuffled taken before the install, and the tracer stops
     # the alarm's cell (alarm_cell): --alarm-wait's filter_entry, a replaced name, entered outside every record at the
     # honest nodes; its custodians alarm, and no member asks a claimant, so alarm_due is never armed
-    das-alarm) echo "--doc v2 --setting rows --nodes 30 --degree 8 --msgs 1 --row-subnets 4 --blobs 4 --withhold 64 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --alarm-wait 3.5 --seed 22" ;;
-    # piece D's stops: v2/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
-    hand5-v2) echo "$HAND5 --doc v2" ;;
-    hand5-off) echo "$HAND5 --doc v2 --source-offers off" ;;
+    das-alarm) echo "--doc seacast --setting rows --nodes 30 --degree 8 --msgs 1 --row-subnets 4 --blobs 4 --withhold 64 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --alarm-wait 3.5 --seed 22" ;;
+    # piece D's stops: seacast/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
+    hand5-v2) echo "$HAND5 --doc seacast" ;;
+    hand5-off) echo "$HAND5 --doc seacast --source-offers off" ;;
     # piece E's carried 7: a custody cell whose churn makes keep_floor open a link, at node a, inside whose question
     # node c's on_open sends a JOIN and a relation
-    custody-floor-churn1) echo "--nodes 30 --degree 8 --msgs 1 --setting custody --blobs 4 --seed 7 --doc v2 --upkeep on --keep-floor on --churn 1" ;;
+    custody-floor-churn1) echo "--nodes 30 --degree 8 --msgs 1 --setting custody --blobs 4 --seed 7 --doc seacast --upkeep on --keep-floor on --churn 1" ;;
   esac
 }
 chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.py's), one a line
@@ -991,7 +991,7 @@ chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.p
       #                   its two observers over defer_on_claim, outermost first (the walk's order, not the bindings')
       for n in 7 8 11 16 23 24; do echo "$n:push_rebuilt:replaced:Node._hoard_column.<locals>.push_rebuilt,doc"; done
       echo '1:push_rebuilt:kept:-'
-      echo '1:defer_on_claim:kept:Node._hoard_column.<locals>.defer_on_claim,Node._v2.<locals>.defer_on_claim,doc' ;;
+      echo '1:defer_on_claim:kept:Node._hoard_column.<locals>.defer_on_claim,Node._seacast.<locals>.defer_on_claim,doc' ;;
     das-samplers-mcoff) echo '*:owed_missing:replaced:Node._member_check.<locals>.owed_missing,doc' ;;
   esac
 }
@@ -1112,7 +1112,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
          want='^\*:filter_entry:replaced:[^ ]*: NOT: filter_entry is not in replaced at every node \([0-9]+\)$' ;;
       c) miss=$(plant_misses c das-hoardcol-w16); k=7     # each hoarder's chain: the lambda, before the layer; and
          #                                                   node 1's two observers in binding order, inner first
-         want='^((7|8|11|16|23|24):push_rebuilt:replaced:[^ ]*: NOT: its chain is \[([^]]*, )?"Node\._v2\.<locals>\.<lambda>", ([^]]*, )?"Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\], not \["Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\]|1:defer_on_claim:kept:[^ ]*: NOT: its chain is \["Node\._v2\.<locals>\.defer_on_claim", "Node\._hoard_column\.<locals>\.defer_on_claim", "doc"\], not \["Node\._hoard_column\.<locals>\.defer_on_claim", "Node\._v2\.<locals>\.defer_on_claim", "doc"\])$' ;;
+         want='^((7|8|11|16|23|24):push_rebuilt:replaced:[^ ]*: NOT: its chain is \[([^]]*, )?"Node\._seacast\.<locals>\.<lambda>", ([^]]*, )?"Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\], not \["Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\]|1:defer_on_claim:kept:[^ ]*: NOT: its chain is \["Node\._seacast\.<locals>\.defer_on_claim", "Node\._hoard_column\.<locals>\.defer_on_claim", "doc"\], not \["Node\._hoard_column\.<locals>\.defer_on_claim", "Node\._seacast\.<locals>\.defer_on_claim", "doc"\])$' ;;
       d) miss=$(plant_misses d das-samplers-mcoff); k=1
          want='^\*:owed_missing:replaced:[^ ]*: NOT: owed_missing is not in replaced at every node \([0-9]+\)$' ;;
       e) miss=$(plant_misses e hand5-peer); k=1
@@ -1142,7 +1142,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
   # the same toy, the listing alone differing: the same digest, records and flipped calls, or the listing reached it
   # (h) is held further: no owed_missing row on its tapes (an observer's call is on none), its planted layers one at
   # each node, and, where the replay names each refused record (20 at most), those records (i)'s with the flipped row
-  local flip="the flipped answer:" kf ni="" ki="" di="" chain="owed_flipped_v2.<locals>.plant.<locals>.owed_missing,Node._member_check.<locals>.owed_missing,doc"
+  local flip="the flipped answer:" kf ni="" ki="" di="" chain="owed_flipped_seacast.<locals>.plant.<locals>.owed_missing,Node._member_check.<locals>.owed_missing,doc"
   local nn
   nn=$(echo "$DAS30" | sed -n -E 's/.*--nodes ([0-9]+) .*/\1/p')
   for p in ${flips:+i h}; do            # (i) first: (h) is held to its counts and digest
@@ -1210,11 +1210,11 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
 swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell that enters its layer, and two plants
   local hand nd why stop also n=0
   : > "$OUT/c-draws.txt"
-  # keep_floor's: v2/hand5 (small's trace), the records that reach keep_floor
-  $PY "$T/chaincases.py" --rows sample_without_replacement "$OUT/v2/hand5.jsonl.gz" keep_floor > "$OUT/c-draws-hand5.rows"
+  # keep_floor's: seacast/hand5 (small's trace), the records that reach keep_floor
+  $PY "$T/chaincases.py" --rows sample_without_replacement "$OUT/seacast/hand5.jsonl.gz" keep_floor > "$OUT/c-draws-hand5.rows"
   hand=$(sed -n -E 's/.*reach keep_floor: ([0-9]+) rows.*/\1/p' "$OUT/c-draws-hand5.rows")
-  if [ "${hand:-0}" -ge 1 ]; then echo "v2/hand5: $(cut -c13- "$OUT/c-draws-hand5.rows")" >> "$OUT/c-draws.txt"
-  else echo "v2/hand5: no keep_floor draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
+  if [ "${hand:-0}" -ge 1 ]; then echo "seacast/hand5: $(cut -c13- "$OUT/c-draws-hand5.rows")" >> "$OUT/c-draws.txt"
+  else echo "seacast/hand5: no keep_floor draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
   # defer_on_claim@1775's: das-samplers-mcoff (the chain cases' trace), the records that reach defer_on_claim
   if [ -z "$NODAS" ]; then
     if [ -f "$OUT/chains/das-samplers-mcoff.replay" ] && replay_clean chains/das-samplers-mcoff > /dev/null; then
@@ -1246,8 +1246,8 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
   fi
   # (g) the swap left unrestored: the record's exit check must stop the tracer, final_check's words after the stop
   rm -f "$OUT/c-draws-g".*
-  stop="^trace3: node 1: sample_without_replacement is bound to draws_unrestored_v2\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\) at the exit of keep_floor's record, not to the tracer's own binding"
-  also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node 1: sample_without_replacement was bound again after the tracer was installed, which under v2 must be the namespace's last binding: draws_unrestored_v2\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\)$"
+  stop="^trace3: node 1: sample_without_replacement is bound to draws_unrestored_seacast\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\) at the exit of keep_floor's record, not to the tracer's own binding"
+  also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node 1: sample_without_replacement was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: draws_unrestored_seacast\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\)$"
   if (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-unrestored-v2 . "$OUT/c-draws-g.jsonl.gz" > "$OUT/c-draws-g.out" 2> "$OUT/c-draws-g.err"); then
     echo "(g) the swap unrestored: the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-draws.txt"
   elif has -E "^tracerfaults3: draws-unrestored-v2, planted [1-9][0-9]* times?\$" "$OUT/c-draws-g.err" && has -E "$stop" "$OUT/c-draws-g.err" && has -E "$also" "$OUT/c-draws-g.err"; then
@@ -1258,8 +1258,8 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
   local said="2 plants each caught"
   [ "$n" = 2 ] || said="$n of 2 plants caught"
   if [ -n "$NODAS" ]; then
-    echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5, and $said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
-  else echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5 and ${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
+    echo "  the swapped draws: ${hand:-0} keep_floor draws on seacast/hand5, and $said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
+  else echo "  the swapped draws: ${hand:-0} keep_floor draws on seacast/hand5 and ${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
 }
 stop_cell() {           # $1: a directory under $OUT; $2: a cell of chain_args: traced alone there, its status kept (a
   local d=$1 c=$2       #   cell the tracer must stop)
@@ -1269,29 +1269,29 @@ stop_cell() {           # $1: a directory under $OUT; $2: a cell of chain_args: 
   echo $? > "$OUT/$d/$c.rc"
   return 0
 }
-arities_plant() {       # a record writer whose arguments are not runV2's case's: on_chunk's writer without p, on
-  #                       v2/hand5, traced to its end (the tracer checks no arity); the replay must refuse each
+arities_plant() {       # a record writer whose arguments are not runSeacast's case's: on_chunk's writer without p, on
+  #                       seacast/hand5, traced to its end (the tracer checks no arity); the replay must refuse each
   #                       on_chunk record, as no function of the twin with those arguments, and no other (c-arity.*,
   #                       at the out directory's top, so that the calls summary does not read it)
   local f=c-arity n total
   rm -f "$OUT/$f".*
-  read -r total n < <(gzip -dc "$OUT/v2/hand5.jsonl.gz" 2> /dev/null | tail -n 1 | $PY -c 'import json, sys
+  read -r total n < <(gzip -dc "$OUT/seacast/hand5.jsonl.gz" 2> /dev/null | tail -n 1 | $PY -c 'import json, sys
 t = json.loads(sys.stdin.read())["trailer"]
 print(t["records"], t["by_fn"].get("on_chunk", 0))' 2> /dev/null)
-  if [ -z "$n" ] || [ "$n" = 0 ]; then no "the record writers' arities: no on_chunk record in v2/hand5's trailer"; return 0; fi
+  if [ -z "$n" ] || [ "$n" = 0 ]; then no "the record writers' arities: no on_chunk record in seacast/hand5's trailer"; return 0; fi
   if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --on-chunk-without-p-v2 . "$OUT/$f.jsonl.gz" > "$OUT/$f.out" 2> "$OUT/$f.err"); then
     no "the record writers' arities: the plant's run did not end with 0 ($f.err)"; return 0
   fi
   if ! has -x "tracerfaults3: on-chunk-without-p-v2, planted $n times" "$OUT/$f.err"; then
-    no "the record writers' arities: not planted at each of v2/hand5's $n on_chunk records ($f.err)"; return 0
+    no "the record writers' arities: not planted at each of seacast/hand5's $n on_chunk records ($f.err)"; return 0
   fi
   replay_of "$f"
   if ! parsed_whole "$OUT/$f.replay" || ! has -x "replay: $total records, $((total - n)) ok, $n mismatched" "$OUT/$f.replay" \
       || [ "$(grep -c '^mismatch ' "$OUT/$f.replay")" != 1 ] \
-      || ! has -x -F "mismatch on_chunk: not a function of the twin under protocol-v2.md, or not its arguments: on_chunk: $n" "$OUT/$f.replay"; then
+      || ! has -x -F "mismatch on_chunk: not a function of the twin under seacast.md, or not its arguments: on_chunk: $n" "$OUT/$f.replay"; then
     no "the record writers' arities: the replay did not refuse exactly the $n on_chunk records, by their arguments ($f.replay)"; return 0
   fi
-  echo "  the record writers' arities: on_chunk's writer without p, traced on v2/hand5 to its end, refused by the replay at its $n on_chunk records and at no other"
+  echo "  the record writers' arities: on_chunk's writer without p, traced on seacast/hand5 to its end, refused by the replay at its $n on_chunk records and at no other"
 }
 rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's rows on its tapes, to rows/NAME.rows
   $PY "$T/chaincases.py" --rows "$1" "$OUT/$2.jsonl.gz" > "$OUT/rows/$1.rows" 2>&1
@@ -1312,7 +1312,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   fi
   fixture() {           # $1: a name: its fixture, a trace without .jsonl.gz
     case $1 in
-      forward|push_rebuilt) echo v2/hand5-own ;;
+      forward|push_rebuilt) echo seacast/hand5-own ;;
       serve_standing) echo chains/das-hoardcol-w16 ;;
       owed_missing) echo chains/das-samplers-mcoff ;;
       send_have) echo rows/das-claim ;;
@@ -1350,14 +1350,14 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
       k=$((k + 1)); counts="$counts${counts:+, }$name $n"
     else echo "$name on $fx: no row on its tapes  <-- NOT" >> "$OUT/c-rows.txt"; fi
   done
-  # (k) push_rebuilt's last argument left out of each of its rows on v2/hand5-own: the replay must refuse each such
+  # (k) push_rebuilt's last argument left out of each of its rows on seacast/hand5-own: the replay must refuse each such
   # record, with C8's words (the run's: the entry unparenthesised, its fields three spaces apart), and nothing else
   pr=$(sed -n -E 's/^chaincases: push_rebuilt on the tapes: ([0-9]+) rows.*/\1/p' "$OUT/rows/push_rebuilt.rows")
-  rec=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/v2/hand5-own.replay" 2> /dev/null)
+  rec=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/seacast/hand5-own.replay" 2> /dev/null)
   mwant='^mismatch decode_group: tape: push_rebuilt\["[0-9a-f]{64}",\[[0-9,]*\]\] asked, SpecTwin\.Replay\.Entry\.call   "push_rebuilt"   "\[\\"[0-9a-f]{64}\\"\]"   "null" logged: [0-9]+$'
   if [ -z "$pr" ] || [ "$pr" = 0 ] || [ -z "$rec" ]; then
-    echo "(k) the argument left out: no push_rebuilt row on v2/hand5-own, or no replay of it  <-- NOT" >> "$OUT/c-rows.txt"
-  elif ! $PY "$T/chaincases.py" --drop-arg push_rebuilt "$OUT/v2/hand5-own.jsonl.gz" "$OUT/rows/plant-k.jsonl.gz" > "$OUT/rows/plant-k.err" 2>&1 \
+    echo "(k) the argument left out: no push_rebuilt row on seacast/hand5-own, or no replay of it  <-- NOT" >> "$OUT/c-rows.txt"
+  elif ! $PY "$T/chaincases.py" --drop-arg push_rebuilt "$OUT/seacast/hand5-own.jsonl.gz" "$OUT/rows/plant-k.jsonl.gz" > "$OUT/rows/plant-k.err" 2>&1 \
       || ! has -E "^chaincases: the last argument of push_rebuilt left out in $pr rows?, in [0-9]+ records?\$" "$OUT/rows/plant-k.err"; then
     echo "(k) the argument left out: not made, or not in each of the $pr rows  <-- NOT" >> "$OUT/c-rows.txt"
   elif replay_of rows/plant-k; then
@@ -1378,7 +1378,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   # so the record's exit check must stop the tracer at node 2's first reconsider that asks repair_verdict, with
   # final_check's words after the stop: plant (g)'s pair, made by the toy's own layer
   stop="^trace3: node 2: shuffled is bound to Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\) at the exit of reconsider's record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run\$"
-  also="^trace3: \\(at the close, after the stop\\) SystemExit: trace3: node 2: shuffled was bound again after the tracer was installed, which under v2 must be the namespace's last binding: Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\)\$"
+  also="^trace3: \\(at the close, after the stop\\) SystemExit: trace3: node 2: shuffled was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\)\$"
   if [ -z "$NODAS" ]; then
     if [ "$(cat "$OUT/rows/das-hoardcol-bias.rc" 2> /dev/null)" = 0 ] || [ ! -f "$OUT/rows/das-hoardcol-bias.rc" ]; then
       echo "(m) the bias cell: not run, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-rows.txt"
@@ -1416,7 +1416,7 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   elif ! has -F -x "trace3: node $n5: filter_entry is replaced here, and $f5's record calls it: the twin has no question for filter_entry, and would run its own code there" "$OUT/chains/plant-p.err"; then
     echo "(p) point 5, on hand5-peer: the tracer stopped without point 5's words at node $n5's $f5 record  <-- NOT" >> "$OUT/c-stops.txt"
   else echo "(p) point 5, on hand5-peer: stopped, as it must, at node $n5's $f5 record" >> "$OUT/c-stops.txt"; ok5=1; fi
-  # (p)'s control on v2/hand5, where filter_entry is the document's: the call is the record's own, its writes ones the
+  # (p)'s control on seacast/hand5, where filter_entry is the document's: the call is the record's own, its writes ones the
   # twin's function does not make, so the replay must refuse that record and no other
   read -r nc fc < <(sed -n -E "$line5" "$OUT/chains/plant-pc.err" 2> /dev/null)
   rec=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-pc.replay" 2> /dev/null)
@@ -1523,7 +1523,7 @@ carried() {             # piece E: R7's tracer-wide depth on a real cell (carrie
   # held, returning and then raising: no record inside, the two counted, the state restored on both, the body
   # hand5-peer's. (t): the suppression cleared for that call (the planted fault): two records of held at node s. Each
   # plant's nodes line is hand5-peer's but for its layer, first in the chain of filter_entry (one entry, every node)
-  st='["suppressed_filter_v2.<locals>.install.<locals>.filter_entry", "Node._peer_promise.<locals>.filter_entry", "doc"]'
+  st='["suppressed_filter_seacast.<locals>.install.<locals>.filter_entry", "Node._peer_promise.<locals>.filter_entry", "doc"]'
   if ! $PY -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("2 held") == 1 else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" 2> /dev/null; then
     echo "E3 carried 9, on hand5-peer: its bare counts lack \"2 held\": 1  <-- NOT" >> "$OUT/c-carried.txt"
   else echo "E3 carried 9, on hand5-peer: as it must: \"2 held\": 1 among its bare counts, the trace written to its end" >> "$OUT/c-carried.txt"; ok3=1; fi
@@ -1567,7 +1567,7 @@ f_cases() {             # piece F: S1-8a's count (carried), S1-8b in both halves
   : > "$OUT/c-fcases.txt"
   # S1-8a: no record of churn1 (carried's trace) names backoff among its tables. Its one reader, candidates, runs in
   # maintain_relations, and its one writer is on_prune, neither a function the twin replays: carried until one is
-  # (V2/Codecs.lean's #guard refuses +inf as its leaf). A count above 0 fails, for the carried status must be read again
+  # (Seacast/Codecs.lean's #guard refuses +inf as its leaf). A count above 0 fails, for the carried status must be read again
   nb=$($PY - "$OUT/$churn.jsonl.gz" 2> /dev/null <<'EOF_BO'
 import gzip
 import json
@@ -1583,29 +1583,29 @@ EOF_BO
   if [ "$nb" = 0 ]; then
     echo "S1-8a on custody-floor-churn1: as it must: 0 records read or write backoff; carried" >> "$OUT/c-fcases.txt"; ok8a=1
   else echo "S1-8a on custody-floor-churn1: ${nb:-no count} records read or write backoff, not 0: the carried status must be read again  <-- NOT" >> "$OUT/c-fcases.txt"; fi
-  # S1-8b, the writer's half: --self-test-v2's four lines (its own run, for the selftests step keeps no output)
-  $PY "$T/trace3.py" --self-test-v2 > "$OUT/c-fcases-selftest.txt" 2>&1
+  # S1-8b, the writer's half: --self-test-seacast's four lines (its own run, for the selftests step keeps no output)
+  $PY "$T/trace3.py" --self-test-seacast > "$OUT/c-fcases-selftest.txt" 2>&1
   if has -x "ok: every case as it must be" "$OUT/c-fcases-selftest.txt" \
-      && has -x -F "forms self-test, S1-8b, a GRAFT with the −1 family, under v2: ok" "$OUT/c-fcases-selftest.txt" \
-      && has -x -F "forms self-test, S1-8b, a PRUNE with the −1 family, under v2: ok" "$OUT/c-fcases-selftest.txt" \
-      && has -x -F "forms self-test, S1-8b, counted's need with the −1 family, under v2: ok" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b, a GRAFT with the −1 family, under SEACAST: ok" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b, a PRUNE with the −1 family, under SEACAST: ok" "$OUT/c-fcases-selftest.txt" \
+      && has -x -F "forms self-test, S1-8b, counted's need with the −1 family, under SEACAST: ok" "$OUT/c-fcases-selftest.txt" \
       && has -x -F "forms self-test, S1-8b's planted writer (the plain int): refuses exactly the 3 cases, ok" "$OUT/c-fcases-selftest.txt"; then
     echo "S1-8b, the writer: as it must: the −1 family written [\"-\", 1] in a GRAFT, a PRUNE and counted's need; the plain-int writer refused in exactly the 3 cases" >> "$OUT/c-fcases.txt"; okw=1
-  else echo "S1-8b, the writer: --self-test-v2's S1-8b lines not as they must be (c-fcases-selftest.txt)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
-  # S1-8b, the reader's half, on churn1 (no trace at hand holds a PRUNE or a record of counted): families_v2.py's
+  else echo "S1-8b, the writer: --self-test-seacast's S1-8b lines not as they must be (c-fcases-selftest.txt)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
+  # S1-8b, the reader's half, on churn1 (no trace at hand holds a PRUNE or a record of counted): families_seacast.py's
   # copies, signed and plain. Signed: every record ok, counted's among them; plain: the strict scan refuses exactly
   # the three lines the tool changed, and the trailer then counts three records more than were read
   r0=$(sed -n -E 's/^replay: ([0-9]+) records, .*/\1/p' "$OUT/$churn.replay" 2> /dev/null)
   nsr=$(sed -n -E 's/^fn send_relation: ([0-9]+) records, .*/\1/p' "$OUT/$churn.replay" 2> /dev/null)
   for m in signed plain; do
     rm -f "$OUT/chains/fam-$m".*
-    if $PY "$T/families_v2.py" "$m" "$OUT/$churn.jsonl.gz" "$OUT/chains/fam-$m.jsonl.gz" > "$OUT/chains/fam-$m.out" 2>&1; then
+    if $PY "$T/families_seacast.py" "$m" "$OUT/$churn.jsonl.gz" "$OUT/chains/fam-$m.jsonl.gz" > "$OUT/chains/fam-$m.out" 2>&1; then
       replay_of "chains/fam-$m"; echo $? > "$OUT/chains/fam-$m.rc"
     fi
   done
   if [ -z "$r0" ] || [ -z "$nsr" ]; then
     echo "S1-8b, the reader: churn1's replay gives no record count  <-- NOT" >> "$OUT/c-fcases.txt"
-  elif ! has -E "^families_v2: signed: $tline" "$OUT/chains/fam-signed.out" || [ "$(cat "$OUT/chains/fam-signed.rc" 2> /dev/null)" != 0 ]; then
+  elif ! has -E "^families_seacast: signed: $tline" "$OUT/chains/fam-signed.out" || [ "$(cat "$OUT/chains/fam-signed.rc" 2> /dev/null)" != 0 ]; then
     echo "S1-8b, the reader, signed: the copy not made as written, or its replay did not end with 0  <-- NOT" >> "$OUT/c-fcases.txt"
   elif ! has -x "replay: $((r0 + 1)) records, $((r0 + 1)) ok, 0 mismatched" "$OUT/chains/fam-signed.replay" \
       || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/fam-signed.replay" \
@@ -1617,7 +1617,7 @@ EOF_BO
   else
     echo "S1-8b, the reader, signed: as it must: $(grep -m 1 '^replay: ' "$OUT/chains/fam-signed.replay"); counted's record and the $nsr send_relation records ok" >> "$OUT/c-fcases.txt"; oks=1
   fi
-  lines=$(sed -n -E "s/^families_v2: plain: $tline/\\1 \\2 \\3/p" "$OUT/chains/fam-plain.out" 2> /dev/null)
+  lines=$(sed -n -E "s/^families_seacast: plain: $tline/\\1 \\2 \\3/p" "$OUT/chains/fam-plain.out" 2> /dev/null)
   refused=$(sed -n -E 's/^line ([0-9]+): not a line the tracer writes: a number with a sign, at [0-9]+$/\1/p' "$OUT/chains/fam-plain.replay" 2> /dev/null | tr '\n' ' ' | sed 's/ $//')
   if [ -z "$r0" ] || [ -z "$lines" ] || [ "$(cat "$OUT/chains/fam-plain.rc" 2> /dev/null)" = 0 ]; then
     echo "S1-8b, the reader, plain: the copy not made as written, or its replay ended with 0  <-- NOT" >> "$OUT/c-fcases.txt"
@@ -1629,19 +1629,19 @@ EOF_BO
   else
     echo "S1-8b, the reader, plain: as it must: its lines $lines refused, each \"not a line the tracer writes: a number with a sign\"; $(grep -m 1 '^replay: ' "$OUT/chains/fam-plain.replay"); trailer: $((r0 + 1)) records written, $((r0 - 2)) read" >> "$OUT/c-fcases.txt"; okp=1
   fi
-  # S1-C5 (cases 2 and 3 carried as unreachable from the document): v2/hand5 (the small step's) enters origin_acked
+  # S1-C5 (cases 2 and 3 carried as unreachable from the document): seacast/hand5 (the small step's) enters origin_acked
   # 8 times, in its two branches, inside records that replay with 0 reads not made; and its non-leaf reads logged
   # with the row absent, per table (the tape's row-absent form), by the schema's key counts
-  rows=$($PY - "$T/gen" "$OUT/v2/hand5.jsonl.gz" 2> /dev/null <<'EOF_RA'
+  rows=$($PY - "$T/gen" "$OUT/seacast/hand5.jsonl.gz" 2> /dev/null <<'EOF_RA'
 import gzip
 import json
 import sys
 from collections import Counter
 sys.path.insert(0, sys.argv[1])
 import schema                           # noqa: E402: the spec's gen/
-import schema_v2                        # noqa: E402
+import schema_seacast                        # noqa: E402
 depth = {t.name: len(t.keys) for t in schema.TABLES}
-depth.update({t.name: len(t.keys) for t in schema_v2.TABLES_V2})
+depth.update({t.name: len(t.keys) for t in schema_seacast.TABLES_Seacast})
 c = Counter()
 with gzip.open(sys.argv[2], "rt") as f:
     for line in f:
@@ -1654,21 +1654,21 @@ with gzip.open(sys.argv[2], "rt") as f:
 print(", ".join(f"{t} {n}" for t, n in sorted(c.items())))
 EOF_RA
 )
-  if ! has -x "branch origin_acked: acknowledged before: 6" "$OUT/v2/hand5.replay" 2> /dev/null \
-      || ! has -x "branch origin_acked: the holding grows: 2" "$OUT/v2/hand5.replay" \
-      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/v2/hand5.replay"; then
-    echo "S1-C5 on v2/hand5: origin_acked's branches not 6 and 2, or a read not made, or no replay  <-- NOT" >> "$OUT/c-fcases.txt"
+  if ! has -x "branch origin_acked: acknowledged before: 6" "$OUT/seacast/hand5.replay" 2> /dev/null \
+      || ! has -x "branch origin_acked: the holding grows: 2" "$OUT/seacast/hand5.replay" \
+      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/seacast/hand5.replay"; then
+    echo "S1-C5 on seacast/hand5: origin_acked's branches not 6 and 2, or a read not made, or no replay  <-- NOT" >> "$OUT/c-fcases.txt"
   elif [ "$rows" != "owed 87, planned 32, promises 2, queue 1" ]; then
-    echo "S1-C5 on v2/hand5: the reads with the row absent are ${rows:-none}, not owed 87, planned 32, promises 2, queue 1  <-- NOT" >> "$OUT/c-fcases.txt"
+    echo "S1-C5 on seacast/hand5: the reads with the row absent are ${rows:-none}, not owed 87, planned 32, promises 2, queue 1  <-- NOT" >> "$OUT/c-fcases.txt"
   else
-    echo "S1-C5 on v2/hand5: as it must: origin_acked entered 8 times (6 acknowledged before, 2 the holding grows), 0 reads not made; the reads with the row absent: $rows" >> "$OUT/c-fcases.txt"; ok5=1
+    echo "S1-C5 on seacast/hand5: as it must: origin_acked entered 8 times (6 acknowledged before, 2 the holding grows), 0 reads not made; the reads with the row absent: $rows" >> "$OUT/c-fcases.txt"; ok5=1
   fi
   if grep -q '<-- NOT' "$OUT/c-fcases.txt"; then no "F's three (c-fcases.txt)"; fi
   s8a="S1-8a carried: no record of custody-floor-churn1 reads or writes backoff (no function the twin replays does)"
   [ "$ok8a" = 1 ] || s8a="S1-8a not as it must be"
   s8b="S1-8b: the writer writes the −1 family as [\"-\", 1] in a GRAFT, a PRUNE and need, and a plain-int writer is refused; on churn1 the reader replays the three ($((r0 + 1)) records, all ok) and refuses the plain int at their 3 lines"
   [ "$okw$oks$okp" = 111 ] || s8b="S1-8b not as it must be"
-  s5="S1-C5: origin_acked entered 8 times on v2/hand5, 0 reads not made; the rows absent: $rows; cases 2 and 3 carried as unreachable"
+  s5="S1-C5: origin_acked entered 8 times on seacast/hand5, 0 reads not made; the rows absent: $rows; cases 2 and 3 carried as unreachable"
   [ "$ok5" = 1 ] || s5="S1-C5 not as it must be"
   echo "  F's three: $s8a; $s8b; $s5"
 }
@@ -1692,20 +1692,20 @@ h4_plant() {            # H4's plant (n): trace3.py's LAYERS without the silent 
   fi
 }
 timers_one() {             # $1: clean, or a plant's numeral; $2: tracerfaults3.py's option: das-samplers-mcoff traced with
-  local f=$OUT/timers/$1   #   it (clean: the chain cases' trace), then timers_v2.py on the trace; a plant's trace removed
+  local f=$OUT/timers/$1   #   it (clean: the chain cases' trace), then timers_seacast.py on the trace; a plant's trace removed
   rm -f "$f".*
   if [ "$1" = clean ]; then
-    (cd "$T" && $PY timers_v2.py "$OUT/chains/das-samplers-mcoff.jsonl.gz") > "$f.timers" 2>&1; echo $? > "$f.trc"
+    (cd "$T" && $PY timers_seacast.py "$OUT/chains/das-samplers-mcoff.jsonl.gz") > "$f.timers" 2>&1; echo $? > "$f.trc"
     return 0
   fi
   # shellcheck disable=SC2046
   (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$2" . "$f.jsonl.gz" $(chain_args das-samplers-mcoff) > "$f.out" 2> "$f.err")
   echo $? > "$f.rc"
-  (cd "$T" && $PY timers_v2.py "$f.jsonl.gz") > "$f.timers" 2>&1; echo $? > "$f.trc"
+  (cd "$T" && $PY timers_seacast.py "$f.jsonl.gz") > "$f.timers" 2>&1; echo $? > "$f.trc"
   rm -f "$f.jsonl.gz" "$f.jsonl.gz.bare.json"
   return 0
 }
-timers_check() {        # the timers of deferred_offers: timers_v2.py holds on das-samplers-mcoff's trace, and refuses
+timers_check() {        # the timers of deferred_offers: timers_seacast.py holds on das-samplers-mcoff's trace, and refuses
   #                       each of its three plants by the checks the plant breaks and by no other (c-timers.txt)
   local p opt want got counts bad=
   if [ -n "$NODAS" ]; then echo "  deferred_offers' timers: --no-das: das-samplers-mcoff and the three plants on it skipped"; return 0; fi
@@ -1719,7 +1719,7 @@ timers_check() {        # the timers of deferred_offers: timers_v2.py holds on d
   for p in clean i ii iii; do
     { echo "== $p"; [ -f "$OUT/timers/$p.err" ] && grep -E '^tracerfaults3: ' "$OUT/timers/$p.err"; cat "$OUT/timers/$p.timers"; } >> "$OUT/c-timers.txt"
   done
-  counts=$(sed -n 's/^timers_v2: the timers of deferred_offers hold on .*: \([0-9]*\) notes, \([0-9]*\) own afters, \([0-9]*\) retry_offer records .*/\1 notes, \2 own afters, \3 records/p' "$OUT/timers/clean.timers")
+  counts=$(sed -n 's/^timers_seacast: the timers of deferred_offers hold on .*: \([0-9]*\) notes, \([0-9]*\) own afters, \([0-9]*\) retry_offer records .*/\1 notes, \2 own afters, \3 records/p' "$OUT/timers/clean.timers")
   [ "$(cat "$OUT/timers/clean.trc")" = 0 ] && [ -n "$counts" ] || bad="$bad clean"
   for p in i ii iii; do
     case $p in
@@ -1727,9 +1727,9 @@ timers_check() {        # the timers of deferred_offers: timers_v2.py holds on d
       ii) opt=timers-delay-no-eps-v2; want="K2" ;;
       iii) opt=timers-note-per-index-v2; want="K1" ;;
     esac
-    got=$(grep -o -E '^timers_v2: K[1-4] FAILS' "$OUT/timers/$p.timers" | cut -c12-13 | tr '\n' ' ' | sed 's/ $//')
+    got=$(grep -o -E '^timers_seacast: K[1-4] FAILS' "$OUT/timers/$p.timers" | cut -c12-13 | tr '\n' ' ' | sed 's/ $//')
     if [ "$(cat "$OUT/timers/$p.rc")" != 0 ] || ! has -E "^tracerfaults3: $opt, planted [1-9][0-9]* times?" "$OUT/timers/$p.err" \
-        || [ "$(cat "$OUT/timers/$p.trc")" != 1 ] || [ "$got" != "$want" ] || ! has '^timers_v2: the timers of deferred_offers FAIL on ' "$OUT/timers/$p.timers"; then
+        || [ "$(cat "$OUT/timers/$p.trc")" != 1 ] || [ "$got" != "$want" ] || ! has '^timers_seacast: the timers of deferred_offers FAIL on ' "$OUT/timers/$p.timers"; then
       bad="$bad ($p)"
     fi
   done
@@ -1740,21 +1740,21 @@ timers_check() {        # the timers of deferred_offers: timers_v2.py holds on d
     echo "  deferred_offers' timers: holds on das-samplers-mcoff ($counts); plants (i), (ii) and (iii) each refused by their checks"
   fi
 }
-calls_one() {           # $1: a trace under OUT, without .jsonl.gz: calls_v2.py's lines for it, in reached/
+calls_one() {           # $1: a trace under OUT, without .jsonl.gz: calls_seacast.py's lines for it, in reached/
   local g=$OUT/reached/${1//\//__}
-  $PY "$T/calls_v2.py" "$OUT" "$1" > "$g.txt" 2> "$g.err"; echo $? > "$g.rc"
+  $PY "$T/calls_seacast.py" "$OUT" "$1" > "$g.txt" 2> "$g.err"; echo $? > "$g.rc"
 }
-calls_plant() {         # $1: a plant's letter, $2: its fault: its trace on hand5's arguments, and calls_v2.py over it
+calls_plant() {         # $1: a plant's letter, $2: its fault: its trace on hand5's arguments, and calls_seacast.py over it
   local f=$OUT/reached/plant-$1
   (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$2" . "$f.jsonl.gz" > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
-  $PY "$T/calls_v2.py" --any "$OUT" "reached/plant-$1" > "$f.txt" 2>&1; echo $? > "$f.crc"
+  $PY "$T/calls_seacast.py" --any "$OUT" "reached/plant-$1" > "$f.txt" 2>&1; echo $? > "$f.crc"
 }
-calls_summary() {       # piece (b): each v2 trace's reached names, and the IWANTs respond, retry_offer and ask_parked
+calls_summary() {       # piece (b): each SEACAST trace's reached names, and the IWANTs respond, retry_offer and ask_parked
   #                       enqueue, by their records and by their calls, with the calls file's three controls
   #                       (c-reached.txt, which the pull carries); plants (u) and (v), each refused by its control
   local rel rels g n=0 s=0 bad= p ok=0 why=
   rm -rf "$OUT/reached"; mkdir -p "$OUT/reached"
-  rels=$(cd "$OUT" && for d in v2 chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
+  rels=$(cd "$OUT" && for d in seacast chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
   for rel in $rels; do par calls_one "$rel"; done
   par calls_plant u calls-nested-off-v2
   par calls_plant v calls-iwants-off-v2
@@ -1794,18 +1794,18 @@ calls_summary() {       # piece (b): each v2 trace's reached names, and the IWAN
     echo "  the calls summary: not as it must be"
   fi
 }
-timers_all_one() {      # $1: a trace under OUT, without .jsonl.gz: timers_v2.py's lines for it, in timersall/
+timers_all_one() {      # $1: a trace under OUT, without .jsonl.gz: timers_seacast.py's lines for it, in timersall/
   local g=$OUT/timersall/${1//\//__}
-  (cd "$T" && $PY timers_v2.py "$OUT/$1.jsonl.gz") > "$g.txt" 2>&1; echo $? > "$g.rc"
+  (cd "$T" && $PY timers_seacast.py "$OUT/$1.jsonl.gz") > "$g.txt" 2>&1; echo $? > "$g.rc"
 }
 timers_all() {          # deferred_offers' timers over every trace the calls summary reads (what it skips left out:
-  #                       plants, copies, a run that stopped, whose cut trace timers_v2.py would read as if whole):
+  #                       plants, copies, a run that stopped, whose cut trace timers_seacast.py would read as if whole):
   #                       each holds, or stops at the type's lookup (two START_DELAYs fit: a stated limit, counted
   #                       apart), and none fails; no enqueue entry carries a timer; a start inside a question counted,
   #                       a search; then the alarm's cell (c-timers-all.txt)
   local rel rels g chk= total line notes w s a h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread
   rm -rf "$OUT/timersall"; mkdir -p "$OUT/timersall"
-  rels=$(cd "$OUT" && for d in v2 chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
+  rels=$(cd "$OUT" && for d in seacast chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
   for rel in $rels; do
     has '^skipped: ' "$OUT/reached/${rel//\//__}.txt" 2> /dev/null && continue
     chk="$chk $rel"; par timers_all_one "$rel"
@@ -1814,17 +1814,17 @@ timers_all() {          # deferred_offers' timers over every trace the calls sum
   : > "$OUT/c-timers-all.txt"
   for rel in $chk; do
     g=$OUT/timersall/${rel//\//__}
-    line=$(sed -n 's/^timers_v2: the timers of deferred_offers hold on .*: \([0-9]*\) notes, \([0-9]*\) own afters, \([0-9]*\) retry_offer records .*/\1 notes, \2 own afters, \3 records/p' "$g.txt")
-    w=$(sed -n 's/^timers_v2: enqueue: [0-9]* entries, \([0-9]*\) with timers$/\1/p' "$g.txt")
-    s=$(sed -n 's/^timers_v2: start: \([0-9]*\) notes of kind start .*/\1/p' "$g.txt")
-    a=$(sed -n 's/^timers_v2: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt")
+    line=$(sed -n 's/^timers_seacast: the timers of deferred_offers hold on .*: \([0-9]*\) notes, \([0-9]*\) own afters, \([0-9]*\) retry_offer records .*/\1 notes, \2 own afters, \3 records/p' "$g.txt")
+    w=$(sed -n 's/^timers_seacast: enqueue: [0-9]* entries, \([0-9]*\) with timers$/\1/p' "$g.txt")
+    s=$(sed -n 's/^timers_seacast: start: \([0-9]*\) notes of kind start .*/\1/p' "$g.txt")
+    a=$(sed -n 's/^timers_seacast: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt")
     if [ "$(cat "$g.rc")" = 0 ] && [ -n "$line" ] && [ -n "$w" ] && [ -n "$s" ] && [ -n "$a" ]; then
       h=$((h + 1)); notes=${line%% *}
       if [ "$notes" -gt 0 ]; then hn=$((hn + 1)); else h0=$((h0 + 1)); fi
       ws=$((ws + w)); as=$((as + a))
       [ "$s" = 0 ] || sn="$sn $rel ($s)"
       echo "$rel: holds: $line; enqueue entries with timers: $w; start notes: $s; alarm_due notes: $a" >> "$OUT/c-timers-all.txt"
-    elif [ "$(cat "$g.rc")" = 2 ] && has -E '^timers_v2: .*: no single START_DELAY fits t - known_at .*; K2 cannot be checked$' "$g.txt"; then
+    elif [ "$(cat "$g.rc")" = 2 ] && has -E '^timers_seacast: .*: no single START_DELAY fits t - known_at .*; K2 cannot be checked$' "$g.txt"; then
       st=$((st + 1)); stn="$stn $rel"
       echo "$rel: stopped at the type's lookup, a stated limit: $(grep -m 1 'no single START_DELAY fits' "$g.txt" | cut -c1-200)" >> "$OUT/c-timers-all.txt"
     else
@@ -1853,8 +1853,8 @@ alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's ce
   sent=$(sed -n -E 's/^  alarm: ([0-9]+) sent by .*/\1/p' "$f.out" 2> /dev/null)
   asks=$(sed -n -E 's/^  alarm: .*; ([0-9]+) asks of a claimant .*/\1/p' "$f.out" 2> /dev/null)
   ps=$($PY -c 'import json, sys; print(json.load(open(sys.argv[1]))["calls"]["probe_settled"]["bare"])' "$f.jsonl.gz.calls.json" 2> /dev/null)
-  pd=$(sed -n 's/^timers_v2: alarm_due: [0-9]* notes name it; promise_due: \([0-9]*\) records$/\1/p' "$g.txt" 2> /dev/null)
-  an=$(sed -n 's/^timers_v2: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt" 2> /dev/null)
+  pd=$(sed -n 's/^timers_seacast: alarm_due: [0-9]* notes name it; promise_due: \([0-9]*\) records$/\1/p' "$g.txt" 2> /dev/null)
+  an=$(sed -n 's/^timers_seacast: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt" 2> /dev/null)
   if ! has ': the same$' "$f.digest" 2> /dev/null; then why="not traced, or its digest is not the untraced run's"
   elif ! why=$(replay_clean rows/das-alarm); then why="its replay: $why"
   elif [ -z "$sent" ] || [ "$sent" = 0 ]; then why="no alarm sent"
@@ -1886,24 +1886,24 @@ s_tracercontrols() {
   for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2 param-after-install-v2 observer-timer-v2; do
     also=
     case $f in
-      observer-timer-v2) want="^trace3: node [0-9]*: the observer Node\._v2\.<locals>\.check_completion \(node\.py:[0-9]+\) over check_completion arms a timer \(sim\.after\): an observer changes nothing$" ;;
+      observer-timer-v2) want="^trace3: node [0-9]*: the observer Node\._seacast\.<locals>\.check_completion \(node\.py:[0-9]+\) over check_completion arms a timer \(sim\.after\): an observer changes nothing$" ;;
       param-after-install-v2) want="^trace3: node [0-9]*: type payload's EAGER changed after the tracer's install \(True there, False now\): the nodes line holds a type's parameters as the install read them" ;;
       # a slot bound again after the install: the next record's entry check stops it (bindings_check), and
       # final_check's words follow at the close, both stops shown
       rebind-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes is bound to Node\._namespace\.<locals>\.peer_id_bytes \(node\.py:[0-9]*\) at the entry of [a-z_0-9]*'s record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run$"
-        also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under v2 must be the namespace's last binding" ;;
+        also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding" ;;
       rebind-view-v2) want="^trace3: node [0-9]*: offers is bound to OfferMap at the entry of [a-z_0-9]*'s record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run$"
-        also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node [0-9]*: offers was bound again after the tracer was installed, which under v2 must be the namespace's last binding: a OfferMap$" ;;
+        also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node [0-9]*: offers was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: a OfferMap$" ;;
       close-keyerror-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs"
         also="^trace3: \(at the close, after the stop\) KeyError: 'planted at the close'$" ;;   # the close's, a note
       rebound-scanned-v2) want="^trace3: node [0-9]*: popcount_again is bound to a function of the toy's that the scan of its bindings does not name: popcount \(bits\.py:[0-9]*\)" ;;
       other-node-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes is called while node [0-9]*'s record is open and no question runs" ;;
       raw-chunk-id-v2) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
       hdr-other-v2) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
-      alias-missing-v2) want="^trace3: node [0-9]*: chunk_id is missing under v2" ;;
+      alias-missing-v2) want="^trace3: node [0-9]*: chunk_id is missing under SEACAST" ;;
       unscanned-layer-v2) want="^trace3: node [0-9]*: on_frame is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.on_frame \(node\.py:2\)" ;;
       early-install-v2) want="^trace3: node [0-9]*: the closure rule's lists and the node differ: ALL is not in the namespace" ;;
-        # An install before _v2 is still refused, and refused first by what it lacks: the install-time check of the
+        # An install before _seacast is still refused, and refused first by what it lacks: the install-time check of the
         # closure rule's lists. The last-binding check keeps its coverage through rebind-tape-v2 and rebind-view-v2,
         # which reach it. If a later install-time check moves the first stop again, these words move with it.
       raw-alias-v2) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
@@ -1916,8 +1916,8 @@ s_tracercontrols() {
       alias-start) want="^trace3: node [0-9]*: one queue entry's control stands in two places, .*, at the record's start" ;;
       alias-message) want="^trace3: node [0-9]*: one queue control message stands in two places" ;;
       defer-chain) want="^trace3: node [0-9]*: a chain of 3 defers in one record, past the twin's 2" ;;
-      replaced) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither protocol.md's own code nor a listed wrapper of it: replaced\.<locals>" ;;
-      false-wrapper) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither protocol.md's own code nor a listed wrapper of it: .*a listed wrapper's name, without the document's may_ask in its closure" ;;
+      replaced) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither seacast-lite.md's own code nor a listed wrapper of it: replaced\.<locals>" ;;
+      false-wrapper) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither seacast-lite.md's own code nor a listed wrapper of it: .*a listed wrapper's name, without the document's may_ask in its closure" ;;
       late-rebind) want="^trace3: node [0-9]*: may_ask was bound again after the tracer was installed, to what is neither the tracer's wrapper nor a listed wrapper of it: late_rebind\.<locals>" ;;
       rebind-after-records) want="^trace3: node [0-9]*: may_ask was bound again after the tracer was installed, to what is neither the tracer's wrapper nor a listed wrapper of it: rebind_after_records\.<locals>" ;;
       limit-fraction) want="^trace3: node [0-9]*: MAX_IHAVE_LENGTH is no count: 2\.5" ;;
@@ -1934,9 +1934,9 @@ s_tracercontrols() {
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
   [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 31 ] || no "not 31 planted faults stop the tracer as written (c-tracerfaults.txt)"
   echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 31 planted faults stop the tracer with their own words"
-  # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
+  # under SEACAST, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
-  # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
+  # a raise; each plant's body is the plain SEACAST trace's (the run above), each control's another (a record inside)
   # each plant's count read from the .bare.json the tracer wrote; each plant's body the plain trace's; each control's
   # the plain one with exactly its extra records of N at the named node, its trailer counting them
   # A plant that replaces a function at a node has that function's chain in the node's entry of the nodes line, for
@@ -1947,22 +1947,22 @@ s_tracercontrols() {
   for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2 bare-timer-v2-now hdr-read-v2 hdr-read-v2-raw observer-timer-v2-off; do
     chain=
     case $f in      # the plant's own function at the planted node, its chain of on_iwant
-      suppressed-entry-v2|suppressed-entry-v2-off) chain='["suppressed_entry_v2.<locals>.install.<locals>.on_iwant"]' ;;
-      bare-replaced-v2) chain='["bare_in_question_v2.<locals>.install.<locals>.on_iwant"]' ;;
+      suppressed-entry-v2|suppressed-entry-v2-off) chain='["suppressed_entry_seacast.<locals>.install.<locals>.on_iwant"]' ;;
+      bare-replaced-v2) chain='["bare_in_question_seacast.<locals>.install.<locals>.on_iwant"]' ;;
     esac
     case $f in     # k: the control's extra records of N; - for a plant read by its line alone (its read adds to a record)
-      bare-in-question-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c N: 1$" ;;
-      bare-in-question-v2-per-node) plain=v2/hand5; k=1; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; records inside: 1; bare c N: 0$" ;;
-      suppressed-entry-v2) plain=v2/hand5-own; k=0; line=", planted 2 times; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 2; entry 2: raised; supp after the raise: 0$" ;;
-      suppressed-entry-v2-off) plain=v2/hand5-own; k=2; line=", planted 2 times; records inside: 2; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 0; entry 2: raised; supp after the raise: 0$" ;;
-      bare-replaced-v2) plain=v2/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the replaced body ran: 1; bare c on_iwant: 1$" ;;
-      bare-timer-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 1; fired from the simulator, outside the question: 1$" ;;
-      bare-timer-v2-now) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 0; fired from the simulator, outside the question: 0$" ;;
-      hdr-read-v2) plain=v2/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1; the record's own reads of it: 0$" ;;
-      hdr-read-v2-raw) plain=v2/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0; the record's own reads of it: 0$" ;;
+      bare-in-question-v2) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c N: 1$" ;;
+      bare-in-question-v2-per-node) plain=seacast/hand5; k=1; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; records inside: 1; bare c N: 0$" ;;
+      suppressed-entry-v2) plain=seacast/hand5-own; k=0; line=", planted 2 times; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 2; entry 2: raised; supp after the raise: 0$" ;;
+      suppressed-entry-v2-off) plain=seacast/hand5-own; k=2; line=", planted 2 times; records inside: 2; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 0; entry 2: raised; supp after the raise: 0$" ;;
+      bare-replaced-v2) plain=seacast/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the replaced body ran: 1; bare c on_iwant: 1$" ;;
+      bare-timer-v2) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 1; fired from the simulator, outside the question: 1$" ;;
+      bare-timer-v2-now) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 0; fired from the simulator, outside the question: 0$" ;;
+      hdr-read-v2) plain=seacast/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1; the record's own reads of it: 0$" ;;
+      hdr-read-v2-raw) plain=seacast/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0; the record's own reads of it: 0$" ;;
       # the simulator's guard off (the control of the planted fault observer-timer-v2): a timer armed at each
-      # assignment of a node's completed, and the body v2/hand5's; one assignment for each group completed
-      observer-timer-v2-off) plain=v2/hand5; k=0; line=", planted [1-9][0-9]* times?; completions: [1-9][0-9]*$" ;;
+      # assignment of a node's completed, and the body seacast/hand5's; one assignment for each group completed
+      observer-timer-v2-off) plain=seacast/hand5; k=0; line=", planted [1-9][0-9]* times?; completions: [1-9][0-9]*$" ;;
     esac
     rm -f "$OUT/c-tp-$f.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz.bare.json"    # nothing left from an earlier run counts
     if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$f" . "$OUT/c-tp-$f.jsonl.gz" > "$OUT/c-tp-$f.out" 2> "$OUT/c-tp-$f.err"); then
@@ -2004,15 +2004,15 @@ s_tracercontrols() {
       echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); the body $plain's and $k records of N at node $node, its trailer counting them$also_chain" >> "$OUT/c-tracerplants.txt"
     else echo "$f: the body not $plain's and $k records of N at node $node$also_chain: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
-  # the check that no v2 trace counts a bare call (s_replays) itself fails on a planted count
+  # the check that no SEACAST trace counts a bare call (s_replays) itself fails on a planted count
   if bare_none "$OUT/c-tp-bare-in-question-v2.jsonl.gz"; then
     echo "control: the check of no bare call passes the plant's count  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
   else echo "control: the check of no bare call fails on the plant's count, as it must" >> "$OUT/c-tracerplants.txt"; fi
-  # extra_records' own controls, on traces made from the plain v2/hand5: itself with k 0 passes; two record lines
+  # extra_records' own controls, on traces made from the plain seacast/hand5: itself with k 0 passes; two record lines
   # swapped, the trailer's rest changed, another function's count changed: each refused, for its own reason (a
   # fixture not made, or not whole, fails the control)
   rm -f "$OUT/c-er-swapped.jsonl.gz" "$OUT/c-er-rest.jsonl.gz" "$OUT/c-er-other.jsonl.gz"
-  if ! $PY - "$OUT/v2/hand5.jsonl.gz" "$OUT/c-er" <<'EOF_ER'
+  if ! $PY - "$OUT/seacast/hand5.jsonl.gz" "$OUT/c-er" <<'EOF_ER'
 import gzip
 import json
 import sys
@@ -2035,26 +2035,26 @@ EOF_ER
   then
     echo "control: extra_records' fixtures were not made  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
   fi
-  if extra_records "$OUT/v2/hand5.jsonl.gz" "$OUT/v2/hand5.jsonl.gz" 1 N 0 > /dev/null; then
+  if extra_records "$OUT/seacast/hand5.jsonl.gz" "$OUT/seacast/hand5.jsonl.gz" 1 N 0 > /dev/null; then
     echo "control: extra_records passes a trace against itself, as it must" >> "$OUT/c-tracerplants.txt"
   else echo "control: extra_records refuses a trace against itself  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   for c in swapped rest other; do
     case $c in swapped) want="is neither the first trace's next line" ;; *) want="the trailer is not the first's" ;; esac
     if ! gzip -t "$OUT/c-er-$c.jsonl.gz" 2> /dev/null; then
       echo "control: the planted $c is not a whole trace  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
-    elif why=$(extra_records "$OUT/v2/hand5.jsonl.gz" "$OUT/c-er-$c.jsonl.gz" 1 N 0 2> /dev/null); then
+    elif why=$(extra_records "$OUT/seacast/hand5.jsonl.gz" "$OUT/c-er-$c.jsonl.gz" 1 N 0 2> /dev/null); then
       echo "control: extra_records passes the planted $c  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
     elif [[ $why == *"$want"* ]]; then
       echo "control: extra_records refuses the planted $c, as it must: $why" >> "$OUT/c-tracerplants.txt"
     else echo "control: extra_records refuses the planted $c for another reason: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
-  # extra_records' chain spec, on traces made from the plain v2/hand5-own, the spec its replaced node's on_iwant with
+  # extra_records' chain spec, on traces made from the plain seacast/hand5-own, the spec its replaced node's on_iwant with
   # its own chain: itself passes; a record line changed; the nodes line changed outside the chains (the replaced
   # node's replaced emptied, the first entry's IWANT_WINDOW and its payload type's M each plus 1); another entry's
   # chains given a name more; the replaced node's chain of on_iwant changed: each refused, for its own reason.
   # Setting the chains aside removes that one member of each entry and nothing else
   rm -f "$OUT"/c-erc-*.jsonl.gz "$OUT/c-erc.spec"
-  if ! $PY - "$OUT/v2/hand5-own.jsonl.gz" "$OUT/c-erc" <<'EOF_ERC'
+  if ! $PY - "$OUT/seacast/hand5-own.jsonl.gz" "$OUT/c-erc" <<'EOF_ERC'
 import gzip
 import json
 import sys
@@ -2100,13 +2100,13 @@ EOF_ERC
   local cnode cchain cabsent
   cnode=$(sed -n 1p "$OUT/c-erc.spec" 2> /dev/null); cchain=$(sed -n 2p "$OUT/c-erc.spec" 2> /dev/null)
   cabsent=$(sed -n 3p "$OUT/c-erc.spec" 2> /dev/null)
-  if [ -n "$cnode" ] && extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/v2/hand5-own.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" > /dev/null; then
-    echo "control: extra_records with node $cnode's chain of on_iwant passes v2/hand5-own against itself, as it must" >> "$OUT/c-tracerplants.txt"
-  else echo "control: extra_records with node ${cnode:-?}'s chain of on_iwant refuses v2/hand5-own against itself  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+  if [ -n "$cnode" ] && extra_records "$OUT/seacast/hand5-own.jsonl.gz" "$OUT/seacast/hand5-own.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" > /dev/null; then
+    echo "control: extra_records with node $cnode's chain of on_iwant passes seacast/hand5-own against itself, as it must" >> "$OUT/c-tracerplants.txt"
+  else echo "control: extra_records with node ${cnode:-?}'s chain of on_iwant refuses seacast/hand5-own against itself  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   # the spec of a node in no entry (the largest plus 1000), the trace against itself: refused, for that reason
   if [ -z "$cabsent" ]; then
     echo "control: no node in no entry for the chain spec  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
-  elif why=$(extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/v2/hand5-own.jsonl.gz" "$cnode" N 0 "$cabsent" on_iwant "$cchain" 2> /dev/null); then
+  elif why=$(extra_records "$OUT/seacast/hand5-own.jsonl.gz" "$OUT/seacast/hand5-own.jsonl.gz" "$cnode" N 0 "$cabsent" on_iwant "$cchain" 2> /dev/null); then
     echo "control: extra_records passes the spec of node $cabsent, in no entry  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
   elif [[ $why == *"the spec's node $cabsent is in no entry of the nodes line"* ]]; then
     echo "control: extra_records refuses the spec of node $cabsent, in no entry, as it must: $why" >> "$OUT/c-tracerplants.txt"
@@ -2120,16 +2120,16 @@ EOF_ERC
     esac
     if [ -z "$cnode" ] || ! gzip -t "$OUT/c-erc-$c.jsonl.gz" 2> /dev/null; then
       echo "control: the chain fixture $c is not a whole trace  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
-    elif why=$(extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/c-erc-$c.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" 2> /dev/null); then
+    elif why=$(extra_records "$OUT/seacast/hand5-own.jsonl.gz" "$OUT/c-erc-$c.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" 2> /dev/null); then
       echo "control: extra_records passes the chain fixture $c  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
     elif [[ $why == *"$want"* ]]; then
       echo "control: extra_records refuses the chain fixture $c, as it must: $why" >> "$OUT/c-tracerplants.txt"
     else echo "control: extra_records refuses the chain fixture $c for another reason: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
-  [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
-  [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 10 ] || no "not 10 plants under v2 as written (c-tracerplants.txt)"
-  echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 10 plants under v2 as written (five, and five controls), and the checks' controls"
-  # under v2, the nodes line's chains: hand5-own traced with its replaced names' chains left out (tracerfaults3's
+  [ "$bad" = 0 ] || no "a plant under SEACAST (c-tracerplants.txt)"
+  [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 10 ] || no "not 10 plants under SEACAST as written (c-tracerplants.txt)"
+  echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 10 plants under SEACAST as written (five, and five controls), and the checks' controls"
+  # under SEACAST, the nodes line's chains: hand5-own traced with its replaced names' chains left out (tracerfaults3's
   # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words, naming the
   # first it meets: a name that a node of the line replaces with no chain there (hand5-own, --rebuilt none: push_rebuilt
   # at every node, and forward and on_iwant at its silent node)
@@ -2160,11 +2160,11 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # observer, on das-samplers-mcoff (--member-check off). Each of (b)-(e) must make its cell's cases fail on what it
   # changed and on nothing else (c-chains.txt)
   chain_cases
-  # the swapped draws (K13): keep_floor's on v2/hand5 and defer_on_claim's on das-samplers-mcoff, each on its records'
+  # the swapped draws (K13): keep_floor's on seacast/hand5 and defer_on_claim's on das-samplers-mcoff, each on its records'
   # tapes; (f) the re-wrap off, which the replay must refuse at each keep_floor record; (g) the swap left unrestored,
   # which the record's exit check must stop (c-draws.txt)
   swapped_draws
-  # a record writer's arguments not runV2's case's: on_chunk's without p, which the replay must refuse (c-arity.*)
+  # a record writer's arguments not runSeacast's case's: on_chunk's without p, which the replay must refuse (c-arity.*)
   arities_plant
   # the replaced names' rows (R3-9): each of the eight names the twin asks, with rows on a fixture's tapes where a
   # node replaces it (repair_verdict's and known_in_scope's fixtures are plants (l) and (j), layers of tracerfaults3's
@@ -2172,7 +2172,7 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # exit check must stop (c-rows.txt)
   replaced_rows
   # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask (plant (p) on
-  # hand5-peer), and its control on v2/hand5; point 6's, a binding live across a record, on v2/hand5 under
+  # hand5-peer), and its control on seacast/hand5; point 6's, a binding live across a record, on seacast/hand5 under
   # --source-offers off: at the entry (D3), at the exit with the entry check removed (q), and with both removed, the
   # trace written to its end, a stated limit (c-stops.txt)
   stops
@@ -2180,17 +2180,17 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # node's question run bare, and its planted fault (r), a depth per node, whose record the replay accepts (a stated
   # limit); a replaced name entered outside every record on hand5-peer, and its plants (s) and (t) (c-carried.txt)
   carried
-  # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-v2) and reader (families_v2.py
-  # on churn1, signed and plain); S1-C5's line on v2/hand5 (c-fcases.txt)
+  # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-seacast) and reader (families_seacast.py
+  # on churn1, signed and plain); S1-C5's line on seacast/hand5 (c-fcases.txt)
   f_cases
   # H4's plant (n): one of LAYERS' changing layers left out, which the scan names and at whose install the tracer
   # stops (c-h4.err)
   h4_plant
-  # the timers of deferred_offers: timers_v2.py on das-samplers-mcoff's trace, and its three plants, each refused by
+  # the timers of deferred_offers: timers_seacast.py on das-samplers-mcoff's trace, and its three plants, each refused by
   # the checks it breaks (c-timers.txt)
   timers_check
-  # piece (b): each v2 trace's reached names and its IWANTs by records and by calls, with the calls file's controls,
-  # last, so that every v2 trace of the run is made (c-reached.txt)
+  # piece (b): each SEACAST trace's reached names and its IWANTs by records and by calls, with the calls file's controls,
+  # last, so that every SEACAST trace of the run is made (c-reached.txt)
   calls_summary
   # deferred_offers' timers over every trace the calls summary reads, and the alarm's cell (c-timers-all.txt)
   timers_all
@@ -2309,7 +2309,7 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
     echo "python $($PY -c 'import sys, platform; print(platform.python_version(), platform.machine(), sys.platform)')"
     echo "replay $(sha256sum < "$REPLAY" | cut -c1-64)"
     echo "twin $(sha256sum < "$OUT/twin-sources.txt" | cut -c1-64) ($(wc -l < "$OUT/twin-sources.txt") files: twin-sources.txt)"
-    echo "documents protocol.md $(sha256sum < "$TOY/../protocol.md" | cut -c1-64) protocol-v2.md $(sha256sum < "$TOY/../protocol-v2.md" | cut -c1-64) (each file's sha256: reported, it decides nothing)"
+    echo "documents seacast-lite.md $(sha256sum < "$TOY/../seacast-lite.md" | cut -c1-64) seacast.md $(sha256sum < "$TOY/../seacast.md" | cut -c1-64) (each file's sha256: reported, it decides nothing)"
     $PY -c 'import sys, hashlib; sys.path.insert(0, sys.argv[1]); import mutants3 as M; n = list(M.MUTANTS); print("mutants", len(n), hashlib.sha256("\n".join(n).encode()).hexdigest(), "(their names, in the tool'"'"'s order)")' "$T"
     # shellcheck disable=SC2046
     (cd "$OUT" && $PY "$T/content.py" --hashes $(for t in $RTRACES; do echo "$t.jsonl.gz"; done))
@@ -2345,8 +2345,8 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
   elif [ -n "$PART" ]; then echo "check.sh: PASS (part $PART of the matrix)"
   elif [ -n "$FEWCELLS" ]; then echo "check.sh: these steps passed ($STEPS): a rehearsal over the cells [$CELLS], not a record"
   elif [ -n "$RECORD" ]; then echo "check.sh: PASS (the record's run)"
-  elif [ -n "$V2STEPS" ]; then echo "check.sh: PASS (with v2cells, schemacontrols, viewcontrols and tracercontrols)"
+  elif [ -n "$V2STEPS" ]; then echo "check.sh: PASS (with seacastcells, schemacontrols, viewcontrols and tracercontrols)"
   else echo "check.sh: PASS"; fi
 } 2>&1 | tee "$LOG"
-case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with v2cells, schemacontrols, viewcontrols and tracercontrols)") true ;; *) false ;; esac \
+case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with seacastcells, schemacontrols, viewcontrols and tracercontrols)") true ;; *) false ;; esac \
   || { { [ "$STEPS" != "$ALL" ] || [ -n "$REHEARSAL" ] || [ -n "$SAMPLE" ] || [ -n "$FEWCELLS" ] || [ -n "$NODAS" ]; } && tail -n 1 "$LOG" | grep -q '^check.sh: these steps passed'; }

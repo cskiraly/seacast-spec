@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A known answer for the `late-block` cell's own check: a run that leaves something waiting fails.
 
-    python3 late_drain_known.py [--doc v2]
+    python3 late_drain_known.py [--doc seacast]
 
 The cell says that every node completes and that at the end nothing waits: no deferred copy, its id, tie,
 reservation or block not installed. run.py checks both under `--late-block` and exits with a failure if either

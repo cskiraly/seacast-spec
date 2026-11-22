@@ -1,8 +1,8 @@
 import Std.Data.HashMap
 import Std.Data.HashSet
-import SpecTwin.V2.Types
+import SpecTwin.Seacast.Types
 
-/-! # The types of the twin of protocol.md §6.1, §4.4 and §4.2 (v0.10.4, spec 34f60f8)
+/-! # The types of the twin of seacast-lite.md §6.1, §4.4 and §4.2 (v0.10.4, spec 34f60f8)
 
 Ask keys (§2), bitmaps, and `Node61`: everything the block asks of the rest of the node. That is the reads of
 other sections' state, the node's own order of announcers, and the effects (`enqueue`, `after`); §6.1 draws
@@ -34,15 +34,15 @@ inductive GroupState where
 /-- A chunk: its group and its index. -/
 abbrev Chunk := Group × Nat
 
-/-- A chunk's place under `protocol-v2.md`: a group and an index (an ask by index, `probe_asks`' members). -/
+/-- A chunk's place under `seacast.md`: a group and an index (an ask by index, `probe_asks`' members). -/
 abbrev GI := Group × Nat
 
-/-- `BlockId` (`protocol-v2.md` §3): the block a cell group belongs to, or the group itself for a type without
+/-- `BlockId` (`seacast.md` §3): the block a cell group belongs to, or the group itself for a type without
 blocks (`block_of`); 64 lowercase hex digits. -/
 abbrev BlockId := String
 
-/-- `backoff`'s inner key (`protocol-v2.md` §3): a colour and a direction. -/
-abbrev ColourDir := Nat × V2.Direction
+/-- `backoff`'s inner key (`seacast.md` §3): a colour and a direction. -/
+abbrev ColourDir := Nat × Seacast.Direction
 
 /-- A set of chunk indices: bit `i` is index `i`. -/
 abbrev Bits := Nat
@@ -114,8 +114,8 @@ inductive IhaveEntry where
   | id (a : Key)
   | other (raw : String)
   | bitmap (g : Group) (bits : Bits)
-  /-- protocol-v2.md's holding: an IDONTWANT's one `HaveBitmap` with its two claims. Only a record under v2
-  holds one; `protocol.md`'s functions that match an entry crash on it, and no v2 record reaches them. -/
+  /-- seacast.md's holding: an IDONTWANT's one `HaveBitmap` with its two claims. Only a record under v2
+  holds one; `seacast-lite.md`'s functions that match an entry crash on it, and no v2 record reaches them. -/
   | holding (g : Group) (bits : Bits) (claimAll complete : Bool)
   deriving BEq, Repr
 
@@ -177,8 +177,8 @@ def ChunkF.narrow (f : ChunkF) : ChunkF := { f with wide := none }
 /-- What `admitted(p, x)` is asked of (§8): the group a chunk, a HAVE or an offered id names. The deferral path
 asks it of a chunk, `on_have` of a HAVE whose group has not expired and that `valid_have` holds (its group and
 bits), and `on_ihave` of each id an IHAVE's entry expands to that is neither held nor of an expired group.
-Under protocol-v2.md, `on_holding` and `on_offer` ask it of a whole holding, after `valid_have` (its group, bits,
-claim_all and complete: v2's `Have` less its offer flag). -/
+Under seacast.md, `on_holding` and `on_offer` ask it of a whole holding, after `valid_have` (its group, bits,
+claim_all and complete: SEACAST's `Have` less its offer flag). -/
 inductive Admit where
   | chunk (f : ChunkF)
   | bitmap (g : Group) (bits : Bits)
@@ -210,8 +210,8 @@ still lives. -/
 structure HaveEntry where
   bits : Bits := 0
   ttl : Nat := 0
-  /-- protocol-v2.md §1.5's two claims of a holding (§3's `peer_has`: "bits, ttl; and claim_all, complete").
-  `protocol.md`'s code builds and reads the entry through its first two fields, so they stay false there. -/
+  /-- seacast.md §1.5's two claims of a holding (§3's `peer_has`: "bits, ttl; and claim_all, complete").
+  `seacast-lite.md`'s code builds and reads the entry through its first two fields, so they stay false there. -/
   claimAll : Bool := false
   complete : Bool := false
   deriving BEq, Repr, Inhabited
@@ -251,9 +251,9 @@ structure Job where
   at_ : UInt64
   deriving BEq, Repr
 
-/-- An ask of protocol-v2.md's WANT (§2): a key, and the toy's `FlaggedWant` flags where any is set (false, 0
+/-- An ask of seacast.md's WANT (§2): a key, and the toy's `FlaggedWant` flags where any is set (false, 0
 and false for a plain ask). It equals its plain key where promises, offers and tries are kept. -/
-structure AskV2 where
+structure AskSeacast where
   key : Key
   standing : Bool := false
   hops : Nat := 0
@@ -268,11 +268,11 @@ inductive Ctl where
   | ihave (ids : List IhaveEntry)
   | idontwant (ids : List IhaveEntry)
   | prune
-  /-- protocol-v2.md's IWANT, as a record under v2 writes every IWANT of a lane: its `want` mark and its asks,
+  /-- seacast.md's IWANT, as a record under v2 writes every IWANT of a lane: its `want` mark and its asks,
   each with its flags -/
-  | iwantV2 (want : Bool) (asks : List AskV2)
-  /-- protocol-v2.md's JOIN, GRAFT or PRUNE, queued by `send` under upkeep -/
-  | relation (m : V2.Relation)
+  | iwantSeacast (want : Bool) (asks : List AskSeacast)
+  /-- seacast.md's JOIN, GRAFT or PRUNE, queued by `send` under upkeep -/
+  | relation (m : Seacast.Relation)
   deriving BEq, Repr
 
 /-- A queue entry (§7.2): at most one chunk, its control (none, or a list of messages), and whether it answers an
@@ -287,7 +287,7 @@ structure QEntry where
 def QEntry.asks (e : QEntry) : List Key :=
   match e.control with
   | none => []
-  | some cs => cs.flatMap fun | .iwant ids => ids | .iwantV2 _ asks => asks.map (·.key) | _ => []
+  | some cs => cs.flatMap fun | .iwant ids => ids | .iwantSeacast _ asks => asks.map (·.key) | _ => []
 
 /-- A control message with no ids (the toy's `_Msg.empty`): a PRUNE's are none in the toy's runs, so it is one;
 a relation holds its one message. -/
@@ -296,7 +296,7 @@ def Ctl.isEmpty : Ctl → Bool
   | .ihave ids => ids.isEmpty
   | .idontwant ids => ids.isEmpty
   | .prune => true
-  | .iwantV2 _ asks => asks.isEmpty
+  | .iwantSeacast _ asks => asks.isEmpty
   | .relation _ => false
 
 /-- `e.is_empty()` (§7.2): no chunk, and no control or only empty messages -/

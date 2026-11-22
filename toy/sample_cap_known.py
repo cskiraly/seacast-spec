@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.10's second phase: a sampler keeps one count and one cap per block across
+"""A known answer for seacast.md §4.10's second phase: a sampler keeps one count and one cap per block across
 the block's sampled types (`SAMPLE_OUTSTANDING`, a setting of the node). When a second-phase ask's wait ends and the
 same sample's next ask does not take the freed slot, the block's held samples are tried for it in order, even when
 the timed-out sample's group has expired.
@@ -74,7 +74,7 @@ class Runaway(Exception):
 
 def setup(seed_cap_a, cap_b, node_cap):
     import copy
-    sim = build(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1",
+    sim = build(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1",
                  "--seed", "7", "--samplers", "50"])
     S = sim.nodes[min(sim.cfg["sampler_ids"])]
     ns = S.ns

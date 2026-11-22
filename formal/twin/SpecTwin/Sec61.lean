@@ -1,6 +1,6 @@
 import SpecTwin.Readers
 
-/-! # protocol.md §6.1, "One ask per chunk at a time, move on, park" [c5] (v0.10.4, spec 34f60f8;
+/-! # seacast-lite.md §6.1, "One ask per chunk at a time, move on, park" [c5] (v0.10.4, spec 34f60f8;
 the block's `close_promises` and `drop_offer` stand with §4.2's deferral path, in Sec42.lean)
 
 The block's twelve functions, in its order, line for line. Python's meanings kept on purpose:

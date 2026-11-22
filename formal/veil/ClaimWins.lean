@@ -7,7 +7,7 @@ set_option veil.smt.trust false
 
 /-! # The claim wins (A1), for any number of nodes, groups and chunks
 
-SEACAST, `protocol.md` v0.5, §4.5 (with §4.1, §4.3, §7.2 and §8.1), and the live window that keeps
+SEACAST, `seacast-lite.md` v0.5, §4.5 (with §4.1, §4.3, §7.2 and §8.1), and the live window that keeps
 an expired group out for good (§8.1, with the group's key of §1, added after v0.6): a node
 penalises a peer that asks it for a chunk the peer has claimed. §4.5 argues that an honest node
 never does so on a live connection: claims are made only for chunks in `mine`, which only grows
@@ -116,7 +116,7 @@ theory ghost relation tombstoneRule :=
 theory ghost relation premises :=
   filterAsks ∧ asksFirst ∧ inOrder ∧ (expiryInFilter ∨ discardAtExpiry) ∧ tombstoneRule
 
--- the spec as written: every rule on, with the live window (every group of protocol.md has a slot)
+-- the spec as written: every rule on, with the live window (every group of seacast-lite.md has a slot)
 theory ghost relation windowed :=
   filterAsks ∧ asksFirst ∧ inOrder ∧ expiryInFilter ∧ discardAtExpiry ∧ liveWindow ∧ windowForward ∧
     ¬ claimsGoFirst

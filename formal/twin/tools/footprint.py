@@ -70,7 +70,7 @@ What is logged, exactly (the contract; footprint_test.py has a case for each lin
 - **A row made in the call:** every entry under it is written, each missing before the call, in a callee's `cw`
   and in the record. So a new PeerQueue's other lane is there, as the toy's is, and a later touch of it is no
   value "before the call".
-- **Rows read on the way down (`row_reads`: the tables a trace's header names so; under protocol-v2.md, `owed`,
+- **Rows read on the way down (`row_reads`: the tables a trace's header names so; under seacast.md, `owed`,
   `planned`, `queue` and `tied`).** In such a table a row above an entry touched is read, not observed: the
   Python's `t[g][i]` evaluates `t[g]` first. And each consulting form on a level above the last logs the row's
   presence, there or not: `t[g]` before it indexes (so a missing row is read as missing, then raises KeyError(g)),
@@ -132,9 +132,9 @@ ROW_READS = [True]
 # that `offers` keeps of the lists each announcer is in. Its answer is on the tape, trusted as it was before
 CALLEE_ATTRS = {("offers", "listed")}
 # A set's members where an entry's keys are listed (a snapshot, the entries under a level) sorted by their encoded
-# key, its JSON, and not by their raw value: protocol-v2.md's `probe_asks` holds WantIndex values, which have
-# equality and hashing but no order. The order is for serialization only. trace3.py sets it under --doc v2;
-# protocol.md's traces keep the raw sort, and with it their bytes
+# key, its JSON, and not by their raw value: seacast.md's `probe_asks` holds WantIndex values, which have
+# equality and hashing but no order. The order is for serialization only. trace3.py sets it under --doc seacast;
+# seacast-lite.md's traces keep the raw sort, and with it their bytes
 SET_ORDER_ENCODED = [False]
 # The recorder's observer mode (trace3.py's class 6): a write by an observer's own code stops, at once through a view
 # or at the next boundary as an entry it touched whose value changed. Off only in a planted fault: writes let through

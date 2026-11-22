@@ -1,7 +1,7 @@
 """Where things are, from this file's own place: `formal/twin/tools/` of the specification's repository.
 
     TWIN    formal/twin, the Lean package these tools check
-    ROOT    the repository's root: the two documents are ROOT/protocol.md and ROOT/protocol-v2.md
+    ROOT    the repository's root: the two documents are ROOT/seacast-lite.md and ROOT/seacast.md
     REPLAY  the twin's replay, where `lake build` leaves it
     toy()   the toy: ROOT/toy, or the directory the environment's SPEC_TOY names
     python(work)    the command a tracer's Python is started with (below)

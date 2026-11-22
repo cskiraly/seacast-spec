@@ -20,7 +20,7 @@ method of the enclosing class (`self.m`, `node.m`).
 Each function bound has a class:
 - **observer**: it holds the earlier binding of its name (a closure variable assigned from `ns[name]` before it, or
   a node attribute so assigned, `self._doc_x = ns["x"]`) and passes the observer test: its code names no question
-  (trace3.py's TAPE, and protocol-v2.md's: the names its functions call that no document defines and that the toy
+  (trace3.py's TAPE, and seacast.md's: the names its functions call that no document defines and that the toy
   binds under v2 alone) and no traced function but the earlier binding; it assigns, deletes or mutates no table,
   through its own aliases too, following the local functions, lambdas and node methods it calls with the tables it
   hands them; on a table, or on what a table's method returns, it calls only the methods that read it, and it hands
@@ -50,7 +50,7 @@ Each function bound has a class:
   (`chunk_id = ns["message_id"]`) is marked as its alias.
 Each clause of the test can be switched off (`scan(…, off=…)`), so that the self-test shows each one doing its part.
 A binding in a method that `Node.__init__` calls only under `if self.v2` (and in what such a method calls), or inside
-such a branch of `__init__`, is marked v2-only: under protocol.md it never runs.
+such a branch of `__init__`, is marked v2-only: under seacast-lite.md it never runs.
 """
 import ast
 import hashlib
@@ -221,7 +221,7 @@ class Scanner:
                 for m in cls.body:
                     if isinstance(m, ast.FunctionDef):
                         self.methods[(path.name, cls.name, m.name)] = m
-        self.v2_methods, self.v2_lines = self.v2_only(tree)
+        self.seacast_methods, self.seacast_lines = self.seacast_only(tree)
         self.body(tree.body, Scope(tree, "", None), cls=None)
 
     def body(self, stmts, scope, cls):
@@ -405,7 +405,7 @@ class Scanner:
         r = {"file": self.path.name, "line": at.lineno, "in": scope.qual, "form": form, "name": name}
         if via:
             r["via"] = via
-        r["v2_only"] = self.in_v2(scope, at.lineno)
+        r["seacast_only"] = self.in_seacast(scope, at.lineno)
         if fn is None:
             r["value"] = ast.unparse(value)[:80] if value is not None else None
             r["class"] = "value"
@@ -418,7 +418,7 @@ class Scanner:
                 r["class"] = "own"
             else:
                 r["holds"] = held
-                docs = ("v2",) if r["v2_only"] else ("protocol.md", "v2")     # the documents it runs under
+                docs = ("seacast",) if r["seacast_only"] else ("seacast-lite.md", "seacast")     # the documents it runs under
                 split = self.closure_split(fn, name, held, docs)
                 if split is not None:       # its class per branch on a closure value (the node's, read later), each
                                             #   branch's per document where the two differ
@@ -439,19 +439,19 @@ class Scanner:
                         r["by_document"] = {d: "observer" if w is None else f"layer ({w})" for d, w in by.items()}
         self.rows.append(r)
 
-    def in_v2(self, scope, line):
+    def in_seacast(self, scope, line):
         s = scope
         while s is not None and not isinstance(s.node, ast.ClassDef):
             if isinstance(s.node, ast.FunctionDef) and s.parent is not None and isinstance(s.parent.node, ast.ClassDef):
-                if s.node.name in self.v2_methods:
+                if s.node.name in self.seacast_methods:
                     return True
                 if s.node.name == "__init__":
-                    return any(a <= line <= b for a, b in self.v2_lines)
+                    return any(a <= line <= b for a, b in self.seacast_lines)
             s = s.parent
         return False
 
     @staticmethod
-    def v2_only(tree):
+    def seacast_only(tree):
         """The methods `Node.__init__` calls only under `if self.v2`, with what they call; and those branches'
         lines."""
         node_cls = next((c for c in tree.body if isinstance(c, ast.ClassDef) and c.name == "Node"), None)
@@ -474,7 +474,7 @@ class Scanner:
             return out
         v2, lines = set(), []
         for st in ast.walk(init):
-            if (isinstance(st, ast.If) and isinstance(st.test, ast.Attribute) and st.test.attr == "v2"
+            if (isinstance(st, ast.If) and isinstance(st.test, ast.Attribute) and st.test.attr == "seacast"
                     and isinstance(st.test.value, ast.Name) and st.test.value.id == "self"):
                 for b in st.body:
                     v2 |= calls(b)
@@ -530,18 +530,18 @@ class Scanner:
         return s
 
     def observer_test(self, fn, name, held, doc, exempt=()):
-        """None for an observer, or why it is not one, under one document's namespace ("protocol.md" or "v2": its
+        """None for an observer, or why it is not one, under one document's namespace ("seacast-lite.md" or "seacast": its
         questions, its traced names, and whether its function of that name returns a value). The slots of `exempt`
         may be named and bound (the swapped draw's test: DRAWS)."""
         self.exempt = exempt
         if name in BY_NAME and "by-name" not in self.off:
             return None
-        self.questions = QUESTIONS_V2 if doc == "v2" else QUESTIONS_DOC
-        self.traced = TRACED_V2 if doc == "v2" else TRACED
-        if doc == "v2":                     # v2's namespace: its own function of the name, else protocol.md's
-            self.returns = RETURNS_V2 if name in DEFS_V2 else RETURNS_DOC
+        self.questions = QUESTIONS_Seacast if doc == "seacast" else QUESTIONS_DOC
+        self.traced = TRACED_Seacast if doc == "seacast" else TRACED
+        if doc == "seacast":                     # SEACAST's namespace: its own function of the name, else seacast-lite.md's
+            self.returns = RETURNS_Seacast if name in DEFS_Seacast else RETURNS_DOC
         else:
-            self.returns = RETURNS_DOC if name in DEFS_DOC else RETURNS_V2
+            self.returns = RETURNS_DOC if name in DEFS_DOC else RETURNS_Seacast
         own = self.own_scope(fn.node, fn.qual, fn.scope)
         return self.names_and_writes(fn.node, own, name, held, set()) or self.paths(fn.node, own, name, held)
 
@@ -986,9 +986,9 @@ class Scanner:
         return k
 
 
-QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, CALLABLES = set(), set(), set(), set(), set()
-TRACED_V2_KEPT = set()      # TRACED_V2's kept names alone: protocol.md's lists (WRAPPERS, REPLACEABLE) are of these
-DEFS_DOC, DEFS_V2, RETURNS_DOC, RETURNS_V2 = set(), set(), set(), set()
+QUESTIONS_DOC, QUESTIONS_Seacast, TRACED, TRACED_Seacast, CALLABLES = set(), set(), set(), set(), set()
+TRACED_V2_KEPT = set()      # TRACED_Seacast's kept names alone: seacast-lite.md's lists (WRAPPERS, REPLACEABLE) are of these
+DEFS_DOC, DEFS_Seacast, RETURNS_DOC, RETURNS_Seacast = set(), set(), set(), set()
 BUILTIN_NAMES = set(dir(__import__("builtins")))
 
 
@@ -1017,7 +1017,7 @@ def returning(defs):
 
 def questions_of(defs, defined):
     """The names a document's functions call that no document defines, no builtin is, and no function binds locally:
-    the questions the environment answers (protocol-v2.md's `type_of_group`, `send`, `choice`, ...)."""
+    the questions the environment answers (seacast.md's `type_of_group`, `send`, `choice`, ...)."""
     out = set()
     for d in defs.values():
         local = {a.arg for a in d.args.args + d.args.kwonlyargs + [x for x in (d.args.vararg, d.args.kwarg) if x]}
@@ -1031,7 +1031,7 @@ def questions_of(defs, defined):
 
 
 def load_names(toy):
-    """The questions (trace3.py's TAPE, and protocol-v2.md's calls of names no document defines), the traced names
+    """The questions (trace3.py's TAPE, and seacast.md's calls of names no document defines), the traced names
     (BLOCK; under v2 its kept ones, as trace3.py's), the documents' functions, and which of them return a value."""
     sys.path.insert(0, str(HERE))
     import trace3 as T                  # noqa: E402
@@ -1040,21 +1040,21 @@ def load_names(toy):
     doc = {d.name: d for d in ast.parse(N.SPEC_SRC).body if isinstance(d, ast.FunctionDef)}
     v2 = {d.name: d for d in ast.parse(N.generate(N.DOC2)).body if isinstance(d, ast.FunctionDef)}
     DEFS_DOC.update(doc)
-    DEFS_V2.update(v2)
+    DEFS_Seacast.update(v2)
     CALLABLES.update(doc, v2)
     RETURNS_DOC.update(returning(doc))
-    RETURNS_V2.update(returning({**doc, **v2}))
+    RETURNS_Seacast.update(returning({**doc, **v2}))
     QUESTIONS_DOC.update(T.TAPE)
-    QUESTIONS_V2.update(T.TAPE)
-    # protocol-v2.md's questions: the names its functions call that no document defines, and that the toy binds in
+    QUESTIONS_Seacast.update(T.TAPE)
+    # seacast.md's questions: the names its functions call that no document defines, and that the toy binds in
     # code that runs under v2 alone (type_of_group, send, choice); the toy's helpers bound for both documents (group,
-    # group_index) are computed in place, as under protocol.md, and are no questions. Provisional until the twin's
+    # group_index) are computed in place, as under seacast-lite.md, and are no questions. Provisional until the twin's
     # question registry for v2 is read
-    v2_bound = {r["name"] for r in scan(toy).rows if r["v2_only"]}
-    QUESTIONS_V2.update(questions_of(v2, set(doc) | set(v2)) & v2_bound)
+    seacast_bound = {r["name"] for r in scan(toy).rows if r["seacast_only"]}
+    QUESTIONS_Seacast.update(questions_of(v2, set(doc) | set(v2)) & seacast_bound)
     TRACED.update(T.BLOCK)
-    TRACED_V2_KEPT.update(n for n in T.v2_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
-    TRACED_V2.update(TRACED_V2_KEPT, T.manifest_v2.COVERED)    # under v2 the kept names and v2's covered ones
+    TRACED_V2_KEPT.update(n for n in T.seacast_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
+    TRACED_Seacast.update(TRACED_V2_KEPT, T.manifest_seacast.COVERED)    # under v2 the kept names and SEACAST's covered ones
     return T, N
 
 
@@ -1075,7 +1075,7 @@ def line(r):
     extra = f" holds {r['holds']}" if "holds" in r else ""
     why = f" ({r['why']})" if "why" in r else ""
     return (f"{r['file']}:{r['line']} {r['in']} {r['form']}{'/' + r['via'] if 'via' in r else ''} {r['name']} = "
-            f"{val}{extra} {r['class']}{why}{' v2-only' if r['v2_only'] else ''}")
+            f"{val}{extra} {r['class']}{why}{' v2-only' if r['seacast_only'] else ''}")
 
 
 def fn_key(v):
@@ -1106,7 +1106,7 @@ def closure_kind_of(split, T):
 def lists(sc, T):
     """The lists the rows give over node.py's bindings of traced names (under v2, of its kept names for a v2-only
     binding), beside trace3.py's hand-kept ones: each name and qualified name the same, or the difference named."""
-    rows = [r for r in sc.rows if r["file"] == "node.py" and r["name"] in (TRACED_V2_KEPT if r["v2_only"] else TRACED)]
+    rows = [r for r in sc.rows if r["file"] == "node.py" and r["name"] in (TRACED_V2_KEPT if r["seacast_only"] else TRACED)]
     defined = CALLABLES
     obs = sorted({(r["name"], r["value"]["qual"]) for r in rows if r["class"] == "observer"})
     own = sorted({(r["name"], r["value"]["qual"]) for r in rows if r["class"] == "own" and r["name"] not in defined})
@@ -1119,13 +1119,13 @@ def lists(sc, T):
                        f"({r['file']}:{r['line']})")
     hand_obs = sorted(T.WRAPPERS.items())
     layers = getattr(T, "LAYERS", None)     # under v2, the chain rule's lists: the toy's layers by file's name,
-    v2_obs = {(r["name"], r["value"]["qual"]) for r in rows     # qualified name and first line, with their kinds
-              if layers is not None and r["v2_only"] and r["class"] == "observer"
+    seacast_obs = {(r["name"], r["value"]["qual"]) for r in rows     # qualified name and first line, with their kinds
+              if layers is not None and r["seacast_only"] and r["class"] == "observer"
               and layers.get(fn_key(r["value"])) == (r["name"], T.OBSERVER)}
     for x in obs:
         if x in hand_obs:
             out.append(f"observer {x[0]} {x[1]}: as WRAPPERS")
-        elif x in v2_obs:
+        elif x in seacast_obs:
             out.append(f"observer {x[0]} {x[1]}: v2-only, an observer in LAYERS (the chain rule's)")
         else:
             other += 1
@@ -1157,7 +1157,7 @@ def lists(sc, T):
                                                          "the directed sets' alone: the toy replaces it"))
     for n in repl:
         if n not in T.REPLACEABLE:
-            sites = [f"{r['in']}:{r['line']}{' v2-only' if r['v2_only'] else ''}" for r in rows
+            sites = [f"{r['in']}:{r['line']}{' v2-only' if r['seacast_only'] else ''}" for r in rows
                      if r["name"] == n and r["class"] in ("own", "layer")]
             out.append(f"replaced {n}, not REPLACEABLE (the tracer stops a trace where it is replaced): {', '.join(sites)}")
     # LAYERS against every node.py binding of a name traced under v2, function by function: an observer; the node's
@@ -1171,7 +1171,7 @@ def lists(sc, T):
             other += 1
             out.append(f"DRAWS: {list(DRAWS)} here, {list(T.DRAWS)} in trace3.py")
         for r in sc.rows:
-            if r["file"] != "node.py" or r["name"] not in TRACED_V2 or not isinstance(r["value"], dict):
+            if r["file"] != "node.py" or r["name"] not in TRACED_Seacast or not isinstance(r["value"], dict):
                 continue
             if r["class"] == "own" and r["name"] not in defined:
                 k = T.NODE_HELPER
@@ -1578,7 +1578,7 @@ def self_test():
         moved = sorted(k for k in before if after.get(k) != before[k])
         report("a changed observer body: its row's hash alone moved, the rows the same",
                moved == [("subscript", "a", 7)] and set(before) == set(after), f"moved {moved}")
-    sets = (QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, DEFS_DOC, RETURNS_DOC)
+    sets = (QUESTIONS_DOC, QUESTIONS_Seacast, TRACED, TRACED_Seacast, DEFS_DOC, RETURNS_DOC)
     saved = [set(s) for s in sets]
     names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_v2q", "c_doc"}
     for s, v in zip(sets, ({"askq"}, {"askq", "v2q"}, {"trf"}, {"trf"}, names,
@@ -1610,9 +1610,9 @@ def self_test():
             (Path(d) / "layers.py").write_text(LAYERS)
             got = [r for r in rows if r["name"] == "c_v2q"]
             ok = (len(got) == 1 and got[0]["class"] == "per-document"
-                  and got[0]["by_document"]["protocol.md"] == "observer"
-                  and got[0]["by_document"]["v2"].startswith("layer"))
-            report("c_v2q per document: an observer under protocol.md, a layer under v2 (a v2 question)", ok,
+                  and got[0]["by_document"]["seacast-lite.md"] == "observer"
+                  and got[0]["by_document"]["seacast"].startswith("layer"))
+            report("c_v2q per document: an observer under seacast-lite.md, a layer under v2 (a v2 question)", ok,
                    f"got {[(r['class'], r.get('by_document')) for r in got]}")
             got = [r for r in rows if r["name"] == "c_closed"]
             ok = (len(got) == 1 and got[0]["class"] == "closure-dependent"
@@ -1622,14 +1622,14 @@ def self_test():
             got = [r for r in rows if r["name"] == "c_doc"]
             ok = (len(got) == 1 and got[0]["class"] == "closure-dependent"
                   and got[0]["closure"] == {"on": "not on", "true": "own",
-                                            "false": {"protocol.md": "observer", "v2": "layer"}})
+                                            "false": {"seacast-lite.md": "observer", "seacast": "layer"}})
             report("c_doc closure-dependent, its branches per document: own where `not on`; where not, an observer "
-                   "under protocol.md and a layer under v2 (a v2 question)", ok,
+                   "under seacast-lite.md and a layer under v2 (a v2 question)", ok,
                    f"got {[(r['class'], r.get('closure')) for r in got]}")
         # the lists count a row of a traced name that has no one class; the control, the same row an observer
         # in WRAPPERS, counts none
         T = type("T", (), {"WRAPPERS": {}, "NODE_OWN": {}, "REPLACEABLE": (), "REPLACEABLE_WHOLE": ()})
-        row = {"file": "node.py", "line": 5, "in": "Node.p", "form": "subscript", "name": "trf", "v2_only": False,
+        row = {"file": "node.py", "line": 5, "in": "Node.p", "form": "subscript", "name": "trf", "seacast_only": False,
                "value": {"qual": "Node.p.<locals>.trf", "file": "node.py", "line": 6, "sha256": "0" * 64}}
         for c in ("closure-dependent", "per-document"):
             out, other = lists(type("S", (), {"rows": [dict(row, **{"class": c})]}), T)

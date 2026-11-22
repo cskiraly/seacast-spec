@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The Lean code of the twin's tables, from schema.py, and protocol-v2.md's manifest, from manifest_v2.py: four files
+"""The Lean code of the twin's tables, from schema.py, and seacast.md's manifest, from manifest_seacast.py: four files
 of the twin, written whole.
 
     python3 gen.py --check TWINDIR            # each generated file against the twin's; exit code 1 if one differs
@@ -11,18 +11,18 @@ The four files, each generated from its first byte to its last and compared byte
 - SpecTwin/Tables.lean: the class `Tables`, `Tables.ofState`, `Tables.lift` and its instance through ReaderT;
 - SpecTwin/ReplayTables.lean: the replay's per-table functions (`cell`, `val`, `level`, `valueAt`, `put`, `drop`,
   `entries`, `under`, `covers`);
-- SpecTwin/V2/Manifest.lean: protocol-v2.md's manifest, the lists by name of manifest_v2.py (`covered`, `kept`,
+- SpecTwin/Seacast/Manifest.lean: seacast.md's manifest, the lists by name of manifest_seacast.py (`covered`, `kept`,
   `nodeOwn`, `replaceable`, `replaceableWhole`, `cut`, `own`, `foreign`, `questions`, `questionsUnloaded`).
 So nothing in these files is written by hand: not a first line, not a line after a body, not a comment. (A check
 that compares slices of hand-written files, regions or declarations' bodies, misses text that the slices do not
 hold.)
 
-Three more checks hold the manifest. Its own rules (manifest_v2.py's docstring): no list holds a name twice, COVERED
+Three more checks hold the manifest. Its own rules (manifest_seacast.py's docstring): no list holds a name twice, COVERED
 and KEPT share no name, NODE_OWN's keys are in neither, CUT's names are in no other list, REPLACEABLE_WHOLE is
 within KEPT, QUESTIONS shares no name with COVERED or KEPT and holds no key of NODE_OWN, and QUESTIONS_UNLOADED's
-keys are within QUESTIONS. KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
-(header3.py's `v2_kept_of`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. And QUESTIONS
-by the code: QUESTIONS less QUESTIONS_UNLOADED is what the code asks, name for name, as closure_v2.py's
+keys are within QUESTIONS. KEPT by its rule: trace3.py's `seacast_kept` over the toy's two documents, less §7.1's window
+(header3.py's `seacast_kept_of`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. And QUESTIONS
+by the code: QUESTIONS less QUESTIONS_UNLOADED is what the code asks, name for name, as closure_seacast.py's
 `derive_questions` reads it over the same documents and the manifest's lists. These are the globals of COVERED
 functions that no other class takes, the `.params` calls, the type's functions called and the context uses'
 questions. A name of QUESTIONS_UNLOADED that the code asks is named too, and so is a name of COVERED or KEPT that
@@ -99,19 +99,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # an isolated Python (-I) puts no directory there itself
 from schema import PARSE, STATE_ORDER, TABLES, VALUES     # noqa: E402
-import schema_v2                                            # noqa: E402
-import manifest_v2                                          # noqa: E402
+import schema_seacast                                            # noqa: E402
+import manifest_seacast                                          # noqa: E402
 
-# protocol-v2.md's tables after protocol.md's, in one State and one Cell (schema_v2.py). The lists are new objects:
-# schema.py's own, which the tracer reads, stay protocol.md's
-TABLES = TABLES + schema_v2.TABLES_V2
-VALUES = {**VALUES, **schema_v2.VALUES_V2}
-PARSE = {**PARSE, **schema_v2.PARSE_V2}
-V2_NAMES = frozenset(t.name for t in schema_v2.TABLES_V2)
+# seacast.md's tables after seacast-lite.md's, in one State and one Cell (schema_seacast.py). The lists are new objects:
+# schema.py's own, which the tracer reads, stay seacast-lite.md's
+TABLES = TABLES + schema_seacast.TABLES_Seacast
+VALUES = {**VALUES, **schema_seacast.VALUES_Seacast}
+PARSE = {**PARSE, **schema_seacast.PARSE_Seacast}
+V2_NAMES = frozenset(t.name for t in schema_seacast.TABLES_Seacast)
 
 WIDTH = 120
-# the manifest as the generator and its checks read it: manifest_v2.py's lists, which a control may change
-MANIFEST = {k: copy.deepcopy(getattr(manifest_v2, k)) for k, _, _ in manifest_v2.LISTS}
+# the manifest as the generator and its checks read it: manifest_seacast.py's lists, which a control may change
+MANIFEST = {k: copy.deepcopy(getattr(manifest_seacast, k)) for k, _, _ in manifest_seacast.LISTS}
 NOT_SOURCES = (".lake", "tools", "record", "__pycache__")    # what is not the twin's sources (as ../layout.py's)
 
 
@@ -541,7 +541,7 @@ def replay():
         elif kind == "jobs":                        # an empty pace queue is no value
             out += [f"  | {pats} =>", f"    let l ← {v['parse']} j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
                     "    return some (.jobs l)"]
-        # protocol-v2.md's kinds (schema_v2.py)
+        # seacast.md's kinds (schema_seacast.py)
         elif kind == "typeid":
             out.append(f"  | {pats} => return some (.typeId (← typeId j))")
         elif kind == "ibits":                       # a stored 0 is a value
@@ -661,7 +661,7 @@ def replay():
         elif t.value == "desc":
             va.append(f"  | {c} => {got_opt}.map (.desc ·)")
             put.append(f"  | {c}, .desc d => pure {{ s with {f} := {ins('d')} }}")
-        # protocol-v2.md's kinds (schema_v2.py)
+        # seacast.md's kinds (schema_seacast.py)
         elif t.value == "typeid":
             va.append(f"  | {c} => {got_opt}.map (.typeId ·)")
             put.append(f"  | {c}, .typeId x => pure {{ s with {f} := {ins('x')} }}")
@@ -730,7 +730,7 @@ def replay():
     return r
 
 
-GENERATED = ("This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_v2.py`, one\n"
+GENERATED = ("This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_seacast.py`, one\n"
              "entry there per table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema,\n"
              "or the generator.")
 
@@ -790,7 +790,7 @@ def state_file():
         "def ownTables : List String :=",
         *wrapped([f'"{t.name}"' for t in TABLES if t.name not in V2_NAMES], "  "),
         "",
-        "/-- `protocol-v2.md`'s tables (`gen/schema_v2.py`), by the names its records give them, in the schema's order. -/",
+        "/-- `seacast.md`'s tables (`gen/schema_seacast.py`), by the names its records give them, in the schema's order. -/",
         "def v2Tables : List String :=",
         *wrapped([f'"{t.name}"' for t in TABLES if t.name in V2_NAMES], "  "),
         "",
@@ -936,28 +936,28 @@ def replay_tables_file():
 
 def manifest_file():
     lines = [
-        "/-! # protocol-v2.md's manifest: what a trace under it holds, by name (generated)",
+        "/-! # seacast.md's manifest: what a trace under it holds, by name (generated)",
         "",
-        "This file is written whole by `tools/gen/gen.py` from `gen/manifest_v2.py`, and `gen.py --check` compares it",
+        "This file is written whole by `tools/gen/gen.py` from `gen/manifest_seacast.py`, and `gen.py --check` compares it",
         "byte for byte. Do not edit it: change the manifest, or the generator.",
         "",
-        "The lists by which the replay routes a record of a trace under `protocol-v2.md`, and against which it reads the",
-        "trace's header and nodes line. `gen/manifest_v2.py` says what each list holds, and the rules they keep. -/",
+        "The lists by which the replay routes a record of a trace under `seacast.md`, and against which it reads the",
+        "trace's header and nodes line. `gen/manifest_seacast.py` says what each list holds, and the rules they keep. -/",
         "",
-        "namespace SpecTwin.V2.Manifest",
+        "namespace SpecTwin.Seacast.Manifest",
     ]
-    for key, name, doc in manifest_v2.LISTS:
+    for key, name, doc in manifest_seacast.LISTS:
         v = MANIFEST[key]
         if isinstance(v, dict):
             typ, items = "List (String × String)", [f'("{k}", "{x}")' for k, x in v.items()]
         else:
             typ, items = "List String", [f'"{x}"' for x in v]
         lines += ["", f"/-- {doc} -/", f"def {name} : {typ} :=", *wrapped(items, "  ")]
-    return "\n".join(lines + ["", "end SpecTwin.V2.Manifest", ""])
+    return "\n".join(lines + ["", "end SpecTwin.Seacast.Manifest", ""])
 
 
 FILES = {"SpecTwin/State.lean": state_file, "SpecTwin/Tables.lean": tables_file,
-         "SpecTwin/ReplayTables.lean": replay_tables_file, "SpecTwin/V2/Manifest.lean": manifest_file}
+         "SpecTwin/ReplayTables.lean": replay_tables_file, "SpecTwin/Seacast/Manifest.lean": manifest_file}
 # the names the first three files declare, which no other file of the twin may declare (the tripwire). `lift` and
 # `instReaderT` are left out: `Node61` has a `lift` of its own, by hand.
 NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "v2Tables", "Tables", "TablesWhole", "ofState",
@@ -990,14 +990,14 @@ def manifest_rules(m):
     key of NODE_OWN in either, a name of CUT in another list, a name of REPLACEABLE_WHOLE not in KEPT, a name of
     QUESTIONS in COVERED or KEPT, a key of NODE_OWN in QUESTIONS, a key of QUESTIONS_UNLOADED not in QUESTIONS."""
     out = []
-    for key, _, _ in manifest_v2.LISTS:
+    for key, _, _ in manifest_seacast.LISTS:
         names = list(m[key])
         out += [f"the manifest: {n} twice in {key}" for n in sorted({x for x in names if names.count(x) > 1})]
     out += [f"the manifest: {n} in both COVERED and KEPT" for n in sorted(set(m["COVERED"]) & set(m["KEPT"]))]
     out += [f"the manifest: {n}, a key of NODE_OWN, in {key}" for n in sorted(m["NODE_OWN"])
             for key in ("COVERED", "KEPT", "QUESTIONS") if n in m[key]]
     out += [f"the manifest: {n}, in CUT, in {key} too" for n in m["CUT"]
-            for key, _, _ in manifest_v2.LISTS if key != "CUT" and n in m[key]]
+            for key, _, _ in manifest_seacast.LISTS if key != "CUT" and n in m[key]]
     out += [f"the manifest: {n} in REPLACEABLE_WHOLE, not in KEPT" for n in m["REPLACEABLE_WHOLE"] if n not in m["KEPT"]]
     out += [f"the manifest: {n} in both QUESTIONS and {key}" for key in ("COVERED", "KEPT")
             for n in sorted(set(m["QUESTIONS"]) & set(m[key]))]
@@ -1007,39 +1007,39 @@ def manifest_rules(m):
 
 
 @functools.lru_cache(maxsize=None)
-def v2_kept_rule():
-    """trace3.py's v2_kept over the toy's two documents, less §7.1's window: header3.py's v2_kept_of, over the toy that
+def seacast_kept_rule():
+    """trace3.py's seacast_kept over the toy's two documents, less §7.1's window: header3.py's seacast_kept_of, over the toy that
     layout.py finds (SPEC_TOY, or the repository's toy/). Computed once."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     import header3                      # noqa: E402: tools/, beside gen/
     import layout                       # noqa: E402
-    return frozenset(header3.v2_kept_of(layout.toy()))
+    return frozenset(header3.seacast_kept_of(layout.toy()))
 
 
 def manifest_kept(m):
-    """KEPT and NODE_OWN's keys against v2_kept's rule, name for name: each name in one and not the other."""
-    rule, have = v2_kept_rule(), set(m["KEPT"]) | set(m["NODE_OWN"])
-    return ([f"the manifest: {n} in v2_kept, not in the manifest" for n in sorted(rule - have)]
-            + [f"the manifest: {n} in the manifest, not in v2_kept" for n in sorted(have - rule)])
+    """KEPT and NODE_OWN's keys against seacast_kept's rule, name for name: each name in one and not the other."""
+    rule, have = seacast_kept_rule(), set(m["KEPT"]) | set(m["NODE_OWN"])
+    return ([f"the manifest: {n} in seacast_kept, not in the manifest" for n in sorted(rule - have)]
+            + [f"the manifest: {n} in the manifest, not in seacast_kept" for n in sorted(have - rule)])
 
 
 @functools.lru_cache(maxsize=None)
 def code_reading():
-    """closure_v2.py's reading of the toy's two documents (the toy that layout.py finds), made once."""
+    """closure_seacast.py's reading of the toy's two documents (the toy that layout.py finds), made once."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-    import closure_v2                   # noqa: E402: tools/, beside gen/
+    import closure_seacast                   # noqa: E402: tools/, beside gen/
     import layout                       # noqa: E402
     sys.path.insert(0, str(layout.toy()))
-    import node                         # noqa: E402: the toy's, as header3.py's v2_kept_of imports it
-    return closure_v2.Reading(node.SPEC_SRC, node.generate(node.DOC2))
+    import node                         # noqa: E402: the toy's, as header3.py's seacast_kept_of imports it
+    return closure_seacast.Reading(node.SPEC_SRC, node.generate(node.DOC2))
 
 
 def manifest_questions(m):
-    """QUESTIONS less QUESTIONS_UNLOADED against what the code asks (closure_v2.py's derive_questions), name for name;
+    """QUESTIONS less QUESTIONS_UNLOADED against what the code asks (closure_seacast.py's derive_questions), name for name;
     a name of QUESTIONS_UNLOADED the code asks; a name of COVERED or KEPT the documents do not define."""
-    import closure_v2                   # noqa: E402: on the path once code_reading has run
+    import closure_seacast                   # noqa: E402: on the path once code_reading has run
     rd = code_reading()
-    derived, undefined = closure_v2.derive_questions(rd, m)
+    derived, undefined = closure_seacast.derive_questions(rd, m)
     unl = set(m["QUESTIONS_UNLOADED"])
     have = set(m["QUESTIONS"]) - unl
     return ([f"the manifest: {n} in QUESTIONS, not asked by the code" for n in sorted(have - set(derived))]
@@ -1050,9 +1050,9 @@ def manifest_questions(m):
 
 def questions_counts(m):
     """The derived set's size and its four groups' sizes, for --check's line."""
-    import closure_v2                   # noqa: E402
-    g1, pcalls, _, _, tcalls, _, cq, _, _ = closure_v2.groups(code_reading(), m)
-    return len(closure_v2.derive_questions(code_reading(), m)[0]), len(g1), len(pcalls), len(tcalls), len(cq)
+    import closure_seacast                   # noqa: E402
+    g1, pcalls, _, _, tcalls, _, cq, _, _ = closure_seacast.groups(code_reading(), m)
+    return len(closure_seacast.derive_questions(code_reading(), m)[0]), len(g1), len(pcalls), len(tcalls), len(cq)
 
 
 def compare(twin):
@@ -1141,7 +1141,7 @@ def check(twin):
               "neither, CUT in no other list, REPLACEABLE_WHOLE within KEPT, QUESTIONS apart from COVERED, KEPT and "
               f"NODE_OWN's keys, QUESTIONS_UNLOADED within QUESTIONS ({len(MANIFEST['QUESTIONS'])} questions)")
     if not manifest_kept(MANIFEST):
-        print(f"the manifest's KEPT and NODE_OWN are v2_kept's rule over the toy's documents: {len(v2_kept_rule())} names")
+        print(f"the manifest's KEPT and NODE_OWN are seacast_kept's rule over the toy's documents: {len(seacast_kept_rule())} names")
     if not manifest_questions(MANIFEST):
         n, g1, g2, g3, g5 = questions_counts(MANIFEST)
         print(f"the manifest's QUESTIONS less QUESTIONS_UNLOADED are what the code asks: {n} names ({g1} globals, "
@@ -1362,14 +1362,14 @@ def controls(twin, work):
               f"{'' if good else '  <-- must find ' + ', '.join(must)}")
 
     manifest("respond taken out of KEPT", lambda m: m["KEPT"].remove("respond"),
-             [MF, "the manifest: respond in v2_kept, not in the manifest"])
-    manifest("on_frame, a name protocol-v2.md defines, added to KEPT", lambda m: m["KEPT"].append("on_frame"),
-             [MF, "the manifest: on_frame in the manifest, not in v2_kept"])
+             [MF, "the manifest: respond in seacast_kept, not in the manifest"])
+    manifest("on_frame, a name seacast.md defines, added to KEPT", lambda m: m["KEPT"].append("on_frame"),
+             [MF, "the manifest: on_frame in the manifest, not in seacast_kept"])
     files("one name of Manifest.lean changed", change(MF, '"respond"', '"respond2"'), [MF])
     manifest("announce twice in COVERED", lambda m: m["COVERED"].append("announce"),
              [MF, "the manifest: announce twice in COVERED"])
     manifest("announce in KEPT too", lambda m: m["KEPT"].append("announce"),
-             [MF, "the manifest: announce in both COVERED and KEPT", "the manifest: announce in the manifest, not in v2_kept"])
+             [MF, "the manifest: announce in both COVERED and KEPT", "the manifest: announce in the manifest, not in seacast_kept"])
     manifest("held, a key of NODE_OWN, in COVERED too", lambda m: m["COVERED"].append("held"),
              [MF, "the manifest: held, a key of NODE_OWN, in COVERED",
               "the manifest: held in COVERED, not a function of the documents"])
@@ -1387,7 +1387,7 @@ def controls(twin, work):
               "the manifest: held in QUESTIONS, not asked by the code"])
     manifest("own_interest taken out of QUESTIONS", lambda m: m["QUESTIONS"].remove("own_interest"),
              [MF, "the manifest: own_interest in QUESTIONS_UNLOADED, not in QUESTIONS"])
-    # QUESTIONS by the code (closure_v2.py's derive_questions): a name no code asks, a name the code asks left out,
+    # QUESTIONS by the code (closure_seacast.py's derive_questions): a name no code asks, a name the code asks left out,
     # and a name the code asks among QUESTIONS_UNLOADED
     manifest("never_asked added to QUESTIONS", lambda m: m["QUESTIONS"].append("never_asked"),
              [MF, "the manifest: never_asked in QUESTIONS, not asked by the code"])

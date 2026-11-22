@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §6.3's limit on the relations one link may carry, in §4.1's `on_graft`
+"""A known answer for seacast.md §6.3's limit on the relations one link may carry, in §4.1's `on_graft`
 (`relation_room`, `MAX_RELATIONS`): the pairs of family and colour a link has in any state (relations, the node's own
 GRAFTs not yet answered, backoffs not yet run out, and its GRAFTs and PRUNEs still owed) stay at most at the limit.
 Over it, a GRAFT for a new pair is ignored without an answer and without penalty, a PRUNE for one sets no backoff, and
@@ -60,7 +60,7 @@ def build(args):
 
 
 def main():
-    sim = build(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    sim = build(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     S = sim.nodes[2]
     ns = S.ns
     COL = ns["type_of"]("column")

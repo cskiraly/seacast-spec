@@ -1,6 +1,6 @@
 import SpecTwin.Readers
 
-/-! # The twin of protocol.md §5.2, "A node forwards" [c3, c7] (v0.10.4, spec 34f60f8): `announce`, `unpush`,
+/-! # The twin of seacast-lite.md §5.2, "A node forwards" [c3, c7] (v0.10.4, spec 34f60f8): `announce`, `unpush`,
 `owe` and `note_push`
 
 `forward`, the section's fifth function, is in Sec54.lean.

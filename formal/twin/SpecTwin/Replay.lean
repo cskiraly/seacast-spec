@@ -103,7 +103,7 @@ a read, with their values then; `cw`, the ones it wrote, with their values at it
 structure CallLog where
   cr : List (Cell × Option Val)
   cw : List (Cell × Option Val)
-  timers : List Note := []                -- the timers it armed, in order (protocol-v2.md only)
+  timers : List Note := []                -- the timers it armed, in order (seacast.md only)
   deriving Repr
 
 /-- One item of a record's tape: an entry, and, for a call that touched the twin's tables, what it did to them. -/
@@ -140,9 +140,9 @@ def cells (what : String) (j : Json) (f : Form := .v1) : Except String (List (Ce
   nodup what (l.map (·.1))
   return l
 
-/-- What an `enqueue` holds, its controls in the document's forms (`f`). Under protocol-v2.md an IWANT enqueued on
-its own is `protocol.md`'s (`retry_offer`, `ask_parked`), since v2's own IWANTs go through `send`. It is written in
-v2's form, unmarked and with plain asks, and is read into `.iwant`, the one constructor in that place; a marked
+/-- What an `enqueue` holds, its controls in the document's forms (`f`). Under seacast.md an IWANT enqueued on
+its own is `seacast-lite.md`'s (`retry_offer`, `ask_parked`), since SEACAST's own IWANTs go through `send`. It is written in
+SEACAST's form, unmarked and with plain asks, and is read into `.iwant`, the one constructor in that place; a marked
 IWANT or a flagged ask there is refused. An IDONTWANT of one bitmap has no v2 form here: no function a record
 under v2 names enqueues one. -/
 def msg (j : Json) (f : Form := .v1) : Except String Msg := do
@@ -152,14 +152,14 @@ def msg (j : Json) (f : Form := .v1) : Except String Msg := do
   | #[e] => match f, ← e.getArr? with
     | .v1, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
     | .v2, #[.str "iwant", asks, w] =>
-      if ← boolOf w then throw s!"an IWANT enqueued on its own is protocol.md's, unmarked: {j.compress}"
+      if ← boolOf w then throw s!"an IWANT enqueued on its own is seacast-lite.md's, unmarked: {j.compress}"
       let asks ← (← arr asks).mapM askV2Of
       if !asks.all fun a => !a.standing && a.hops == 0 && !a.probe then
-        throw s!"an IWANT enqueued on its own is protocol.md's, its asks plain: {j.compress}"
+        throw s!"an IWANT enqueued on its own is seacast-lite.md's, its asks plain: {j.compress}"
       return .iwant (asks.map (·.key))
-    | .v2, #[.str "iwant", _] => throw s!"under protocol-v2.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
+    | .v2, #[.str "iwant", _] => throw s!"under seacast.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
     | _, #[.str "idontwant", .arr #[h]] =>                -- one HAVE: a group's whole bitmap (§4.2)
-      match ← (if f == .v1 then ihaveEntry h else idontwantV2 h) with
+      match ← (if f == .v1 then ihaveEntry h else idontwantSeacast h) with
       | .bitmap g b => return .have g b
       | _ => throw s!"not an IDONTWANT of one bitmap: {j.compress}"
     | _, #[.str "ihave", .arr #[h]] => match ← ihaveEntry h with      -- announce's offer, one bitmap (§5.2)
@@ -285,11 +285,11 @@ def ownKeys (t : String) (path : Array Json) (ks : Json) : Except String Entry :
     return .owedKeys (← nat p) l
   | _, _ => throw s!"not a level whose order the twin asks: {t} {(Json.arr path).compress}"
 
-/-- What reading a record takes from its trace's document. The defaults are `protocol.md`'s; protocol-v2.md's replay
-passes its own (`V2/Replay.lean`).
+/-- What reading a record takes from its trace's document. The defaults are `seacast-lite.md`'s; seacast.md's replay
+passes its own (`Seacast/Replay.lean`).
 - `entry`: a reader of the document's own tape entries, asked first: `some` for an entry it reads, `none` to leave
   the entry to `entry`'s.
-- `raisesKey`: a `KeyError`'s key, as the twin's crash names it. Under `protocol.md` it is a peer, a natural
+- `raisesKey`: a `KeyError`'s key, as the twin's crash names it. Under `seacast-lite.md` it is a peer, a natural
   number.
 - `form`: the forms of its values that depend on the document, a lane's controls and a peer's holding. -/
 structure Doc where
@@ -369,7 +369,7 @@ def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
     | _, _ => throw s!"not a question of the block: {j.compress}"
 
 /-- A tape's item: an entry, and fourth and last, for a call that touched the twin's tables or armed a timer,
-`{"cr": [...], "cw": [...]}`, with `"timers": [note, ...]` where it armed one (protocol-v2.md only). A call's
+`{"cr": [...], "cw": [...]}`, with `"timers": [note, ...]` where it armed one (seacast.md only). A call's
 entry is its name, its arguments and its answer; the log is a fourth member, never the answer. -/
 def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
   let a ← j.getArr?
@@ -383,7 +383,7 @@ def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
     let timers ← match field o "timers" with
       | none => pure []
       | some t =>
-        if doc.form != .v2 then throw s!"timers under protocol.md, whose tracer writes none: {j.compress}"
+        if doc.form != .v2 then throw s!"timers under seacast-lite.md, whose tracer writes none: {j.compress}"
         notesOf t
     let cr ← cells "cr" cr doc.form
     let cw ← cells "cw" cw doc.form
@@ -480,23 +480,31 @@ def argsOf (hd : Json) : Except String (List String) :=
       | .str s => .ok s
       | _ => .error bad
 
-/-- The document a trace's arguments name, read from the words as the tracer reads them: `--doc D` or `--doc=D`,
-the first of them; none for protocol.md. -/
+/-- The values of `--doc` before v0.12.0, as the headers of traces written then hold them, each with the value that
+names the same document since: trace3.py's `OLD_DOCS`. -/
+def oldDocs : List (String × String) := [("v2", "seacast"), ("v03", "lite")]
+
+/-- A document word as v0.12.0 names it: an old value is read as its new one, any other word as it is. -/
+def docAlias (d : String) : String := (List.lookup d oldDocs).getD d
+
+/-- The document a trace's arguments name, read from the words as the tracer reads them (trace3.py's `doc_of`):
+`--doc D` or `--doc=D`, the first of them, with an old value read as its new one (`docAlias`); none for
+seacast-lite.md. `headerForm` and `rowReadsOf` both read a header's document here. -/
 def docOf : List String → Option String
-  | "--doc" :: d :: _ => some d
-  | a :: rest => if a.startsWith "--doc=" then some (a.drop 6).toString else docOf rest
+  | "--doc" :: d :: _ => some (docAlias d)
+  | a :: rest => if a.startsWith "--doc=" then some (docAlias (a.drop 6).toString) else docOf rest
   | [] => none
 
 /-- The tables that keep their rows: the only list a header's `row_reads` may give. -/
 def rowTables : List String := ["owed", "planned", "queue", "tied"]
 
 /-- The tables whose rows a trace's view logs as read where an access goes through them: the header's
-`row_reads`, or none where it has no such member. The member is protocol-v2.md's alone (the header's arguments
-name `--doc v2`), and it lists exactly `rowTables`, in that order. -/
+`row_reads`, or none where it has no such member. The member is seacast.md's alone (the header's arguments
+name `--doc seacast`), and it lists exactly `rowTables`, in that order. -/
 def rowReadsOf (hd : Json) : Except String (List String) := do
   let .ok j := hd.getObjVal? "row_reads" | return []
-  if docOf (← argsOf hd) != some "v2" then
-    throw "header: row_reads in a trace of protocol.md"
+  if docOf (← argsOf hd) != some "seacast" then
+    throw "header: row_reads in a trace of seacast-lite.md"
   if j != .arr (rowTables.map Json.str).toArray then
     throw s!"header: row_reads is not {(Json.arr (rowTables.map Json.str).toArray).compress}: {j.compress}"
   return rowTables
@@ -941,7 +949,7 @@ def reachedOk (traced : List String) (r : Record) (rs : RSt) : Except String Uni
 
 /-- The verdict on one replayed record, from the twin's run (its state and whether its return value is the toy's,
 or its error) and the replay's state after it: the branches taken and how many of the Python's reads the twin did
-not make, or the first difference. `run` and protocol-v2.md's `runV2` share it. -/
+not make, or the first difference. `run` and seacast.md's `runSeacast` share it. -/
 def judge (traced : List String) (r : Record) (res : Except String (State × Bool)) (rs : RSt) :
     Except String (Array String × Nat) := do
   match r.raises, res with
@@ -1048,7 +1056,7 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
       exec (withOwed (← nat p) (← qentry e f)) fun v => do
         return v == (← if r.ret == .null then pure none else some <$> qentry r.ret f)
     | "projected", #[p, .str g'] => do exec (projected (← nat p) (← group g')) fun v => return v == (← r.ret.getBool?)
-    | "rarest", #[p] => do exec (rarestOf (← nat p)) fun v => return v == (← retNat r.ret)   -- v2's choose calls it
+    | "rarest", #[p] => do exec (rarestOf (← nat p)) fun v => return v == (← retNat r.ret)   -- SEACAST's choose calls it
     -- §1's seven. K and N take what the caller read of `desc`: a descriptor, or null
     | "message_id", #[f] => do exec (messageId (← chunkIn form f)) fun v => return v == (← mid r.ret)   -- §2
     -- §6.4's paced gossip

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """A known answer for the toy's report of asks left unanswered (`Node.refused`, run.py's "asks left unanswered by
-the asked node"), for protocol-v2.md's marked probe (R5).
+the asked node"), for seacast.md's marked probe (R5).
 
     python3 refusal_report_known.py
 
 The claim rule (§4.5) leaves unanswered an ask of an index the asker's holding names, and the report counts it
 as "claimed". A marked probe of an index the node claims is answered whatever the asker holds, once per asker and
-group (`probe_of_claim`), so the report must not count it. On one node of a small rows run (protocol-v2.md, one
+group (`probe_of_claim`), so the report must not count it. On one node of a small rows run (seacast.md, one
 block, run to its end), for a row cell the node holds, each asker's holding made to name it:
 - a plain ask from peer 1 (the control): counted "claimed";
 - a marked probe from peer 3: not counted;
@@ -27,7 +27,7 @@ def main():
     from bits import Bits
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

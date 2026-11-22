@@ -2,7 +2,7 @@
 """A known answer for a HAVE bitmap's length (§2, §4.3, §8.2): a bitmap longer than `MAX_HAVE_BYTES` is malformed,
 whether or not its group's count is known.
 
-    python3 have_length_known.py        # protocol.md, then protocol-v2.md on top of it
+    python3 have_length_known.py        # seacast-lite.md, then seacast.md on top of it
 
 §2 sends a group's bitmap as `ByteList[MAX_HAVE_BYTES]`, 1024 bytes, index i in bit i, trailing zero bytes dropped:
 it names indices below 8192 and no other. §8.2 holds a HAVE, and an IHAVE's bitmap (§4.4), to that length, and to
@@ -31,7 +31,7 @@ def check(doc):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     nd = got["sim"].nodes[NODE]
     ns = nd.ns
     ns["desc"][G2] = type("Descriptor", (), {"count": 4})()         # a group whose count is known: 4 chunks
@@ -63,7 +63,7 @@ def check(doc):
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         print(f"--doc {doc}:")
         bad += check(doc)
     print("ok" if not bad else "FAIL")

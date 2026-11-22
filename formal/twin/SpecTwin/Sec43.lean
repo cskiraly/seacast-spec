@@ -2,7 +2,7 @@ import SpecTwin.Readers
 import SpecTwin.Sec51
 import SpecTwin.Sec71
 
-/-! # The twin of protocol.md §4.3, "A HAVE arrives in an IDONTWANT" [c7] (v0.10.4, spec 34f60f8): `on_have`
+/-! # The twin of seacast-lite.md §4.3, "A HAVE arrives in an IDONTWANT" [c7] (v0.10.4, spec 34f60f8): `on_have`
 
 - **`peer_has` and `holders` are the twin's own tables,** since on_have writes them. `peer_has[p][g]` is an
   entry of bits and a ttl, there from p's first HAVE for g, an empty one too. The writer's reads (§7.2) are of the

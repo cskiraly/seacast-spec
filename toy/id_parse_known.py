@@ -2,7 +2,7 @@
 """A known answer for what an ask by id names (§2, §4.5, §8.1): a group and an index only if it is a chunk's
 structured id, of exactly 56 bytes.
 
-    python3 id_parse_known.py           # protocol.md, then protocol-v2.md on top of it
+    python3 id_parse_known.py           # seacast-lite.md, then seacast.md on top of it
 
 A chunk's id is structured: the group's 32 bytes, the index as uint32 little-endian, and a 20-byte content id,
 "32 + 4 + 20 bytes" (§2); §4.4's `valid_id` takes nothing else for one. §8.1's `group_index` gives the group and
@@ -32,7 +32,7 @@ def check(doc):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "65536", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"])
     sim.publish(1)
@@ -72,7 +72,7 @@ def check(doc):
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         print(f"--doc {doc}:")
         bad += check(doc)
     print("ok" if not bad else "FAIL")

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""The kept copies' check: each function of `SpecTwin/V2/Kept.lean` is its original in protocol.md's Lean, with the
+"""The kept copies' check: each function of `SpecTwin/Seacast/Kept.lean` is its original in seacast-lite.md's Lean, with the
 named differences alone.
 
-Under protocol-v2.md the Python runs `on_pace_tick` and `on_block_installed` as protocol.md writes them, and they
-call v2's `send_gossip` and `on_validated`, since the Python binds a name when it calls it. The twin binds a name
-when the function is defined, so `V2/Kept.lean` holds a copy of each, written in v2's monad and calling v2's
-functions. It also holds a copy of `respond`, whose IWANT a record under v2 writes in v2's form, so that the copy
-builds v2's constructor. This check keeps each copy from drifting from its original.
+Under seacast.md the Python runs `on_pace_tick` and `on_block_installed` as seacast-lite.md writes them, and they
+call SEACAST's `send_gossip` and `on_validated`, since the Python binds a name when it calls it. The twin binds a name
+when the function is defined, so `Seacast/Kept.lean` holds a copy of each, written in SEACAST's monad and calling SEACAST's
+functions. It also holds a copy of `respond`, whose IWANT a record under v2 writes in SEACAST's form, so that the copy
+builds SEACAST's constructor. This check keeps each copy from drifting from its original.
 
     python3 keptcopy.py [--twin DIR]     the check: one line per function, then a closing line; exit 0 or 1
     python3 keptcopy.py --self-test      its own cases: each must give the verdict it states
@@ -23,14 +23,14 @@ import sys
 from pathlib import Path
 
 TWIN = Path(__file__).resolve().parent.parent
-COPY = "SpecTwin/V2/Kept.lean"
+COPY = "SpecTwin/Seacast/Kept.lean"
 
 M2 = "the monad: M2"
-V1 = "a function of protocol.md's Lean, through v1"
-LATE = "a call the Python binds late: v2's function"
-IWANT = "the IWANT it builds: v2's, unmarked, its asks plain"
+V1 = "a function of seacast-lite.md's Lean, through v1"
+LATE = "a call the Python binds late: SEACAST's function"
+IWANT = "the IWANT it builds: SEACAST's, unmarked, its asks plain"
 
-# the no-bid branch of on_block_installed: today's, never reached under protocol.md, and v2's, which enters ledger
+# the no-bid branch of on_block_installed: today's, never reached under seacast-lite.md, and SEACAST's, which enters ledger
 NOBID_OLD = """\
   | none =>                                                 -- a block of columns: `ledger(None)` reads `offered`
     let _ ← connectedTopicPeers                             --   under a group no table has, and finds nothing.
@@ -47,18 +47,18 @@ NOBID_NEW = """\
 FUNCTIONS = {
     "paceTurns": ("SpecTwin/Sec64.lean", [
         (M2, "def paceTurns : Nat → M m Unit", "def paceTurns : Nat → M2 m Unit", 1),
-        ("the context: protocol.md's, as v2's base", "      let ctx ← read\n", "      let ctx := (← read).base\n", 1),
-        (LATE, "        sendGossip job.q job.ids", "        V2.sendGossip job.q job.ids", 1),
+        ("the context: seacast-lite.md's, as SEACAST's base", "      let ctx ← read\n", "      let ctx := (← read).base\n", 1),
+        (LATE, "        sendGossip job.q job.ids", "        Seacast.sendGossip job.q job.ids", 1),
     ]),
     "onPaceTick": ("SpecTwin/Sec64.lean", [
         (M2, "def onPaceTick : M m Unit", "def onPaceTick : M2 m Unit", 1),
-        (LATE, "  paceTurns (← paceJobs .jobs).length", "  V2.paceTurns (← paceJobs .jobs).length", 1),
+        (LATE, "  paceTurns (← paceJobs .jobs).length", "  Seacast.paceTurns (← paceJobs .jobs).length", 1),
     ]),
     "onBlockInstalled": ("SpecTwin/Sec42.lean", [
         (M2, "def onBlockInstalled (root : Root) : M m Unit", "def onBlockInstalled (root : Root) : M2 m Unit", 1),
         (V1, "(← messageId f)", "(← v1 (messageId f))", 1),
-        (LATE + " (v2's on_validated takes no fuel)", "onValidated deferDepth p f (← validateChunk f)",
-         "V2.onValidated p f (← v1 (validateChunk f))", 1),
+        (LATE + " (SEACAST's on_validated takes no fuel)", "onValidated deferDepth p f (← validateChunk f)",
+         "Seacast.onValidated p f (← v1 (validateChunk f))", 1),
         (V1, "← popTiedRoot root", "← v1 (popTiedRoot root)", 1),
         (V1, "        dropTie p g bits ", "        v1 (dropTie p g bits) ", 1),
         (V1, "← N (← desc g)", "← v1 (N (← desc g))", 1),
@@ -73,7 +73,7 @@ FUNCTIONS = {
         (IWANT,
          "  let control : Option (List Ctl) := if !asks.isEmpty || prunes > 0 then some [.iwant asks, .prune] else none\n",
          "  let control : Option (List Ctl) :=\n"
-         "    if !asks.isEmpty || prunes > 0 then some [.iwantV2 false (asks.map fun k => { key := k }), .prune] else none\n",
+         "    if !asks.isEmpty || prunes > 0 then some [.iwantSeacast false (asks.map fun k => { key := k }), .prune] else none\n",
          1),
     ]),
 }

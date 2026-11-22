@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """Runtime monitors on the spec's own code: the model's safety properties, checked on the toy (which
-executes ../protocol.md) in check.py's 60-node cells, each property at its own moment (below).
+executes ../seacast-lite.md) in check.py's 60-node cells, each property at its own moment (below).
 
     python3 -I formal/toy/monitor.py [--seeds 7,8,9] [--cells push,withholders,...] [-j 8] [--break askfilter]
 
 It exits 0 when no property is violated, or, with --break, when the broken rule is caught; 1 otherwise,
-and 1 when a cell's run fails (a break that no longer matches protocol.md's text among them).
+and 1 when a cell's run fails (a break that no longer matches seacast-lite.md's text among them).
 
 Checked, as in formal/diffusion.qnt:
 - W1 window: in_flight equals the writers holding a slot plus the chunks in `sent`, and is at most W
@@ -54,7 +54,7 @@ src = NODE.SPEC_SRC
 for pat, new, _ in PATCHES:
     src, n = re.subn(pat, lambda _m: new, src, count=0, flags=re.M)
     assert n == 1, f"{n} matches: {pat[:60]}"
-NODE.SPEC = compile(src, "protocol.md (extracted, monitored)", "exec")
+NODE.SPEC = compile(src, "seacast-lite.md (extracted, monitored)", "exec")
 import sim as S
 import run as R
 V = collections.Counter(); EX = {}

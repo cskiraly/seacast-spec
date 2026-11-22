@@ -2,7 +2,7 @@
 """A known answer for §4.1's rule on an IDONTWANT entry that is not a HAVE bitmap: it is a stock message id, kept
 in `unwanted[p]` as stock gossipsub keeps it, and not read as a HAVE.
 
-    python3 idontwant_id_known.py [--doc v2]
+    python3 idontwant_id_known.py [--doc seacast]
 
 An IDONTWANT names no topic, so beside the HAVE bitmaps (§2, a string opening with MAGIC "HAVE" and VERSION, and
 holding a group after them) its entries can be stock message ids, another topic's say. `on_frame` hands a bitmap
@@ -17,9 +17,9 @@ the peer holds. On the document before the rule, the stock id went to `on_have`,
 check fails there. The toy tells a bitmap by its type (`wire.is_have_bitmap`), so this does not test the
 document's test of the string's first bytes and length.
 
-With `--doc v2`, the same frame reaches `protocol-v2.md` on the gossipsub binding (`protocol-v2-bindings.md` §4): the toy
-reads the frame as v2's messages, a bitmap in an IDONTWANT as a holding (`on_holding`, v2's §4.3) and any other
-entry as a stock id in `unwanted[p]`, which v2's `on_want` reads (§4.5). Before the binding said so, the toy left
+With `--doc seacast`, the same frame reaches `seacast.md` on the gossipsub binding (`seacast-bindings.md` §4): the toy
+reads the frame as SEACAST's messages, a bitmap in an IDONTWANT as a holding (`on_holding`, SEACAST's §4.3) and any other
+entry as a stock id in `unwanted[p]`, which SEACAST's `on_want` reads (§4.5). Before the binding said so, the toy left
 the stock id out of `unwanted[p]`: the check fails there.
 """
 import sys
@@ -28,8 +28,8 @@ from pathlib import Path
 SEED, NODE, PEER = 7, 2, 1
 G = bytes([0x35]) * 32                              # a group no block commits
 STOCK_ID = bytes([0x22]) * 20                       # a stock message id, another topic's
-V2 = sys.argv[1:] == ["--doc", "v2"]
-RULE = "protocol-v2-bindings.md §4" if V2 else "§4.1"
+SEACAST = sys.argv[1:] == ["--doc", "seacast"]
+RULE = "seacast-bindings.md §4" if SEACAST else "§4.1"
 
 
 def main():
@@ -41,7 +41,7 @@ def main():
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED)]
-             + (["--doc", "v2"] if V2 else []))
+             + (["--doc", "seacast"] if SEACAST else []))
     node = got["sim"].nodes[NODE]
     ns = node.ns
 

@@ -1,6 +1,6 @@
 import SpecTwin.Readers
 
-/-! # The twin of protocol.md §5.3, "Whom to push to: furthest behind first" [c16] (v0.10.4, spec 34f60f8):
+/-! # The twin of seacast-lite.md §5.3, "Whom to push to: furthest behind first" [c16] (v0.10.4, spec 34f60f8):
 `choose_push` and `guard_fails`
 
 - **The push order's keys are questions:** for each candidate, in the candidates' order, the node

@@ -63,7 +63,7 @@ keeps the sender outstanding through its promise (`ka_expiry_keeps_promise`). F1
 `drop_offer` (§6.1: dropped offers take their ask with them), has both parts: where a peer's offers
 of an index are dropped, by `drop_tie` or by their expiry, its queued asks of it go (`dropAsks`)
 and its promise for it closes (`dropPromises`). **Under level 1 by group** (`byGroup`:
-a candidate rule, off for the spec's rules; one of the options `protocol.md` §4.6 lists for
+a candidate rule, off for the spec's rules; one of the options `seacast-lite.md` §4.6 lists for
 relabelled copies, F12, which it leaves open): a copy passes level 1 against either block, so the
 first installation of either is the node's installation (the `install` actions), a copy waits only
 before it, whatever root it names, and it releases every tie; the other block's gate alone does not
@@ -87,7 +87,7 @@ The rest of this header is `NoStallEquiv.lean`'s. -/
 
 /-! # No stall under equivocation, the asking part (F6), for any number of nodes
 
-SEACAST, `protocol.md` v0.7 (§3, §4.1, §4.2, §4.4, §4.5, §6.1, §6.4, §7.2), with the two rules
+SEACAST, `seacast-lite.md` v0.7 (§3, §4.1, §4.2, §4.4, §4.5, §6.1, §6.4, §7.2), with the two rules
 for F6 that v0.8 adds (`../README.md`, F6): **when the asking machinery has nothing left to do, a node
 that has installed the builder's block holds every chunk an honest peer offered it, or has stopped
 pulling the group, also when it installed the proposer's other block first.** The chunk is any one
@@ -135,7 +135,7 @@ that copy waits for good, and its sender, which counted it, sends nothing more f
 v0.8's §4.6 has a rebuilt chunk name the block the chunks it was rebuilt from name, where they all
 name one: the source publishes under one block, and forwarding and the rule keep it, so among
 honest nodes every copy names it, while no node relabels a chunk under the other block's root
-(`protocol.md` §4.6, open: honest nodes forward such a copy and rebuild from it). That argument is
+(`seacast-lite.md` §4.6, open: honest nodes forward such a copy and rebuild from it). That argument is
 by inspection, not in this model.
 
 Not modelled here: how offers come about (the transport), lifetimes, adversaries (so every tie is
@@ -174,7 +174,7 @@ immutable individual countsReset : Bool
 -- `drop_tie`, or their expiry), its queued asks of it go, and its promise for it closes
 immutable individual dropAsks : Bool
 immutable individual dropPromises : Bool
--- level 1 by group, a candidate rule for F12 (`protocol.md` §4.6's relabelled copies, open), off for
+-- level 1 by group, a candidate rule for F12 (`seacast-lite.md` §4.6's relabelled copies, open), off for
 -- the spec's rules: a copy passes level 1 against either block, so the first installation of either
 -- is the node's installation, and the other block's gate alone (`installOther`) does not arise
 immutable individual byGroup : Bool
@@ -845,7 +845,7 @@ announcer parked only at the one state between the close and the new offer; enab
 it is not forced by weak fairness, and the last resort never arms. The loop's four steps lead from
 a state `f14` back to one; the assertions say which of the honest nodes' machinery events are
 pending at each of the loop's states, so the run that repeats the loop is weakly fair, by
-inspection. F14 is open: `protocol.md` §6.1 names it ("an announcer that is never parked holds the
+inspection. F14 is open: `seacast-lite.md` §6.1 names it ("an announcer that is never parked holds the
 last resort off") and does not address it. -/
 
 -- the three roles, in an instance of three nodes

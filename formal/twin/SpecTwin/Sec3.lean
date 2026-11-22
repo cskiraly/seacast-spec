@@ -1,6 +1,6 @@
 import SpecTwin.Sec1
 
-/-! # The twin of protocol.md §3, "Validation: three levels, and what each gates" [c1, c6, c10] (v0.10.4, spec
+/-! # The twin of seacast-lite.md §3, "Validation: three levels, and what each gates" [c1, c6, c10] (v0.10.4, spec
 34f60f8): level 1, `validate_chunk` and `committed_descriptor`
 
 - **A chunk is wide where level 1 reads it:** its descriptor, its proof and its data, a blob. A chunk without

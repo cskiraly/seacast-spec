@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Directed records for §3's level 1, validate_chunk and committed_descriptor (protocol.md §3). The
+"""Directed records for §3's level 1, validate_chunk and committed_descriptor (seacast-lite.md §3). The
 toy's own functions are called in two toy nodes' namespaces on generated chunks and blocks, and trace3.py's tracer
 logs each call with the node's whole state.
 
@@ -155,7 +155,7 @@ def main(argv):
         sc.proof_ok = rng.random() < 0.9
         f = Chunk(slot=slot, beacon_block_root=root, group=group, descriptor=d, index=index,
                   proof=[rng.randbytes(32) for _ in range(rng.randrange(0, 4))], data=Wm.Blob(max(0, n), ("d", rng.randrange(8))))
-        # a design B chunk in its wire shape has no descriptor field (protocol.md §2: "design A only"): half of
+        # a design B chunk in its wire shape has no descriptor field (seacast-lite.md §2: "design A only"): half of
         # node 3's chunks. And now and then a design A chunk without one, where the document's `f.descriptor` raises
         if (nd is nodes[3][0] and rng.random() < 0.5) or (nd is nodes[2][0] and rng.random() < 0.03):
             del f.descriptor

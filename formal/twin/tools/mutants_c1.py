@@ -14,9 +14,9 @@ import sys
 SEC1, SEC2, SEC3 = "SpecTwin/Sec1.lean", "SpecTwin/Sec2.lean", "SpecTwin/Sec3.lean"
 SEC41, SEC42, SEC43 = "SpecTwin/Sec41.lean", "SpecTwin/Sec42.lean", "SpecTwin/Sec43.lean"
 SEC46, SEC64, TABLES = "SpecTwin/Sec46.lean", "SpecTwin/Sec64.lean", "SpecTwin/Tables.lean"
-# on_frame's IDONTWANT match ends with v2's holding entry, a crash in v1's on_frame; a mutant that moves the
+# on_frame's IDONTWANT match ends with SEACAST's holding entry, a crash in v1's on_frame; a mutant that moves the
 # match moves this arm with it
-HOLDING_ARM = "    | .holding .. => crash \"twin: a v2 holding reached protocol.md's on_frame, which v2 redefines (D1)\"\n"
+HOLDING_ARM = "    | .holding .. => crash \"twin: a v2 holding reached seacast-lite.md's on_frame, which v2 redefines (D1)\"\n"
 
 # ---- §1 and §2's message_id
 E = [

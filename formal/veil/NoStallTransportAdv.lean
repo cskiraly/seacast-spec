@@ -45,7 +45,7 @@ chunk, and the chunk is not acknowledged yet**, whatever the adversaries did.
 
 The rest of this header is `NoStallTransport.lean`'s.
 
-SEACAST, `protocol.md` v0.7 (§3, §4.2, §4.4, §4.6, §5, §7.2, §8.1), with F9's rule, §5.4 since v0.8,
+SEACAST, `seacast-lite.md` v0.7 (§3, §4.2, §4.4, §4.6, §5, §7.2, §8.1), with F9's rule, §5.4 since v0.8,
 and the source's announcement at the acknowledgement, §5.1 since v0.9, as a setting (below):
 **when the transport has nothing left to do, a node that has its block holds every chunk a mesh
 neighbour received, or has stopped pulling the group, or holds that neighbour's offer of the
@@ -124,7 +124,7 @@ on is `ACK`, the default since v0.9; off is `PUBLISH`, the source's other choice
   acknowledgement. Like forwarding at any node, it may push or announce to either.
 - **With adversaries,** an adversary's HAVE, true or not, acknowledges the chunk as any HAVE does.
 
-Where no acknowledgement comes, `protocol.md` §5.1's open item, a mesh peer of the source holds
+Where no acknowledgement comes, `seacast-lite.md` §5.1's open item, a mesh peer of the source holds
 neither the chunk nor its offer when the transport is done (`ka_never_acknowledged`). So at `ACK`
 the per-link step holds for the source's links once the chunk is acknowledged.
 
@@ -999,7 +999,7 @@ sat trace [ack_by_timeout] {
     ∃ M N, source M ∧ ¬ adv N ∧ ¬ planned N ∧ installed N ∧ offered N M)
 }
 
--- `protocol.md` §5.1's open item, a chunk never acknowledged: the source's one push, to the peer it
+-- `seacast-lite.md` §5.1's open item, a chunk never acknowledged: the source's one push, to the peer it
 -- chose, is lost with its connection before a HAVE or a timeout, either written and in flight or
 -- skipped by projection with its offer owed. The close leaves the same state either way; the solver's
 -- witness is the second. The source's other mesh peer, honest and with its block, holds neither the

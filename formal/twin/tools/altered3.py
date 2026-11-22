@@ -2,13 +2,13 @@
 """Controls that must fail: the hand-counted trace with one field altered, replayed through the twin; each must give
 one mismatch, at the altered record, for the reason the alteration is for.
 
-    python3 altered3.py TRACE61 WORKDIR DIRECTED HAND DIRECTED44 [DIRECTED42 [V2 [DIRECTED4B [DIRECTED7]]]]
+    python3 altered3.py TRACE61 WORKDIR DIRECTED HAND DIRECTED44 [DIRECTED42 [SEACAST [DIRECTED4B [DIRECTED7]]]]
 
 TRACE61 is the 5-node hand-counted cell's trace with §6.1's twelve traced alone (TRACE3_ONLY=sec61): its six
 records are add_offer, parked, outstanding, may_ask, retry_offer, promise_due. HAND is the same cell traced whole:
 its one on_ihave record that reaches §6.1's functions is altered too. DIRECTED and DIRECTED44 are §6.1's directed
-records and directed44.py's, which hold the whole state. V2 is a cell's trace under --doc v2: its header and one of
-its records (`v2_controls`).
+records and directed44.py's, which hold the whole state. SEACAST is a cell's trace under --doc seacast: its header and one of
+its records (`seacast_controls`).
 
 - Alterations of what a record says happened: a return value, a tape, a write's value, a write removed or added.
   The replay compares the state before the tables' notes, so these fail as "return value", "tape" or "post".
@@ -645,7 +645,7 @@ def main(argv):
     pbad = shuffled_controls(directed44, work, head)
     vbad = v010_controls(directed44, work, head)
     fbad = format5_controls(Path(argv[5]), work, head) if len(argv) > 5 else 0
-    v2bad = v2_controls(Path(argv[6]), work, head) if len(argv) > 6 else 0
+    v2bad = seacast_controls(Path(argv[6]), work, head) if len(argv) > 6 else 0
     dbad = deferral_controls(Path(argv[7]), Path(argv[5]), work, head) if len(argv) > 7 else 0
     dbad += writer_controls(Path(argv[8]), work, head) if len(argv) > 8 else 0
     dbad += nodes_controls(Path(argv[8]), work, head) if len(argv) > 8 else 0
@@ -727,18 +727,18 @@ def queue_controls(hand, work, head):
     }, work, head, "queue")
 
 
-def v2_header_controls(v2trace, work):
-    """header3.py on a cell's header under --doc v2, each with the outcome written before it first ran: it passes as
-    v2's kept, and as §6.1's twelve alone (TRACE3_ONLY=sec61 under --doc v2); it is refused with on_ihave among its
-    traced (on_ihave calls gated, which v2 redefines), with gated among them (v2 redefines it), with the whole block,
-    with v2's kept less a name, with --doc v2 gone from its args (v2's kept is a kind only for a trace run so, and the
-    tables and row_reads are a v2 trace's), and with protocol.md's own tables as its own (a v2 trace's are the
-    manifest's, protocol.md's and v2's); and its envelope's cases, as the hand cell's in header3_controls. Each
+def seacast_header_controls(v2trace, work):
+    """header3.py on a cell's header under --doc seacast, each with the outcome written before it first ran: it passes as
+    SEACAST's kept, and as §6.1's twelve alone (TRACE3_ONLY=sec61 under --doc seacast); it is refused with on_ihave among its
+    traced (on_ihave calls gated, which SEACAST redefines), with gated among them (SEACAST redefines it), with the whole block,
+    with SEACAST's kept less a name, with --doc seacast gone from its args (SEACAST's kept is a kind only for a trace run so, and the
+    tables and row_reads are a SEACAST trace's), and with seacast-lite.md's own tables as its own (a SEACAST trace's are the
+    manifest's, seacast-lite.md's and SEACAST's); and its envelope's cases, as the hand cell's in header3_controls. Each
     refusal is for the reasons named, in their order, each by the words it starts with. No replay."""
     toy = layout.toy()
     hdr = load(v2trace)[0]
     h = hdr["header"]
-    assert header3.trace3.doc_of(h["args"]) == "v2", "V2 is not a trace run with --doc v2"
+    assert header3.trace3.doc_of(h["args"]) == "seacast", "SEACAST is not a trace run with --doc seacast"
 
     def variant(**change):
         out = copy.deepcopy(hdr)
@@ -747,19 +747,19 @@ def v2_header_controls(v2trace, work):
 
     args = list(h["args"])
     k = args.index("--doc")
-    # the reasons of a v2 trace read as protocol.md's: its traced, its tables where they differ, its row_reads
-    lost = (["traced: ", "own: "] + (["foreign: "] if list(header3.trace3.FOREIGN) != list(header3.manifest_v2.FOREIGN)
+    # the reasons of a SEACAST trace read as seacast-lite.md's: its traced, its tables where they differ, its row_reads
+    lost = (["traced: ", "own: "] + (["foreign: "] if list(header3.trace3.FOREIGN) != list(header3.manifest_seacast.FOREIGN)
                                      else []) + ["row_reads: "])
     text = dump(hdr)
     hcases = {  # name -> (the header line, whether it must pass, the words its reasons start with where it must not)
-        "a v2 cell's header, v2's kept": (hdr, True, None),
+        "a SEACAST cell's header, SEACAST's kept": (hdr, True, None),
         "with §6.1's twelve alone as its traced": (variant(traced=sorted(header3.trace3.SEC61)), True, None),
         "with on_ihave among its traced": (variant(traced=sorted(h["traced"] + ["on_ihave"])), False, ["traced: "]),
         "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False, ["traced: "]),
         "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False, ["traced: "]),
-        "with v2's kept less its first name as its traced": (variant(traced=h["traced"][1:]), False, ["traced: "]),
-        "v2's kept, from a trace not run with --doc v2": (variant(args=args[:k] + args[k + 2:]), False, lost),
-        "with protocol.md's own as its own": (variant(own=list(header3.trace3.OWN)), False, ["own: "]),
+        "with SEACAST's kept less its first name as its traced": (variant(traced=h["traced"][1:]), False, ["traced: "]),
+        "SEACAST's kept, from a trace not run with --doc seacast": (variant(args=args[:k] + args[k + 2:]), False, lost),
+        "with seacast-lite.md's own as its own": (variant(own=list(header3.trace3.OWN)), False, ["own: "]),
         # the envelope
         "with format twice": (text.replace('"format":7', '"format":3,"format":7', 1), False,
                               ["the second line holds a member twice: format"]),
@@ -769,61 +769,61 @@ def v2_header_controls(v2trace, work):
                                                           ["header: a member trace3.py does not write: zz"]),
         "with args null": (variant(args=None), False, ["args: not a list of words"] + lost),
         "with args [42]": (variant(args=[42]), False, ["args: not a list of words"] + lost),
-        "with --doc v3 for --doc v2": (variant(args=args[:k + 1] + ["v3"] + args[k + 2:]), False,
+        "with --doc v3 for --doc seacast": (variant(args=args[:k + 1] + ["v3"] + args[k + 2:]), False,
                                        ["args: a document trace3.py does not write: v3"] + lost),
     }
-    assert text.count('"format":7') == 1, "the v2 header's format is not written once as 7"
+    assert text.count('"format":7') == 1, "the SEACAST header's format is not written once as 7"
     bad = 0
     for name, (hl, must, words) in hcases.items():
-        f = work / f"v2-header3-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
+        f = work / f"seacast-header3-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
         write(f, [hl])
         why = header3.check(toy, f)
         ok = (not why) == must and (must or (len(why) == len(words) and
                                              all(w.startswith(p) for w, p in zip(why, words))))
         bad += not ok
-        print(f"v2, header3, {name}: {'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, "
+        print(f"SEACAST, header3, {name}: {'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, "
               f"must {'pass' if must else 'be refused'}{'' if ok else '  <-- FAIL'}")
     return bad
 
 
 def own_controls(hand_hdr, work):
-    """header3.py on the hand cell's header (protocol.md) with protocol-v2.md's manifest's own tables as its own:
-    refused, for its one reason, the tables; a trace not run with --doc v2 has trace3.py's own. With
-    v2_header_controls' case of the other way round, the two that tell the header's tables by the trace's
+    """header3.py on the hand cell's header (seacast-lite.md) with seacast.md's manifest's own tables as its own:
+    refused, for its one reason, the tables; a trace not run with --doc seacast has trace3.py's own. With
+    seacast_header_controls' case of the other way round, the two that tell the header's tables by the trace's
     document. No replay."""
     toy = layout.toy()
     out = copy.deepcopy(hand_hdr)
-    out["header"]["own"] = list(header3.manifest_v2.OWN)
+    out["header"]["own"] = list(header3.manifest_seacast.OWN)
     f = work / "header3-hand-manifest-own.jsonl"
     write(f, [out])
     why = header3.check(toy, f)
     ok = len(why) == 1 and why[0].startswith("own: ")
-    print(f"protocol.md, header3, the hand cell's header with the manifest's own: "
+    print(f"seacast-lite.md, header3, the hand cell's header with the manifest's own: "
           f"{'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, must be refused{'' if ok else '  <-- FAIL'}")
     print("ok: every control of the headers' own tables as it must be" if ok else
           "1 control of the headers' own tables wrong")
     return 0 if ok else 1
 
 
-def v2_controls(v2trace, work, head):
-    """The controls of a cell's trace under --doc v2, each with the outcome written before it first ran:
-    - header3.py's on its header (v2_header_controls);
+def seacast_controls(v2trace, work, head):
+    """The controls of a cell's trace under --doc seacast, each with the outcome written before it first ran:
+    - header3.py's on its header (seacast_header_controls);
     - its first record that reaches may_ask with no ask in flight (a read of asked_at as None), alone, replays; with
       that read as now (an ask in flight) it fails at that record ("tape": may_ask answers no, and the twin stops
-      asking where the Python's tape goes on). Under v2, may_ask runs inside its covered caller's record (on_offer's
+      asking where the Python's tape goes on). Under SEACAST, may_ask runs inside its covered caller's record (on_offer's
       in hand5), so it has no record of its own.
-    A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-v2)."""
+    A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-seacast)."""
     def unasked(d):                     # the index of its read of asked_at as None, or None
         return next((j for j, x in enumerate(d["reads"]) if x[0] == "asked_at" and x[2] is None), None)
     hdr, consts, rec = first(v2trace, lambda d: "may_ask" in (d.get("reached") or []) and "raises" not in d
                              and unasked(d) is not None)
-    bad = v2_header_controls(v2trace, work)
+    bad = seacast_header_controls(v2trace, work)
     now = copy.deepcopy(rec)
     now["reads"][unasked(rec)][2] = rec["t"]
-    bad += check("v2", {
-        f"a {rec['fn']} record of a v2 cell that reaches may_ask, alone": (alone(hdr, consts, rec), 0, None),
+    bad += check("seacast", {
+        f"a {rec['fn']} record of a SEACAST cell that reaches may_ask, alone": (alone(hdr, consts, rec), 0, None),
         "the same, its read of asked_at as now": (alone(hdr, consts, now), 1, "]: tape"),
-    }, work, head, "v2")
+    }, work, head, "seacast")
     return bad + row_reads_controls(v2trace, work, head)
 
 
@@ -841,17 +841,17 @@ def passed_rows(r):
 
 def row_reads_controls(v2trace, work, head):
     """The header's `row_reads`: the twin reads a row on the way down as the Python's read only where the header
-    names its table, and a v2 trace's view logs those reads. On the first record of the V2 trace with a row read
+    names its table, and a SEACAST trace's view logs those reads. On the first record of the SEACAST trace with a row read
     that only such an access makes (`passed_rows`), each with the outcome written before it first ran:
     - alone, as written: it replays, and every read of the Python's is the twin's;
     - the member taken out (the twin's mode off): it replays, and the rows are reads the twin did not make (a
       count above 0, which the replays step refuses);
     - those rows moved from its reads to its rest (the leaf-only view, where a row above an entry is observed): it
       fails, the twin reading a row the Python did not;
-    - the member with another list, and the member in a trace not run with --doc v2: refused by the header."""
+    - the member with another list, and the member in a trace not run with --doc seacast: refused by the header."""
     hdr, consts, rec = first(v2trace, lambda d: bool(passed_rows(d)) and "raises" not in d)
     h = hdr["header"]
-    assert h.get("row_reads") == list(ROW_DEPTH), "V2's header does not name the four tables in row_reads"
+    assert h.get("row_reads") == list(ROW_DEPTH), "SEACAST's header does not name the four tables in row_reads"
     rows = passed_rows(rec)
 
     def variant(drop=False, **change):
@@ -878,18 +878,18 @@ def row_reads_controls(v2trace, work, head):
         "the same, row_reads naming tied alone": (
             alone(variant(row_reads=["tied"]), consts, rec), 1, None,
             'header: row_reads is not ["owed","planned","queue","tied"]: ["tied"]'),
-        "the same, row_reads in a trace not run with --doc v2": (
+        "the same, row_reads in a trace not run with --doc seacast": (
             alone(variant(args=args[:k] + args[k + 2:]), consts, rec), 1, None,
-            "header: row_reads in a trace of protocol.md"),
+            "header: row_reads in a trace of seacast-lite.md"),
     }
     for name, (ls, want, fewer_ok, why) in cases.items():
-        f = work / f"v2-rowreads-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
+        f = work / f"SEACAST-rowreads-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
         write(f, ls)
         rc, m, ex, fewer, out, _ = run(f, "--content", head)
         said = why is None or why in out
         ok = rc == want and said and (fewer_ok is None or (fewer is not None and fewer_ok(fewer)))
         bad += not ok
-        print(f"v2, row_reads, {name}: replay rc={rc}, must be {want}; reads not made {fewer}"
+        print(f"SEACAST, row_reads, {name}: replay rc={rc}, must be {want}; reads not made {fewer}"
               f"{'' if why is None else ('; says: ' if said else '; does NOT say: ') + why}{'' if ok else '  <-- FAIL'}")
     print("ok: every control of row_reads as it must be" if not bad else f"{bad} controls of row_reads wrong")
     return bad
@@ -2534,13 +2534,13 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
     assert ov["args"][0][4] is None and ov["args"][0][1] == 2 ** 32 and not ov["tape"]
     within = copy.deepcopy(ov)
     within["args"][0][1] = 2 ** 32 - 1                          # the last index a uint32 holds
-    # the third: a v2 cell's record with its node said to have replaced a name the header does not trace, picked by a
+    # the third: a SEACAST cell's record with its node said to have replaced a name the header does not trace, picked by a
     # rule: the first, sorted, of the manifest's replaceable names outside the header's traced. A replaceable name,
     # so that the nodes line's check of the header's traced refuses it, not the check before it (a replaced name the
     # twin has no question for)
     hdr2, nodes2, r2 = first(v2trace, lambda d: "raises" not in d)
-    outside = sorted(set(header3.manifest_v2.REPLACEABLE) - set(hdr2["header"]["traced"]))
-    assert outside, "no replaceable name outside v2's traced"
+    outside = sorted(set(header3.manifest_seacast.REPLACEABLE) - set(hdr2["header"]["traced"]))
+    assert outside, "no replaceable name outside SEACAST's traced"
     name2 = outside[0]
     own2 = node_of(nodes2, r2)
     untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {name2})}]}
@@ -2553,7 +2553,7 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
         "that chunk given a descriptor": (alone(hdr, nodes, given), 1, "the Python raises AttributeError"),
         "message_id of an index beyond a uint32 raises, as it is": (alone(hdr1, nodes1, ov), 0, None),
         "its index written as the last a uint32 holds": (alone(hdr1, nodes1, within), 1, "the Python raises OverflowError"),
-        "a v2 cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
+        "a SEACAST cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
         f"that node said to have replaced {name2}, which the header does not trace": (
             alone(hdr2, untraced, r2), 1, f"nodes: has replaced [{name2}], which the header does not list as traced"),
     }, work, head, "carried")
@@ -3121,7 +3121,7 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
     each for its reason; the directed traces' headers pass, and are refused where they do not claim the whole
     state. The envelope on the hand cell's header: a member twice, a member beside the header, a member trace3.py
     does not write, args that are not a list of words and a document word the toy does not take, each refused for
-    its reason; --doc v03 passes."""
+    its reason; --doc lite passes."""
     toy = layout.toy()
 
     def variant(**change):
@@ -3143,7 +3143,7 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
         "another footprint.py": (other(f"{T}/footprint.py"), False, f"content: not this tree's: {T}/footprint.py: other bytes"),
         "another gen/schema.py": (other(f"{T}/gen/schema.py"), False, f"content: not this tree's: {T}/gen/schema.py: other bytes"),
         "another directed41.py": (other(f"{T}/directed41.py"), False, f"content: not this tree's: {T}/directed41.py: other bytes"),
-        "another protocol.md": (other("protocol.md"), False, "content: not this tree's: protocol.md: other code"),
+        "another seacast-lite.md": (other("seacast-lite.md"), False, "content: not this tree's: seacast-lite.md: other code"),
         "another toy/node.py": (other("toy/node.py"), False, "content: not this tree's: toy/node.py: other bytes"),
         "a module more in the toy": (other("toy/zz.py"), False, "content: not this tree's: toy/zz.py: only in the second"),
         "no content line": ([RAW, hdr, hdr], False, "content: the first line is no content line"),
@@ -3176,7 +3176,7 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
         "the hand cell's header with args [42]": (hand_args([42]), False, "args: not a list of words"),
         "the hand cell's header with --doc v3": (hand_args(hargs + ["--doc", "v3"]), False,
                                                  "args: a document trace3.py does not write: v3"),
-        "the hand cell's header with --doc v03": (hand_args(hargs + ["--doc", "v03"]), True, None),
+        "the hand cell's header with --doc lite": (hand_args(hargs + ["--doc", "lite"]), True, None),
     })
     for tag, path in (("§6.1's", directed), ("§4.4's", directed44)):
         dh = load(path)[0]

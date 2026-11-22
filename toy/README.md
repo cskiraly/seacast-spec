@@ -1,6 +1,6 @@
 # The protocol, executed: a toy simulator
 
-[`protocol.md`](../protocol.md) is written in Python-like pseudocode, in the style of the consensus
+[`seacast-lite.md`](../seacast-lite.md) is written in Python-like pseudocode, in the style of the consensus
 specs. This directory runs it. `extract.py` takes every `python` block of the document, in order,
 and the toy executes that code once per simulated node, with each node's state in its own
 namespace. The document stays the source of truth: change it, and the next run executes the change.
@@ -35,7 +35,7 @@ A 500-node cell takes about five minutes on one core and about 250 MB.
 
 **The transport** (since 2026-11-15): a connection's transport takes one entry at a time
 (`--send-buffer 1`), so a writer hands a chunk over only when the previous one has left, as
-`protocol.md` §7.3 asks and as the harness's stream writes block. `--send-buffer 0` is the earlier
+`seacast-lite.md` §7.3 asks and as the harness's stream writes block. `--send-buffer 0` is the earlier
 default, a transport that takes every write at once (§7.3's rule not met); `--uplink rr` has no send
 buffer and always runs that way. Figures and comparisons in this README measured before that change
 ran with that earlier transport unless they say otherwise.
@@ -50,26 +50,26 @@ any moment, changes the digest, even when the printed numbers stay the same.
 The thirteenth cell, `ihave-limits` (2026-10-27), sets stock gossipsub's two IHAVE limits
 (`--ihave-limits 10,5000`).
 - The others set none, so it is the one cell where asks are held back to the next heartbeat
-  (`protocol.md` §4.4).
-- In `protocol.md`'s run, 26 799 asks are held back. The warm median goes from the `push` cell's
+  (`seacast-lite.md` §4.4).
+- In `seacast-lite.md`'s run, 26 799 asks are held back. The warm median goes from the `push` cell's
   427 ms to 512 ms, and every node completes.
-- At `protocol.md`'s reference values (§8.3, `--ihave-limits 4096,5000`) no cell holds an ask back,
-  with or without `--doc v2`: every other cell gives its recorded digest, and this cell, run at
+- At `seacast-lite.md`'s reference values (§8.3, `--ihave-limits 4096,5000`) no cell holds an ask back,
+  with or without `--doc seacast`: every other cell gives its recorded digest, and this cell, run at
   those values instead, gives the `push` cell's (2026-11-18).
 
 The fourteenth cell, `late-block` (2026-11-15), is the one cell where a block installs after its
 chunks arrive (`--late-block 30,400`): 18 of the 60 nodes install each block 400 ms after its
 publish, and each keeps at most two deferred copies per peer.
 - Everywhere else a block installs at its publish at every node, so it is the one cell that runs
-  `protocol.md` §4.2's deferral: `defer`, `tie`, `on_block_installed`, and the ties' release into
+  `seacast-lite.md` §4.2's deferral: `defer`, `tie`, `on_block_installed`, and the ties' release into
   offers.
-- In `protocol.md`'s run, 491 deferred copies are kept and 347 refused, 923 ties are released, and
+- In `seacast-lite.md`'s run, 491 deferred copies are kept and 347 refused, 923 ties are released, and
   at the end nothing waits: no copy, tie, reservation or block. Every node completes. Under
   `--late-block` run.py checks both, and fails if either does not hold (`late_drain_known.py`), since
   a leak of state changes no event and so no digest. The warm median goes from the `push` cell's 427 ms
   to 635 ms, and not only through the 18: the 41 nodes that install on time are slower too, at
   628, 616 and 645 ms at their median for the three payloads, against 426, 423 and 420 ms for the
-  same nodes without late blocks. The cause is the source's sending window (`protocol.md` §7.1), one
+  same nodes without late blocks. The cause is the source's sending window (`seacast-lite.md` §7.1), one
   for all its peers. A chunk pushed to a late node holds its slot until that node's HAVE covers it,
   which can come only after the node installs, or until `WINDOW_TIMEOUT` ("their window slots stay
   held", §4.2), while an on-time peer's comes back within tens of milliseconds. So for the second payload the late peers hold 59 of the 69 slots at 450 ms,
@@ -93,13 +93,13 @@ which takes every write at once (`--send-buffer 0`, the default until that day):
 met, a case the document allows and the check keeps. Its line is the `push` cell's line before the
 default changed, in both recordings.
 
-Every cell of `golden.txt` runs the source at `protocol.md`'s reference value, `SOURCE_OFFERS = ACK`
+Every cell of `golden.txt` runs the source at `seacast-lite.md`'s reference value, `SOURCE_OFFERS = ACK`
 (§5.1). `--source-offers publish` sets `PUBLISH`, the source's other choice: its offers at publish and
 its HAVE growing at each chunk's first write, as before v0.9's rule. In all fifteen cells it gives the
 digest of the document with the source of before that rule put back (v0.8's `publish` and
 `origin_sent`, from `c9881d3`'s parent), and none gives its recorded digest (2026-11-18). That
 needs the acknowledgement to do nothing at `PUBLISH`: with `origin_acked` acting, `loss-thin` and
-`late-block` differ, since there a chunk is acknowledged before the source writes it. `--doc v2`
+`late-block` differ, since there a chunk is acknowledged before the source writes it. `--doc seacast`
 takes `publish` too: the draft's `SOURCE_OFFERS` (§4.7). The option's other values, `off` and
 `late`, act only on offers `publish` itself makes, so since v0.9's rule they change nothing.
 
@@ -121,36 +121,36 @@ and where one has a control that must come out the other way, it is named:
 - `idontwant_id_known.py`: §4.1, an IDONTWANT entry that is not a HAVE bitmap is a stock id, kept in
   `unwanted[p]` with no penalty; a bitmap beside it must still be read as a HAVE, and not be kept in
   `unwanted[p]`. The toy tells a bitmap by its type, not by the string's first bytes and length.
-  With `--doc v2`, the same on the gossipsub binding (`protocol-v2-bindings.md` §4): the toy reads
+  With `--doc seacast`, the same on the gossipsub binding (`seacast-bindings.md` §4): the toy reads
   the frame as SEACAST's messages and keeps the stock id in `unwanted[p]`, which SEACAST's `on_want`
   reads.
-- `want_promise_known.py`: `protocol-v2.md` §4.5 and §4.10, an ask sent as a `Want` starts no
+- `want_promise_known.py`: `seacast.md` §4.5 and §4.10, an ask sent as a `Want` starts no
   promise at its write: such an ask sent through the gossipsub binding and written by
   `filter_entry` gets none, and the control, an ask on an offer written the same way, gets v0.5's;
-  a claim's probe gets one at its first write and at a write again. It runs `protocol-v2.md`; the
+  a claim's probe gets one at its first write and at a write again. It runs `seacast.md`; the
   document's `filter_entry` started a promise for every ask until the rule was in its code, which
   the toy had kept in a wrapper.
-- `write_wait_known.py [--doc v2]`: §7.1 and §7.2 (`protocol-v2.md` §4.11), a writer in the
+- `write_wait_known.py [--doc seacast]`: §7.1 and §7.2 (`seacast.md` §4.11), a writer in the
   window's line that writes control wakes the first writer in line that can write when its write
   starts to wait for the transport (`write_waits`), and not before. Two writers wait in line, p
   first, then q. For each way p's writer writes control (an urgent entry, owed offers on their own,
-  and under `protocol-v2.md` a control-only entry of the normal lane), five cases, each on a network
+  and under `seacast.md` a control-only entry of the normal lane), five cases, each on a network
   built anew: (a) `next_to_send(p)` returns the control, and q gets no run; (b) p's writer writes
   it, the write waits, and q gets a run, in this order: the control reaches the transport while q
   has no run, then `write_waits(p)` is called once, with p's write pending; (c) as (b) with p not in
-  line, and q gets no run; (d) as (b) with the window full, and under `protocol-v2.md` also above
+  line, and q gets no run; (d) as (b) with the window full, and under `seacast.md` also above
   its cap, and q gets no run; (e) as (b) with no send buffer, so the write completes at once, and
   `write_waits` is not called. In (a), (b) and (d), p keeps its place. A run for q is read from the
   simulator's queue of events. Case (a) fails on v0.10.7 and v0.10.8, which woke q before the write.
-- `xcheck_observes_known.py [--doc v2]`: `--xcheck` only observes. `check.py`'s push cell runs with
-  and without it, and both give the same digest. Under `protocol-v2.md` it fails on the toy before
+- `xcheck_observes_known.py [--doc seacast]`: `--xcheck` only observes. `check.py`'s push cell runs with
+  and without it, and both give the same digest. Under `seacast.md` it fails on the toy before
   its fix, whose wrapper of `track_in_flight` took two arguments where that document passes three.
-- `xcheck_window_known.py [--doc v2]`: `--xcheck`'s window invariant. `check.py`'s push cell runs
+- `xcheck_window_known.py [--doc seacast]`: `--xcheck`'s window invariant. `check.py`'s push cell runs
   with it, and every xcheck line must show `inv_window=0` and a `peak` no larger than `w`. `peak`
-  and `w` count slots of a chunk (`W`) under `protocol.md`, and bytes (`W_BYTES`, §4.11) under
-  `protocol-v2.md`. Under `protocol-v2.md` it fails on the toy before its fix, whose recorder
+  and `w` count slots of a chunk (`W`) under `seacast-lite.md`, and bytes (`W_BYTES`, §4.11) under
+  `seacast.md`. Under `seacast.md` it fails on the toy before its fix, whose recorder
   compared the bytes in flight with `W` in slots and did not see `acquire_room`.
-- `outside_ask_known.py`: `protocol-v2.md` §4.5, an ask outside what a node serves. Once the gate is
+- `outside_ask_known.py`: `seacast.md` §4.5, an ask outside what a node serves. Once the gate is
   open, a standing WANT for a column the node neither holds nor custodies keeps no standing request
   and draws no penalty; a sampler's WANT for one adds no bit to its interest. The controls: a column
   the node custodies, a routed WANT to a forwarding node (kept, and marked routed), a group the node
@@ -162,7 +162,7 @@ and where one has a control that must come out the other way, it is named:
   hops. Two honest runs, custody with samplers and the rows, publish their blocks and ignore no
   ask; it prints how many asks they tested, and fails if none, or if the custody run met
   no routed request. It fails on the document before the rule.
-- `sample_cap_known.py`: `protocol-v2.md` §4.10, the second phase's cap. A custody network with
+- `sample_cap_known.py`: `seacast.md` §4.10, the second phase's cap. A custody network with
   samplers is built and one block published but not run, and one sampler's `resample` and
   `ask_sample` are driven directly on two column groups of that block. The second group is given its
   own copy of the column type's parameters. (a) The node's cap holds across the two groups: a freed
@@ -171,7 +171,7 @@ and where one has a control that must come out the other way, it is named:
   that runs past 100 calls is stopped. It fails on the document before the fix, which had a cap per
   type and returned early for an expired group: (a)'s loop does not end, and (b)'s sample stays
   held.
-- `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the pairs of family and colour a link
+- `relation_limit_known.py`: `seacast.md` §6.3 and §4.1, the pairs of family and colour a link
   may have (`MAX_RELATIONS`). With the limit set to what the link has, a GRAFT for a new column
   family is ignored without an answer, the node's own GRAFT for one is not sent, and a PRUNE for one
   sets no backoff, against a control PRUNE for a carried pair that does; a GRAFT for a family the
@@ -180,7 +180,7 @@ and where one has a control that must come out the other way, it is named:
   counts. The peer's next PRUNE drops a backoff that has run out, with the entry it empties, and a
   backoff of zero stores none. The node's upkeep, offered the peer for every family, grafts no pair
   new to the link at the limit. No penalty. It fails on the document before the limit.
-- `relation_types_known.py`: `protocol-v2.md` §2 and §4.1, object types a link has not joined, under
+- `relation_types_known.py`: `seacast.md` §2 and §4.1, object types a link has not joined, under
   `--upkeep on`. A JOIN for a type the node does not run stores nothing and draws no JOIN back; with
   the link's rows JOIN taken back, a GRAFT for a row family makes no relation and draws no answer, a
   PRUNE sets no backoff even with a backoff of five seconds, and a WANT for a row cell keeps no
@@ -196,7 +196,7 @@ and where one has a control that must come out the other way, it is named:
   is stored and a holding frees the room. A holding that claims a column whole is kept, but makes no
   claimant on the rows-only link; the control, on a link that joined columns, does. No other
   penalty. It fails on the document before the rule.
-- `serve_budget_known.py`: `protocol-v2.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
+- `serve_budget_known.py`: `seacast.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
   budget set to two, of three asks for cells of distinct columns the node holds, not on its offers,
   two are answered and the third refused; an ask on an offer the writer wrote, sent or owed, is
   answered over the budget; a standing request's answer is dropped, and a kept probe answered; after
@@ -210,12 +210,12 @@ and where one has a control that must come out the other way, it is named:
   network, a plain ask of a cell through its column and a probe of it through the node's row in one
   frame, in either order, give one answer with the probe's exemption, written after the asker's
   holding of the cell. No penalty. It fails on the document before the budget.
-- `unknown_groups_known.py`: `protocol.md` §8.2's limit of unknown groups per peer, in both
+- `unknown_groups_known.py`: `seacast-lite.md` §8.2's limit of unknown groups per peer, in both
   documents. With the node's `admitted` refusing one group, a HAVE (a holding claiming the group
   whole) and an offer of it leave nothing in `peer_has`, `holders`, `claims`, `offered` or `offers`;
   the controls, for a group admitted, leave their state. No penalty. It fails on the documents
   before the rule.
-- `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
+- `want_bounds_known.py`: `seacast.md` §4.5, a WANT's two bounds. A standing WANT at an index
   beyond the group's count keeps no standing request, nor one past the type's most before the count
   is known; a routed one kept before the count is dropped with its route mark when the group opens
   in the run (`fill`, `drop_wants_beyond`); and with the asker's limit of unknown groups set to one
@@ -230,12 +230,12 @@ and where one has a control that must come out the other way, it is named:
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an
   index it has already received, is acknowledged and neither forwarded nor put in the gossip
   history; a copy of an index held only as rebuilt is still forwarded, and the publisher's first
-  copy is (the controls); a further id at that rebuilt index is forwarded by `protocol-v2.md`, which
-  stores no copy there, and only acknowledged by `protocol.md`, which stored the first
-  (`protocol-v2.md` §6.1); and at a rebuilt index a repeat of a seen id is acknowledged where that
-  id was stored: by `protocol.md` the first network copy's, by `protocol-v2.md` the rebuilt chunk's
+  copy is (the controls); a further id at that rebuilt index is forwarded by `seacast.md`, which
+  stores no copy there, and only acknowledged by `seacast-lite.md`, which stored the first
+  (`seacast.md` §6.1); and at a rebuilt index a repeat of a seen id is acknowledged where that
+  id was stored: by `seacast-lite.md` the first network copy's, by `seacast.md` the rebuilt chunk's
   own, in either order of arrival. The toy's ids hash the chunk's identity,
-  so the second id is made by changing it, and level 1 is taken as passed. `protocol-v2.md`
+  so the second id is made by changing it, and level 1 is taken as passed. `seacast.md`
   forwarded the second id's copy until 2026-11-19.
 - `tie_read_known.py`: a peer that was only asked about has no tie; the tied peer beside it must
   lose its park.
@@ -255,9 +255,9 @@ and where one has a control that must come out the other way, it is named:
     offer of an index within it stays.
   - Level 1 rejects a copy whose slot is not its block's; the copy as it came passes.
 
-  With `--doc v2` it runs the same states on `protocol-v2.md`'s own `defer`, `on_heartbeat` and
+  With `--doc seacast` it runs the same states on `seacast.md`'s own `defer`, `on_heartbeat` and
   `fill`, which carry these rules since 2026-11-16.
-- `v2_carried_known.py`: the same rules where `protocol-v2.md` has its own functions for offers and
+- `seacast_carried_known.py`: the same rules where `seacast.md` has its own functions for offers and
   cells, on a small rows run.
   - An offer's bitmap of an index beyond the group's known count is ignored and penalised; one
     within it leaves an offer.
@@ -269,7 +269,7 @@ and where one has a control that must come out the other way, it is named:
     the tied index; the control, a peer whose link joined columns, is.
   - A cell's level 1 rejects a copy whose slot is not its header's, for its column and its row; the
     copy as it came passes.
-- `close_known.py`: a connection's close under `protocol-v2.md` (`--churn`).
+- `close_known.py`: a connection's close under `seacast.md` (`--churn`).
   - The closed announcer's offers, tries, promises, last-resort counts and ties go; its park and
     the kept deferred copy, the controls, stay.
   - A probed claimant that leaves gets no verdict and no penalty, and the duty is re-armed at its own
@@ -293,8 +293,8 @@ and where one has a control that must come out the other way, it is named:
   entry it wrote. It does not test §8.1's "reading it allocates nothing": the toy keeps an entry
   for each missing key read, until it is written (`bits.py`). Held reads share one entry, a held read
   written after a set fails, the collections' own writes join, and an offer list refuses what
-  would bypass `listed`. And the writer after a read of an owed answer. With `--doc v2` it also
-  reads the tables `protocol-v2.md` adds (§3: the relations, JOINs, backoffs, standing asks,
+  would bypass `listed`. And the writer after a read of an owed answer. With `--doc seacast` it also
+  reads the tables `seacast.md` adds (§3: the relations, JOINs, backoffs, standing asks,
   claims, the probe's tables, the repair sample's and the sampler's), which read without creating
   since 2026-11-16.
 - `probe_decode_known.py`: a marked probe that reaches a claimant still decoding is kept, the
@@ -330,7 +330,7 @@ and where one has a control that must come out the other way, it is named:
   chunk of a dropped group, not stored, can be noted; and `unpush` clears every mark `note_push` made,
   the row's as well as the column's. The control: the payload's push undone as before.
 - `dropped_group_known.py`: a chunk of a group the node dropped is not stored, sent under the group to
-  anyone, or put in the gossip history, as `protocol.md`'s `on_validated` returns. The control: with the
+  anyone, or put in the gossip history, as `seacast-lite.md`'s `on_validated` returns. The control: with the
   group live, the same chunk is stored, pushed or offered, and put there. And a row's repair
   (`push_rebuilt`) sends nothing under a dropped column; the control, the column live, sends.
 - `dropped_dup_known.py`: after a node drops a group, a copy of a chunk it stored before is still
@@ -343,13 +343,13 @@ and where one has a control that must come out the other way, it is named:
 - `accepted_id_known.py`: `accepted(mid)` asks after the id, not the index (§8.1: "the id was stored"),
   in both documents. Two ids can name one index, since the id holds the content id (§2). A later copy
   of a copy level 1 rejected is not acknowledged though its index is stored, nor is a later copy of a
-  second copy with its own id, which `on_validated` acknowledged once and did not store (protocol.md;
-  under protocol-v2.md `fill` acknowledges it). A rebuilt chunk, stored and never seen, is accepted.
+  second copy with its own id, which `on_validated` acknowledged once and did not store (seacast-lite.md;
+  under seacast.md `fill` acknowledges it). A rebuilt chunk, stored and never seen, is accepted.
   The controls: copies of the stored chunks are acknowledged. `accepted` reads `known_id`, the id
-  stored at the index now; where a copy with its own id is stored over a rebuilt one (protocol.md
+  stored at the index now; where a copy with its own id is stored over a rebuilt one (seacast-lite.md
   only; no run does this), the rebuilt id is no longer accepted. That case belongs to relabelled
-  copies, which protocol.md names open.
-- `probe_replay_known.py`: under protocol-v2.md, the claimant's copy of the probed cell that level 1
+  copies, which seacast-lite.md names open.
+- `probe_replay_known.py`: under seacast.md, the claimant's copy of the probed cell that level 1
   rejected does not pass the probe (§4.6, R5) when it comes again, though another peer's good copy of
   the cell was stored meanwhile: its id, of the same group and index (other content, another slot,
   which the cell's slot check rejects), was seen and never stored, so `accepted` says no and the
@@ -363,7 +363,7 @@ and where one has a control that must come out the other way, it is named:
   in both documents. Where an entry carries another group's part too (an answer with the frame's asks
   and PRUNE, the IHAVEs of what is owed), that part stays, and the entry with it; the controls are
   the other group's pushes, asks, IHAVEs and owed bits, which stay. An entry kept without its chunk
-  is no longer an answer, so with `--doc v2` §4.12's `choose` under `ANSWERS_FIRST` takes the other
+  is no longer an answer, so with `--doc seacast` §4.12's `choose` under `ANSWERS_FIRST` takes the other
   group's answer; the other group's answer keeps its mark. Three entries are queued by hand in shapes
   the documents' code does not queue here, each named in the script: `with_owed`'s entry with an IHAVE
   of each group, built by `with_owed` itself, which builds it only at the write; an IHAVE by id, as a
@@ -385,7 +385,7 @@ and where one has a control that must come out the other way, it is named:
   not pushed again through its column by the repair, where that peer is a custodian short of it
   (`note_push` under every group the chunk fills). The control: a custodian that made no WANT is
   pushed the cell once.
-- `standalone_wire_known.py`: an encoder written from `protocol-v2-bindings.md` §1 to §3.
+- `standalone_wire_known.py`: an encoder written from `seacast-bindings.md` §1 to §3.
   - Every message kind round-trips at its smallest and largest.
   - §1.2's layout, read from the document, must be the encoder's, field by field, with its fixed
     sizes. The largest bodies equal §1.4's bounds, and §1.5's sizes hold, both tables read from the
@@ -418,7 +418,7 @@ and where one has a control that must come out the other way, it is named:
   sends its other peers their chunks, or has none left for them; the stalled peer gets no more
   chunks, and control still flows. The control: the same run with the peer reading. It fails on the
   toy whose `acquire_slot` admitted only the line's first writer: every slot free, the line held, and
-  chunks left waiting in the other peers' queues. With `--doc v2`, the same on `protocol-v2.md`'s
+  chunks left waiting in the other peers' queues. With `--doc seacast`, the same on `seacast.md`'s
   window in bytes (its §4.11, `acquire_room`), which failed the same way before it took the rule.
 
 An edit that should change nothing must leave every digest as it is. An edit that changes behaviour
@@ -431,7 +431,7 @@ id, as admission loss does, and the payloads and peer ids are the same at every 
 is one draw that seeds do not average out. The group's key (2026-10-23, §1) re-recorded both
 recordings this way. With the key replaced by the group id, every cell of both documents kept its
 digest; with the key, the cells moved at seed 7 by −10 to +69 ms at the median in `golden.txt`
-(`silent` 579 → 648 ms) and by −6 to +74 ms in `golden-v2.txt`. Over seeds 1 to 20 of `push`,
+(`silent` 579 → 648 ms) and by −6 to +74 ms in `golden-seacast.txt`. Over seeds 1 to 20 of `push`,
 `silent`, `cap-wait` and `without-a`, the mean of the 80 warm medians was 486 to 498 ms across seven
 namings: 486 ms for the descriptor's group id, the naming until then; 491 and 493 ms for the same
 construction under two other domain bytes; 498 ms for the key and 489 to 497 ms for three other
@@ -442,8 +442,8 @@ withheld columns.
 
 Ties and no second ask of a peer at once (2026-10-26, §4.2, §6.1) re-recorded both recordings. No
 copy waited for its block in the toy then, so nothing was tied; the rule against a second ask changes
-the events of all twelve cells of `golden.txt` and eleven of `golden-v2.txt`, at seed 7 by −7 to +3 ms at the median and −15 to +13 ms at the tail in
-`golden.txt`, and by −6 to +3 ms and −10 to +19 ms in `golden-v2.txt`. Over seeds 7 to 9 of the
+the events of all twelve cells of `golden.txt` and eleven of `golden-seacast.txt`, at seed 7 by −7 to +3 ms at the median and −15 to +13 ms at the tail in
+`golden.txt`, and by −6 to +3 ms and −10 to +19 ms in `golden-seacast.txt`. Over seeds 7 to 9 of the
 twelve cells it moved them by −8 to +6 ms at p50, −15 to +34 ms at p99 and −0.04 to +0.03 copies,
 where `--check-ms 5.01`, a change that alters no rule, moved them by −1 to +5 ms, −13 to +10 ms
 and −0.05 to +0.01. Its digests at seed 7 are those of the run that measured it.
@@ -459,7 +459,7 @@ and degree 30 the asks the publisher receives fall to about a third and its uplo
 payload. One cost appears with it: the publisher's HAVE names a chunk about a round trip later than
 before, and a mesh peer that got the chunk from a forwarder meanwhile may push it back to the
 publisher (a few chunks a payload at that size; cancel drops the pushes still queued when the HAVE
-arrives). `golden-v2.txt` was unchanged by it: SEACAST kept its own source until it took
+arrives). `golden-seacast.txt` was unchanged by it: SEACAST kept its own source until it took
 the rule for every object type (2026-11-11) and was recorded again.
 
 ## How it maps onto the document
@@ -475,7 +475,7 @@ the rule for every object type (2026-11-11) and was recorded again.
 | `run.py` | the command line |
 | `check.py`, `golden.txt` | the check above, and its recorded digests |
 | `xcheck.py` | the harness's network loaded from its dump, and the counters and invariants it prints, counted here the same way (below) |
-| `graft_check.py` | `protocol-v2.md` §4.1's JOIN and answered GRAFT: its functions as written, on two nodes, over every interleaving from the link's first JOIN, for one link and one relation, with `--both` for a `SYMMETRIC` type's relation (an end that holds it one way acts on it at any count), `--diverged` to start from linked ends that disagree (the yes again; with `--both`, every way but whole or empty at both), `--doc` for another version of the text (its three controls in `controls/` must fail) and `--model` for the abstract comparison of the three ways (`python3 graft_check.py`: "ok", about 2.5 minutes and 2.3 GiB) |
+| `graft_check.py` | `seacast.md` §4.1's JOIN and answered GRAFT: its functions as written, on two nodes, over every interleaving from the link's first JOIN, for one link and one relation, with `--both` for a `SYMMETRIC` type's relation (an end that holds it one way acts on it at any count), `--diverged` to start from linked ends that disagree (the yes again; with `--both`, every way but whole or empty at both), `--doc` for another version of the text (its three controls in `controls/` must fail) and `--model` for the abstract comparison of the three ways (`python3 graft_check.py`: "ok", about 2.5 minutes and 2.3 GiB) |
 
 What the toy adds to the document, and nothing else:
 - **The environment the document assumes:** the clock (`now`, `after`), the per-peer queues and
@@ -516,7 +516,7 @@ What the toy adds to the document, and nothing else:
   between 6 and 12 by grafting and pruning, around D = 8. The mesh is built before the first publish
   and no connection closes, so §5.4, a peer joining the mesh, never runs here.
 - **Links:** each node has an uplink and a downlink. A writer hands its entries to the
-  connection's transport, one at a time by default (below), as `protocol.md` §7.3 asks; the window
+  connection's transport, one at a time by default (below), as `seacast-lite.md` §7.3 asks; the window
   (card 14) is what holds chunks back, as in the document. The uplink is shared equally by the connections with
   something to send (processor sharing), the fluid limit of the harness's FQ-CoDel, which serves
   per-peer flows a packet at a time; `--uplink rr` sends whole entries in turn instead. The
@@ -543,18 +543,18 @@ lawful cases that the `budget`, `window` and `late` entries name:
 
 - `budget`: a forwarding node that sent one chunk unasked more often than its push degree. Like the
   harness's line, it counts every copy sent unasked, so the copies of a rebuilt chunk that repair
-  pushes count too. Under `protocol.md`, and under `protocol-v2.md` with `REPAIR_BUDGET` off,
+  pushes count too. Under `seacast-lite.md`, and under `seacast.md` with `REPAIR_BUDGET` off,
   repair's pushes of rebuilt chunks go to peers short of K, each up to its shortfall, with no
   push-degree bound on one chunk's copies, so what repair adds to the count breaks no rule;
-- `window`: a node with more room in flight than its window: `W` slots under `protocol.md`,
-  `W_BYTES` bytes under `protocol-v2.md` (§4.11 there). An empty window there takes one chunk of any
+- `window`: a node with more room in flight than its window: `W` slots under `seacast-lite.md`,
+  `W_BYTES` bytes under `seacast.md` (§4.11 there). An empty window there takes one chunk of any
   size, so a window smaller than a chunk can count a node that broke no rule;
 - `overlap`: an ask for a chunk decided while an earlier ask for it is open (inside `IWANT_WINDOW`, not
   yet held), timed at `may_ask`, where the harness's request ledger times its asks too;
 - `late`: a chunk sent to a mesh peer whose HAVE for it (in an IDONTWANT, the only carrier that feeds
   `peer_has`) had reached the sender earlier in the message, held or since expired, as the harness's
   ledger reads it. `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
-  it is on, drops such a send, and under `protocol-v2.md` it lets a probe's exempt answer through; a
+  it is on, drops such a send, and under `seacast.md` it lets a probe's exempt answer through; a
   send that cancel would not drop complies with card 8;
 - `fault`: a chunk from a silent node, or an answer from a withholder.
 
@@ -564,7 +564,7 @@ one delivered to its publisher, as the harness's seen cache counts it, not one h
 decode. The recorder counts tier 4's events. Under both documents, `xcheck_observes_known.py` and
 `xcheck_window_known.py` run it on `check.py`'s push cell.
 
-**A DAS dump** (the research harness's column proxy, 2026-11-01) runs under `--doc v2 --setting
+**A DAS dump** (the research harness's column proxy, 2026-11-01) runs under `--doc seacast --setting
 custody` or `rows`. Besides `net`, it has records of its own:
 - `network`: the base graph;
 - `shape`: the links the harness added, each with its pass (custody floor, the proposer's fanout,
@@ -646,8 +646,8 @@ places where it was not yet executable or left a choice open, all fixed in the d
 With these, the toy's 60-node smoke cell printed the same results as before, down to the number of
 events processed: the fixes wrote down the choices the toy had made.
 
-A tenth was found on 2026-10-07 by running the custody setting of `protocol-v2.md` (below), and
-fixed in `protocol.md` since the window is v0.3's:
+A tenth was found on 2026-10-07 by running the custody setting of `seacast.md` (below), and
+fixed in `seacast-lite.md` since the window is v0.3's:
 
 10. **The line of writers stalled while slots were free** (§7.1). A writer that took a slot did not
     wake the next writer in line, so when several slots freed at one instant (a holding bitmap
@@ -659,7 +659,7 @@ fixed in `protocol.md` since the window is v0.3's:
     way, copies rose by 0.03 to 0.12 (`cap-wait` 1.64 → 1.66, `dcb20` 3.20 → 3.32, `push` 2.35 →
     2.41), since chunks that had waited in the line, and were pulled meanwhile, now go out.
 
-## SEACAST (`--doc v2`)
+## SEACAST (`--doc seacast`)
 
 *SEACAST is checked in this toy only (its banner). Figures below from fewer than ten
 seeds, a single seed unless stated, are toy checks of a mechanism, not measurements. Those of runs
@@ -667,29 +667,29 @@ with a payload (tier 4, variant C) were recorded before 2026-10-23, under the de
 as the payload's name; under the group's key their exact values move as any renaming's do
 ("Checking a change"). Column and row groups are named as before.*
 
-[`protocol-v2.md`](../protocol-v2.md) is run on top of `protocol.md`: `extract.py` pulls both
+[`seacast.md`](../seacast.md) is run on top of `seacast-lite.md`: `extract.py` pulls both
 documents' blocks, v0.3's are executed first and SEACAST's after them in the same namespace, so
 SEACAST redefines what it changes (`on_frame`, `on_chunk`, `forward`, `announce`, the holding and
 offer handlers, `on_want`, completion and repair, `publish`, the heartbeat) and keeps what it says
 carries over (the ask discipline, `choose_push`; the window and the writer as its §4.11 and §4.12 adapt them). `node.py` supplies what
 SEACAST leaves to the environment under its tier 4 setting (its §6.1): the payload object type
 with its parameters, the join tables, the push relation behind the mesh, and the gossipsub
-binding of its messages (`protocol-v2-bindings.md` §4): a holding is an IDONTWANT bitmap, an offer
+binding of its messages (`seacast-bindings.md` §4): a holding is an IDONTWANT bitmap, an offer
 an IHAVE bitmap, an ask a `WantIndex`. Relations are static, as the mesh is for v0.3.
 
-`check.py --doc v2` runs the fifteen cells against SEACAST's own recording,
-`golden-v2.txt` (`--update` records it, as for v0.3). `check.py --doc v2 --golden golden.txt`
-compares SEACAST against `protocol.md`'s cells instead (v0.3's until 2026-10-13, v0.4's
+`check.py --doc seacast` runs the fifteen cells against SEACAST's own recording,
+`golden-seacast.txt` (`--update` records it, as for v0.3). `check.py --doc seacast --golden golden.txt`
+compares SEACAST against `seacast-lite.md`'s cells instead (v0.3's until 2026-10-13, v0.4's
 until 2026-10-21, v0.5's until 2026-10-25, v0.7's until 2026-10-26, v0.8's until 2026-11-12, v0.9's
 since); there a cell whose digest moved but whose numbers did not is reported as such and does not
 count, since SEACAST iterates the relation in peer order where v0.3 iterates the mesh set,
 which reorders same-instant sends. On 2026-10-07, with v0.3's slot window, eleven cells reproduced
 v0.3's numbers exactly and `rr-stripe` differed by 3 ms at the median; with the window in bytes
-(`protocol-v2.md` §4.11) the cells differ from v0.3's by at most 7 ms at the median, 15 ms at the
+(`seacast.md` §4.11) the cells differ from v0.3's by at most 7 ms at the median, 15 ms at the
 tail and 0.04 copies either way, which is the writer choosing the entry before taking room and
 control taking none, not the unit.
 
-**v0.4's P4 in SEACAST** (2026-10-21, `protocol-v2.md` §4.7): the source's holding names only the
+**v0.4's P4 in SEACAST** (2026-10-21, `seacast.md` §4.7): the source's holding names only the
 chunks it has sent. Against v0.4's recording the twelve cells now sit within 3 ms at the median,
 16 ms at the tail and 0.03 copies, `loss-thin` aside (§4.13's ask window, at 20 Mbps); without P4
 the medians had been up to 102 ms behind. On the settings it costs a slow proposer of columns
@@ -712,7 +712,7 @@ first copies wait longer in its queue (1 179 → 1 225 ms at the median). Its pe
 it holds every cell, also offer it cells (84 700 → 94 117 offers). With a 1 Gbps proposer the
 holdings cost nothing measurable.
 
-`--merge-holdings on` (`protocol-v2.md` §6.3's `MERGE_HOLDINGS`, an option, off by default) merges
+`--merge-holdings on` (`seacast.md` §6.3's `MERGE_HOLDINGS`, an option, off by default) merges
 them as v0.4 allows (its §5.1): a holding of a group the node publishes that is still in its queue
 takes the newer chunks instead of a second holding going out. It takes back little (P4 against P4
 with merging, seeds 7 to 16; `--send-buffer 1` has its own P4 baseline):
@@ -744,7 +744,7 @@ against 80, more on seven seeds, as many on two, fewer on one (not traced). Its 
 as before, on every seed but 13, where two custodians stay short either way. Tables further down
 that predate 2026-10-21 were recorded without P4.
 
-**v0.5 in SEACAST** (2026-10-21, `protocol-v2.md` §5 and the functions it names in its header):
+**v0.5 in SEACAST** (2026-10-21, `seacast.md` §5 and the functions it names in its header):
 a refused push or offer is offered with the next write, parked announcers are asked once more, the
 gate per object type, the promise from the write (a WANT starts none). Against SEACAST just
 before the merge, with P4 (60 nodes, warm medians; over several seeds the median and the range):
@@ -775,15 +775,15 @@ against 283. Custody with
 merge: the loss refuses a chunk on a link every time, which the custody setting does not get
 around either way (not traced).
 
-Every `--doc v2` run ends with the **invariants report** (`invariants.py`; `--no-invariants` skips
-it): the invariants `protocol-v2.md` §6.2 asks of every setting, checked on
+Every `--doc seacast` run ends with the **invariants report** (`invariants.py`; `--no-invariants` skips
+it): the invariants `seacast.md` §6.2 asks of every setting, checked on
 the links and the nodes' state without scheduling anything, so the digest is unchanged. It
 reports chunks pushed outside the receiver's interest (I3: must be none), offers for indices the
 receiver does not want (waste, counted), eager pushes of one chunk by one node above its budget
 (R_NODE for a forwarding node, R for a source: must be none), repair copies, the upload per message
 by bandwidth class in units of the node's own interest with the duty spread (max over median), the
 source's upload in copies of the message, and whether every node completed its interest. The
-other two of the invariants `protocol-v2.md` §6.2 lists, a claim whose probe goes unanswered and a cell filling both of its
+other two of the invariants `seacast.md` §6.2 lists, a claim whose probe goes unanswered and a cell filling both of its
 groups, are checked under the row setting, where deferral and cross-fill exist. Three lines on the
 queues follow: how long each class of entry waited from being queued to being handed to the link
 (urgent control, asks, offers, answers, the source's answers of chunks it held from the start,
@@ -792,7 +792,7 @@ experienced: the time from a chunk's first ask to its arrival from anyone, wheth
 or another delivered it first, the (peer, group) pairs parked on a broken promise, and the chunks
 that arrived at a node already holding them, by class.
 
-`--setting c` (with `--doc v2`) is variant C as a setting of the same document: a colour per index
+`--setting c` (with `--doc seacast`) is variant C as a setting of the same document: a colour per index
 (`M = N`) and a mesh per colour built on the same connections, so each chunk's pushers are its own
 colour's mesh and a node's holdings go to every peer that may push it something. The toy's
 indications on the 60-node check cell (degree 30, three payloads, seed 7), not measurements:
@@ -812,7 +812,7 @@ The direction is the harness's (faster tail, more bytes and control); the sizes 
 per-colour heartbeat gossip of variant C is not modelled: a peer in any colour's mesh counts as
 related, so the heartbeat has nobody to gossip to.
 
-`--setting custody` (with `--doc v2`) is the PeerDAS custody row of `protocol-v2.md` §6.2: a block
+`--setting custody` (with `--doc seacast`) is the PeerDAS custody row of `seacast.md` §6.2: a block
 of `--blobs` blobs (32) published as 128 column groups whose header is a descriptor-shaped object
 with the blob count as N and K = N (no code within a column, `sim.publish_block`), a derived
 interest of `--cgc` columns (8) per node from das-core's `get_custody_groups` over the toy's peer
@@ -824,7 +824,7 @@ and the proposer `--source-floor` (2) for every column; the push relation of a c
 mesh built on its custodians' subgraph (`scenario.custody_topology`), and the proposer's relation is
 its custodian links per column. A node's completion is the last of its custody columns to complete,
 and copies are in units of its own custody's chunks. Executing this setting found the
-window stall (item 10 above) and that card 12's projection assumes a code (`protocol-v2.md` §4.9).
+window stall (item 10 above) and that card 12's projection assumes a code (`seacast.md` §4.9).
 The indications, one seed, with the invariants holding (nothing pushed outside interest, no push
 above budget, every custodian complete):
 
@@ -836,7 +836,7 @@ above budget, every custodian complete):
 
 The proposer's upload counts its first copies (two per cell) and the asks it answers; a 1 Gbps
 proposer among custodians that pull serves about as much again as it pushes. These are the numbers
-with the window in bytes (`protocol-v2.md` §4.11) and a source's own chunks first (§4.12). With
+with the window in bytes (`seacast.md` §4.11) and a source's own chunks first (§4.12). With
 v0.3's slot window the same cells gave 777 / 963 ms and 1.90 copies, 9 173 / 9 475 ms and 1.75,
 and 1 011 / 1 207 ms and 1.78: a cell is a sixth of a payload chunk, so the slot window admitted a
 sixth of the bytes per round trip and held the 50 Mbps proposer to about 10 Mbps (a 9 MB block at
@@ -852,7 +852,7 @@ eager pushes for 128 000 cells needed), and control is 0.4 copies of a node's cu
 where the announce width `[D5]` and the push budget act.
 
 `--samplers PCT` (with `--setting custody`) turns that share of the nodes into samplers, the
-FullDAS sampling row of `protocol-v2.md` §6.2: interest `DECLARED`, duty `NONE`, no custody, no
+FullDAS sampling row of `seacast.md` §6.2: interest `DECLARED`, duty `NONE`, no custody, no
 place in any column's mesh and no top-up edges, so a sampler reaches a column only through the
 custodians among its random peers. At block arrival each sampler draws `--samples` (8) cells of the
 block at random and declares each to one link whose interest includes it, as §4.10 says: the WANT
@@ -874,7 +874,7 @@ one seed, recorded before 2026-10-23, when the `samples` line still left out the
 | the same, 30 % withholding custodians (`--fault wh30`) | 336 ms / never (one withholder whose three pushers all withhold) | 2 090 / 4 016 ms | 0 of 149 | 43 of 192 | median 2, max 6 |
 | 500 nodes, degree 70, 100 samplers, 1 Gbps proposer, slot window | 1 014 / 1 216 ms | 918 / 1 146 ms | 0 of 1 553 | 47 of 1 600 | median 3, max 11 |
 
-The first two rows are with the window in bytes (`protocol-v2.md` §4.11); with v0.3's slot window
+The first two rows are with the window in bytes (`seacast.md` §4.11); with v0.3's slot window
 they gave 752 / 910 and 750 / 828 ms, and 809 / 1 482 and 798 / 4 197 ms. Under withholders a
 sampler's completion is the retry: with eight samples each and 30 % of custodians withholding,
 nearly every sampler declares at least one sample to a withholder first and waits the 2 s before
@@ -901,7 +901,7 @@ report: only the counting changed. What a sampler does with a sample no link can
 of unavailable or another round through other peers, the document leaves to the application
 (§4.10).
 
-**A sampler's reach** (`protocol-v2.md` `[D12]`: the coverage floor of §1.3, routed sample requests
+**A sampler's reach** (`seacast.md` `[D12]`: the coverage floor of §1.3, routed sample requests
 and LiteDAS's two phases in §4.10). `--sample-cover T` builds the floor with the graph: each sampler
 adds sampling-only links, the custodian covering the most columns still short first, until every
 column has T custodians among its links, counted by distinct links, a node of high custody (more
@@ -977,7 +977,7 @@ nodes sampling, `--setting custody --net bld --msgs 2`, seeds 7 to 16, honest an
 Off is set against A+C with the floor of one cover (then the draft's proposal; two were decided
 later) and of two. The batch's first cell, the 60-node `r-honest-AC-s7`, printed its digest again.
 Every A+C cell's floor links equal those of a build of its graph alone (2 and 8 added per sampler on
-top of 70, 13 and 29 on top of 16, as `protocol-v2.md` §6.3 counts).
+top of 70, 13 and 29 on top of 16, as `seacast.md` §6.3 counts).
 
 The table gives, over 2 000 sampler-blocks per row:
 - short: samplers that did not confirm;
@@ -1025,7 +1025,7 @@ move.
 
 **Under withholders,** the samplers' median is again the first phase's 2 s wait.
 
-`--setting rows` is the RowDAS row of `protocol-v2.md` §6.2 on top of custody (EIP-8371 as the
+`--setting rows` is the RowDAS row of `seacast.md` §6.2 on top of custody (EIP-8371 as the
 pinned draft reads): a second object type, the row, with N = 128 cells and K = 64; every cell is
 index b of column c and index c of row b, so one arrival fills both groups (R4); each node has one
 designated row subnet from its id (`--row-subnets`, 32 by default so that every subnet is active
@@ -1038,7 +1038,7 @@ nodes custody 64 columns and decode their subnet's row at K (phase 1); any membe
 peer's claim defers an armed duty by `--defer-window`, during which one probe ask verifies it (R5);
 row offers are asked only after `--row-delay` (R7); a peer serves at most 64 cells of a row (R6);
 and each member keeps `--repair-floor` (1) custodian peers for every column it does not custody
-(`protocol-v2.md` §4.6), drawn after the meshes from a generator of its own, so that the graph and
+(`seacast.md` §4.6), drawn after the meshes from a generator of its own, so that the graph and
 the meshes are the same with and without them and these links are in no mesh; 0 leaves a member the
 links the graph gives it. `--withhold N` makes the proposer keep the last N columns, so that only
 reconstruction can fill them, and `--fault claimNN` makes that share of the nodes claim every cell
@@ -1046,7 +1046,7 @@ of their row at the first one and never answer. The report adds the cross-fill c
 mirrored in their other group: must be none) and the rows line: decodes at K and later, duties
 deferred, claims verified by the probe, re-arms with the claimant penalised, and the links the
 repair floor added. `--col-announce` and `--row-announce` set the columns' and the rows'
-`ANNOUNCE_EXTRA` (`protocol-v2.md` `[D5]`; `ALL_JOINED`, the default, `SAMPLE` or `NONE`). A cell is
+`ANNOUNCE_EXTRA` (`seacast.md` `[D5]`; `ALL_JOINED`, the default, `SAMPLE` or `NONE`). A cell is
 published under its column, and its message id names that group, so the heartbeat's gossip offers
 cells under their columns: the rows' `SAMPLE` runs as `NONE` (the same events in the rows cell at
 seed 7). Indications at 60 nodes (degree 30, a 1 Gbps proposer, 6 reconstructors), one seed:
@@ -1059,7 +1059,7 @@ seed 7). Indications at 60 nodes (degree 30, a 1 Gbps proposer, 6 reconstructors
 | half withheld, 16 subnets, 20 % liars | 2 957 / 3 873 ms | 1 776 ms / never | 24 / 90 | 137 / 82 / 55 | all but 4 custody groups; the rows of 2 members short of 64 in the first block, of 1 in the second |
 | 500 nodes, degree 70, half withheld, 32 subnets, 50 reconstructors | 2 360 / 2 504 ms | 1 219 / 1 302 ms | 100 / 215 | 680 / 680 / 0 | all, through the rows; copies 2.28 of own custody, control 0.72; the proposer served 4.7 copies of the block |
 
-These are the numbers with the window in bytes (`protocol-v2.md` §4.11) and the repair floor (§4.6).
+These are the numbers with the window in bytes (`seacast.md` §4.11) and the repair floor (§4.6).
 Without the floor the seed-7 cells gave 632 / 1 095 ms (honest), 2 438 / 2 750 ms (withheld, 16
 subnets), 3 101 / 3 315 ms (liars) and 2 368 / 2 505 ms at 500 nodes, with the same completions.
 With v0.3's slot window and no floor the same 60-node cells gave: honest 848 / 2 037 ms with 37
@@ -1086,7 +1086,7 @@ claimants in one block under the slot window) and the re-arms decode the rows th
 the rows still missing are the liars' own. The empty subnets of the 32-subnet cell are the EIP's
 team-size floor seen at toy scale: 59 members over 32 subnets leave some with none.
 
-**The probe of a claim** (R5, since 2026-11-15; `protocol-v2.md` §4.6). The claimant passes only on
+**The probe of a claim** (R5, since 2026-11-15; `seacast.md` §4.6). The claimant passes only on
 its own copy; the probe's WANT carries `probe`, which the toy's binding carries beside the index
 (`wire.FlaggedWant`) and charges no bytes, as it does `standing` and `hops`; and the probed index is
 drawn at random among those lacked. The toy draws that index from a generator of its own, seeded by
@@ -1119,7 +1119,7 @@ per run (2 to 8 in the honest cell), and on the eight seeds that complete either
 median by −54 to +34 ms, the tail by −65 to +129 ms and the copies by at most 0.07, within the
 seeds' spread. With the floor, the run at seed 7 found a node that held every cell of a custody
 column and never completed it: it had rebuilt the row that supplied the column's last cell, and
-`decode_group` filled the column without checking its completion, which `protocol-v2.md` §4.6 now
+`decode_group` filled the column without checking its completion, which `seacast.md` §4.6 now
 does; without the floor the fix changes one event in one of the thirteen runs and no result.
 
 `--supernodes PCT` (custody and rows) makes that share of the nodes custody all 128 columns, drawn
@@ -1127,7 +1127,7 @@ by a generator of their own so that the other draws stay those of a run without 
 datacenter link (`--supernode-link home` for the home one). A supernode keeps every row group,
 filled from its columns, with interest declared on no link, and rebuilds a row still short
 `--phase2` seconds (1) after the block plus up to `--phase2-jitter` (0.2): EIP-8371's second
-phase, and under custody alone PeerDAS's reconstruction with a delay (`protocol-v2.md` §4.6). Under
+phase, and under custody alone PeerDAS's reconstruction with a delay (`seacast.md` §4.6). Under
 rows it is also a row reconstructor of its own subnet. A row whose missing cells its column peers
 hold waits once, `--defer-window`, before it is rebuilt (`known_across`). `--repair-budget on`
 pushes each rebuilt cell to `R_NODE` custodians lacking it and offers it to the rest. The rows line
@@ -1174,7 +1174,7 @@ ms and 2.22 copies (428 / 1 674 ms and 2.88; 459 / 1 143 ms and 2.16), the withh
 1 642 ms and 2.76 copies with 16 subnets and 1 192 / 1 685 ms and 2.66 with 32 (1 200 / 1 756 and
 3.33; 1 202 / 1 833 and 3.32). The repair budget pays where members on home links rebuild and loses
 tail where datacenter supernodes do; with the fast class off it saves 0.41 copies in the 16-subnet
-cell for 0.1 s at seeds 7 to 9 (1 305 / 1 728 ms, 2.37 copies; `protocol-v2.md` §4.6, §6.3).
+cell for 0.1 s at seeds 7 to 9 (1 305 / 1 728 ms, 2.37 copies; `seacast.md` §4.6, §6.3).
 
 `--promise` sets v0.3's promise (0.4 s). The asks line now matches an answer to an ask on either
 axis: a row ask is answered with a column chunk, and the earlier report counted every row ask as
@@ -1187,7 +1187,7 @@ answered later, 448 ms after the ask at the median and 824 ms at the 99th percen
 rows' pulls on its uplink. With `--promise 0.8` it broke 1 to 3 times and parked as many pairs, the
 withheld 16-subnet cell parked none where it had parked 41 to 127, the medians moved by at most 3
 ms, the copies not at all and the tails by at most 20 ms: the asker moves on after `IWANT_WINDOW`
-either way, and the promise decides only whom it parks (`protocol-v2.md` §6.3, `PROMISE`, for later
+either way, and the promise decides only whom it parks (`seacast.md` §6.3, `PROMISE`, for later
 study).
 
 Whom rebuilt cells go to, explored on 2026-10-08. Supernodes keep every row, so a
@@ -1200,7 +1200,7 @@ instead of pushing it, as a row's are (`--keeper-claims ignore` makes a supernod
 ignore claims, kept for the measurement). Over seeds 7 to 19 at 60 nodes with three supernodes, the
 medians, p50 / p99 and copies of own custody:
 
-| cell | pushed (`protocol-v2.md`) | keepers offered | keepers skipped | all offered |
+| cell | pushed (`seacast.md`) | keepers offered | keepers skipped | all offered |
 |---|---|---|---|---|
 | custody, half withheld | 1 196 / 1 251 ms, 3.76 | 1 195 / 1 290 ms, 3.43 | 1 199 / 2 309 ms, 3.38 | 1 264 / 1 386 ms, 3.04 |
 | rows, 16 subnets, half withheld | 1 203 / 1 767 ms, 3.34 | 1 185 / 1 647 ms, 3.16 | 1 194 / 1 693 ms, 3.16 | 1 313 / 1 782 ms, 2.80 |
@@ -1212,9 +1212,9 @@ keepers saves 0.17 to 0.33 copies at no cost in time; offering everything saves 
 costs 60 to 110 ms at the median; skipping the keepers saves as much as offering to them, but a
 skipped supernode in the custody cell gets its missing cells only from its own rebuild, after it
 has waited out a deferral on the claims it heard, which is the 2.3 s tail. None of these is in
-`protocol-v2.md`; §4.6 keeps the push (options).
+`seacast.md`; §4.6 keeps the push (options).
 
-R5's verdict (`protocol-v2.md` §4.6, "The verdict, by what the node can see"). Draft 1 ended a
+R5's verdict (`seacast.md` §4.6, "The verdict, by what the node can see"). Draft 1 ended a
 deferred duty when the probed cell arrived. When the explorations above stopped pushing to
 supernodes, supernodes deferred on a claim that came in an acknowledgement, received the probed
 cell and ended one cell short of a column. The rule now: a row member ends its duty on a verified
@@ -1253,13 +1253,13 @@ document says, pushes none of its rebuilt cells, drops a standing WANT for one, 
 for one only once per peer and group and only when it is the frame's one ask on that group, which is
 what a probe looks like; it forwards what it receives. The hoarders line counts them by role, the
 rows they rebuilt, and the asks for their rebuilt cells answered (the probes) and refused.
-The member check (`protocol-v2.md` §4.6, decided 2026-10-09, on by default; `--member-check off`
+The member check (`seacast.md` §4.6, decided 2026-10-09, on by default; `--member-check off`
 removes it) ends a member's duty on its own subnet's row on a verified claim only if the row's cells
 in the member's custody columns are held, the cells an honest claimant's repair brings it; otherwise
 the member goes by the cells it holds and rebuilds. Over seeds 7 to 19 at 60 nodes, half the columns
 withheld, medians (p50 / p99) where every seed completes:
 
-| cell | hoarders | draft 1 | R5's second wording, no check | `protocol-v2.md` (the check, R5's wording fixed) |
+| cell | hoarders | draft 1 | R5's second wording, no check | `seacast.md` (the check, R5's wording fixed) |
 |---|---|---|---|---|
 | rows, 16 subnets, 3 supernodes | 20 % | 1 215 / 1 816 ms, all | 1 215 / 1 796 ms, all | 1 215 / 1 816 ms, all; draft 1's events on 12 of 13 seeds |
 | | 50 % | short on seed 14 | short on seed 14 | short on seed 14 |
@@ -1295,7 +1295,7 @@ with supernodes it never fires.
 
 `--fault hoardm<pct>` is a hoarder that pushes each member of the row's subnet among its peers the
 row's cells of that member's custody columns and nobody else anything, so that every member check
-passes and the columns no member keeps stay short. `--repair-sample S1:L1,S2:L2` (`protocol-v2.md`
+passes and the columns no member keeps stay short. `--repair-sample S1:L1,S2:L2` (`seacast.md`
 §4.6, "Sampling the repair", an option) samples the repair after a verified claim and a passed
 member check: `S1` cells of the row the member lacks, each asked of a custodian of its column that
 is not a claimant, judged `--sample-wait` (0.5 s) later, passing with at most `L1` missing, else
@@ -1402,18 +1402,18 @@ every row was rebuilt by an honest node).
 - Without a fault, under `hoardm20` with the member check alone, and under `claim20`, no alarm was
   sent at seed 11.
 
-**`--wire standalone`** (with `--doc v2`) charges the links the bytes of the libp2p stream binding
-(`protocol-v2-bindings.md` §1 and §2) in place of the gossipsub binding, which stays the default and
+**`--wire standalone`** (with `--doc seacast`) charges the links the bytes of the libp2p stream binding
+(`seacast-bindings.md` §1 and §2) in place of the gossipsub binding, which stays the default and
 the recordings'. It is a model of bytes: what reaches the receiver, and when, follows from those
 bytes, but an entry is still delivered as one unit, as on the gossipsub binding. The toy's two wires
 model two header forms for comparison, not one object type's definition: this wire charges
-form (b), and the gossipsub binding charges form (a) (`protocol-v2-bindings.md` §1.6).
+form (b), and the gossipsub binding charges form (a) (`seacast-bindings.md` §1.6).
 - *Each message is a frame of its own:* a uvarint length, a kind byte and its SSZ, sized before
-  compression. The payload's chunk is `protocol.md`'s `Chunk`; a cell is a `CellChunk`.
+  compression. The payload's chunk is `seacast-lite.md`'s `Chunk`; a cell is a `CellChunk`.
 - *One WANT per ask:* several asks of one group to one peer are charged a frame each, where one
   bitmap could carry them, so the asks' bytes are an upper bound.
 - *An entry is delivered as one unit:* `on_frame` sees the entry's messages together, so the IHAVE
-  limits (`protocol-v2.md` §4.3) count entries, not each offer's frame. Only the `ihave-limits` cell
+  limits (`seacast.md` §4.3) count entries, not each offer's frame. Only the `ihave-limits` cell
   sets them.
 - *A cell carries the block's header* (every blob's commitment) with the first eager push of its
   group on a link: an unsolicited cell, once per group and connection. The default wire charges none.
@@ -1421,7 +1421,7 @@ form (b), and the gossipsub binding charges form (a) (`protocol-v2-bindings.md` 
   has already sent a message of the block, which the toy does not.
 - *The window's chunk size follows the wire* (`wire_size(p, entry)`), a first push's header
   included. "copies" keeps its denominators, so a cell's copies compare bytes on both wires.
-- *Measured* (2026-11-17; `check.py`'s 15 cells under `--doc v2`, and two 60-node custody cells, one
+- *Measured* (2026-11-17; `check.py`'s 15 cells under `--doc seacast`, and two 60-node custody cells, one
   with a fifth of the nodes sampling; seed 7, one run each). The same numbers, to the byte, after the
   window began counting the header: in the custody cell the window sized 5 649 writes with a header
   and never refused one, so its size changed no event.
@@ -1432,11 +1432,11 @@ form (b), and the gossipsub binding charges form (a) (`protocol-v2-bindings.md` 
   - the warm medians within 11 ms and the 99th percentiles within 28 ms, either way, one seed each.
   - In the custody cells data moved by +0.0 and −0.7 %. At 32 blobs one header (1 880 bytes) costs
     what about 13 cells save (143 bytes each), and the header goes once per group and link
-    (`protocol-v2.md` §2). This is a balance of magnitudes at one seed, with the two wires running
+    (`seacast.md` §2). This is a balance of magnitudes at one seed, with the two wires running
     different events, not a measurement of either. Per block instead of per group, as consensus's
     partial columns allow, is for later study.
 
-`--answers-first` sets the writer's order (`protocol-v2.md` §4.12). The default sends a source's
+`--answers-first` sets the writer's order (`seacast.md` §4.12). The default sends a source's
 own chunks first, past its offers and answers, by rarity, and `on` adds the option of answers
 before pushes. `v03` is v0.3's order, rarest-first up to the first control-only entry. The other
 values are forms checked against it on 2026-10-07, kept so that the check can be repeated
@@ -1468,7 +1468,7 @@ proposer's window from its first copies. At seed 7 the proposer's last first cop
 sooner with the rule, it sends 1 992 second copies where it sent 2 400, it answers 518 asks where it
 answered 1 212, and over both blocks it sends 15 % fewer chunks, since more of its queued pushes are
 dropped by a holding while they wait. In every single-group cell the rule changes no event
-(`check.py --doc v2` passes unchanged), and with a 1 Gbps proposer it changes nothing but the honest
+(`check.py --doc seacast` passes unchanged), and with a 1 Gbps proposer it changes nothing but the honest
 row cell. Dropping the source's offers, or deferring them, gains as much with the slow proposer and
 loses with a fast one, whose offers let custodians pull from it while its uplink has room. Answers
 first is a wash: against the source rule it moves the median within 5 ms in every tier 4 and variant
@@ -1489,7 +1489,7 @@ and 2.0 without, and then completes 10 ms later at the median. A rule keyed on t
 uplink, as striping's is, could save the home builder's bytes where they are scarce. It is not in
 the document; v0.9's timing of the source's offers, below, saves most of them instead.
 
-**v0.9 in SEACAST** (2026-11-11, `protocol-v2.md` §4.7, §4.11). What SEACAST
+**v0.9 in SEACAST** (2026-11-11, `seacast.md` §4.7, §4.11). What SEACAST
 takes from v0.9, as written:
 - the source's holding grows at a chunk's acknowledgement, not at its write;
 - its offers wait for the acknowledgement, for every object type;
@@ -1575,13 +1575,13 @@ and the range over the seeds of what a column's source saves.
 - **`--send-buffer 1` on the rows** brings them 2 ms sooner (1 to 21) as taken, and 45 ms sooner
   (12 to 58) with offers per type.
 
-**`golden-v2.txt` is re-recorded.**
+**`golden-seacast.txt` is re-recorded.**
 - At seed 7 every cell moves, by −10 to +2 ms at the median, −35 to +9 ms at the tail and −0.13 to
   +0.06 copies. `golden.txt` is unchanged.
 - Against v0.9's own recording, eleven cells are within 13 ms at the median, 18 ms at the tail and
   0.06 copies. `loss-thin` is 6 ms later and 0.14 copies lighter.
 
-**The announce relation's width and the row pull delay** (`protocol-v2.md` §8, `[D5]` and `[D8]`,
+**The announce relation's width and the row pull delay** (`seacast.md` §8, `[D5]` and `[D8]`,
 decided 2026-11-14). Each arm is run against `base` (`ALL_JOINED` on both axes, a 1 s row delay)
 and paired with it by seed; a figure is the median over the seeds of the arm's change. The arms:
 `--col-announce SAMPLE` or `NONE`, `--row-announce NONE`, and `--row-delay 0`, `0.5` or `2`. The

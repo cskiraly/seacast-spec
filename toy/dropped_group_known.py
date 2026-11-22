@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.4's on_validated and forward with a dropped group: a chunk of a group the
+"""A known answer for seacast.md §4.4's on_validated and forward with a dropped group: a chunk of a group the
 node dropped (§4.6, level 2 failed) is not stored, not pushed, not offered and not put in the gossip history, as
-protocol.md's on_validated returns.
+seacast-lite.md's on_validated returns.
 
     python3 dropped_group_known.py
 
@@ -80,7 +80,7 @@ def main():
         bad += got != want
         print(f"{what}: {got}{'' if got == want else f'  <-- must be {want}'}")
 
-    pay = sim_of(["--doc", "v2", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    pay = sim_of(["--doc", "seacast", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     nd = pay.nodes[2]
     ns = nd.ns
     peers = sorted(nd.peers)
@@ -96,7 +96,7 @@ def main():
     line("the group dropped: anything sent under it, to anyone", len(under_g), 0)
     line("the group dropped: stored, and put in the gossip history", (stored, put), (False, 0))
 
-    rows = sim_of(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    rows = sim_of(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     found = None
     for nid in sorted(rows.nodes):                              # a node with a complete row whose repair, the cell's
         nd = rows.nodes[nid]                                    #   column live, sends something under that column

@@ -1,6 +1,6 @@
 # formal/refine: the asking path of the twin against the Veil model
 
-This directory is a Lake package. It has both the Lean twin of `protocol.md` (`../twin`, by path) and the
+This directory is a Lake package. It has both the Lean twin of `seacast-lite.md` (`../twin`, by path) and the
 generated transitions of one Veil model (`NoStallEquiv` in `../veil`), and it proves statements that relate the
 two. It is a first piece of a refinement, with a narrow scope, stated below. It is not a proof that the twin
 satisfies the model's properties.

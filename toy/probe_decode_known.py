@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.6's probe that reaches a claimant still decoding (R5).
+"""A known answer for seacast.md §4.6's probe that reaches a claimant still decoding (R5).
 
     python3 probe_decode_known.py
 
@@ -8,7 +8,7 @@ of such a cell finds nothing (`resolve`); the claimant keeps the first one per a
 with its exemption when the cell is stored, rebuilt included (`probe_waiting`, `serve_waiting_probe`). The toy's
 decode takes 5 ms, so no run meets the case; it is made by hand.
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), for a row the node holds whole:
+On one node of a small rows run (seacast.md, one block, run to its end), for a row the node holds whole:
 three of its cells are taken out of its store, as if it were still decoding, its claim on them kept. Then:
 - peer 1 sends a marked probe of the first cell, and a second marked probe, of the second cell (only the first
   per asker and group is kept as a probe; peer 1 is a `DECLARED` link, so the second stands, as any WANT on
@@ -33,7 +33,7 @@ def main():
     import wire as Wm
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

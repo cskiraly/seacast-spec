@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 """Trace check.py's cells with trace3.py and replay each through the twin.
 
-    python3 cells3.py TOYDIR OUTDIR [-j N] [--replay BINARY] [--doc v2] [CELL ...]
+    python3 cells3.py TOYDIR OUTDIR [-j N] [--replay BINARY] [--doc seacast] [CELL ...]
 
 Per cell, in OUTDIR: <cell>.jsonl.gz (the trace), <cell>.out and <cell>.err (run.py's output and the tracer's),
 <cell>.replay (the replay's report). A cell passes when its digest is the golden one (the tracer and its views
 perturb nothing), every record replays, and its first line is this tree's content line, its header of the
 cell's kind (header3.py). The replay is given the tree's content line (content.py), written once to OUTDIR.
 
-With --doc v2 the cells are protocol-v2.md's (check.py --doc v2, against golden-v2.txt). Their records are
-replayed too: trace3.py traces under v2 only the names that are protocol.md's all the way down, so each record is
-of the twin's protocol.md, called in v2's states.
+With --doc seacast the cells are seacast.md's (check.py --doc seacast, against golden-seacast.txt). Their records are
+replayed too: trace3.py traces under SEACAST only the names that are seacast-lite.md's all the way down, so each record is
+of the twin's seacast-lite.md, called in SEACAST's states.
 
 Each run is a plain child, under the caller's limits.
 """
@@ -103,7 +103,7 @@ def main(argv):
     ap.add_argument("out")
     ap.add_argument("-j", type=int, default=6)
     ap.add_argument("--replay", default=str(REPLAY))
-    ap.add_argument("--doc", default="v03", choices=("v03", "v2"))
+    ap.add_argument("--doc", default="lite", choices=("lite", "seacast"))
     ap.add_argument("--nodes-lines", action="store_true",
                     help="each cell's header and nodes line alone, read by the replay (no message published: seconds)")
     ap.add_argument("cells", nargs="*")
@@ -121,10 +121,10 @@ def main(argv):
     if not cells:
         print("cells3: no cell selected", file=sys.stderr)
         return 2
-    v2 = a.doc == "v2"
-    want = golden(toy / ("golden-v2.txt" if v2 else "golden.txt"))
-    extra = ["--doc", "v2"] if v2 else []
-    replay = a.replay                   # v2's records are replayed too
+    seacast = a.doc == "seacast"
+    want = golden(toy / ("golden-seacast.txt" if seacast else "golden.txt"))
+    extra = ["--doc", "seacast"] if seacast else []
+    replay = a.replay                   # SEACAST's records are replayed too
     head = str(out / "content.line")    # the tree's content line, which every replay here is given
     Path(head).write_text(content.line(content.content(toy)))
     if a.nodes_lines:
@@ -154,8 +154,8 @@ def main(argv):
         ok = rc == 0 and same and hok and counts is not None and counts[2] == "0" and qrc == 0
         bad += not ok
         rep = (f", replay {'/'.join(counts) if counts else 'no report'} (records/ok/mismatched), "
-               f"rc={qrc}, reads the twin did not make {fewer}")      # v2's too
-        print(f"{name}: trace rc={rc}, digest {'as ' + ('golden-v2.txt' if v2 else 'golden.txt') if same else 'DIFFERS'}"
+               f"rc={qrc}, reads the twin did not make {fewer}")      # SEACAST's too
+        print(f"{name}: trace rc={rc}, digest {'as ' + ('golden-seacast.txt' if seacast else 'golden.txt') if same else 'DIFFERS'}"
               f"{rep}, header {'as these tools and these documents' if hok else 'DIFFERS'}"
               f"{'' if ok else '  <-- FAIL'}")
     print("ok" if not bad else f"{bad} of {len(res)} cells fail")

@@ -1,13 +1,13 @@
 # Control: a JOIN lost at a full queue
 
-`protocol-v2.md` §4.1's functions as they stood on 2026-11-04 with the GRAFT answered but before a
+`seacast.md` §4.1's functions as they stood on 2026-11-04 with the GRAFT answered but before a
 JOIN was owed, kept for `graft_check.py --doc`: a JOIN that a full queue refused was lost, so a link
 can fail to form. The check must fail on it.
 
 ```python
 def on_join(p, j: Join):
     T = type_of(j.object_type)
-    if j.colours != T.params.M: return                 # no v2 for T on this link; the stock path remains
+    if j.colours != T.params.M: return                 # no SEACAST for T on this link; the stock path remains
     join_recv[p][T] = j
     if T not in join_sent[p]: send(p, our_join(T), urgent=True)
 
@@ -55,7 +55,7 @@ def on_graft(p, gr: Graft):                            # each direction answered
             send_relation(p, Prune(object_type=T.id, family=fam, colour=c, direction=OUT))
 
 def join_push(p, T, fam, c):                           # p joins our push relation for colour c: what we hold of
-    if c in push_out[p][T][fam]: return                #   it is announced (protocol.md §5.4's on_mesh_join);
+    if c in push_out[p][T][fam]: return                #   it is announced (seacast-lite.md §5.4's on_mesh_join);
     push_out[p][T][fam].add(c)                         #   a GRAFT that adds nothing runs nothing
     for g in list(chunks):
         if expired(g) or state[g] == INVALID or type_of_group(g) != T or T.family(g) != fam: continue

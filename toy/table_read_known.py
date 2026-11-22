@@ -2,7 +2,7 @@
 """Known answers for §8.1's rule in the toy's tables: "reading it allocates nothing".
 
     python3 table_read_known.py
-    python3 table_read_known.py --doc v2     # and the tables protocol-v2.md adds, on a node of its own
+    python3 table_read_known.py --doc seacast     # and the tables seacast.md adds, on a node of its own
 
 The document reads its per-peer and per-group tables as maps whose missing entries are empty, and some of its
 decisions go by whether an entry is there at all (the writer's `if owed_answers[p]`, for one). Each table
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 SEED, NODE, P = 7, 2, 1
-V2 = sys.argv[1:] == ["--doc", "v2"]
+SEACAST = sys.argv[1:] == ["--doc", "seacast"]
 G = bytes([0x55]) * 32                                      # a group the node knows nothing of
 
 
@@ -56,7 +56,7 @@ def main():
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED)]
-             + (["--doc", "v2"] if V2 else []))
+             + (["--doc", "seacast"] if SEACAST else []))
     ns = got["sim"].nodes[NODE].ns
     bad = 0
 
@@ -95,7 +95,7 @@ def main():
              "offered": {G: [0]}, "asked_parked": {P}, "park": {G: 1.0}, "pending": [(P, None)],
              "chunks": {0: "a chunk"}, "known_id": {0: b"an id"}, "received": [0], "mine": [0], "holders": {0: {P}},
              "sent_to": {G: [0]}, "unwanted": {b"an id"}, "serve_count": {G: 1}, "peer_has": {G: [0]}, "pushed": {G: [0]}}
-    if V2:                          # protocol-v2.md's own tables (§3), read as its code reads them
+    if SEACAST:                          # seacast.md's own tables (§3), read as its code reads them
         T, fam, c = "column", 5, 0                          # an object type, a family and a colour
         PV = 99                                             # a peer the node holds nothing for (peer 1 has JOINed)
         rel = (lambda t: (c in t[PV][T][fam], len(t[PV][T][fam]), list(t[PV][T])), lambda t: t[PV][T][fam].add(c), PV)

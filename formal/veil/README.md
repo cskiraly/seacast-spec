@@ -1,6 +1,6 @@
-# SEACAST on gossipsub in Veil: properties at any size
+# SEACAST Lite in Veil: properties at any size
 
-Models of the spec, `protocol.md`, whose properties are proved for **any number of nodes, groups and
+Models of the spec, `seacast-lite.md`, whose properties are proved for **any number of nodes, groups and
 chunk indices** and every interleaving. In each Veil model the safety property is an inductive
 invariant whose conditions Lean's kernel checks (the SMT solver is not trusted), and Q3's are
 temporal theorems the kernel checks too, their one-step facts proved by Lean's `grind` without the
@@ -9,7 +9,7 @@ solver; the plain-Lean files are theorems.
 - `ClaimWins.lean`: an honest node is never penalised for an ask, "the claim wins" (A1, §4.5);
 - `SenderFault.lean`: nor for a chunk that fails level 1, its slot checked since v0.10, nor for a
   malformed HAVE or IHAVE bitmap (A1's other three penalties, §3, §4.2, §4.3, §4.4), so A1 holds at
-  every place `protocol.md` penalises a peer (its four `penalise` calls, by inspection);
+  every place `seacast-lite.md` penalises a peer (its four `penalise` calls, by inspection);
 - `NoStallTransport.lean`, `NoStallAsk.lean` and `NoStallCount.lean`: no stall (Q1). For any one
   chunk, when the transport has nothing left to do, a node with its block holds every chunk a mesh
   neighbour received, has stopped pulling, or holds that neighbour's offer, or, where the source
@@ -20,7 +20,7 @@ solver; the plain-Lean files are theorems.
   announces at a chunk's acknowledgement, this needs each chunk the counting uses on the source's
   links acknowledged, or received, stopped for or offered at the receiver (below); where it
   announces at publish, it needs nothing more. The mesh may change on the
-  way (peers join and leave it, connections close), with F9's rule, `protocol.md` §5.4 since v0.8: a
+  way (peers join and leave it, connections close), with F9's rule, `seacast-lite.md` §5.4 since v0.8: a
   peer that joins the mesh is announced what the node holds. How the pieces make Q1 is below. The
   counting also gives Q1 with a builder that releases only K of the N chunks, with a source that
   drops out, and with nodes that never install the block.
@@ -30,7 +30,7 @@ solver; the plain-Lean files are theorems.
   `ACK`, the source's links), for every honest node reachable from the source through nodes that
   installed the builder's block, given that
   every honest copy, rebuilt ones included, names that block (a node that relabels chunks under the
-  other block's root breaks this: `protocol.md` §4.6 lists the gap as open).
+  other block's root breaks this: `seacast-lite.md` §4.6 lists the gap as open).
 - `NoStallAskAdv.lean`, `NoStallTransportAdv.lean` and `NoStallEquivAdv.lean`: the per-chunk pieces
   with malicious peers. With the counting through honest nodes, Q1 holds for every honest node the
   source reaches along links between honest nodes, into nodes that installed the block, whatever the
@@ -38,7 +38,7 @@ solver; the plain-Lean files are theorems.
   source's links (below). An adversary chosen as a push target can keep a chunk unacknowledged by
   closing its connection, as in `ka_never_acknowledged`'s run, where the push target's connection
   closes. `NoStallEquivAdv.lean` is v0.8's asking among them, and shows two findings: F13, closed
-  in v0.8, and F14, which `protocol.md` §6.1 leaves open.
+  in v0.8, and F14, which `seacast-lite.md` §6.1 leaves open.
 - `Agreement.lean` (plain Lean): level 2 is all or none, a check that succeeds recovers the bytes the
   root commits, and two honest nodes never deliver different payloads for a group, under the codec's
   assumptions (below).
@@ -53,7 +53,7 @@ on three or four nodes, and not agreement or integrity (`../README.md` lists its
 
 **The models are of v0.8's rules, with four later changes in places** (`NoStallAsk.lean` and
 `NoStallAskAdv.lean` have v0.7's asking, which `NoStallEquiv.lean` and `NoStallEquivAdv.lean` take to
-v0.8's). Each header names the sections and the version it follows. `protocol.md` has changed since.
+v0.8's). Each header names the sections and the version it follows. `seacast-lite.md` has changed since.
 The models have four of the changes below, as their items say: the source's announcement at the
 acknowledgement, level 1's check of the slot, the IHAVE bitmap's penalty, and the drop of an
 adversary's tie whose slot left the live window. They do not have the others, and whether each
@@ -453,7 +453,7 @@ name any one of them, does not arise (A1's model of rebuilt chunks needs only th
 commit the group, which the rule keeps). That holds while no node relabels a chunk: a node that
 puts the other block's root in a chunk makes an authentic copy, which honest nodes on that block
 forward and rebuild from, and a node behind them with only the builder's block can then stall;
-`protocol.md` §4.6 lists this gap, F12, as open, with its options. That argument is by inspection,
+`seacast-lite.md` §4.6 lists this gap, F12, as open, with its options. That argument is by inspection,
 not in the models.
 
 | piece | proof | traces | the build |
@@ -559,7 +559,7 @@ promise does the same, `ka_expiry_keeps_promise`). §6.1's rule since v0.8, `dro
 peer's queued asks of an index go and its promise for it closes where its offers of it are dropped
 (the switches `dropAsks` and `dropPromises`). With it the proof holds.
 
-**F14, open in `protocol.md` §6.1: an announcer that is never parked holds the last resort off.**
+**F14, open in `seacast-lite.md` §6.1: an announcer that is never parked holds the last resort off.**
 The traces `ka_f14_s0` to `ka_f14_s3` and `ka_f14_loop`, under v0.8's rules, show it:
 - an honest node n with the builder's block lacks a chunk, and its honest provider h is parked by a
   slow answer on another chunk of the group;
@@ -576,12 +576,12 @@ from these finite traces and the actions, by inspection, not proved. The control
 (`f14_control`) shows that without a's new offer the last resort asks h. In the spec the same holds
 for as long as h's park lasts and the group is live, and an adversary that leaves its ask unwritten
 by not reading does the same without reconnecting, which these models leave out (their writes drain).
-`protocol.md` §6.1 names this open, and no rule for it is modelled. Q1 above holds in the quiet
+`seacast-lite.md` §6.1 names this open, and no rule for it is modelled. Q1 above holds in the quiet
 states, which such a run never reaches; Q3 with malicious peers (below) holds once the environment,
 the adversaries included, stops.
 
 **Level 1 by group** (`NoStallEquivAdv.lean`'s switch `byGroup`): **a candidate rule, off for the
-spec's rules.** It is one of the options `protocol.md` §4.6 lists for relabelled copies (F12): the
+spec's rules.** It is one of the options `seacast-lite.md` §4.6 lists for relabelled copies (F12): the
 root a chunk names takes no part in level 1, deferral or ties. With it on, a copy passes level 1
 against either block, so the first installation of either is the node's installation, and offers
 resolve at an honest node with either block (`offers_resolve_any`); without it, a node with only the
@@ -589,7 +589,7 @@ other block stalls (`ka_other_block_stalls`, a known answer for that clause). Th
 only the other block's installation alone, so its runs are a subset of those proved with it off.
 Reading `installed` as the first installation of either block, and the handler that takes every
 waiting copy of the group in at that installation, are by inspection of a draft of the rule, not of
-`protocol.md`, and the transport under the rule is a model outside this folder. Nothing here
+`seacast-lite.md`, and the transport under the rule is a model outside this folder. Nothing here
 proposes the rule: it is in the file so that the option's asking part is checked with the rest.
 
 | piece | proof | traces | the build |

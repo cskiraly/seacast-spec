@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Pull the executable part of the protocol out of its Markdown.
 
-Every ```python block of protocol.md is kept, in document order, under a comment that
+Every ```python block of seacast-lite.md is kept, in document order, under a comment that
 names the section it came from, so a traceback points at the doc. The few spellings that are not
 Python are rewritten by the NORMALISE table; each rewrite must match exactly once, so a doc edit that
 removes or changes one fails here instead of silently running something else.
@@ -12,7 +12,7 @@ import re
 import sys
 from pathlib import Path
 
-DOC = Path(__file__).resolve().parent.parent / "protocol.md"
+DOC = Path(__file__).resolve().parent.parent / "seacast-lite.md"
 
 # (what the doc says, what runs, why). Every entry is a place where the doc is not yet Python, and
 # a candidate for a fix in the doc itself. Empty since the nine fixes of 2026-10-03: the document's
