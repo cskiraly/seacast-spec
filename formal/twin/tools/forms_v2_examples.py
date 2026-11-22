@@ -154,6 +154,7 @@ def rows(f0, d, w=None):
     default, which needs no toy: every leaf here is a stub)."""
     if w is None:
         w = trace3.Tracer3.__new__(trace3.Tracer3)
+    if not hasattr(w, "doc_v2"):        # a bare writer: this one, or trace3's self-test's planted one
         w.doc_v2 = True                 # timer_args writes v2's three timers under v2 alone
     G, idx, slot, ROOT, MID = f0
     assert idx == 0 and MID.startswith(G + "00000000"), f0
