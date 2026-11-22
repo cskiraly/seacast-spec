@@ -713,7 +713,7 @@ def bare_in_question_v2(per_node, callee="N"):
                         ran.n += 1
                     return _own(p, iw)
                 ns["on_iwant"] = on_iwant
-                T.LAYERS[(on_iwant.__qualname__, on_iwant.__code__.co_firstlineno)] = ("on_iwant", T.CHANGING)
+                T.LAYERS[T.layer_key(on_iwant)] = ("on_iwant", T.CHANGING)
         doc = ns["peer_id_bytes"]
 
         def peer_id_bytes(p):
@@ -840,7 +840,7 @@ def suppressed_entry_v2(toy, off):
                     return []
                 return fn(*a, **kw)
             ns["on_iwant"] = on_iwant
-            T.LAYERS[(on_iwant.__qualname__, on_iwant.__code__.co_firstlineno)] = ("on_iwant", T.CHANGING)
+            T.LAYERS[T.layer_key(on_iwant)] = ("on_iwant", T.CHANGING)
         return _install(self, nd, ns)
 
     T.Tracer3.install = install

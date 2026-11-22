@@ -427,23 +427,24 @@ REPLACEABLE = ("forward",               # a node that forwards nothing (silent, 
 # directed sets of §4.2 draw its result (a sequence of DEFERs with the block there, a REJECT of a chunk whose proof
 # nobody made) to reach on_validated's and defer's paths, as they did while validate_chunk was a question.
 REPLACEABLE_WHOLE = ("validate_chunk",)
-# The chain rule's lists, under --doc v2 (chain_rule): every layer the toy binds over a traced name, by its qualified
-# name and its first line in node.py, with the name it is listed for and its kind. A qualified name alone does not
-# tell layers apart: lambdas share `<lambda>`, and a class's method may make two locals of one name. An observer
+# The chain rule's lists, under --doc v2 (chain_rule): every layer the toy binds over a traced name, by its file's
+# name, its qualified name and its first line, with the name it is listed for and its kind. A qualified name alone
+# does not tell layers apart: lambdas share `<lambda>`, and a class's method may make two locals of one name; nor do
+# a qualified name and a line without the file, where a fixture lists a function of its own. An observer
 # calls the function it holds once, with its own arguments, and returns its result, changing no table and no
 # constant (scan_bindings.py's observer test); the node's own helper is a traced name the documents do not define
 # (NODE_OWN); a changing layer changes the function on some path, so that the name is a question at that node. Each
 # read in toy/node.py, and held to the scan of the toy's bindings by scan_bindings.py --lists.
 OBSERVER, NODE_HELPER, CHANGING = "observer", "node's own", "changing"
-LAYERS = {("Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),   # counts the asks
-          ("Node._namespace.<locals>.held", 700): ("held", NODE_HELPER),                        #   held back
-          ("Node._override.<locals>.message_id", 940): ("message_id", OBSERVER),     # a cache: it skips the call on
-          ("Node._override.<locals>.add_offer", 954): ("add_offer", OBSERVER),       #   a hit, with the same answer
-          ("Node._override.<locals>.may_ask", 961): ("may_ask", OBSERVER),           # these three keep the toy's
-          ("Node._override.<locals>.close_promises", 966): ("close_promises", OBSERVER),    # index of ask keys
-          ("Node._faults.<locals>.<lambda>", 1099): ("on_iwant", CHANGING),          # a withholder's: answers nothing
-          ("Node._peer_promise.<locals>.close_promises", 1174): ("close_promises", OBSERVER),   # notes answer times
-          ("Node._v2.<locals>.promise_due", 1697): ("promise_due", OBSERVER)}        # notes a broken promise
+LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),  # counts
+          ("node.py", "Node._namespace.<locals>.held", 700): ("held", NODE_HELPER),         # the asks held back
+          ("node.py", "Node._override.<locals>.message_id", 940): ("message_id", OBSERVER),     # a cache: it skips
+          ("node.py", "Node._override.<locals>.add_offer", 954): ("add_offer", OBSERVER),       #   the call on a hit
+          ("node.py", "Node._override.<locals>.may_ask", 961): ("may_ask", OBSERVER),           # these three keep the
+          ("node.py", "Node._override.<locals>.close_promises", 966): ("close_promises", OBSERVER),   # toy's index
+          ("node.py", "Node._faults.<locals>.<lambda>", 1099): ("on_iwant", CHANGING),     # a withholder's: no answer
+          ("node.py", "Node._peer_promise.<locals>.close_promises", 1174): ("close_promises", OBSERVER),  # answer times
+          ("node.py", "Node._v2.<locals>.promise_due", 1697): ("promise_due", OBSERVER)}   # notes a broken promise
 
 
 def own_code(name, fn):
@@ -512,15 +513,20 @@ def layer_where(f):
     return f"{qual} ({Path(code.co_filename).name}:{code.co_firstlineno})" if code is not None else qual
 
 
+def layer_key(f):
+    """A Python function's key in LAYERS: its file's name, its qualified name and its first line."""
+    return Path(f.__code__.co_filename).name, f.__qualname__, f.__code__.co_firstlineno
+
+
 def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
     """Under --doc v2, a traced name's chain at a node and whether the node replaces it: (chain, replaced).
 
     The chain is the name's layers (`layers_of`), outermost first, each by its qualified name, ending in `doc` where
     the walk reaches the document's function of that name (protocol.md's or protocol-v2.md's). It is None where the
     name is bound to the document's function itself, or to the node's own helper alone: such a name has no key in
-    `chains`. Each layer above `doc` must be listed in `lists` (LAYERS) for this name, by its qualified name and its
-    first line: the toy's in node.py, and a fixture's that the fixture lists before the install. The name is replaced
-    where any layer is changing, and only a REPLACEABLE name may be. A
+    `chains`. Each layer above `doc` must be listed in `lists` (LAYERS) for this name, by its file's name, its
+    qualified name and its first line (layer_key): the toy's in node.py, and a fixture's that the fixture lists
+    before the install. The name is replaced where any layer is changing, and only a REPLACEABLE name may be. A
     walk that does not reach `doc` ends in a changing layer, or is the node's own helper alone. In a trace of the
     whole state, a REPLACEABLE_WHOLE name bound to a function outside node.py (a directed set's level 1) is changing.
     Anything else raises ChainStop, naming the layer."""
@@ -543,7 +549,7 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
         if whole and name in REPLACEABLE_WHOLE and Path(c.co_filename).name != "node.py":
             kinds.append(CHANGING)
             continue
-        listed = lists.get((getattr(f, "__qualname__", None), c.co_firstlineno))
+        listed = lists.get(layer_key(f))
         if listed is None:
             raise ChainStop(f"{name}: a layer in none of the tracer's lists: {layer_where(f)}")
         if listed[0] != name:
@@ -1110,7 +1116,7 @@ def manifest_self_test():
 
 
 # The chain rule self-test's stub toy, compiled as node.py's: each function a layer the self-test lists, or leaves
-# out, by its qualified name and first line, as LAYERS lists the toy's.
+# out, by its file's name, qualified name and first line, as LAYERS lists the toy's.
 CHAIN_TOY = '''\
 def over(inner):
     def message_id(f):
@@ -1171,21 +1177,23 @@ def lone(other):
 
 def chains_self_test():
     """The chain rule (chain_rule, node_chains) and the nodes line's grouping by `chains`, on stub layers compiled as
-    node.py's (CHAIN_TOY) and listed in stub lists by their qualified names and first lines. Each case runs as the
-    tracer has it; a case with a planted fault runs again with it, which must fail the case, and what the plant
-    gives is printed."""
-    doc, toy, lvl = {}, {}, {}
+    node.py's (CHAIN_TOY) and listed in stub lists by their files' names, qualified names and first lines. Each case
+    runs as the tracer has it; a case with a planted fault runs again with it, which must fail the case, and what
+    the plant gives is printed."""
+    doc, toy, other, lvl = {}, {}, {}, {}
     exec(compile("def message_id(f):\n    return b''\n\n\ndef on_iwant(p, iw):\n    return []\n\n\n"
                  "def close_promises(g, i, of=None):\n    return None\n", DOC_FILE, "exec"), doc)
     exec(compile(CHAIN_TOY, "node.py", "exec"), toy)
+    exec(compile(CHAIN_TOY, "fixture.py", "exec"), other)       # the same functions, at the same lines, elsewhere
     exec(compile("def validate_chunk(f):\n    return 'ACCEPT'\n", "directed.py", "exec"), lvl)
     mid_obs, lone = toy["over"](doc["message_id"]), toy["lone"](lambda f: b"")
+    mid_other = other["over"](doc["message_id"])
     close_obs = toy["over_close"](doc["close_promises"])
     close_peer = toy["peer"](close_obs)
     iw_obs, iw_chg = toy["pick"](doc["on_iwant"], False), toy["pick"](doc["on_iwant"], True)
     iw_skip, iw_own = toy["skipping"](doc["on_iwant"]), toy["withhold"]()
     two, held = toy["both"](doc["on_iwant"], iw_obs), toy["helper"]()
-    key = lambda f: (f.__qualname__, f.__code__.co_firstlineno)    # noqa: E731
+    key = layer_key
     q = lambda *fs: [f.__qualname__ for f in fs]                   # noqa: E731
     lists = {key(mid_obs): ("message_id", OBSERVER), key(lone): ("message_id", OBSERVER),
              key(close_obs): ("close_promises", OBSERVER), key(close_peer): ("close_promises", OBSERVER),
@@ -1205,7 +1213,11 @@ def chains_self_test():
     # the plants
     class ByQual(dict):         # lists keyed by qualified name alone: the first listed of that name answers
         def get(self, k, d=None):
-            return next((v for (qual, _), v in self.items() if qual == k[0]), d)
+            return next((v for (_, qual, _), v in self.items() if qual == k[1]), d)
+
+    class NoFile(dict):         # lists keyed by qualified name and first line, in any file
+        def get(self, k, d=None):
+            return next((v for (_, qual, line), v in self.items() if (qual, line) == k[1:]), d)
 
     class AnyName(str):         # listed for whatever name it is asked under
         def __ne__(self, other):
@@ -1279,6 +1291,10 @@ def chains_self_test():
          lambda r, w, g: r("on_iwant", iw_obs, ls=unlisted),
          stop("on_iwant", "a layer in none of the tracer's lists", iw_obs),
          [("an unlisted layer classed as changing", rule(wrap=Unlisted), W, group_nodes)]),
+        ("a listed layer's qualified name and first line in another file: a stop",
+         lambda r, w, g: r("message_id", mid_other),
+         stop("message_id", "a layer in none of the tracer's lists", mid_other),
+         [("lists keyed without the file", rule(wrap=NoFile), W, group_nodes)]),
         ("a layer that holds the document's on_iwant and returns without calling it, unlisted: a stop",
          lambda r, w, g: r("on_iwant", iw_skip), stop("on_iwant", "a layer in none of the tracer's lists", iw_skip),
          [("the kinds read through innermost alone", rule(innermost_only), W, group_nodes)]),
@@ -1309,7 +1325,7 @@ def chains_self_test():
          lambda r, w, g: r("validate_chunk", lvl["validate_chunk"]),
          stop("validate_chunk", "a layer in none of the tracer's lists", lvl["validate_chunk"]), []),
         ("LAYERS' node's own helpers are NODE_OWN",
-         lambda r, w, g: {n: qual for (qual, _), (n, k) in LAYERS.items() if k == NODE_HELPER}, NODE_OWN, []),
+         lambda r, w, g: {n: qual for (_, qual, _), (n, k) in LAYERS.items() if k == NODE_HELPER}, NODE_OWN, []),
     ]
 
     def run(f, r, w, g):

@@ -1061,6 +1061,16 @@ def line(r):
             f"{val}{extra} {r['class']}{why}{' v2-only' if r['v2_only'] else ''}")
 
 
+def fn_key(v):
+    """A function value's key in trace3.py's LAYERS: its file's name, its qualified name and its first line."""
+    return v["file"], v["qual"], v["line"]
+
+
+def at(fl, q, ln):
+    """A LAYERS key as the lines name it: qualified name@line in node.py, the file named only for another."""
+    return f"{q}@{ln}" if fl == "node.py" else f"{q}@{fl}:{ln}"
+
+
 def lists(sc, T):
     """The lists the rows give over node.py's bindings of traced names (under v2, of its kept names for a v2-only
     binding), beside trace3.py's hand-kept ones: each name and qualified name the same, or the difference named."""
@@ -1076,10 +1086,10 @@ def lists(sc, T):
             out.append(f"{r['class']} {r['name']} {r['value']['qual']}: NOT one class, which trace3.py's lists need "
                        f"({r['file']}:{r['line']})")
     hand_obs = sorted(T.WRAPPERS.items())
-    layers = getattr(T, "LAYERS", None)     # under v2, the chain rule's lists: the toy's layers by qualified name and
-    v2_obs = {(r["name"], r["value"]["qual"]) for r in rows     # first line, with their kinds
+    layers = getattr(T, "LAYERS", None)     # under v2, the chain rule's lists: the toy's layers by file's name,
+    v2_obs = {(r["name"], r["value"]["qual"]) for r in rows     # qualified name and first line, with their kinds
               if layers is not None and r["v2_only"] and r["class"] == "observer"
-              and layers.get((r["value"]["qual"], r["value"]["line"])) == (r["name"], T.OBSERVER)}
+              and layers.get(fn_key(r["value"])) == (r["name"], T.OBSERVER)}
     for x in obs:
         if x in hand_obs:
             out.append(f"observer {x[0]} {x[1]}: as WRAPPERS")
@@ -1126,18 +1136,18 @@ def lists(sc, T):
                 continue
             k = T.NODE_HELPER if r["class"] == "own" and r["name"] not in defined else kind.get(r["class"])
             if k is not None:           # a class of more than one kind is named above
-                want[(r["value"]["qual"], r["value"]["line"])] = (r["name"], k)
-        for (q, ln), v in sorted(want.items(), key=lambda kv: kv[0][1]):
-            if layers.get((q, ln)) == v:
-                out.append(f"layer {v[0]} {q}@{ln}: {v[1]}, as LAYERS")
+                want[fn_key(r["value"])] = (r["name"], k)
+        for (fl, q, ln), v in sorted(want.items(), key=lambda kv: (kv[0][0], kv[0][2])):
+            if layers.get((fl, q, ln)) == v:
+                out.append(f"layer {v[0]} {at(fl, q, ln)}: {v[1]}, as LAYERS")
             else:
                 other += 1
-                out.append(f"layer {v[0]} {q}@{ln}: {v[1]}, NOT so in LAYERS"
-                           + (f" (there {layers[(q, ln)]})" if (q, ln) in layers else ""))
-        for (q, ln), v in sorted(layers.items(), key=lambda kv: kv[0][1]):
-            if (q, ln) not in want:
+                out.append(f"layer {v[0]} {at(fl, q, ln)}: {v[1]}, NOT so in LAYERS"
+                           + (f" (there {layers[(fl, q, ln)]})" if (fl, q, ln) in layers else ""))
+        for (fl, q, ln), v in sorted(layers.items(), key=lambda kv: (kv[0][0], kv[0][2])):
+            if (fl, q, ln) not in want:
                 other += 1
-                out.append(f"LAYERS {v[0]} {q}@{ln}: NOT a binding the scan finds of a name traced under v2")
+                out.append(f"LAYERS {v[0]} {at(fl, q, ln)}: NOT a binding the scan finds of a name traced under v2")
     return out, other
 
 
