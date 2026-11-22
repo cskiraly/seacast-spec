@@ -1,7 +1,9 @@
 """One example tape row per form of the questions the tracer writes under protocol-v2.md, made by the tracer's own
 writers (trace3.py's questions_enc_v2, type_enc_v2, param_enc_v2, swr_v2): the 39 forms of v2's 36 questions
 (`choice` has four, and `send` has a row for each kind of message it takes), and protocol.md's three questions in
-the forms v2 asks them. Each line is the twin's form name (V2/Replay.lean's NodeV2), a tab, and the row,
+the forms v2 asks them; then 18 more forms the twin reads: v2's `after` (one row per timer), release_wanted_groups,
+window_release, a draw of peers, an order, the two levels whose order is asked (probe_waiting[g], claims), interest's
+miss, and the eight names a node can replace (asked_enc_v2), 62 rows in all. Each line is the twin's form name (V2/Replay.lean's NodeV2), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
 
@@ -96,10 +98,63 @@ class Join(Have):
     pass
 
 
+class Interest(dict):                  # the toy's ALL fixture (node.py's `_v2`): every index for any group
+    def __missing__(self, g):
+        return NS(v=-1)
+
+
+def order_entry(place, members):
+    """The entry order_writer puts on an open record's tape, the recorder on, no question running."""
+    rec, st = F.Recorder(), {"cur": {"tape": []}, "ext": False, "supp": False}
+    rec.on = True
+    trace3.order_writer(rec, st, lambda: True, 4)(place, members)
+    (entry,) = st["cur"]["tape"]
+    return entry
+
+
+def keys_entry(table, prefix, ks):
+    """The entry the recorder puts on a tape where a record iterates a level whose order is asked."""
+    rec = F.Recorder()
+    rec.tape = []
+    rec.keys(table, prefix, ks)
+    (entry,) = rec.tape
+    return entry
+
+
+def own_interest_entry(g):
+    """The entry of `interest`'s miss as the question own_interest (miss_question), on a recorder that is on."""
+    rec = F.Recorder()
+    rec.on, rec.tape = True, []
+    trace3.miss_question(rec)(g, Interest())
+    (entry,) = rec.tape
+    return entry
+
+
+def tail(name, entry):
+    """A writer's whole entry as a row's parts after its name, which must be the row's."""
+    if entry[0] != name:
+        raise SystemExit(f"forms_v2_examples: the writer put {entry[0]!r} on the tape, where {name!r} is the row's")
+    return entry[1:]
+
+
+def reconsider(*a):                     # the three v2 timers, by their names alone: after_row writes fn.__name__
+    pass
+
+
+def ask_sample(*a):
+    pass
+
+
+def resample(*a):
+    pass
+
+
 def rows(f0, d, w=None):
     """The rows, as (form name, the row's compact JSON), made by the writers of `w` (a Tracer3; a bare one by
     default, which needs no toy: every leaf here is a stub)."""
-    w = w or trace3.Tracer3.__new__(trace3.Tracer3)
+    if w is None:
+        w = trace3.Tracer3.__new__(trace3.Tracer3)
+        w.doc_v2 = True                 # timer_args writes v2's three timers under v2 alone
     G, idx, slot, ROOT, MID = f0
     assert idx == 0 and MID.startswith(G + "00000000"), f0
     g, root = bytes.fromhex(G), bytes.fromhex(ROOT)
@@ -124,6 +179,10 @@ def rows(f0, d, w=None):
     ty = {t.id: w.type_enc_v2(t) for t in (P, COL, ROW)}
     pm = {t.id: w.param_enc_v2(t) for t in (P, COL, ROW)}
     swr_a, swr_r = w.swr_v2()
+    asked = w.asked_enc_v2()
+    ts = {t.name: t for t in trace3.schema_v2.python_tables_v2(F, w.key, trace3.fbits, w.rel_msg)}
+    g2 = hashlib.sha256(b"group" + (2).to_bytes(4, "little")).digest()     # a second group, made up here
+    after = lambda r, delay, fn, *args: [w.after_row(delay, fn, *args), None]   # noqa: E731: install's encoder
     # (form, tape name, its encoder, the Python answer, the Python arguments, keywords)
     table = [
         ("typeOfGroup", "type_of_group", q["type_of_group"], P, (g,), {}),
@@ -172,6 +231,28 @@ def rows(f0, d, w=None):
         ("sampleCovers", "sample_without_replacement", lambda r, xs, k: [swr_a(xs, k), swr_r(r)], [c2], ([c1, c2], 1),
          {}),
         ("shuffledPairs", "shuffled", q["shuffled"], [(1, fb), (0, fa)], ([(0, fa), (1, fb)],), {}),
+        # the forms the twin reads besides: the timers a record arms (one row per v2 timer), protocol-v2.md's
+        # release_wanted_groups and window_release, a draw of peers, an order, the two levels whose order is asked,
+        # interest's miss; then the eight names a node can replace, in NodeV2's forms (asked_enc_v2)
+        ("afterV2 (reconsider)", "after", after, None, (0.5, reconsider, g, 1.25), {}),
+        ("afterV2 (ask_sample)", "after", after, None, (0.25, ask_sample, g, 3), {}),
+        ("afterV2 (resample)", "after", after, None, (0.25, resample, g, 3, 4, True), {}),
+        ("releaseWantedGroups", "release_wanted_groups", q["release_wanted_groups"], None, (), {}),
+        ("shuffledPeers", "shuffled", q["shuffled"], [7, 2, 4], ([2, 4, 7],), {}),
+        ("order", "order", lambda r: tail("order", order_entry("fill", [2, 4, 7])), None, (), {}),
+        ("probeWaitingOrder", "keys", lambda r: tail("keys", keys_entry(ts["probe_waiting"], (g,), [5, 2, 9])),
+         None, (), {}),
+        ("claimsOrder", "keys", lambda r: tail("keys", keys_entry(ts["claims"], (), [g2, g])), None, (), {}),
+        ("ownInterest", "own_interest", lambda r: tail("own_interest", own_interest_entry(g)), None, (), {}),
+        ("windowRelease", "window_release", q["window_release"], None, (4, g, 3), {}),
+        ("forwardNode", "forward", asked["forward"], None, (fa, 4), {"axes": [(g, 3)]}),
+        ("pushRebuiltNode", "push_rebuilt", asked["push_rebuilt"], None, (g, [3, 5]), {}),
+        ("sendHaveNode", "send_have", asked["send_have"], None, (4, g), {}),
+        ("serveStandingNode", "serve_standing", asked["serve_standing"], None, (g, 3), {}),
+        ("owedMissingNode", "owed_missing", asked["owed_missing"], True, (g,), {}),
+        ("repairVerdictNode", "repair_verdict", asked["repair_verdict"], "REPAIRED", (g,), {}),
+        ("noteClaimNode", "note_claim", asked["note_claim"], None, (4, g), {}),
+        ("knownInScopeNode", "known_in_scope", asked["known_in_scope"], bits(5), (g,), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 
