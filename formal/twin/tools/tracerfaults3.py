@@ -373,8 +373,9 @@ def tracer_instance():
 def early_install_v2(toy):
     """Under v2: the tracer installed where protocol.md has it, inside `Node._override`, before `_v2` and the options'
     bindings, and the install at the end of construction skipped. `_v2` then binds its `promise_due` over the tracer's
-    wrapper, a listed wrapper that protocol.md's reading accepts. Under v2 the install is the namespace's last binding:
-    the names' check at the nodes line must stop it."""
+    wrapper, a listed wrapper that protocol.md's reading accepts. The install must be refused there, and it is refused
+    first by what the namespace lacks before `_v2`: the install-time check of the closure rule's lists. (Under v2 the
+    install is also the namespace's last binding; rebind-tape-v2 and rebind-view-v2 reach that check.)"""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node as N                    # noqa: E402: the pinned toy's
     tracer_instance()
@@ -401,9 +402,9 @@ def early_install_v2(toy):
 
     def _override(self, ns):
         _over(self, ns)
+        PLANTED[0] += 1                 # the plant is the early call itself: counted before it, which may stop the run
         TR[0].install(self, ns)
-        early.add(id(self))
-        PLANTED[0] += 1
+        early.add(id(self))             # after it: install() above returns at once for a node in `early`
 
     N.Node._override = _override
 

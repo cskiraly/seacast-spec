@@ -922,8 +922,9 @@ s_tracercontrols() {
     if [ -n "$chain" ]; then spec=("$node" on_iwant "$chain"); also_chain=", but node $node's chain of on_iwant, the plant's"; fi
     if [ "$k" = - ]; then           # read by its line alone
       echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want" >> "$OUT/c-tracerplants.txt"
-    elif [ "$k" = 0 ]; then         # a plant: the plain trace's body
-      if why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "$node" N 0 "${spec[@]}"); then
+    elif [ "$k" = 0 ]; then         # a plant: the plain trace's body (a plant that names no node c or s: node 0,
+      #                               which no node is, so that no record counts as inserted, as k 0 requires)
+      if why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "${node:-0}" N 0 "${spec[@]}"); then
         echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want; the body $plain's$also_chain" >> "$OUT/c-tracerplants.txt"
       else echo "$f: the body not $plain's$also_chain: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
     elif why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "$node" N "$k" "${spec[@]}"); then
