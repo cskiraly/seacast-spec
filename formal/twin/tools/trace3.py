@@ -149,6 +149,21 @@ ROW_READS_V2 = ("owed", "planned", "queue", "tied")
 # No name is both here and in CALLS: a question that raises is written with its arguments as they are at exit
 EAGER_V2 = ("enqueue",)
 EAGER_LATE = [False]
+# Under --doc v2, the names whose IWANTs enqueued are counted per call in OUT.calls.json, beside the trace: those
+# found in the enqueue rows the tape gains between a call's entry and its exit, callees included
+IW_NAMES = ("respond", "retry_offer", "ask_parked")
+
+
+def iwant_asks(x):
+    """The asks' counts of the IWANTs in x, an encoded value: each list whose first member is "iwant" and whose second
+    is a list, anywhere in x, gives that list's length."""
+    if isinstance(x, (list, tuple)):
+        if x and x[0] == "iwant" and len(x) >= 2 and isinstance(x[1], (list, tuple)):
+            return [len(x[1])] + [n for y in x[2:] for n in iwant_asks(y)]
+        return [n for y in x for n in iwant_asks(y)]
+    if isinstance(x, dict):
+        return [n for y in x.values() for n in iwant_asks(y)]
+    return []
 # Under --doc v2, a timer armed inside a question at the node (`after` or `start`, the two kinds): a note of the
 # outermost question open there, [kind, delay, target, args], in its row's fourth member (call_log), in the order
 # armed. The target is a document's timer of that kind, by its name, or a toy callback of TOY_TIMERS, by its
@@ -2377,6 +2392,10 @@ class Tracer3(Tracer):
         # node keeps its own state, as before
         self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0} if self.doc_v2 else None
         self.bare = Counter()
+        # under v2, every call of a traced name, by where it ran (count_call), the IWANTs that IW_NAMES' calls enqueue
+        # (count_iwants), and how often one of IW_NAMES runs inside another: a file beside the trace (OUT.calls.json),
+        # not in it, since a record's `reached` names a function once, however often it ran
+        self.calls, self.iw, self.inside, self.open_iw = {}, {}, {}, []
         # under v2, the toy's functions a namespace may hold: those the scan of its bindings names (scan_bindings.py),
         # by file, first line and qualified name; checked at each install (unscanned_check)
         self.scanned, self.aliases = None, None     # by slot: the functions the scan binds there, and the slots
@@ -2462,6 +2481,7 @@ class Tracer3(Tracer):
             with open(self.out_path + ".bare.json", "w") as f:      # any record: a run output beside the trace
                 json.dump(dict(sorted(self.bare.items())), f, sort_keys=True)
                 f.write("\n")
+            self.write_calls()
 
     def start_check(self, out):
         """What must hold of this Python before the toy is imported, so that what runs is what the content line
@@ -3287,6 +3307,56 @@ class Tracer3(Tracer):
                  else self.control(x) if isinstance(x, self.Wm.Control)
                  else ["chunk", self.chunk(x)], bool(urgent)], bool(r)]
 
+    def count_call(self, name, branch, host=None):
+        """Under v2, a call of a traced name, by where it ran: "record" (it opened one), "in" (inside an open record,
+        by that record's fn, `host`), "ext" (inside an interface call) or "observer" (an observer's own code). Its bare
+        calls are .bare.json's, added at the end."""
+        c = self.calls.setdefault(name, {"record": 0, "in": Counter(), "ext": 0, "observer": 0})
+        if branch == "in":
+            c["in"][host] += 1
+        else:
+            c[branch] += 1
+
+    def iw_enter(self, name):
+        """A call of one of IW_NAMES in a record, entered: each of them open around it, counted once."""
+        ins = self.inside.setdefault(name, Counter())
+        for o in set(self.open_iw):
+            ins[o] += 1
+        self.open_iw.append(name)
+
+    def iw_leave(self, name, branch, tape, k):
+        """That call left: the IWANTs in the enqueue rows its record's tape gained since it was entered (k rows)."""
+        self.open_iw.pop()
+        self.count_iwants(name, branch, tape[k:])
+
+    def count_iwants(self, name, branch, rows):
+        asks = [n for t in rows if isinstance(t, (list, tuple)) and len(t) >= 2 and t[0] == "enqueue"
+                for n in iwant_asks(t[1])]
+        s = self.iw.setdefault(name, {}).setdefault(branch, {"calls": 0, "with": 0, "iwants": 0, "asks": Counter()})
+        s["calls"] += 1
+        s["with"] += 1 if asks else 0
+        s["iwants"] += len(asks)
+        s["asks"].update(asks)
+
+    def write_calls(self):
+        """OUT.calls.json, under v2: count_call's counts with the bare ones, count_iwants' and the IW_NAMES inside
+        one another, keys sorted."""
+        bare = Counter()
+        for k, v in self.bare.items():
+            bare[k.split(" ", 1)[1]] += v
+        calls = {}
+        for n in sorted(set(self.calls) | set(bare)):
+            c = self.calls.get(n, {"record": 0, "in": Counter(), "ext": 0, "observer": 0})
+            calls[n] = {"record": c["record"], "in": dict(sorted(c["in"].items())), "bare": bare[n], "ext": c["ext"],
+                        "observer": c["observer"]}
+        iw = {n: {b: {"calls": s["calls"], "with": s["with"], "iwants": s["iwants"],
+                      "asks": {str(a): m for a, m in sorted(s["asks"].items())}} for b, s in sorted(d.items())}
+              for n, d in sorted(self.iw.items())}
+        inside = {n: dict(sorted(c.items())) for n, c in sorted(self.inside.items())}
+        with open(self.out_path + ".calls.json", "w") as f:
+            json.dump({"calls": calls, "iwants": iw, "inside": inside}, f, sort_keys=True)
+            f.write("\n")
+
     def at_call(self, name, enc, args, kw):
         """Under v2, a name of EAGER_V2: its arguments' form as they are at the call, before it runs (else None)."""
         if self.doc_v2 and name in EAGER_V2 and not EAGER_LATE[0]:
@@ -3870,7 +3940,8 @@ class Tracer3(Tracer):
             @functools.wraps(fn)
             def w(*args, **kw):
                 if tr.doc_v2 and rec.observer is not None:  # called by an observer's own code (class 6): not the
-                    return fn(*args, **kw)                  #   record's, run bare, its reads unlogged, a write a stop
+                    tr.count_call(name, "observer")         #   record's, run bare, its reads unlogged, a write a stop
+                    return fn(*args, **kw)
                 if tr.doc_v2 and (st["supp"] or (st["depth"] and st["node"] != int(nd.id))):
                     if st["supp"] or st["ext"]:     # inside a question at another node, or inside a replaced name
                         tr.bare[f"{nd.id} {name}"] += 1     # entered outside any record: bare, and counted
@@ -3881,12 +3952,20 @@ class Tracer3(Tracer):
                     raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record is "
                                      f"open and no question runs")
                 if st["ext"]:                       # inside an interface call: not §6.1's own call
+                    if tr.doc_v2:
+                        tr.count_call(name, "ext")
                     r = fn(*args, **kw)
                     if name == "message_id":        # m2_check there too: the node's store asks it
                         tr.m2_check(args[0], r, nd.id)
                     return r
                 if st["depth"]:
                     st["reached"].add(name)
+                    iw = tr.doc_v2 and name in IW_NAMES
+                    if tr.doc_v2:                   # a call inside the open record, by its fn
+                        tr.count_call(name, "in", st["cur"]["fn"])
+                    if iw:                          # and its IWANTs, from the rows the tape gains while it runs
+                        tr.iw_enter(name)
+                        k = len(st["cur"]["tape"])
                     st["depth"] += 1
                     if name == "defer":             # a record's chain of defers, bounded as the
                         st["defers"] += 1           #   twin's fuel (deferDepth) is
@@ -3904,6 +3983,8 @@ class Tracer3(Tracer):
                         st["depth"] -= 1
                         if name == "defer":
                             st["defers"] -= 1
+                        if iw:
+                            tr.iw_leave(name, "in", st["cur"]["tape"], k)
                 found = {}                          # under v2 every installed slot checked at the record's entry, a
                 if tr.doc_v2:                       #   draw the toy has bound re-wrapped for the record (K13)
                     found = rewrap_draws(ns, slots, rewrap)
@@ -3919,6 +4000,8 @@ class Tracer3(Tracer):
 
                 def finish(**out):
                     rec.on = False
+                    if tr.doc_v2 and name in IW_NAMES:      # its IWANTs, from its whole tape
+                        tr.iw_leave(name, "record", r_["tape"], 0)
                     if tr.doc_v2:                   # and at its exit, with the toy's draws put back where the
                         for d, cur in found.items():    # re-wrap still holds them
                             if getattr(ns.get(d), "_trace3_rewrap", False):
@@ -3954,6 +4037,9 @@ class Tracer3(Tracer):
                 st["cur"], st["depth"], st["reached"], st["defers"] = r_, 1, {name}, 1 if name == "defer" else 0
                 if tr.doc_v2:
                     st["node"] = int(nd.id)
+                    tr.count_call(name, "record")
+                    if name in IW_NAMES:
+                        tr.iw_enter(name)
                 mesh_on()
                 rec.on = True
                 if name == "rarest" or (tr.doc_v2 and name in ("choose", "pick")):  # v2's choose passes the raw

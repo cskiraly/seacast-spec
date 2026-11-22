@@ -828,6 +828,35 @@ def per_node_depth_v2():
     T.Tracer3.install = install
 
 
+def calls_nested_off_v2():
+    """Under v2, plant (u): the calls sidecar (OUT.calls.json) counts no call made inside an open record. The trace and
+    its replay are unchanged; calls_v2.py's reach control must refuse the sidecar, since records of one function
+    reach another whose calls inside them are then 0. Counted once for each call left out."""
+    tracer_instance()
+    _count = T.Tracer3.count_call
+
+    @functools.wraps(_count)
+    def count_call(self, name, branch, host=None):
+        if branch == "in":
+            PLANTED[0] += 1
+            return None
+        return _count(self, name, branch, host)
+
+    T.Tracer3.count_call = count_call
+
+
+def calls_iwants_off_v2():
+    """Under v2, plant (v): the calls sidecar counts no IWANT, nor any call of respond, retry_offer or ask_parked
+    among its IWANT counts. calls_v2.py's by-fn control must refuse it where those names' records enqueue one (v2/
+    hand5's respond). Counted once for each call left out."""
+    tracer_instance()
+
+    def count_iwants(self, name, branch, rows):
+        PLANTED[0] += 1
+
+    T.Tracer3.count_iwants = count_iwants
+
+
 SILENT_FORWARD = ("node.py", "Node._faults.<locals>.forward", 1103)    # LAYERS' key of the silent node's forward
 
 
@@ -1285,7 +1314,8 @@ PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppress
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
           "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS + (
           "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_V2 + (  # K13's two: the first must not
-          "--layer-missing-v2",)        # stop it, the second must; pieces D's and E's; H4's plant (n), on hand5-own
+          "--layer-missing-v2",         # stop it, the second must; pieces D's and E's; H4's plant (n), on hand5-own;
+          "--calls-nested-off-v2", "--calls-iwants-off-v2")     # piece (b)'s (u) and (v), on hand5
 HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -1363,6 +1393,10 @@ def main(argv):
             suppressed_filter_v2(rest[0], off=fault.endswith("-off"))
         elif fault == "--layer-missing-v2":
             layer_missing_v2(rest[0])
+        elif fault == "--calls-nested-off-v2":
+            calls_nested_off_v2()
+        elif fault == "--calls-iwants-off-v2":
+            calls_iwants_off_v2()
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":

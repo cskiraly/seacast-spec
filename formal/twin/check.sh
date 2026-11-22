@@ -1546,6 +1546,60 @@ h4_plant() {            # H4's plant (n): trace3.py's LAYERS without the silent 
     echo "  H4's plant (n): the silent node's layer of forward left out of LAYERS: the scan names it, the one difference, and the tracer stops at node 3's install, with its words"
   fi
 }
+calls_one() {           # $1: a trace under OUT, without .jsonl.gz: calls_v2.py's lines for it, in reached/
+  local g=$OUT/reached/${1//\//__}
+  $PY "$T/calls_v2.py" "$OUT" "$1" > "$g.txt" 2> "$g.err"; echo $? > "$g.rc"
+}
+calls_plant() {         # $1: a plant's letter, $2: its fault: its trace on hand5's arguments, and calls_v2.py over it
+  local f=$OUT/reached/plant-$1
+  (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$2" . "$f.jsonl.gz" > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
+  $PY "$T/calls_v2.py" --any "$OUT" "reached/plant-$1" > "$f.txt" 2>&1; echo $? > "$f.crc"
+}
+calls_summary() {       # piece (b): each v2 trace's reached names, and the IWANTs respond, retry_offer and ask_parked
+  #                       enqueue, by their records and by their calls, with the calls file's three controls
+  #                       (c-reached.txt, which the pull carries); plants (u) and (v), each refused by its control
+  local rel rels g n=0 s=0 bad= p ok=0 why=
+  rm -rf "$OUT/reached"; mkdir -p "$OUT/reached"
+  rels=$(cd "$OUT" && for d in v2 chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
+  for rel in $rels; do par calls_one "$rel"; done
+  par calls_plant u calls-nested-off-v2
+  par calls_plant v calls-iwants-off-v2
+  par_end || true       # each one's status is read below
+  : > "$OUT/c-reached.txt"
+  for rel in $rels; do
+    g=$OUT/reached/${rel//\//__}
+    cat "$g.txt" >> "$OUT/c-reached.txt"
+    if [ "$(cat "$g.rc")" != 0 ] || [ -s "$g.err" ]; then bad="$bad $rel"
+    elif has '^skipped: ' "$g.txt"; then s=$((s + 1))
+    else n=$((n + 1)); fi
+  done
+  if [ -n "$bad" ]; then
+    echo "c-reached: $n traces read, $s skipped; the controls fail, or the tool did, in:$bad" >> "$OUT/c-reached.txt"
+    no "the calls summary: the controls fail, or the tool did, in:$bad (c-reached.txt)"
+  else
+    echo "c-reached: $n traces read, $s skipped; the controls hold in every one" >> "$OUT/c-reached.txt"
+  fi
+  for p in u:calls-nested-off-v2:reach v:calls-iwants-off-v2:by-fn; do
+    local l=${p%%:*} q=${p#*:} f c
+    c=${q#*:}; q=${q%%:*}; f=$OUT/reached/plant-$l
+    if [ "$(cat "$f.rc")" != 0 ] || ! has -x -E "tracerfaults3: $q, planted [1-9][0-9]* times?" "$f.err"; then
+      why="$why ($l) not planted, or its run stopped;"
+    elif [ "$(cat "$f.crc")" != 1 ] || ! has -E "^reached/plant-$l: controls: NOT: $c: " "$f.txt" \
+        || has -E "^reached/plant-$l: controls: NOT: .*(K4a|$( [ "$c" = reach ] && echo by-fn || echo reach)): " "$f.txt"; then
+      why="$why ($l) not refused by $c alone;"
+    else
+      ok=$((ok + 1))
+    fi
+  done
+  if [ -n "$why" ]; then
+    no "the calls summary's plants:$why (reached/plant-*.txt)"
+  fi
+  if [ -z "$bad" ] && [ "$ok" = 2 ]; then
+    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u) and (v) each refused by their control"
+  else
+    echo "  the calls summary: not as it must be"
+  fi
+}
 s_tracercontrols() {
   local f want bad
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
@@ -1837,6 +1891,9 @@ EOF_ERC
   # H4's plant (n): one of LAYERS' changing layers left out, which the scan names and at whose install the tracer
   # stops (c-h4.err)
   h4_plant
+  # piece (b): each v2 trace's reached names and its IWANTs by records and by calls, with the calls file's controls,
+  # last, so that every v2 trace of the run is made (c-reached.txt)
+  calls_summary
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
