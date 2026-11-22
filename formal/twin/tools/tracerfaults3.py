@@ -857,7 +857,83 @@ def calls_iwants_off_v2():
     T.Tracer3.count_iwants = count_iwants
 
 
-SILENT_FORWARD = ("node.py", "Node._faults.<locals>.forward", 1103)    # LAYERS' key of the silent node's forward
+def timers_note_dropped_v2():
+    """Under v2, timers_v2.py's plant (i), on das-samplers-mcoff: the first note of a `retry_offer` timer in a question that
+    read `interest[g]` is left out of the question's row. The timer is still armed, and its record is written.
+    timers_v2.py's K1 (an ask newly armed with no note) and K4 (a record that nothing armed) must refuse the trace.
+    Counted once."""
+    _call_log = T.call_log
+
+    def call_log(cr, cw, timers=()):
+        if not PLANTED[0] and any(x[0] == "interest" and x[2] is not None for x in cr):
+            ts = list(timers)
+            j = next((k for k, tm in enumerate(ts) if tm[0] == "after" and tm[2] == "retry_offer"), None)
+            if j is not None:
+                SEEN["dropped"] = ts.pop(j)[3]
+                PLANTED[0] += 1
+                timers = ts
+        return _call_log(cr, cw, timers)
+
+    T.call_log = call_log
+
+
+def timers_v2_node(toy):
+    sys.path.insert(0, str(Path(toy).resolve()))
+    import node as N                    # noqa: E402: the pinned toy's (one sys.modules entry with trace3's)
+    return N
+
+
+def timers_delay_no_eps_v2(toy):
+    """Under v2, timers_v2.py's plant (ii), on das-samplers-mcoff: the toy's `deferred_offers` arms its timers without the
+    `+ 1e-6`, as `after(max(0.0, due), …)`. It is node.py's own function with that one constant made 0.0 (its code
+    object's constants), bound at the end of `_v2`, before the tracer's install. The timers fire where their notes
+    say, so timers_v2.py's K3 and K4 hold, and K2 must refuse every note. Counted once per node."""
+    N = timers_v2_node(toy)
+    _v2 = N.Node._v2
+
+    @functools.wraps(_v2)
+    def v2(self, ns):
+        _v2(self, ns)
+        f = ns["deferred_offers"]
+        consts = f.__code__.co_consts
+        hits = [k for k, c in enumerate(consts) if type(c) is float and c == 1e-6]
+        if len(hits) != 1:
+            raise SystemExit(f"tracerfaults3: deferred_offers has {len(hits)} constants 1e-6, not one")
+        code = f.__code__.replace(co_consts=tuple(0.0 if k == hits[0] else c for k, c in enumerate(consts)))
+        g = types.FunctionType(code, f.__globals__, f.__name__, f.__defaults__, f.__closure__)
+        g.__qualname__, g.__kwdefaults__ = f.__qualname__, f.__kwdefaults__
+        ns["deferred_offers"] = g
+        PLANTED[0] += 1
+
+    N.Node._v2 = v2
+
+
+class NeverArmed(set):
+    """A node's `_retry_armed` under plant (iii): it keeps what is added, and says that no ask is in it."""
+    def __contains__(self, a):
+        if set.__contains__(self, a):
+            PLANTED[0] += 1             # an ask armed already, armed again
+        return False
+
+
+def timers_note_per_index_v2(toy):
+    """Under v2, timers_v2.py's plant (iii), on das-samplers-mcoff: `deferred_offers` arms a timer for every wanted
+    index it is offered, without the toy's `_retry_armed` test, through a `_retry_armed` that says no ask is in it
+    (NeverArmed), set at the end of the node's construction, before the tracer's install. timers_v2.py's K1 must
+    refuse the trace, once for each ask armed again, whether or not the entry read interest[g]; K2, K3 and K4 hold.
+    Counted once for each ask armed again."""
+    N = timers_v2_node(toy)
+    _init = N.Node.__init__
+
+    @functools.wraps(_init)
+    def init(self, *a, **kw):
+        _init(self, *a, **kw)
+        self._retry_armed = NeverArmed(self._retry_armed)
+
+    N.Node.__init__ = init
+
+
+SILENT_FORWARD =("node.py", "Node._faults.<locals>.forward", 1103)    # LAYERS' key of the silent node's forward
 
 
 def layer_missing_v2(toy):
@@ -962,7 +1038,8 @@ def suppressed_filter_v2(toy, off):
 
 
 CELL_PLANTS_V2 = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-checks-off-v2",  # on a cell's arguments
-                  "--per-node-depth-v2", "--suppressed-filter-v2", "--suppressed-filter-v2-off")
+                  "--per-node-depth-v2", "--suppressed-filter-v2", "--suppressed-filter-v2-off",
+                  "--timers-note-dropped-v2", "--timers-delay-no-eps-v2", "--timers-note-per-index-v2")   # timers_v2.py's (i)-(iii)
 
 
 def hdr_read_v2(raw):
@@ -1397,6 +1474,12 @@ def main(argv):
             calls_nested_off_v2()
         elif fault == "--calls-iwants-off-v2":
             calls_iwants_off_v2()
+        elif fault == "--timers-note-dropped-v2":
+            timers_note_dropped_v2()
+        elif fault == "--timers-delay-no-eps-v2":
+            timers_delay_no_eps_v2(rest[0])
+        elif fault == "--timers-note-per-index-v2":
+            timers_note_per_index_v2(rest[0])
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":
