@@ -1,54 +1,54 @@
-start 2026-11-21 12:12:17 UTC
+start 2026-11-22 01:22:00 UTC
 the toy: RUN/tree/toy
-the content line: 9959 bytes, sha256 f6ed400910465f13f3f8f31ec803887e3a0587ca4a01f3f6eb9bcfd4d7196e4c
-== build: 12:12:17
+the content line: 10631 bytes, sha256 ff20bc104d9e501d6ee861005ad0af654be5917bfabfa050dbf355e7fff07260
+== build: 01:22:00
   Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release)
-  the twin's sources: 32 files, the list's sha256 0aefe386de51584bd050dd0fb5cbabb6092f4702ee6e9dfc9d726152f849a924 (twin-sources.txt)
-  the replay: sha256 229d1990b80446a6ef7eb30d131f8d8eabf0067db2a423d9409dab8f3b03ba5b
-== selftests: 12:12:56
+  the twin's sources: 32 files, the list's sha256 5f5c59b004bc27455346abd614612bc3a623de2f5c20cb19fd0067cf1218e167 (twin-sources.txt)
+  the replay: sha256 d9e6b3ade9880b5383e59c7440911220275d22ab283f583944ce536b47116f0f
+== selftests: 01:22:58
   8 of 8 tools' own cases as they must be (selftests.txt)
-== tables: 12:12:58
+== tables: 01:22:59
     ok: the replay's one instance, by Tables.ofState, and nothing else
   ok: every case as the contract says
-== scope: 12:13:03
+== scope: 01:23:05
   by section: §1 7, §2 1, §3 2, §4.1 2, §4.2 12, §4.3 1, §4.4 4, §4.5 1, §4.6 4, §5.1 4, §5.2 5, §5.3 2, §5.4 1, §6.1 14, §6.2 1, §6.4 3, §7.1 9, §7.2 5
   the twin's functions with no def in the code blocks: held
   control, the twin without group_id: refused, as it must be
   78 of 78 functions of protocol.md's code blocks have their twin, by name
-== mutants: 12:13:03
-  562 of 562 mutants' texts stand in the twin once, each in the place its description names
+== mutants: 01:23:05
+  569 of 569 mutants' texts stand in the twin once, each in the place its description names
   control, a change that does not type-check: rc=1: it fails, as it must
-  562 of 562 mutants type-check alone against the twin's built imports
-== screen: 12:15:07
+  569 of 569 mutants type-check alone against the twin's built imports
+== screen: 01:25:13
   v03: 15 cells' header and nodes line read; control, a nodes line without PROMISE: refused, and seen
   v2: 15 cells' header and nodes line read; control, a nodes line without PROMISE: refused, and seen
-== cells: 12:15:11
+== cells: 01:25:17
   none: trace rc=0, digest as golden.txt, replay 914902/914902/0 (records/ok/mismatched), rc=0, reads the twin did not make 0, header as these tools and these documents
-== small: 12:20:01
+== small: 01:30:25
   traces/hand5-publish: digest traced d49283d6734a2d42, untraced d49283d6734a2d42: the same
   traces/hand5-sec61: digest traced 484bb9a09a8c557e, untraced 484bb9a09a8c557e: the same
   traces/hand5: digest traced 484bb9a09a8c557e, untraced 484bb9a09a8c557e: the same
   traces/late16: digest traced bf3aa10491aba732, untraced bf3aa10491aba732: the same
   v2/hand5-own: digest traced 5b4d8fb84b978a7d, untraced 5b4d8fb84b978a7d: the same
   v2/hand5: digest traced 484bb9a09a8c557e, untraced 484bb9a09a8c557e: the same
-== directed: 12:20:45
+== directed: 01:31:13
   22 of 22 directed sets traced
-== replays: 12:22:11
+== replays: 01:32:54
   29 of 29 replays: every record of a trace that is not empty, none mismatched, no read left unmade (replays.txt)
-== headers: 12:22:11
+== headers: 01:32:54
   29 headers read (headers.txt)
-  hashes.txt: 29 traces, the file's sha256 704a0e3784f484870f25571066a79669bdbdb0bee23d15e52159ab4a71c53d31
-== picks: 12:22:20
+  hashes.txt: 29 traces, the file's sha256 ed9c89e3ddfab172d713727d8600c931190b53b2c40146bec0931e76cd47c04b
+== picks: 01:33:05
   fixcontrols pick: directed42.jsonl.gz --only fn=validate_chunk: 20000 records; 0 reached validate_chunk, 2887 more ask it on the tape; the replay took 2887 and ended with 0
   fixcontrols pick: directed41.jsonl.gz --only fn=on_iwant: 20000 records; 13610 reached on_iwant, 2988 more ask it on the tape; the replay took 16598 and ended with 0
   fixcontrols pick: directed46d.jsonl.gz --only fn=push_rebuilt: 20000 records; 13998 reached push_rebuilt, 3160 more ask it on the tape; the replay took 17158 and ended with 0
   fixcontrols draw: directed3v.jsonl.gz: the blocks answered, by form: design A, an id, a descriptor: 1800; design A, an id, no descriptor: 7101; design A, no id, no descriptor: 636; design B, an id, 
-== controls: 12:22:50
+== controls: 01:33:36
   control, a mutant that compiles (window-le): told, as it must be: window-le: may_ask: an ask is in flight while now - t <= IWANT_WINDOW (for <): 187 mismatched records in 1 of 1 traces, by {'tape': 187}; 0 reads not 
   control, altered records, headers and nodes lines: 31 groups, each refused as it must be (c-altered.txt)
   control, a trace cut short: refused, as it must be: trailer: none (the trace is cut off)
   control, the content line: 38 cases, each as it must be (c-content.txt)
-== perturbed: 12:24:05
+== perturbed: 01:34:57
   control, a tracer that perturbs: push's digest is 933921d8dca3a9c3, golden.txt's c59362bcb57be09d: another, as it must be
-end 2026-11-21 12:26:54 UTC
+end 2026-11-22 01:38:00 UTC
 check.sh: PASS

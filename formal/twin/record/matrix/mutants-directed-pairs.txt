@@ -70,8 +70,8 @@ backoff-x2 directed3v 0 0 {}
 backoff-x2 directed41 0 0 {}
 backoff-x2 directed42 0 0 {}
 backoff-x2 directed43 0 0 {}
-backoff-x2 directed44 461 0 {'tape': 461}
-backoff-x2 directed44u 461 0 {'tape': 461}
+backoff-x2 directed44 389 0 {'tape': 389}
+backoff-x2 directed44u 389 0 {'tape': 389}
 backoff-x2 directed46 0 0 {}
 backoff-x2 directed46d 0 0 {}
 backoff-x2 directed4b 324 0 {'tape': 324}
@@ -136,8 +136,8 @@ outstanding-no-queue directed3v 0 0 {}
 outstanding-no-queue directed41 0 2305 {}
 outstanding-no-queue directed42 0 0 {}
 outstanding-no-queue directed43 0 0 {}
-outstanding-no-queue directed44 171 4270 {'tape': 171}
-outstanding-no-queue directed44u 171 4270 {'tape': 171}
+outstanding-no-queue directed44 147 3663 {'tape': 147}
+outstanding-no-queue directed44u 147 3663 {'tape': 147}
 outstanding-no-queue directed46 0 0 {}
 outstanding-no-queue directed46d 0 0 {}
 outstanding-no-queue directed4b 0 4079 {}
@@ -158,8 +158,8 @@ announcers-peers-first directed3v 0 0 {}
 announcers-peers-first directed41 0 0 {}
 announcers-peers-first directed42 0 0 {}
 announcers-peers-first directed43 0 0 {}
-announcers-peers-first directed44 19 12 {'reads': 19}
-announcers-peers-first directed44u 19 12 {'reads': 19}
+announcers-peers-first directed44 18 12 {'reads': 18}
+announcers-peers-first directed44u 18 12 {'reads': 18}
 announcers-peers-first directed46 0 0 {}
 announcers-peers-first directed46d 0 0 {}
 announcers-peers-first directed4b 425 0 {'tape': 425}
@@ -224,8 +224,8 @@ last-resort-rearms directed3v 0 0 {}
 last-resort-rearms directed41 0 0 {}
 last-resort-rearms directed42 0 0 {}
 last-resort-rearms directed43 0 0 {}
-last-resort-rearms directed44 198 943 {'reads': 60, 'tape': 138}
-last-resort-rearms directed44u 198 943 {'reads': 60, 'tape': 138}
+last-resort-rearms directed44 162 786 {'reads': 52, 'tape': 110}
+last-resort-rearms directed44u 162 786 {'reads': 52, 'tape': 110}
 last-resort-rearms directed46 0 0 {}
 last-resort-rearms directed46d 0 0 {}
 last-resort-rearms directed4b 10 2376 {'tape': 10}
@@ -268,8 +268,8 @@ outstanding-group-only directed3v 0 0 {}
 outstanding-group-only directed41 0 0 {}
 outstanding-group-only directed42 0 0 {}
 outstanding-group-only directed43 0 0 {}
-outstanding-group-only directed44 1438 21 {'tape': 1438}
-outstanding-group-only directed44u 1438 21 {'tape': 1438}
+outstanding-group-only directed44 1223 20 {'tape': 1223}
+outstanding-group-only directed44u 1223 20 {'tape': 1223}
 outstanding-group-only directed46 0 0 {}
 outstanding-group-only directed46d 0 0 {}
 outstanding-group-only directed4b 0 0 {}
@@ -378,8 +378,8 @@ parked-any-group directed3v 0 0 {}
 parked-any-group directed41 2809 0 {'reads': 2809}
 parked-any-group directed42 0 0 {}
 parked-any-group directed43 0 0 {}
-parked-any-group directed44 5654 0 {'reads': 4857, 'tape': 797}
-parked-any-group directed44u 5654 0 {'reads': 4857, 'tape': 797}
+parked-any-group directed44 4835 0 {'reads': 4153, 'tape': 682}
+parked-any-group directed44u 4835 0 {'reads': 4153, 'tape': 682}
 parked-any-group directed46 0 0 {}
 parked-any-group directed46d 0 0 {}
 parked-any-group directed4b 3183 0 {'reads': 2105, 'tape': 1078}
@@ -422,8 +422,8 @@ announcers-any-group directed3v 0 0 {}
 announcers-any-group directed41 0 0 {}
 announcers-any-group directed42 0 0 {}
 announcers-any-group directed43 0 0 {}
-announcers-any-group directed44 702 0 {'reads': 435, 'tape': 267}
-announcers-any-group directed44u 702 0 {'reads': 435, 'tape': 267}
+announcers-any-group directed44 583 0 {'reads': 361, 'tape': 222}
+announcers-any-group directed44u 583 0 {'reads': 361, 'tape': 222}
 announcers-any-group directed46 0 0 {}
 announcers-any-group directed46d 0 0 {}
 announcers-any-group directed4b 3367 0 {'reads': 774, 'tape': 2593}
@@ -444,8 +444,8 @@ outstanding-queued-any-group directed3v 0 0 {}
 outstanding-queued-any-group directed41 0 0 {}
 outstanding-queued-any-group directed42 0 0 {}
 outstanding-queued-any-group directed43 0 0 {}
-outstanding-queued-any-group directed44 176 0 {'tape': 176}
-outstanding-queued-any-group directed44u 176 0 {'tape': 176}
+outstanding-queued-any-group directed44 152 0 {'tape': 152}
+outstanding-queued-any-group directed44u 152 0 {'tape': 152}
 outstanding-queued-any-group directed46 0 0 {}
 outstanding-queued-any-group directed46d 0 0 {}
 outstanding-queued-any-group directed4b 0 0 {}
@@ -466,8 +466,8 @@ window-per-chunk directed3v 0 0 {}
 window-per-chunk directed41 2379 0 {'reads': 2379}
 window-per-chunk directed42 0 0 {}
 window-per-chunk directed43 0 0 {}
-window-per-chunk directed44 1293 0 {'reads': 986, 'tape': 307}
-window-per-chunk directed44u 4365 0 {'reads': 3247, 'tape': 1118}
+window-per-chunk directed44 1116 0 {'reads': 846, 'tape': 270}
+window-per-chunk directed44u 3748 0 {'reads': 2800, 'tape': 948}
 window-per-chunk directed46 0 0 {}
 window-per-chunk directed46d 0 0 {}
 window-per-chunk directed4b 2218 0 {'reads': 2181, 'tape': 37}
@@ -620,8 +620,8 @@ last-resort-done-per-group directed3v 0 0 {}
 last-resort-done-per-group directed41 0 0 {}
 last-resort-done-per-group directed42 0 0 {}
 last-resort-done-per-group directed43 0 0 {}
-last-resort-done-per-group directed44 866 0 {'reads': 688, 'tape': 178}
-last-resort-done-per-group directed44u 866 0 {'reads': 688, 'tape': 178}
+last-resort-done-per-group directed44 725 0 {'reads': 572, 'tape': 153}
+last-resort-done-per-group directed44u 725 0 {'reads': 572, 'tape': 153}
 last-resort-done-per-group directed46 0 0 {}
 last-resort-done-per-group directed46d 0 0 {}
 last-resort-done-per-group directed4b 1592 0 {'reads': 1436, 'tape': 156}
@@ -642,8 +642,8 @@ last-resort-armed-any-chunk directed3v 0 0 {}
 last-resort-armed-any-chunk directed41 0 0 {}
 last-resort-armed-any-chunk directed42 0 0 {}
 last-resort-armed-any-chunk directed43 0 0 {}
-last-resort-armed-any-chunk directed44 866 0 {'reads': 646, 'tape': 220}
-last-resort-armed-any-chunk directed44u 866 0 {'reads': 646, 'tape': 220}
+last-resort-armed-any-chunk directed44 725 0 {'reads': 542, 'tape': 183}
+last-resort-armed-any-chunk directed44u 725 0 {'reads': 542, 'tape': 183}
 last-resort-armed-any-chunk directed46 0 0 {}
 last-resort-armed-any-chunk directed46d 0 0 {}
 last-resort-armed-any-chunk directed4b 1592 0 {'reads': 1490, 'tape': 102}
@@ -664,8 +664,8 @@ announcers-list-any-form directed3v 0 0 {}
 announcers-list-any-form directed41 0 0 {}
 announcers-list-any-form directed42 0 0 {}
 announcers-list-any-form directed43 0 0 {}
-announcers-list-any-form directed44 866 0 {'reads': 626, 'tape': 240}
-announcers-list-any-form directed44u 866 0 {'reads': 626, 'tape': 240}
+announcers-list-any-form directed44 725 0 {'reads': 526, 'tape': 199}
+announcers-list-any-form directed44u 725 0 {'reads': 526, 'tape': 199}
 announcers-list-any-form directed46 0 0 {}
 announcers-list-any-form directed46d 0 0 {}
 announcers-list-any-form directed4b 1262 0 {'reads': 1018, 'tape': 244}
@@ -686,8 +686,8 @@ last-resort-armed-any-group directed3v 0 0 {}
 last-resort-armed-any-group directed41 0 0 {}
 last-resort-armed-any-group directed42 0 0 {}
 last-resort-armed-any-group directed43 0 0 {}
-last-resort-armed-any-group directed44 866 0 {'reads': 782, 'tape': 84}
-last-resort-armed-any-group directed44u 866 0 {'reads': 782, 'tape': 84}
+last-resort-armed-any-group directed44 725 0 {'reads': 652, 'tape': 73}
+last-resort-armed-any-group directed44u 725 0 {'reads': 652, 'tape': 73}
 last-resort-armed-any-group directed46 0 0 {}
 last-resort-armed-any-group directed46d 0 0 {}
 last-resort-armed-any-group directed4b 1592 0 {'reads': 1592}
@@ -708,8 +708,8 @@ window-per-group directed3v 0 0 {}
 window-per-group directed41 2665 0 {'reads': 815, 'tape': 1850}
 window-per-group directed42 0 0 {}
 window-per-group directed43 0 0 {}
-window-per-group directed44 1293 0 {'reads': 449, 'tape': 844}
-window-per-group directed44u 4365 0 {'reads': 1373, 'tape': 2992}
+window-per-group directed44 1116 0 {'reads': 395, 'tape': 721}
+window-per-group directed44u 3748 0 {'reads': 1194, 'tape': 2554}
 window-per-group directed46 0 0 {}
 window-per-group directed46d 0 0 {}
 window-per-group directed4b 2674 0 {'reads': 701, 'tape': 1973}
@@ -730,8 +730,8 @@ own-order-unasked directed3v 0 0 {}
 own-order-unasked directed41 0 0 {}
 own-order-unasked directed42 0 0 {}
 own-order-unasked directed43 0 0 {}
-own-order-unasked directed44 866 0 {'tape': 866}
-own-order-unasked directed44u 866 0 {'tape': 866}
+own-order-unasked directed44 725 0 {'tape': 725}
+own-order-unasked directed44u 725 0 {'tape': 725}
 own-order-unasked directed46 0 0 {}
 own-order-unasked directed46d 0 0 {}
 own-order-unasked directed4b 3689 0 {'tape': 3689}
@@ -752,8 +752,8 @@ own-order-of-all directed3v 0 0 {}
 own-order-of-all directed41 0 0 {}
 own-order-of-all directed42 0 0 {}
 own-order-of-all directed43 0 0 {}
-own-order-of-all directed44 595 0 {'tape': 595}
-own-order-of-all directed44u 595 0 {'tape': 595}
+own-order-of-all directed44 506 0 {'tape': 506}
+own-order-of-all directed44u 506 0 {'tape': 506}
 own-order-of-all directed46 0 0 {}
 own-order-of-all directed46d 0 0 {}
 own-order-of-all directed4b 1352 0 {'tape': 1352}
@@ -774,8 +774,8 @@ own-order-reversed directed3v 0 0 {}
 own-order-reversed directed41 0 0 {}
 own-order-reversed directed42 0 0 {}
 own-order-reversed directed43 0 0 {}
-own-order-reversed directed44 66 15 {'reads': 66}
-own-order-reversed directed44u 66 15 {'reads': 66}
+own-order-reversed directed44 49 14 {'reads': 49}
+own-order-reversed directed44u 49 14 {'reads': 49}
 own-order-reversed directed46 0 0 {}
 own-order-reversed directed46d 0 0 {}
 own-order-reversed directed4b 695 0 {'tape': 695}
@@ -796,8 +796,8 @@ may-ask-erases-group directed3v 0 0 {}
 may-ask-erases-group directed41 1850 0 {'state': 1850}
 may-ask-erases-group directed42 0 0 {}
 may-ask-erases-group directed43 0 0 {}
-may-ask-erases-group directed44 952 0 {'state': 923, 'tape': 29}
-may-ask-erases-group directed44u 3281 0 {'state': 3115, 'tape': 166}
+may-ask-erases-group directed44 816 0 {'state': 787, 'tape': 29}
+may-ask-erases-group directed44u 2800 0 {'state': 2656, 'tape': 144}
 may-ask-erases-group directed46 0 0 {}
 may-ask-erases-group directed46d 0 0 {}
 may-ask-erases-group directed4b 2219 0 {'state': 2077, 'tape': 142}
@@ -818,8 +818,8 @@ may-ask-writes-outside directed3v 0 0 {}
 may-ask-writes-outside directed41 2809 0 {'state': 2069, 'tape': 740}
 may-ask-writes-outside directed42 0 0 {}
 may-ask-writes-outside directed43 0 0 {}
-may-ask-writes-outside directed44 1209 0 {'state': 1120, 'tape': 57, 'writes': 32}
-may-ask-writes-outside directed44u 4045 0 {'state': 3648, 'tape': 304, 'writes': 93}
+may-ask-writes-outside directed44 1036 0 {'state': 966, 'tape': 46, 'writes': 24}
+may-ask-writes-outside directed44u 3461 0 {'state': 3113, 'tape': 268, 'writes': 80}
 may-ask-writes-outside directed46 0 0 {}
 may-ask-writes-outside directed46d 0 0 {}
 may-ask-writes-outside directed4b 2935 0 {'state': 1564, 'tape': 1371}
@@ -884,8 +884,8 @@ may-ask-erases-outside directed3v 0 0 {}
 may-ask-erases-outside directed41 2809 0 {'writes': 2809}
 may-ask-erases-outside directed42 0 0 {}
 may-ask-erases-outside directed43 0 0 {}
-may-ask-erases-outside directed44 1215 0 {'state': 139, 'writes': 1076}
-may-ask-erases-outside directed44u 4067 0 {'state': 537, 'writes': 3530}
+may-ask-erases-outside directed44 1041 0 {'state': 121, 'writes': 920}
+may-ask-erases-outside directed44u 3481 0 {'state': 463, 'writes': 3018}
 may-ask-erases-outside directed46 0 0 {}
 may-ask-erases-outside directed46d 0 0 {}
 may-ask-erases-outside directed4b 2829 0 {'state': 2, 'writes': 2827}
@@ -906,8 +906,8 @@ announcers-any-index directed3v 0 0 {}
 announcers-any-index directed41 0 0 {}
 announcers-any-index directed42 0 0 {}
 announcers-any-index directed43 0 0 {}
-announcers-any-index directed44 298 0 {'tape': 298}
-announcers-any-index directed44u 298 0 {'tape': 298}
+announcers-any-index directed44 256 0 {'tape': 256}
+announcers-any-index directed44u 256 0 {'tape': 256}
 announcers-any-index directed46 0 0 {}
 announcers-any-index directed46d 0 0 {}
 announcers-any-index directed4b 2043 0 {'tape': 2043}
@@ -928,8 +928,8 @@ tables-read-wide directed3v 0 0 {}
 tables-read-wide directed41 0 0 {}
 tables-read-wide directed42 0 0 {}
 tables-read-wide directed43 0 0 {}
-tables-read-wide directed44 811 0 {'reads': 14, 'tape': 797}
-tables-read-wide directed44u 811 0 {'reads': 14, 'tape': 797}
+tables-read-wide directed44 696 0 {'reads': 14, 'tape': 682}
+tables-read-wide directed44u 696 0 {'reads': 14, 'tape': 682}
 tables-read-wide directed46 0 0 {}
 tables-read-wide directed46d 0 0 {}
 tables-read-wide directed4b 1078 174 {'tape': 1078}
@@ -972,8 +972,8 @@ no-note-read directed3v 0 0 {}
 no-note-read directed41 0 4952 {}
 no-note-read directed42 0 0 {}
 no-note-read directed43 0 0 {}
-no-note-read directed44 0 1753 {}
-no-note-read directed44u 0 6555 {}
+no-note-read directed44 0 1509 {}
+no-note-read directed44u 0 5598 {}
 no-note-read directed46 0 0 {}
 no-note-read directed46d 0 0 {}
 no-note-read directed4b 0 7116 {}
@@ -1038,8 +1038,8 @@ tables-offered-wide directed3v 0 0 {}
 tables-offered-wide directed41 3265 0 {'state': 3265}
 tables-offered-wide directed42 5023 0 {'reads': 305, 'state': 4718}
 tables-offered-wide directed43 0 0 {}
-tables-offered-wide directed44 7344 0 {'state': 7344}
-tables-offered-wide directed44u 7344 0 {'state': 7344}
+tables-offered-wide directed44 6289 0 {'state': 6289}
+tables-offered-wide directed44u 6289 0 {'state': 6289}
 tables-offered-wide directed46 0 0 {}
 tables-offered-wide directed46d 0 0 {}
 tables-offered-wide directed4b 4304 0 {'reads': 188, 'state': 4116}
@@ -1060,8 +1060,8 @@ no-note-write directed3v 0 0 {}
 no-note-write directed41 2809 0 {'writes': 2809}
 no-note-write directed42 0 0 {}
 no-note-write directed43 0 0 {}
-no-note-write directed44 1215 0 {'writes': 1215}
-no-note-write directed44u 4067 0 {'writes': 4067}
+no-note-write directed44 1041 0 {'writes': 1041}
+no-note-write directed44u 3481 0 {'writes': 3481}
 no-note-write directed46 0 0 {}
 no-note-write directed46d 0 0 {}
 no-note-write directed4b 2935 0 {'writes': 2935}
@@ -1104,8 +1104,8 @@ ihave-asks-block-always directed3v 0 0 {}
 ihave-asks-block-always directed41 0 0 {}
 ihave-asks-block-always directed42 0 0 {}
 ihave-asks-block-always directed43 0 0 {}
-ihave-asks-block-always directed44 932 0 {'tape': 932}
-ihave-asks-block-always directed44u 932 0 {'tape': 932}
+ihave-asks-block-always directed44 776 0 {'tape': 776}
+ihave-asks-block-always directed44u 776 0 {'tape': 776}
 ihave-asks-block-always directed46 0 0 {}
 ihave-asks-block-always directed46d 0 0 {}
 ihave-asks-block-always directed4b 0 0 {}
@@ -1148,8 +1148,8 @@ ihave-offers-held directed3v 0 0 {}
 ihave-offers-held directed41 0 0 {}
 ihave-offers-held directed42 0 0 {}
 ihave-offers-held directed43 0 0 {}
-ihave-offers-held directed44 539 0 {'reached': 64, 'reads': 14, 'state': 33, 'tape': 428}
-ihave-offers-held directed44u 539 0 {'reached': 64, 'reads': 14, 'state': 33, 'tape': 428}
+ihave-offers-held directed44 539 0 {'reached': 72, 'reads': 11, 'state': 28, 'tape': 428}
+ihave-offers-held directed44u 539 0 {'reached': 72, 'reads': 11, 'state': 28, 'tape': 428}
 ihave-offers-held directed46 0 0 {}
 ihave-offers-held directed46d 0 0 {}
 ihave-offers-held directed4b 0 0 {}
@@ -1170,8 +1170,8 @@ ihave-tied-ignored directed3v 0 0 {}
 ihave-tied-ignored directed41 0 0 {}
 ihave-tied-ignored directed42 0 0 {}
 ihave-tied-ignored directed43 0 0 {}
-ihave-tied-ignored directed44 499 0 {'reached': 29, 'reads': 4, 'tape': 466}
-ihave-tied-ignored directed44u 499 0 {'reached': 29, 'reads': 4, 'tape': 466}
+ihave-tied-ignored directed44 434 0 {'reached': 24, 'reads': 2, 'tape': 408}
+ihave-tied-ignored directed44u 434 0 {'reached': 24, 'reads': 2, 'tape': 408}
 ihave-tied-ignored directed46 0 0 {}
 ihave-tied-ignored directed46d 0 0 {}
 ihave-tied-ignored directed4b 0 0 {}
@@ -1192,8 +1192,8 @@ ihave-parked-no-last-resort directed3v 0 0 {}
 ihave-parked-no-last-resort directed41 0 0 {}
 ihave-parked-no-last-resort directed42 0 0 {}
 ihave-parked-no-last-resort directed43 0 0 {}
-ihave-parked-no-last-resort directed44 866 0 {'tape': 866}
-ihave-parked-no-last-resort directed44u 866 0 {'tape': 866}
+ihave-parked-no-last-resort directed44 725 0 {'tape': 725}
+ihave-parked-no-last-resort directed44u 725 0 {'tape': 725}
 ihave-parked-no-last-resort directed46 0 0 {}
 ihave-parked-no-last-resort directed46d 0 0 {}
 ihave-parked-no-last-resort directed4b 0 0 {}
@@ -1214,8 +1214,8 @@ ihave-parked-goes-on directed3v 0 0 {}
 ihave-parked-goes-on directed41 0 0 {}
 ihave-parked-goes-on directed42 0 0 {}
 ihave-parked-goes-on directed43 0 0 {}
-ihave-parked-goes-on directed44 852 0 {'reached': 87, 'tape': 765}
-ihave-parked-goes-on directed44u 852 0 {'reached': 87, 'tape': 765}
+ihave-parked-goes-on directed44 716 0 {'reached': 72, 'tape': 644}
+ihave-parked-goes-on directed44u 716 0 {'reached': 72, 'tape': 644}
 ihave-parked-goes-on directed46 0 0 {}
 ihave-parked-goes-on directed46d 0 0 {}
 ihave-parked-goes-on directed4b 0 0 {}
@@ -1236,8 +1236,8 @@ ihave-outstanding-ignored directed3v 0 0 {}
 ihave-outstanding-ignored directed41 0 0 {}
 ihave-outstanding-ignored directed42 0 0 {}
 ihave-outstanding-ignored directed43 0 0 {}
-ihave-outstanding-ignored directed44 1198 0 {'tape': 1198}
-ihave-outstanding-ignored directed44u 1198 0 {'tape': 1198}
+ihave-outstanding-ignored directed44 1001 0 {'tape': 1001}
+ihave-outstanding-ignored directed44u 1001 0 {'tape': 1001}
 ihave-outstanding-ignored directed46 0 0 {}
 ihave-outstanding-ignored directed46d 0 0 {}
 ihave-outstanding-ignored directed4b 0 0 {}
@@ -1280,8 +1280,8 @@ ihave-limit-after-ask directed3v 0 0 {}
 ihave-limit-after-ask directed41 0 0 {}
 ihave-limit-after-ask directed42 0 0 {}
 ihave-limit-after-ask directed43 0 0 {}
-ihave-limit-after-ask directed44 3334 0 {'reached': 298, 'state': 38, 'tape': 2996, 'writes': 2}
-ihave-limit-after-ask directed44u 298 0 {'reached': 298}
+ihave-limit-after-ask directed44 2862 0 {'reached': 267, 'state': 35, 'tape': 2558, 'writes': 2}
+ihave-limit-after-ask directed44u 267 0 {'reached': 267}
 ihave-limit-after-ask directed46 0 0 {}
 ihave-limit-after-ask directed46d 0 0 {}
 ihave-limit-after-ask directed4b 0 0 {}
@@ -1302,7 +1302,7 @@ ihave-held-back-key directed3v 0 0 {}
 ihave-held-back-key directed41 0 0 {}
 ihave-held-back-key directed42 0 0 {}
 ihave-held-back-key directed43 0 0 {}
-ihave-held-back-key directed44 3256 0 {'state': 3256}
+ihave-held-back-key directed44 2787 0 {'state': 2787}
 ihave-held-back-key directed44u 0 0 {}
 ihave-held-back-key directed46 0 0 {}
 ihave-held-back-key directed46d 0 0 {}
@@ -1324,8 +1324,8 @@ ihave-asked-not-counted directed3v 0 0 {}
 ihave-asked-not-counted directed41 2809 0 {'state': 2809}
 ihave-asked-not-counted directed42 0 0 {}
 ihave-asked-not-counted directed43 0 0 {}
-ihave-asked-not-counted directed44 1215 0 {'state': 1071, 'tape': 144}
-ihave-asked-not-counted directed44u 4067 0 {'state': 4067}
+ihave-asked-not-counted directed44 1041 0 {'state': 923, 'tape': 118}
+ihave-asked-not-counted directed44u 3481 0 {'state': 3481}
 ihave-asked-not-counted directed46 0 0 {}
 ihave-asked-not-counted directed46d 0 0 {}
 ihave-asked-not-counted directed4b 0 0 {}
@@ -1346,7 +1346,7 @@ ihave-rpcs-not-counted directed3v 0 0 {}
 ihave-rpcs-not-counted directed41 3975 0 {'state': 3975}
 ihave-rpcs-not-counted directed42 0 0 {}
 ihave-rpcs-not-counted directed43 0 0 {}
-ihave-rpcs-not-counted directed44 11181 0 {'reached': 58, 'state': 10381, 'tape': 742}
+ihave-rpcs-not-counted directed44 11181 0 {'reached': 51, 'state': 10501, 'tape': 629}
 ihave-rpcs-not-counted directed44u 11181 0 {'state': 11181}
 ihave-rpcs-not-counted directed46 0 0 {}
 ihave-rpcs-not-counted directed46d 0 0 {}
@@ -1390,7 +1390,7 @@ limits-rpcs-ge directed3v 0 0 {}
 limits-rpcs-ge directed41 0 0 {}
 limits-rpcs-ge directed42 0 0 {}
 limits-rpcs-ge directed43 0 0 {}
-limits-rpcs-ge directed44 1121 643 {'reached': 45, 'return': 406, 'tape': 670}
+limits-rpcs-ge directed44 1028 575 {'reached': 44, 'return': 406, 'tape': 578}
 limits-rpcs-ge directed44u 0 0 {}
 limits-rpcs-ge directed46 0 0 {}
 limits-rpcs-ge directed46d 0 0 {}
@@ -1412,7 +1412,7 @@ limits-asks-gt directed3v 0 0 {}
 limits-asks-gt directed41 0 0 {}
 limits-asks-gt directed42 0 0 {}
 limits-asks-gt directed43 0 0 {}
-limits-asks-gt directed44 839 0 {'reached': 21, 'return': 293, 'state': 38, 'tape': 485, 'writes': 2}
+limits-asks-gt directed44 760 0 {'reached': 19, 'return': 293, 'state': 35, 'tape': 411, 'writes': 2}
 limits-asks-gt directed44u 0 0 {}
 limits-asks-gt directed46 0 0 {}
 limits-asks-gt directed46d 0 0 {}
@@ -1434,7 +1434,7 @@ limits-reads-both directed3v 0 0 {}
 limits-reads-both directed41 0 0 {}
 limits-reads-both directed42 0 0 {}
 limits-reads-both directed43 0 0 {}
-limits-reads-both directed44 2969 0 {'reads': 2969}
+limits-reads-both directed44 2640 0 {'reads': 2640}
 limits-reads-both directed44u 0 0 {}
 limits-reads-both directed46 0 0 {}
 limits-reads-both directed46d 0 0 {}
@@ -1478,8 +1478,8 @@ expand-ignores-known-id directed3v 0 0 {}
 expand-ignores-known-id directed41 0 0 {}
 expand-ignores-known-id directed42 0 0 {}
 expand-ignores-known-id directed43 0 0 {}
-expand-ignores-known-id directed44 2904 0 {'reads': 258, 'return': 510, 'state': 371, 'tape': 1765}
-expand-ignores-known-id directed44u 2904 0 {'reads': 258, 'return': 510, 'state': 371, 'tape': 1765}
+expand-ignores-known-id directed44 2904 0 {'return': 510, 'tape': 2394}
+expand-ignores-known-id directed44u 2904 0 {'return': 510, 'tape': 2394}
 expand-ignores-known-id directed46 0 0 {}
 expand-ignores-known-id directed46d 0 0 {}
 expand-ignores-known-id directed4b 0 0 {}
@@ -1522,8 +1522,8 @@ gated-false directed3v 0 0 {}
 gated-false directed41 0 0 {}
 gated-false directed42 0 0 {}
 gated-false directed43 0 0 {}
-gated-false directed44 1075 0 {'return': 143, 'tape': 932}
-gated-false directed44u 1075 0 {'return': 143, 'tape': 932}
+gated-false directed44 919 0 {'return': 143, 'tape': 776}
+gated-false directed44u 919 0 {'return': 143, 'tape': 776}
 gated-false directed46 0 0 {}
 gated-false directed46d 0 0 {}
 gated-false directed4b 0 0 {}
@@ -1566,8 +1566,8 @@ ihave-expired-ignored directed3v 0 0 {}
 ihave-expired-ignored directed41 393 0 {'tape': 393}
 ihave-expired-ignored directed42 0 0 {}
 ihave-expired-ignored directed43 0 0 {}
-ihave-expired-ignored directed44 693 0 {'reached': 7, 'tape': 686}
-ihave-expired-ignored directed44u 693 0 {'reached': 7, 'tape': 686}
+ihave-expired-ignored directed44 693 0 {'tape': 693}
+ihave-expired-ignored directed44u 693 0 {'tape': 693}
 ihave-expired-ignored directed46 0 0 {}
 ihave-expired-ignored directed46d 0 0 {}
 ihave-expired-ignored directed4b 0 0 {}
@@ -1588,8 +1588,8 @@ ihave-block-ignored directed3v 0 0 {}
 ihave-block-ignored directed41 456 0 {'tape': 456}
 ihave-block-ignored directed42 0 0 {}
 ihave-block-ignored directed43 0 0 {}
-ihave-block-ignored directed44 819 0 {'reached': 76, 'reads': 11, 'tape': 732}
-ihave-block-ignored directed44u 819 0 {'reached': 76, 'reads': 11, 'tape': 732}
+ihave-block-ignored directed44 697 0 {'reached': 66, 'reads': 10, 'tape': 621}
+ihave-block-ignored directed44u 697 0 {'reached': 66, 'reads': 10, 'tape': 621}
 ihave-block-ignored directed46 0 0 {}
 ihave-block-ignored directed46d 0 0 {}
 ihave-block-ignored directed4b 0 0 {}
@@ -1610,8 +1610,8 @@ ihave-offer-after-gate directed3v 0 0 {}
 ihave-offer-after-gate directed41 3265 0 {'tape': 3265}
 ihave-offer-after-gate directed42 0 0 {}
 ihave-offer-after-gate directed43 0 0 {}
-ihave-offer-after-gate directed44 6769 4 {'reached': 177, 'tape': 6592}
-ihave-offer-after-gate directed44u 6769 4 {'reached': 177, 'tape': 6592}
+ihave-offer-after-gate directed44 5783 4 {'reached': 155, 'tape': 5628}
+ihave-offer-after-gate directed44u 5783 4 {'reached': 155, 'tape': 5628}
 ihave-offer-after-gate directed46 0 0 {}
 ihave-offer-after-gate directed46d 0 0 {}
 ihave-offer-after-gate directed4b 0 0 {}
@@ -1632,8 +1632,8 @@ ihave-entries-reversed directed3v 0 0 {}
 ihave-entries-reversed directed41 0 0 {}
 ihave-entries-reversed directed42 0 0 {}
 ihave-entries-reversed directed43 0 0 {}
-ihave-entries-reversed directed44 3124 0 {'tape': 3124}
-ihave-entries-reversed directed44u 3124 0 {'tape': 3124}
+ihave-entries-reversed directed44 3141 0 {'tape': 3141}
+ihave-entries-reversed directed44u 3141 0 {'tape': 3141}
 ihave-entries-reversed directed46 0 0 {}
 ihave-entries-reversed directed46d 0 0 {}
 ihave-entries-reversed directed4b 0 0 {}
@@ -1676,7 +1676,7 @@ ihave-held-back-and-asked directed3v 0 0 {}
 ihave-held-back-and-asked directed41 0 0 {}
 ihave-held-back-and-asked directed42 0 0 {}
 ihave-held-back-and-asked directed43 0 0 {}
-ihave-held-back-and-asked directed44 3230 0 {'reached': 220, 'reads': 14, 'tape': 2996}
+ihave-held-back-and-asked directed44 2761 0 {'reached': 192, 'reads': 11, 'tape': 2558}
 ihave-held-back-and-asked directed44u 0 0 {}
 ihave-held-back-and-asked directed46 0 0 {}
 ihave-held-back-and-asked directed46d 0 0 {}
@@ -1698,8 +1698,8 @@ ihave-asked-counted-always directed3v 0 0 {}
 ihave-asked-counted-always directed41 0 0 {}
 ihave-asked-counted-always directed42 0 0 {}
 ihave-asked-counted-always directed43 0 0 {}
-ihave-asked-counted-always directed44 230 0 {'state': 183, 'tape': 47}
-ihave-asked-counted-always directed44u 981 0 {'state': 981}
+ihave-asked-counted-always directed44 207 0 {'state': 169, 'tape': 38}
+ihave-asked-counted-always directed44u 852 0 {'state': 852}
 ihave-asked-counted-always directed46 0 0 {}
 ihave-asked-counted-always directed46d 0 0 {}
 ihave-asked-counted-always directed4b 0 0 {}
@@ -1720,7 +1720,7 @@ ihave-rpcs-per-entry directed3v 0 0 {}
 ihave-rpcs-per-entry directed41 0 0 {}
 ihave-rpcs-per-entry directed42 0 0 {}
 ihave-rpcs-per-entry directed43 0 0 {}
-ihave-rpcs-per-entry directed44 4464 0 {'reached': 19, 'state': 3915, 'tape': 530}
+ihave-rpcs-per-entry directed44 4464 0 {'reached': 21, 'state': 3986, 'tape': 457}
 ihave-rpcs-per-entry directed44u 4464 0 {'state': 4464}
 ihave-rpcs-per-entry directed46 0 0 {}
 ihave-rpcs-per-entry directed46d 0 0 {}
@@ -1742,8 +1742,8 @@ ihave-shuffle-ignored directed3v 0 0 {}
 ihave-shuffle-ignored directed41 1275 0 {'tape': 1275}
 ihave-shuffle-ignored directed42 0 0 {}
 ihave-shuffle-ignored directed43 0 0 {}
-ihave-shuffle-ignored directed44 323 0 {'reads': 1, 'state': 63, 'tape': 257, 'writes': 2}
-ihave-shuffle-ignored directed44u 831 0 {'tape': 831}
+ihave-shuffle-ignored directed44 272 0 {'state': 51, 'tape': 219, 'writes': 2}
+ihave-shuffle-ignored directed44u 706 0 {'tape': 706}
 ihave-shuffle-ignored directed46 0 0 {}
 ihave-shuffle-ignored directed46d 0 0 {}
 ihave-shuffle-ignored directed4b 0 0 {}
@@ -1787,7 +1787,7 @@ limits-asks-unset-not-read directed41 0 0 {}
 limits-asks-unset-not-read directed42 0 0 {}
 limits-asks-unset-not-read directed43 0 0 {}
 limits-asks-unset-not-read directed44 0 0 {}
-limits-asks-unset-not-read directed44u 0 2685 {}
+limits-asks-unset-not-read directed44u 0 2654 {}
 limits-asks-unset-not-read directed46 0 0 {}
 limits-asks-unset-not-read directed46d 0 0 {}
 limits-asks-unset-not-read directed4b 0 0 {}
@@ -1849,11 +1849,11 @@ expand-id-dropped directed7u 0 0 {}
 expand-fallback-next-index directed 0 0 {}
 expand-fallback-next-index directed1 0 0 {}
 expand-fallback-next-index directed3v 0 0 {}
-expand-fallback-next-index directed41 3411 0 {'state': 283, 'tape': 3128}
+expand-fallback-next-index directed41 3411 0 {'tape': 3411}
 expand-fallback-next-index directed42 0 0 {}
 expand-fallback-next-index directed43 0 0 {}
-expand-fallback-next-index directed44 5618 0 {'reached': 4, 'reads': 29, 'return': 983, 'state': 532, 'tape': 4070}
-expand-fallback-next-index directed44u 5618 0 {'reached': 4, 'reads': 29, 'return': 983, 'state': 532, 'tape': 4070}
+expand-fallback-next-index directed44 5618 0 {'return': 983, 'tape': 4635}
+expand-fallback-next-index directed44u 5618 0 {'return': 983, 'tape': 4635}
 expand-fallback-next-index directed46 0 0 {}
 expand-fallback-next-index directed46d 0 0 {}
 expand-fallback-next-index directed4b 0 0 {}
@@ -1874,7 +1874,7 @@ tables-rpcs-write-none directed3v 0 0 {}
 tables-rpcs-write-none directed41 3975 0 {'state': 3975}
 tables-rpcs-write-none directed42 0 0 {}
 tables-rpcs-write-none directed43 0 0 {}
-tables-rpcs-write-none directed44 11181 0 {'reached': 58, 'state': 10381, 'tape': 742}
+tables-rpcs-write-none directed44 11181 0 {'reached': 51, 'state': 10501, 'tape': 629}
 tables-rpcs-write-none directed44u 11181 0 {'state': 11181}
 tables-rpcs-write-none directed46 0 0 {}
 tables-rpcs-write-none directed46d 0 0 {}
@@ -1896,7 +1896,7 @@ tables-rpcs-read-asked directed3v 0 0 {}
 tables-rpcs-read-asked directed41 0 0 {}
 tables-rpcs-read-asked directed42 0 0 {}
 tables-rpcs-read-asked directed43 0 0 {}
-tables-rpcs-read-asked directed44 9573 594 {'reached': 112, 'return': 413, 'state': 7627, 'tape': 1421}
+tables-rpcs-read-asked directed44 9542 594 {'reached': 96, 'return': 413, 'state': 7823, 'tape': 1210}
 tables-rpcs-read-asked directed44u 8953 0 {'state': 8953}
 tables-rpcs-read-asked directed46 0 0 {}
 tables-rpcs-read-asked directed46d 0 0 {}
@@ -1918,8 +1918,8 @@ tables-asked-write-wide directed3v 0 0 {}
 tables-asked-write-wide directed41 2809 0 {'state': 2809}
 tables-asked-write-wide directed42 0 0 {}
 tables-asked-write-wide directed43 0 0 {}
-tables-asked-write-wide directed44 1176 0 {'state': 1176}
-tables-asked-write-wide directed44u 3946 0 {'state': 3946}
+tables-asked-write-wide directed44 1008 0 {'state': 1008}
+tables-asked-write-wide directed44u 3380 0 {'state': 3380}
 tables-asked-write-wide directed46 0 0 {}
 tables-asked-write-wide directed46d 0 0 {}
 tables-asked-write-wide directed4b 0 0 {}
@@ -1940,8 +1940,8 @@ tables-asked-read-zero directed3v 0 0 {}
 tables-asked-read-zero directed41 1850 0 {'state': 1850}
 tables-asked-read-zero directed42 0 0 {}
 tables-asked-read-zero directed43 0 0 {}
-tables-asked-read-zero directed44 2195 0 {'reached': 46, 'return': 594, 'state': 717, 'tape': 838}
-tables-asked-read-zero directed44u 3272 0 {'state': 3272}
+tables-asked-read-zero directed44 1960 0 {'reached': 42, 'return': 594, 'state': 619, 'tape': 705}
+tables-asked-read-zero directed44u 2806 0 {'state': 2806}
 tables-asked-read-zero directed46 0 0 {}
 tables-asked-read-zero directed46d 0 0 {}
 tables-asked-read-zero directed4b 0 0 {}
@@ -1962,7 +1962,7 @@ tables-heldback-write-none directed3v 0 0 {}
 tables-heldback-write-none directed41 0 0 {}
 tables-heldback-write-none directed42 0 0 {}
 tables-heldback-write-none directed43 0 0 {}
-tables-heldback-write-none directed44 3083 0 {'state': 3083}
+tables-heldback-write-none directed44 2632 0 {'state': 2632}
 tables-heldback-write-none directed44u 0 0 {}
 tables-heldback-write-none directed46 0 0 {}
 tables-heldback-write-none directed46d 0 0 {}
@@ -1984,7 +1984,7 @@ tables-heldback-wide directed3v 0 0 {}
 tables-heldback-wide directed41 0 0 {}
 tables-heldback-wide directed42 0 0 {}
 tables-heldback-wide directed43 0 0 {}
-tables-heldback-wide directed44 3256 0 {'state': 3256}
+tables-heldback-wide directed44 2787 0 {'state': 2787}
 tables-heldback-wide directed44u 0 0 {}
 tables-heldback-wide directed46 0 0 {}
 tables-heldback-wide directed46d 0 0 {}
@@ -2775,7 +2775,7 @@ have-bits-mine-only directed1 0 0 {}
 have-bits-mine-only directed3v 0 0 {}
 have-bits-mine-only directed41 0 3184 {}
 have-bits-mine-only directed42 2289 5579 {'reads': 247, 'return': 235, 'tape': 1807}
-have-bits-mine-only directed43 2628 0 {'reads': 185, 'tape': 2443}
+have-bits-mine-only directed43 2240 0 {'reads': 163, 'tape': 2077}
 have-bits-mine-only directed44 0 0 {}
 have-bits-mine-only directed44u 0 0 {}
 have-bits-mine-only directed46 2070 5315 {'tape': 2070}
@@ -2797,7 +2797,7 @@ send-have-normal-lane directed1 0 0 {}
 send-have-normal-lane directed3v 0 0 {}
 send-have-normal-lane directed41 3184 0 {'tape': 3184}
 send-have-normal-lane directed42 6767 0 {'tape': 6767}
-send-have-normal-lane directed43 2628 0 {'tape': 2628}
+send-have-normal-lane directed43 2240 0 {'tape': 2240}
 send-have-normal-lane directed44 0 0 {}
 send-have-normal-lane directed44u 0 0 {}
 send-have-normal-lane directed46 7385 0 {'tape': 7385}
@@ -2930,8 +2930,8 @@ tied-any-peer directed3v 0 0 {}
 tied-any-peer directed41 0 0 {}
 tied-any-peer directed42 215 0 {'return': 215}
 tied-any-peer directed43 0 0 {}
-tied-any-peer directed44 876 11 {'reached': 64, 'tape': 812}
-tied-any-peer directed44u 876 11 {'reached': 64, 'tape': 812}
+tied-any-peer directed44 741 9 {'reached': 52, 'tape': 689}
+tied-any-peer directed44u 741 9 {'reached': 52, 'tape': 689}
 tied-any-peer directed46 0 0 {}
 tied-any-peer directed46d 0 0 {}
 tied-any-peer directed4b 1011 0 {'tape': 1011}
@@ -2952,8 +2952,8 @@ tied-any-group directed3v 0 0 {}
 tied-any-group directed41 0 0 {}
 tied-any-group directed42 28 0 {'return': 28}
 tied-any-group directed43 0 0 {}
-tied-any-group directed44 465 8 {'reached': 17, 'reads': 3, 'tape': 445}
-tied-any-group directed44u 465 8 {'reached': 17, 'reads': 3, 'tape': 445}
+tied-any-group directed44 385 8 {'reached': 14, 'reads': 3, 'tape': 368}
+tied-any-group directed44u 385 8 {'reached': 14, 'reads': 3, 'tape': 368}
 tied-any-group directed46 0 0 {}
 tied-any-group directed46d 0 0 {}
 tied-any-group directed4b 711 65 {'tape': 711}
@@ -2974,8 +2974,8 @@ tied-any-index directed3v 0 0 {}
 tied-any-index directed41 0 0 {}
 tied-any-index directed42 276 0 {'return': 276}
 tied-any-index directed43 0 0 {}
-tied-any-index directed44 852 22 {'reached': 73, 'reads': 9, 'tape': 770}
-tied-any-index directed44u 852 22 {'reached': 73, 'reads': 9, 'tape': 770}
+tied-any-index directed44 722 18 {'reached': 61, 'reads': 7, 'tape': 654}
+tied-any-index directed44u 722 18 {'reached': 61, 'reads': 7, 'tape': 654}
 tied-any-index directed46 0 0 {}
 tied-any-index directed46d 0 0 {}
 tied-any-index directed4b 862 115 {'tape': 862}
@@ -3084,8 +3084,8 @@ outstanding-urgent-too directed3v 0 0 {}
 outstanding-urgent-too directed41 1923 0 {'reads': 1923}
 outstanding-urgent-too directed42 0 0 {}
 outstanding-urgent-too directed43 0 0 {}
-outstanding-urgent-too directed44 4441 0 {'reads': 4441}
-outstanding-urgent-too directed44u 4441 0 {'reads': 4441}
+outstanding-urgent-too directed44 3810 0 {'reads': 3810}
+outstanding-urgent-too directed44u 3810 0 {'reads': 3810}
 outstanding-urgent-too directed46 0 0 {}
 outstanding-urgent-too directed46d 0 0 {}
 outstanding-urgent-too directed4b 2935 0 {'reads': 2935}
@@ -3128,8 +3128,8 @@ outstanding-ask-by-group directed3v 0 0 {}
 outstanding-ask-by-group directed41 0 0 {}
 outstanding-ask-by-group directed42 0 0 {}
 outstanding-ask-by-group directed43 0 0 {}
-outstanding-ask-by-group directed44 284 0 {'tape': 284}
-outstanding-ask-by-group directed44u 284 0 {'tape': 284}
+outstanding-ask-by-group directed44 241 0 {'tape': 241}
+outstanding-ask-by-group directed44u 241 0 {'tape': 241}
 outstanding-ask-by-group directed46 0 0 {}
 outstanding-ask-by-group directed46d 0 0 {}
 outstanding-ask-by-group directed4b 0 0 {}
@@ -3172,8 +3172,8 @@ tables-lane-read-none directed3v 0 0 {}
 tables-lane-read-none directed41 0 0 {}
 tables-lane-read-none directed42 3276 0 {'state': 3276}
 tables-lane-read-none directed43 0 0 {}
-tables-lane-read-none directed44 171 0 {'tape': 171}
-tables-lane-read-none directed44u 171 0 {'tape': 171}
+tables-lane-read-none directed44 147 0 {'tape': 147}
+tables-lane-read-none directed44u 147 0 {'tape': 147}
 tables-lane-read-none directed46 0 0 {}
 tables-lane-read-none directed46d 0 0 {}
 tables-lane-read-none directed4b 0 0 {}
@@ -7418,8 +7418,8 @@ tables-stop-pull-read-false directed3v 0 0 {}
 tables-stop-pull-read-false directed41 0 3265 {}
 tables-stop-pull-read-false directed42 0 0 {}
 tables-stop-pull-read-false directed43 0 0 {}
-tables-stop-pull-read-false directed44 1075 8017 {'return': 143, 'tape': 932}
-tables-stop-pull-read-false directed44u 1075 8017 {'return': 143, 'tape': 932}
+tables-stop-pull-read-false directed44 919 6968 {'return': 143, 'tape': 776}
+tables-stop-pull-read-false directed44u 919 6968 {'return': 143, 'tape': 776}
 tables-stop-pull-read-false directed46 0 0 {}
 tables-stop-pull-read-false directed46d 0 0 {}
 tables-stop-pull-read-false directed4b 1096 5702 {'tape': 1096}
@@ -7527,7 +7527,7 @@ have-newly-all-bits directed1 0 0 {}
 have-newly-all-bits directed3v 0 0 {}
 have-newly-all-bits directed41 952 0 {'reached': 358, 'reads': 594}
 have-newly-all-bits directed42 0 0 {}
-have-newly-all-bits directed43 4445 0 {'reached': 1104, 'reads': 1378, 'state': 309, 'tape': 1654}
+have-newly-all-bits directed43 3761 0 {'reached': 923, 'reads': 1169, 'state': 259, 'tape': 1410}
 have-newly-all-bits directed44 0 0 {}
 have-newly-all-bits directed44u 0 0 {}
 have-newly-all-bits directed46 0 0 {}
@@ -7549,7 +7549,7 @@ have-bits-replaced directed1 0 0 {}
 have-bits-replaced directed3v 0 0 {}
 have-bits-replaced directed41 1347 0 {'reached': 11, 'reads': 8, 'state': 1328}
 have-bits-replaced directed42 0 0 {}
-have-bits-replaced directed43 4824 0 {'state': 4824}
+have-bits-replaced directed43 4095 0 {'state': 4095}
 have-bits-replaced directed44 0 0 {}
 have-bits-replaced directed44u 0 0 {}
 have-bits-replaced directed46 0 0 {}
@@ -7571,7 +7571,7 @@ have-ttl-not-refreshed-nothing-new directed1 0 0 {}
 have-ttl-not-refreshed-nothing-new directed3v 0 0 {}
 have-ttl-not-refreshed-nothing-new directed41 0 0 {}
 have-ttl-not-refreshed-nothing-new directed42 0 0 {}
-have-ttl-not-refreshed-nothing-new directed43 2177 0 {'state': 2177}
+have-ttl-not-refreshed-nothing-new directed43 1851 0 {'state': 1851}
 have-ttl-not-refreshed-nothing-new directed44 0 0 {}
 have-ttl-not-refreshed-nothing-new directed44u 0 0 {}
 have-ttl-not-refreshed-nothing-new directed46 0 0 {}
@@ -7593,7 +7593,7 @@ have-ttl-kept directed1 0 0 {}
 have-ttl-kept directed3v 0 0 {}
 have-ttl-kept directed41 0 0 {}
 have-ttl-kept directed42 0 0 {}
-have-ttl-kept directed43 2945 0 {'state': 2945}
+have-ttl-kept directed43 2512 0 {'state': 2512}
 have-ttl-kept directed44 0 0 {}
 have-ttl-kept directed44u 0 0 {}
 have-ttl-kept directed46 0 0 {}
@@ -7615,7 +7615,7 @@ have-holder-not-added directed1 0 0 {}
 have-holder-not-added directed3v 0 0 {}
 have-holder-not-added directed41 3827 0 {'state': 3827}
 have-holder-not-added directed42 0 0 {}
-have-holder-not-added directed43 12546 0 {'state': 12546}
+have-holder-not-added directed43 10648 0 {'state': 10648}
 have-holder-not-added directed44 0 0 {}
 have-holder-not-added directed44u 0 0 {}
 have-holder-not-added directed46 0 0 {}
@@ -7637,7 +7637,7 @@ have-release-after-ack directed1 0 0 {}
 have-release-after-ack directed3v 0 0 {}
 have-release-after-ack directed41 0 0 {}
 have-release-after-ack directed42 0 0 {}
-have-release-after-ack directed43 585 0 {'tape': 585}
+have-release-after-ack directed43 498 0 {'tape': 498}
 have-release-after-ack directed44 0 0 {}
 have-release-after-ack directed44u 0 0 {}
 have-release-after-ack directed46 0 0 {}
@@ -7659,7 +7659,7 @@ have-ack-unplanned directed1 0 0 {}
 have-ack-unplanned directed3v 0 0 {}
 have-ack-unplanned directed41 3827 0 {'raise': 3827}
 have-ack-unplanned directed42 0 0 {}
-have-ack-unplanned directed43 8214 0 {'raise': 8214}
+have-ack-unplanned directed43 6949 0 {'raise': 6949}
 have-ack-unplanned directed44 0 0 {}
 have-ack-unplanned directed44u 0 0 {}
 have-ack-unplanned directed46 0 0 {}
@@ -7681,7 +7681,7 @@ have-planned-once directed1 0 0 {}
 have-planned-once directed3v 0 0 {}
 have-planned-once directed41 464 0 {'reads': 464}
 have-planned-once directed42 0 0 {}
-have-planned-once directed43 3548 0 {'reads': 3548}
+have-planned-once directed43 3002 0 {'reads': 3002}
 have-planned-once directed44 0 0 {}
 have-planned-once directed44u 0 0 {}
 have-planned-once directed46 0 0 {}
@@ -7703,7 +7703,7 @@ have-new-indices-downward directed1 0 0 {}
 have-new-indices-downward directed3v 0 0 {}
 have-new-indices-downward directed41 0 0 {}
 have-new-indices-downward directed42 0 0 {}
-have-new-indices-downward directed43 1656 0 {'tape': 1656}
+have-new-indices-downward directed43 1393 0 {'tape': 1393}
 have-new-indices-downward directed44 0 0 {}
 have-new-indices-downward directed44u 0 0 {}
 have-new-indices-downward directed46 0 0 {}
@@ -7725,7 +7725,7 @@ tables-peer-has-read-none directed1 0 0 {}
 tables-peer-has-read-none directed3v 0 0 {}
 tables-peer-has-read-none directed41 3830 0 {'reached': 256, 'reads': 131, 'state': 886, 'tape': 2557}
 tables-peer-has-read-none directed42 0 0 {}
-tables-peer-has-read-none directed43 7087 0 {'reached': 1097, 'reads': 275, 'state': 2636, 'tape': 3079}
+tables-peer-has-read-none directed43 6011 0 {'reached': 916, 'reads': 230, 'state': 2251, 'tape': 2614}
 tables-peer-has-read-none directed44 0 0 {}
 tables-peer-has-read-none directed44u 0 0 {}
 tables-peer-has-read-none directed46 0 0 {}
@@ -7747,7 +7747,7 @@ tables-peer-has-write-none directed1 0 0 {}
 tables-peer-has-write-none directed3v 0 0 {}
 tables-peer-has-write-none directed41 3827 0 {'state': 3827}
 tables-peer-has-write-none directed42 0 0 {}
-tables-peer-has-write-none directed43 14876 0 {'state': 13560, 'tape': 1316}
+tables-peer-has-write-none directed43 12631 0 {'state': 11524, 'tape': 1107}
 tables-peer-has-write-none directed44 0 0 {}
 tables-peer-has-write-none directed44u 0 0 {}
 tables-peer-has-write-none directed46 0 0 {}
@@ -7769,7 +7769,7 @@ tables-holders-read-no-note directed1 0 0 {}
 tables-holders-read-no-note directed3v 0 0 {}
 tables-holders-read-no-note directed41 0 8542 {}
 tables-holders-read-no-note directed42 0 0 {}
-tables-holders-read-no-note directed43 0 34738 {}
+tables-holders-read-no-note directed43 0 29359 {}
 tables-holders-read-no-note directed44 0 0 {}
 tables-holders-read-no-note directed44u 0 0 {}
 tables-holders-read-no-note directed46 0 0 {}
@@ -7791,7 +7791,7 @@ tables-holders-write-none directed1 0 0 {}
 tables-holders-write-none directed3v 0 0 {}
 tables-holders-write-none directed41 3827 0 {'state': 3827}
 tables-holders-write-none directed42 0 0 {}
-tables-holders-write-none directed43 12546 0 {'state': 12546}
+tables-holders-write-none directed43 10648 0 {'state': 10648}
 tables-holders-write-none directed44 0 0 {}
 tables-holders-write-none directed44u 0 0 {}
 tables-holders-write-none directed46 0 0 {}
@@ -9177,7 +9177,7 @@ tables-origin-read-none directed1 0 0 {}
 tables-origin-read-none directed3v 0 0 {}
 tables-origin-read-none directed41 0 0 {}
 tables-origin-read-none directed42 2289 0 {'reads': 247, 'return': 235, 'tape': 1807}
-tables-origin-read-none directed43 4485 0 {'raise': 4485}
+tables-origin-read-none directed43 3831 0 {'raise': 3831}
 tables-origin-read-none directed44 0 0 {}
 tables-origin-read-none directed44u 0 0 {}
 tables-origin-read-none directed46 2070 0 {'tape': 2070}
@@ -9199,7 +9199,7 @@ tables-planned-row-read-false directed1 0 0 {}
 tables-planned-row-read-false directed3v 0 0 {}
 tables-planned-row-read-false directed41 0 0 {}
 tables-planned-row-read-false directed42 0 0 {}
-tables-planned-row-read-false directed43 4485 0 {'reached': 974, 'tape': 3511}
+tables-planned-row-read-false directed43 3831 0 {'reached': 838, 'tape': 2993}
 tables-planned-row-read-false directed44 0 0 {}
 tables-planned-row-read-false directed44u 0 0 {}
 tables-planned-row-read-false directed46 0 0 {}
@@ -9221,7 +9221,7 @@ tables-pushed-read-none directed1 0 0 {}
 tables-pushed-read-none directed3v 0 0 {}
 tables-pushed-read-none directed41 0 0 {}
 tables-pushed-read-none directed42 0 0 {}
-tables-pushed-read-none directed43 539 0 {'tape': 539}
+tables-pushed-read-none directed43 453 0 {'tape': 453}
 tables-pushed-read-none directed44 0 0 {}
 tables-pushed-read-none directed44u 0 0 {}
 tables-pushed-read-none directed46 0 0 {}
@@ -9507,7 +9507,7 @@ announce-pushed-not-minus directed1 0 0 {}
 announce-pushed-not-minus directed3v 0 0 {}
 announce-pushed-not-minus directed41 0 0 {}
 announce-pushed-not-minus directed42 0 0 {}
-announce-pushed-not-minus directed43 539 0 {'tape': 539}
+announce-pushed-not-minus directed43 453 0 {'tape': 453}
 announce-pushed-not-minus directed44 0 0 {}
 announce-pushed-not-minus directed44u 0 0 {}
 announce-pushed-not-minus directed46 0 0 {}
@@ -9529,7 +9529,7 @@ announce-held-not-minus directed1 0 0 {}
 announce-held-not-minus directed3v 0 0 {}
 announce-held-not-minus directed41 0 0 {}
 announce-held-not-minus directed42 0 0 {}
-announce-held-not-minus directed43 1631 0 {'tape': 1631}
+announce-held-not-minus directed43 1377 0 {'tape': 1377}
 announce-held-not-minus directed44 0 0 {}
 announce-held-not-minus directed44u 0 0 {}
 announce-held-not-minus directed46 0 0 {}
@@ -9551,7 +9551,7 @@ announce-empty-enqueued directed1 0 0 {}
 announce-empty-enqueued directed3v 0 0 {}
 announce-empty-enqueued directed41 0 0 {}
 announce-empty-enqueued directed42 0 0 {}
-announce-empty-enqueued directed43 1936 0 {'tape': 1936}
+announce-empty-enqueued directed43 1637 0 {'tape': 1637}
 announce-empty-enqueued directed44 0 0 {}
 announce-empty-enqueued directed44u 0 0 {}
 announce-empty-enqueued directed46 0 0 {}
@@ -9617,7 +9617,7 @@ announce-urgent directed1 0 0 {}
 announce-urgent directed3v 0 0 {}
 announce-urgent directed41 0 0 {}
 announce-urgent directed42 0 0 {}
-announce-urgent directed43 1884 0 {'tape': 1884}
+announce-urgent directed43 1603 0 {'tape': 1603}
 announce-urgent directed44 0 0 {}
 announce-urgent directed44u 0 0 {}
 announce-urgent directed46 0 0 {}
@@ -9639,7 +9639,7 @@ announce-owed-when-taken directed1 0 0 {}
 announce-owed-when-taken directed3v 0 0 {}
 announce-owed-when-taken directed41 0 0 {}
 announce-owed-when-taken directed42 0 0 {}
-announce-owed-when-taken directed43 1884 0 {'tape': 1884}
+announce-owed-when-taken directed43 1603 0 {'tape': 1603}
 announce-owed-when-taken directed44 0 0 {}
 announce-owed-when-taken directed44u 0 0 {}
 announce-owed-when-taken directed46 0 0 {}
@@ -10629,7 +10629,7 @@ tables-in-flight-write-not-made directed1 0 0 {}
 tables-in-flight-write-not-made directed3v 0 0 {}
 tables-in-flight-write-not-made directed41 0 0 {}
 tables-in-flight-write-not-made directed42 0 0 {}
-tables-in-flight-write-not-made directed43 4390 0 {'reached': 694, 'state': 1764, 'tape': 1932}
+tables-in-flight-write-not-made directed43 3732 0 {'reached': 591, 'state': 1509, 'tape': 1632}
 tables-in-flight-write-not-made directed44 0 0 {}
 tables-in-flight-write-not-made directed44u 0 0 {}
 tables-in-flight-write-not-made directed46 0 0 {}
@@ -10651,7 +10651,7 @@ tables-waiters-read-reversed directed1 0 0 {}
 tables-waiters-read-reversed directed3v 0 0 {}
 tables-waiters-read-reversed directed41 0 0 {}
 tables-waiters-read-reversed directed42 0 0 {}
-tables-waiters-read-reversed directed43 1620 0 {'tape': 1620}
+tables-waiters-read-reversed directed43 1380 0 {'tape': 1380}
 tables-waiters-read-reversed directed44 0 0 {}
 tables-waiters-read-reversed directed44u 0 0 {}
 tables-waiters-read-reversed directed46 0 0 {}
@@ -10673,7 +10673,7 @@ tables-sent-erase-not-made directed1 0 0 {}
 tables-sent-erase-not-made directed3v 0 0 {}
 tables-sent-erase-not-made directed41 0 0 {}
 tables-sent-erase-not-made directed42 0 0 {}
-tables-sent-erase-not-made directed43 4390 0 {'state': 4390}
+tables-sent-erase-not-made directed43 3732 0 {'state': 3732}
 tables-sent-erase-not-made directed44 0 0 {}
 tables-sent-erase-not-made directed44u 0 0 {}
 tables-sent-erase-not-made directed46 0 0 {}
@@ -10695,7 +10695,7 @@ free-slot-count-kept directed1 0 0 {}
 free-slot-count-kept directed3v 0 0 {}
 free-slot-count-kept directed41 0 0 {}
 free-slot-count-kept directed42 0 0 {}
-free-slot-count-kept directed43 4390 0 {'reached': 694, 'state': 1764, 'tape': 1932}
+free-slot-count-kept directed43 3732 0 {'reached': 591, 'state': 1509, 'tape': 1632}
 free-slot-count-kept directed44 0 0 {}
 free-slot-count-kept directed44u 0 0 {}
 free-slot-count-kept directed46 0 0 {}
@@ -10717,7 +10717,7 @@ free-slot-no-wake directed1 0 0 {}
 free-slot-no-wake directed3v 0 0 {}
 free-slot-no-wake directed41 0 0 {}
 free-slot-no-wake directed42 0 0 {}
-free-slot-no-wake directed43 4390 0 {'reached': 1672, 'tape': 2718}
+free-slot-no-wake directed43 3732 0 {'reached': 1421, 'tape': 2311}
 free-slot-no-wake directed44 0 0 {}
 free-slot-no-wake directed44u 0 0 {}
 free-slot-no-wake directed46 0 0 {}
@@ -10959,7 +10959,7 @@ window-release-send-kept directed1 0 0 {}
 window-release-send-kept directed3v 0 0 {}
 window-release-send-kept directed41 0 0 {}
 window-release-send-kept directed42 0 0 {}
-window-release-send-kept directed43 4390 0 {'state': 4390}
+window-release-send-kept directed43 3732 0 {'state': 3732}
 window-release-send-kept directed44 0 0 {}
 window-release-send-kept directed44u 0 0 {}
 window-release-send-kept directed46 0 0 {}
@@ -10981,7 +10981,7 @@ window-release-no-slot directed1 0 0 {}
 window-release-no-slot directed3v 0 0 {}
 window-release-no-slot directed41 0 0 {}
 window-release-no-slot directed42 0 0 {}
-window-release-no-slot directed43 4390 0 {'reached': 1672, 'tape': 2718}
+window-release-no-slot directed43 3732 0 {'reached': 1421, 'tape': 2311}
 window-release-no-slot directed44 0 0 {}
 window-release-no-slot directed44u 0 0 {}
 window-release-no-slot directed46 0 0 {}
@@ -11069,7 +11069,7 @@ origin-acked-again directed1 0 0 {}
 origin-acked-again directed3v 0 0 {}
 origin-acked-again directed41 0 0 {}
 origin-acked-again directed42 0 0 {}
-origin-acked-again directed43 3495 0 {'tape': 3495}
+origin-acked-again directed43 2991 0 {'tape': 2991}
 origin-acked-again directed44 0 0 {}
 origin-acked-again directed44u 0 0 {}
 origin-acked-again directed46 0 0 {}
@@ -11091,7 +11091,7 @@ origin-acked-bit-not-set directed1 0 0 {}
 origin-acked-bit-not-set directed3v 0 0 {}
 origin-acked-bit-not-set directed41 0 0 {}
 origin-acked-bit-not-set directed42 0 0 {}
-origin-acked-bit-not-set directed43 3511 0 {'state': 883, 'tape': 2628}
+origin-acked-bit-not-set directed43 2993 0 {'state': 753, 'tape': 2240}
 origin-acked-bit-not-set directed44 0 0 {}
 origin-acked-bit-not-set directed44u 0 0 {}
 origin-acked-bit-not-set directed46 0 0 {}
@@ -11113,7 +11113,7 @@ origin-acked-have-not-sent directed1 0 0 {}
 origin-acked-have-not-sent directed3v 0 0 {}
 origin-acked-have-not-sent directed41 0 0 {}
 origin-acked-have-not-sent directed42 0 0 {}
-origin-acked-have-not-sent directed43 3511 0 {'tape': 3511}
+origin-acked-have-not-sent directed43 2993 0 {'tape': 2993}
 origin-acked-have-not-sent directed44 0 0 {}
 origin-acked-have-not-sent directed44u 0 0 {}
 origin-acked-have-not-sent directed46 0 0 {}
@@ -11135,7 +11135,7 @@ origin-acked-targets-announced-too directed1 0 0 {}
 origin-acked-targets-announced-too directed3v 0 0 {}
 origin-acked-targets-announced-too directed41 0 0 {}
 origin-acked-targets-announced-too directed42 0 0 {}
-origin-acked-targets-announced-too directed43 811 3089 {'reached': 52, 'reads': 88, 'tape': 671}
+origin-acked-targets-announced-too directed43 693 2621 {'reached': 43, 'reads': 73, 'tape': 577}
 origin-acked-targets-announced-too directed44 0 0 {}
 origin-acked-targets-announced-too directed44u 0 0 {}
 origin-acked-targets-announced-too directed46 0 0 {}
@@ -11157,7 +11157,7 @@ origin-acked-nobody-announced directed1 0 0 {}
 origin-acked-nobody-announced directed3v 0 0 {}
 origin-acked-nobody-announced directed41 0 0 {}
 origin-acked-nobody-announced directed42 0 0 {}
-origin-acked-nobody-announced directed43 3511 0 {'tape': 3511}
+origin-acked-nobody-announced directed43 2993 0 {'tape': 2993}
 origin-acked-nobody-announced directed44 0 0 {}
 origin-acked-nobody-announced directed44u 0 0 {}
 origin-acked-nobody-announced directed46 0 0 {}
@@ -12213,7 +12213,7 @@ wake-front-wakes-a-writer-mid-write directed1 0 0 {}
 wake-front-wakes-a-writer-mid-write directed3v 0 0 {}
 wake-front-wakes-a-writer-mid-write directed41 0 0 {}
 wake-front-wakes-a-writer-mid-write directed42 0 0 {}
-wake-front-wakes-a-writer-mid-write directed43 3707 0 {'reached': 989, 'tape': 2718}
+wake-front-wakes-a-writer-mid-write directed43 3158 0 {'reached': 847, 'tape': 2311}
 wake-front-wakes-a-writer-mid-write directed44 0 0 {}
 wake-front-wakes-a-writer-mid-write directed44u 0 0 {}
 wake-front-wakes-a-writer-mid-write directed46 0 0 {}
@@ -12235,7 +12235,7 @@ wake-front-with-no-slot directed1 0 0 {}
 wake-front-with-no-slot directed3v 0 0 {}
 wake-front-with-no-slot directed41 0 0 {}
 wake-front-with-no-slot directed42 0 0 {}
-wake-front-with-no-slot directed43 997 0 {'reached': 187, 'tape': 810}
+wake-front-with-no-slot directed43 838 0 {'reached': 162, 'tape': 676}
 wake-front-with-no-slot directed44 0 0 {}
 wake-front-with-no-slot directed44u 0 0 {}
 wake-front-with-no-slot directed46 0 0 {}
@@ -12362,3 +12362,157 @@ write-waits-wakes-out-of-line directed7 0 0 {}
 write-waits-wakes-out-of-line directed71 1117 427 {'reached': 916, 'tape': 201}
 write-waits-wakes-out-of-line directed7p 0 0 {}
 write-waits-wakes-out-of-line directed7u 0 0 {}
+have-admitted-not-asked directed 0 0 {}
+have-admitted-not-asked directed1 0 0 {}
+have-admitted-not-asked directed3v 0 0 {}
+have-admitted-not-asked directed41 4185 0 {'tape': 4185}
+have-admitted-not-asked directed42 0 0 {}
+have-admitted-not-asked directed43 16247 0 {'tape': 16247}
+have-admitted-not-asked directed44 0 0 {}
+have-admitted-not-asked directed44u 0 0 {}
+have-admitted-not-asked directed46 0 0 {}
+have-admitted-not-asked directed46d 0 0 {}
+have-admitted-not-asked directed4b 0 0 {}
+have-admitted-not-asked directed51 0 0 {}
+have-admitted-not-asked directed52 0 0 {}
+have-admitted-not-asked directed53 0 0 {}
+have-admitted-not-asked directed54 0 0 {}
+have-admitted-not-asked directed64 0 0 {}
+have-admitted-not-asked directed64h 0 0 {}
+have-admitted-not-asked directed6o 0 0 {}
+have-admitted-not-asked directed7 0 0 {}
+have-admitted-not-asked directed71 0 0 {}
+have-admitted-not-asked directed7p 0 0 {}
+have-admitted-not-asked directed7u 0 0 {}
+have-not-admitted-taken directed 0 0 {}
+have-not-admitted-taken directed1 0 0 {}
+have-not-admitted-taken directed3v 0 0 {}
+have-not-admitted-taken directed41 0 0 {}
+have-not-admitted-taken directed42 0 0 {}
+have-not-admitted-taken directed43 2465 0 {'reached': 1124, 'reads': 220, 'state': 326, 'tape': 795}
+have-not-admitted-taken directed44 0 0 {}
+have-not-admitted-taken directed44u 0 0 {}
+have-not-admitted-taken directed46 0 0 {}
+have-not-admitted-taken directed46d 0 0 {}
+have-not-admitted-taken directed4b 0 0 {}
+have-not-admitted-taken directed51 0 0 {}
+have-not-admitted-taken directed52 0 0 {}
+have-not-admitted-taken directed53 0 0 {}
+have-not-admitted-taken directed54 0 0 {}
+have-not-admitted-taken directed64 0 0 {}
+have-not-admitted-taken directed64h 0 0 {}
+have-not-admitted-taken directed6o 0 0 {}
+have-not-admitted-taken directed7 0 0 {}
+have-not-admitted-taken directed71 0 0 {}
+have-not-admitted-taken directed7p 0 0 {}
+have-not-admitted-taken directed7u 0 0 {}
+have-admitted-before-valid directed 0 0 {}
+have-admitted-before-valid directed1 0 0 {}
+have-admitted-before-valid directed3v 0 0 {}
+have-admitted-before-valid directed41 4185 0 {'tape': 4185}
+have-admitted-before-valid directed42 0 0 {}
+have-admitted-before-valid directed43 18039 0 {'tape': 18039}
+have-admitted-before-valid directed44 0 0 {}
+have-admitted-before-valid directed44u 0 0 {}
+have-admitted-before-valid directed46 0 0 {}
+have-admitted-before-valid directed46d 0 0 {}
+have-admitted-before-valid directed4b 0 0 {}
+have-admitted-before-valid directed51 0 0 {}
+have-admitted-before-valid directed52 0 0 {}
+have-admitted-before-valid directed53 0 0 {}
+have-admitted-before-valid directed54 0 0 {}
+have-admitted-before-valid directed64 0 0 {}
+have-admitted-before-valid directed64h 0 0 {}
+have-admitted-before-valid directed6o 0 0 {}
+have-admitted-before-valid directed7 0 0 {}
+have-admitted-before-valid directed71 0 0 {}
+have-admitted-before-valid directed7p 0 0 {}
+have-admitted-before-valid directed7u 0 0 {}
+ihave-admitted-not-asked directed 0 0 {}
+ihave-admitted-not-asked directed1 0 0 {}
+ihave-admitted-not-asked directed3v 0 0 {}
+ihave-admitted-not-asked directed41 3265 0 {'tape': 3265}
+ihave-admitted-not-asked directed42 0 0 {}
+ihave-admitted-not-asked directed43 0 0 {}
+ihave-admitted-not-asked directed44 7344 0 {'tape': 7344}
+ihave-admitted-not-asked directed44u 7344 0 {'tape': 7344}
+ihave-admitted-not-asked directed46 0 0 {}
+ihave-admitted-not-asked directed46d 0 0 {}
+ihave-admitted-not-asked directed4b 0 0 {}
+ihave-admitted-not-asked directed51 0 0 {}
+ihave-admitted-not-asked directed52 0 0 {}
+ihave-admitted-not-asked directed53 0 0 {}
+ihave-admitted-not-asked directed54 0 0 {}
+ihave-admitted-not-asked directed64 0 0 {}
+ihave-admitted-not-asked directed64h 0 0 {}
+ihave-admitted-not-asked directed6o 0 0 {}
+ihave-admitted-not-asked directed7 0 0 {}
+ihave-admitted-not-asked directed71 0 0 {}
+ihave-admitted-not-asked directed7p 0 0 {}
+ihave-admitted-not-asked directed7u 0 0 {}
+ihave-not-admitted-taken directed 0 0 {}
+ihave-not-admitted-taken directed1 0 0 {}
+ihave-not-admitted-taken directed3v 0 0 {}
+ihave-not-admitted-taken directed41 0 0 {}
+ihave-not-admitted-taken directed42 0 0 {}
+ihave-not-admitted-taken directed43 0 0 {}
+ihave-not-admitted-taken directed44 1231 0 {'reached': 11, 'state': 3, 'tape': 1217}
+ihave-not-admitted-taken directed44u 1231 0 {'reached': 11, 'state': 3, 'tape': 1217}
+ihave-not-admitted-taken directed46 0 0 {}
+ihave-not-admitted-taken directed46d 0 0 {}
+ihave-not-admitted-taken directed4b 0 0 {}
+ihave-not-admitted-taken directed51 0 0 {}
+ihave-not-admitted-taken directed52 0 0 {}
+ihave-not-admitted-taken directed53 0 0 {}
+ihave-not-admitted-taken directed54 0 0 {}
+ihave-not-admitted-taken directed64 0 0 {}
+ihave-not-admitted-taken directed64h 0 0 {}
+ihave-not-admitted-taken directed6o 0 0 {}
+ihave-not-admitted-taken directed7 0 0 {}
+ihave-not-admitted-taken directed71 0 0 {}
+ihave-not-admitted-taken directed7p 0 0 {}
+ihave-not-admitted-taken directed7u 0 0 {}
+ihave-admitted-before-held directed 0 0 {}
+ihave-admitted-before-held directed1 0 0 {}
+ihave-admitted-before-held directed3v 0 0 {}
+ihave-admitted-before-held directed41 3658 0 {'tape': 3658}
+ihave-admitted-before-held directed42 0 0 {}
+ihave-admitted-before-held directed43 0 0 {}
+ihave-admitted-before-held directed44 8199 0 {'tape': 8199}
+ihave-admitted-before-held directed44u 8199 0 {'tape': 8199}
+ihave-admitted-before-held directed46 0 0 {}
+ihave-admitted-before-held directed46d 0 0 {}
+ihave-admitted-before-held directed4b 0 0 {}
+ihave-admitted-before-held directed51 0 0 {}
+ihave-admitted-before-held directed52 0 0 {}
+ihave-admitted-before-held directed53 0 0 {}
+ihave-admitted-before-held directed54 0 0 {}
+ihave-admitted-before-held directed64 0 0 {}
+ihave-admitted-before-held directed64h 0 0 {}
+ihave-admitted-before-held directed6o 0 0 {}
+ihave-admitted-before-held directed7 0 0 {}
+ihave-admitted-before-held directed71 0 0 {}
+ihave-admitted-before-held directed7p 0 0 {}
+ihave-admitted-before-held directed7u 0 0 {}
+ihave-offer-before-admitted directed 0 0 {}
+ihave-offer-before-admitted directed1 0 0 {}
+ihave-offer-before-admitted directed3v 0 0 {}
+ihave-offer-before-admitted directed41 3265 0 {'tape': 3265}
+ihave-offer-before-admitted directed42 0 0 {}
+ihave-offer-before-admitted directed43 0 0 {}
+ihave-offer-before-admitted directed44 6708 0 {'reached': 114, 'state': 2, 'tape': 6592}
+ihave-offer-before-admitted directed44u 6708 0 {'reached': 114, 'state': 2, 'tape': 6592}
+ihave-offer-before-admitted directed46 0 0 {}
+ihave-offer-before-admitted directed46d 0 0 {}
+ihave-offer-before-admitted directed4b 0 0 {}
+ihave-offer-before-admitted directed51 0 0 {}
+ihave-offer-before-admitted directed52 0 0 {}
+ihave-offer-before-admitted directed53 0 0 {}
+ihave-offer-before-admitted directed54 0 0 {}
+ihave-offer-before-admitted directed64 0 0 {}
+ihave-offer-before-admitted directed64h 0 0 {}
+ihave-offer-before-admitted directed6o 0 0 {}
+ihave-offer-before-admitted directed7 0 0 {}
+ihave-offer-before-admitted directed71 0 0 {}
+ihave-offer-before-admitted directed7p 0 0 {}
+ihave-offer-before-admitted directed7u 0 0 {}

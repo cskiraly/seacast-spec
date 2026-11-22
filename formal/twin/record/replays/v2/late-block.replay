@@ -1,8 +1,8 @@
-content: as --content's, 104 names
+content: as --content's, 111 names
 header: {"args":["--nodes","60","--degree","30","--msgs","3","--seed","7","--late-block","30,400","--doc","v2","--digest"],"foreign":["known_id","chunks"],"format":7,"own":["asked_at","tried","offers","promises","offered","park","asked_parked","last_resort_armed","ihave_frames","ihave_asked","held_back","received","mine","state","tied","queue","pending","pending_ids","tie_slot","owed","owed_answers","sent_to","slot_held","pace_queue","stop_pull","peer_has","holders","serve_count","origin","planned","pushed","desc","in_flight","waiters","sent","unwanted"],"traced":["K","N","add_offer","announcers","ask_parked","build_group","choose_push","close_promises","committed_descriptor","drop_beyond","drop_group","drop_offer","drop_stale_waits","drop_tie","expand","group_id","group_key","guard_fails","have_bits","held","last_resort","least_recently_tried","ledger","may_ask","message_id","on_iwant","outstanding","over_ihave_limits","owe","parked","promise_due","rarest","respond","retry_offer","segment_length","tie","tie_room","tied_to_root","untried","valid_descriptor","valid_id","validate_chunk","with_owed"],"tracer":"trace3.py","whole":false}
-replay: 1282618 records, 1282618 ok, 0 mismatched
+replay: 1295001 records, 1295001 ok, 0 mismatched
 fn K: 49147 records, 49147 ok
-fn N: 251329 records, 251329 ok
+fn N: 263709 records, 263709 ok
 fn add_offer: 38945 records, 38945 ok
 fn build_group: 3 records, 3 ok
 fn choose_push: 15984 records, 15984 ok
@@ -10,7 +10,7 @@ fn close_promises: 11472 records, 11472 ok
 fn drop_beyond: 177 records, 177 ok
 fn drop_stale_waits: 3360 records, 3360 ok
 fn group_id: 6 records, 6 ok
-fn group_key: 183 records, 183 ok
+fn group_key: 186 records, 186 ok
 fn have_bits: 120038 records, 120038 ok
 fn held: 12230 records, 12230 ok
 fn ledger: 54 records, 54 ok

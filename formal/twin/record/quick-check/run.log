@@ -1,7 +1,7 @@
-start 2026-11-21 12:12:17 UTC on HOST: width 8; the watchdog's limit 3600 s, its floor 70 GiB available; what: twin
-pid 575746, group 575746, nice 10, CPUs 8-11,32-35
+start 2026-11-22 01:22:00 UTC on HOST: width 8; the watchdog's limit 3600 s, its floor 45 GiB available; what: twin
+pid 990911, group 990911, nice 10, CPUs 20-23,44-47
 Python 3.12.3; git version 2.43.0; Lean (version 4.35.0, x86_64-unknown-linux-gnu, commit eb6cafb7290e8bd5f2937522d8d804f58f02bafc, Release); Lake version 5.0.0-src+eb6cafb (Lean version 4.35.0)
-the clone: commit 229631c7145b6e155a62ce623d23b01c70df2014, 351 files, its tree its commit's
-step twin-check: rc=0, 877 s, peak 1658996 KiB; last line: check.sh: PASS
+the clone: commit f72cb4df73df69528eabe7644054a750744a2cff, 358 files, its tree its commit's
+step twin-check: rc=0, 960 s, peak 1662888 KiB; last line: check.sh: PASS
 the clone after the run: its commit's
-end 2026-11-21 12:26:54 UTC: 877 s; rc=0
+end 2026-11-22 01:38:00 UTC: 960 s; rc=0
