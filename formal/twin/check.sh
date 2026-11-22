@@ -892,6 +892,9 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     das-keeper-ignore) echo "$DAS30 --keeper-claims ignore" ;; # note_claim, at the supernodes
     das-hoardcol-bias) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16 --repair-bias 0.5" ;;
     #                     control (m): the bias layer restores a shuffled taken before the install, and the tracer stops
+    # the alarm's cell (alarm_cell): --alarm-wait's filter_entry, a replaced name, entered outside every record at the
+    # honest nodes; its custodians alarm, and no member asks a claimant, so alarm_due is never armed
+    das-alarm) echo "--doc v2 --setting rows --nodes 30 --degree 8 --msgs 1 --row-subnets 4 --blobs 4 --withhold 64 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --alarm-wait 3.5 --seed 22" ;;
     # piece D's stops: v2/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
     hand5-v2) echo "$HAND5 --doc v2" ;;
     hand5-off) echo "$HAND5 --doc v2 --source-offers off" ;;
@@ -1162,7 +1165,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   if [ -z "$NODAS" ]; then
     names="forward push_rebuilt serve_standing owed_missing send_have note_claim repair_verdict known_in_scope"
     # shellcheck disable=SC2046
-    { for c in das-claim das-keeper-ignore; do par small "$c" rows "" $(chain_args "$c"); done
+    { for c in das-claim das-keeper-ignore das-alarm; do par small "$c" rows "" $(chain_args "$c"); done
       par chain_plant j known-replaced-v2 das-samplers-mcoff
       par chain_plant l verdict-replaced-v2 das-hoardcol-w16
       par stop_cell rows das-hoardcol-bias; }
@@ -1649,6 +1652,84 @@ calls_summary() {       # piece (b): each v2 trace's reached names, and the IWAN
     echo "  the calls summary: not as it must be"
   fi
 }
+timers_all_one() {      # $1: a trace under OUT, without .jsonl.gz: timers_v2.py's lines for it, in timersall/
+  local g=$OUT/timersall/${1//\//__}
+  (cd "$T" && $PY timers_v2.py "$OUT/$1.jsonl.gz") > "$g.txt" 2>&1; echo $? > "$g.rc"
+}
+timers_all() {          # deferred_offers' timers over every trace the calls summary reads (what it skips left out:
+  #                       plants, copies, a run that stopped, whose cut trace timers_v2.py would read as if whole):
+  #                       each holds, or stops at the type's lookup (two START_DELAYs fit: a stated limit, counted
+  #                       apart), and none fails; no enqueue entry carries a timer; a start inside a question counted,
+  #                       a search; then the alarm's cell (c-timers-all.txt)
+  local rel rels g chk= total line notes w s a h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread
+  rm -rf "$OUT/timersall"; mkdir -p "$OUT/timersall"
+  rels=$(cd "$OUT" && for d in v2 chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
+  for rel in $rels; do
+    has '^skipped: ' "$OUT/reached/${rel//\//__}.txt" 2> /dev/null && continue
+    chk="$chk $rel"; par timers_all_one "$rel"
+  done
+  par_end || true       # each one's status is read below
+  : > "$OUT/c-timers-all.txt"
+  for rel in $chk; do
+    g=$OUT/timersall/${rel//\//__}
+    line=$(sed -n 's/^timers_v2: the timers of deferred_offers hold on .*: \([0-9]*\) notes, \([0-9]*\) own afters, \([0-9]*\) retry_offer records .*/\1 notes, \2 own afters, \3 records/p' "$g.txt")
+    w=$(sed -n 's/^timers_v2: enqueue: [0-9]* entries, \([0-9]*\) with timers$/\1/p' "$g.txt")
+    s=$(sed -n 's/^timers_v2: start: \([0-9]*\) notes of kind start .*/\1/p' "$g.txt")
+    a=$(sed -n 's/^timers_v2: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt")
+    if [ "$(cat "$g.rc")" = 0 ] && [ -n "$line" ] && [ -n "$w" ] && [ -n "$s" ] && [ -n "$a" ]; then
+      h=$((h + 1)); notes=${line%% *}
+      if [ "$notes" -gt 0 ]; then hn=$((hn + 1)); else h0=$((h0 + 1)); fi
+      ws=$((ws + w)); as=$((as + a))
+      [ "$s" = 0 ] || sn="$sn $rel ($s)"
+      echo "$rel: holds: $line; enqueue entries with timers: $w; start notes: $s; alarm_due notes: $a" >> "$OUT/c-timers-all.txt"
+    elif [ "$(cat "$g.rc")" = 2 ] && has -E '^timers_v2: .*: no single START_DELAY fits t - known_at .*; K2 cannot be checked$' "$g.txt"; then
+      st=$((st + 1)); stn="$stn $rel"
+      echo "$rel: stopped at the type's lookup, a stated limit: $(grep -m 1 'no single START_DELAY fits' "$g.txt" | cut -c1-200)" >> "$OUT/c-timers-all.txt"
+    else
+      fl="$fl $rel"
+      echo "$rel: FAILS (exit $(cat "$g.rc")): $(tail -n 1 "$g.txt" | cut -c1-200)  <-- NOT" >> "$OUT/c-timers-all.txt"
+    fi
+  done
+  total=$(echo $chk | wc -w)
+  nread=$(sed -n 's/^c-reached: \([0-9]*\) traces read, [0-9]* skipped; the controls hold in every one$/\1/p' "$OUT/c-reached.txt" 2> /dev/null)
+  [ "$total" -gt 0 ] || no "deferred_offers' timers over every trace: no trace to check"
+  [ -z "$nread" ] || [ "$total" = "$nread" ] || no "deferred_offers' timers over every trace: $total checked, where the calls summary read $nread (c-timers-all.txt)"
+  [ -z "$fl" ] || no "deferred_offers' timers over every trace: failed in:$fl (c-timers-all.txt)"
+  [ "$ws" = 0 ] || no "deferred_offers' timers over every trace: $ws enqueue entries carry a timer (c-timers-all.txt)"
+  echo "  deferred_offers' timers over the $total traces the calls summary reads: $h hold ($hn with notes, $h0 with none), $st stopped at the type's lookup${stn:+ (in:$stn)}, $(echo $fl | wc -w) fail; enqueue entries with timers: $ws; start notes: ${sn:+in$sn}${sn:-none} (c-timers-all.txt)"
+  if [ -n "$NODAS" ]; then echo "  the alarm's cell: --no-das: skipped (a DAS cell)"; else alarm_cell "$as"; fi
+}
+alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's cell (--alarm-wait, rows/das-alarm), traced
+  #                       by the rows step: its digest the untraced run's and its replay clean; its custodians alarm; at
+  #                       the honest nodes its filter_entry, a replaced name, is entered outside every record, so
+  #                       probe_settled, which filter_entry alone calls, runs bare; promise_due's records still come.
+  #                       A limit, not a check: no cell found asks a claimant (a member asks one only while it defers on
+  #                       a verified claim, node.py's _alarm; ten seeds of this cell, with and without the repair sample,
+  #                       none did), so no trace holds an alarm_due note and a toy callback's note path stays
+  #                       unexercised; the 0 asks and the 0 notes are required, so that a change that arms it is read
+  local f=$OUT/rows/das-alarm g=$OUT/timersall/rows__das-alarm sent asks ps pd an why= line
+  sent=$(sed -n -E 's/^  alarm: ([0-9]+) sent by .*/\1/p' "$f.out" 2> /dev/null)
+  asks=$(sed -n -E 's/^  alarm: .*; ([0-9]+) asks of a claimant .*/\1/p' "$f.out" 2> /dev/null)
+  ps=$($PY -c 'import json, sys; print(json.load(open(sys.argv[1]))["calls"]["probe_settled"]["bare"])' "$f.jsonl.gz.calls.json" 2> /dev/null)
+  pd=$(sed -n 's/^timers_v2: alarm_due: [0-9]* notes name it; promise_due: \([0-9]*\) records$/\1/p' "$g.txt" 2> /dev/null)
+  an=$(sed -n 's/^timers_v2: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt" 2> /dev/null)
+  if ! has ': the same$' "$f.digest" 2> /dev/null; then why="not traced, or its digest is not the untraced run's"
+  elif ! why=$(replay_clean rows/das-alarm); then why="its replay: $why"
+  elif [ -z "$sent" ] || [ "$sent" = 0 ]; then why="no alarm sent"
+  elif [ "$asks" != 0 ]; then why="a member asked a claimant (${asks:-?}): alarm_due may be armed, and the limit is no longer as stated"
+  elif [ -z "$ps" ] || [ "$ps" = 0 ]; then why="probe_settled ran bare ${ps:-?} times: filter_entry was not entered outside a record"
+  elif [ -z "$pd" ] || [ "$pd" = 0 ]; then why="no promise_due record"
+  elif [ "$an" != 0 ] || [ "$1" != 0 ]; then why="a note names alarm_due (${an:-?} here, $1 over every trace)"
+  fi
+  if [ -n "$why" ]; then
+    echo "the alarm's cell (rows/das-alarm): $why  <-- NOT" >> "$OUT/c-timers-all.txt"
+    no "the alarm's cell (rows/das-alarm): $why (c-timers-all.txt)"
+  else
+    line="the alarm's cell (rows/das-alarm): digest the untraced run's; $(grep -m 1 '^replay: ' "$f.replay"); $sent alarms sent; filter_entry entered outside every record at the alarm's nodes (probe_settled bare $ps); promise_due $pd records; a limit, not a check: no member asks a claimant (0 asks), so alarm_due is never armed (0 notes)"
+    echo "$line" >> "$OUT/c-timers-all.txt"
+    echo "  $line"
+  fi
+}
 s_tracercontrols() {
   local f want bad
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
@@ -1946,6 +2027,8 @@ EOF_ERC
   # piece (b): each v2 trace's reached names and its IWANTs by records and by calls, with the calls file's controls,
   # last, so that every v2 trace of the run is made (c-reached.txt)
   calls_summary
+  # deferred_offers' timers over every trace the calls summary reads, and the alarm's cell (c-timers-all.txt)
+  timers_all
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
