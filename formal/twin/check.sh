@@ -69,8 +69,9 @@
 #             line after the verdict, a line on stderr, exit code 2) refused, the plain one taken
 #   tracercontrols   a tracer whose views let an assignment through unlogged, and 29 faults planted in the tracer:
 #             each must stop it, with its own words; under v2, nine plants that must not (five, and four controls),
-#             each as written, and the controls of the checks' own helpers; and a nodes line without a replaced
-#             name's chain, which the replay must refuse with its words
+#             each as written (a plant that replaces a function at a node: the nodes line with its chains set
+#             aside, that node's chain the plant's), and the controls of the checks' own helpers; and a nodes
+#             line without a replaced name's chain, which the replay must refuse with its words
 #   seeds     the same bytes whatever Python's hash seed, which is random in every process of an isolated Python:
 #             every directed set made again twice, two cells once (46 traces)
 #   sizes     sizes.txt: each of the record's traces as the tracer wrote it: bytes, lines, the longest line; and
@@ -218,10 +219,11 @@ digest_of() { sed -n '/^digest /{s/^digest \(.\{16\}\).*/\1/p;q}' "$1"; }
 bare_none() { [ "$(cat "$1.bare.json" 2> /dev/null)" = "{}" ]; }     # $1: a v2 trace: its run counted no bare call
 extra_records() {       # $1: a trace; $2: another; $3: a node; $4: a function; $5: k: the second's body is the first's,
   $PY - "$@" <<'EOF'    #   in order, with exactly k records inserted, each of that function at that node, and its
-import gzip             #   trailer the first's with those k counted, nothing else changed
-import json
-import sys
+import gzip             #   trailer the first's with those k counted, nothing else changed. [$6 $7 $8: a node, a name
+import json             #   and a chain (JSON): the nodes line judged with its chains set aside, that node's chain of
+import sys              #   that name the given one; without them, the nodes line the first's byte for byte]
 a_p, b_p, node, fn, k = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4], int(sys.argv[5])
+spec = sys.argv[6:]
 
 
 def body(p):            # an unreadable file (a CRC error too) raises here, and the check fails
@@ -238,17 +240,42 @@ def inserted(line):
     return isinstance(r, dict) and r.get("fn") == fn and int(r.get("n", -1)) == node
 
 
+def nodes_rule(la, lb):
+    """The nodes line. Without a spec, the first's byte for byte. With one, each entry's `chains` set aside and
+    nothing else: the rest equal; every entry's chains the first's, but the planted node's chain of the name, which is
+    the spec's (a plant's own function there: the chain tells the truth about the code at that node)."""
+    if not spec:
+        return None if la == lb else "the nodes line differs from the first's"
+    cnode, cname, cwant = int(spec[0]), spec[1], json.loads(spec[2])
+    ea, eb = json.loads(la)["nodes"], json.loads(lb)["nodes"]
+    ca, cb = [e.pop("chains", None) for e in ea], [e.pop("chains", None) for e in eb]
+    if ea != eb:
+        return "the nodes line differs outside its chains"
+    for e, x, y in zip(ea, ca, cb):
+        if cnode in e["n"]:
+            got = (y or {}).get(cname)
+            if got != cwant:
+                return f"the planted node's chain of {cname} is {json.dumps(got)}, not {json.dumps(cwant)}"
+            x, y = {n: c for n, c in (x or {}).items() if n != cname}, {n: c for n, c in (y or {}).items() if n != cname}
+        if x != y:
+            return "a chain other than the planted node's differs from the first's"
+    return None
+
+
 a, ta = body(a_p)
 b, tb = body(b_p)
 i = extra = 0
-why = None
-for line in b:          # b is a, in order, with lines inserted that are records of fn at node
+why = nodes_rule(a[1], b[1]) if len(a) > 1 and len(b) > 1 else "a trace without its nodes line"
+a, b = a[:1] + a[2:], b[:1] + b[2:]     # the header, then the records: the nodes line judged above
+for line in b if why is None else ():   # b is a, in order, with lines inserted that are records of fn at node
     if i < len(a) and line == a[i]:
         i += 1
     elif inserted(line):
         extra += 1
     else:
-        why = f"line {i + extra + 2} is neither the first trace's next line nor an inserted record of {fn} at node {node}"
+        at = i + extra
+        why = (f"line {at + 2 if at == 0 else at + 3} is neither the first trace's next line nor an inserted record of "
+               f"{fn} at node {node}")
         break
 want = dict(ta, records=ta["records"] + k, by_fn=dict(ta["by_fn"], **{fn: ta["by_fn"].get(fn, 0) + k}))
 if why is None and i != len(a):
@@ -812,7 +839,10 @@ s_tracercontrols() {
       hdr-other-v2) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
       alias-missing-v2) want="^trace3: node [0-9]*: chunk_id is missing under v2" ;;
       unscanned-layer-v2) want="^trace3: node [0-9]*: on_frame is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.on_frame \(node\.py:2\)" ;;
-      early-install-v2) want="^trace3: node [0-9]*: promise_due was bound again after the tracer was installed, which under v2 must be the namespace's last binding: Node\._v2\.<locals>\.promise_due" ;;
+      early-install-v2) want="^trace3: node [0-9]*: the closure rule's lists and the node differ: ALL is not in the namespace" ;;
+        # An install before _v2 is still refused, and refused first by what it lacks: the install-time check of the
+        # closure rule's lists. The last-binding check keeps its coverage through rebind-tape-v2 and rebind-view-v2,
+        # which reach it. If a later install-time check moves the first stop again, these words move with it.
       raw-alias-v2) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
       other-node-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs" ;;
       made-rows-off) want="^trace3: the views' log does not account for the state" ;;
@@ -846,9 +876,17 @@ s_tracercontrols() {
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
   # each plant's count read from the .bare.json the tracer wrote; each plant's body the plain trace's; each control's
   # the plain one with exactly its extra records of N at the named node, its trailer counting them
+  # A plant that replaces a function at a node has that function's chain in the node's entry of the nodes line, for
+  # the chain tells the truth about the code there: chain names it, and extra_records judges the nodes line with each
+  # entry's chains set aside, that node's chain of on_iwant the plant's, every other the plain trace's
   : > "$OUT/c-tracerplants.txt"; bad=0
-  local plain line node k want why
+  local plain line node k want why chain spec also_chain
   for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2 bare-timer-v2-now hdr-read-v2 hdr-read-v2-raw; do
+    chain=
+    case $f in      # the plant's own function at the planted node, its chain of on_iwant
+      suppressed-entry-v2|suppressed-entry-v2-off) chain='["suppressed_entry_v2.<locals>.install.<locals>.on_iwant"]' ;;
+      bare-replaced-v2) chain='["bare_in_question_v2.<locals>.install.<locals>.on_iwant"]' ;;
+    esac
     case $f in     # k: the control's extra records of N; - for a plant read by its line alone (its read adds to a record)
       bare-in-question-v2) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c N: 1$" ;;
       bare-in-question-v2-per-node) plain=v2/hand5; k=1; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; records inside: 1; bare c N: 0$" ;;
@@ -880,15 +918,17 @@ s_tracercontrols() {
     if [ "$(cat "$OUT/c-tp-$f.jsonl.gz.bare.json" 2> /dev/null)" != "$want" ]; then
       echo "$f: its .bare.json is not $want  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
     fi
+    spec=() also_chain=
+    if [ -n "$chain" ]; then spec=("$node" on_iwant "$chain"); also_chain=", but node $node's chain of on_iwant, the plant's"; fi
     if [ "$k" = - ]; then           # read by its line alone
       echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want" >> "$OUT/c-tracerplants.txt"
     elif [ "$k" = 0 ]; then         # a plant: the plain trace's body
-      if cmp -s <(zcat "$OUT/c-tp-$f.jsonl.gz" | tail -n +2) <(zcat "$OUT/$plain.jsonl.gz" | tail -n +2); then
-        echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want; the body $plain's" >> "$OUT/c-tracerplants.txt"
-      else echo "$f: the body not $plain's  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
-    elif why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "$node" N "$k"); then
-      echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); the body $plain's and $k records of N at node $node, its trailer counting them" >> "$OUT/c-tracerplants.txt"
-    else echo "$f: the body not $plain's and $k records of N at node $node: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+      if why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "$node" N 0 "${spec[@]}"); then
+        echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); .bare.json $want; the body $plain's$also_chain" >> "$OUT/c-tracerplants.txt"
+      else echo "$f: the body not $plain's$also_chain: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+    elif why=$(extra_records "$OUT/$plain.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz" "$node" N "$k" "${spec[@]}"); then
+      echo "$f: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/c-tp-$f.err" | cut -c16-160); the body $plain's and $k records of N at node $node, its trailer counting them$also_chain" >> "$OUT/c-tracerplants.txt"
+    else echo "$f: the body not $plain's and $k records of N at node $node$also_chain: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
   # the check that no v2 trace counts a bare call (s_replays) itself fails on a planted count
   if bare_none "$OUT/c-tp-bare-in-question-v2.jsonl.gz"; then
@@ -933,6 +973,72 @@ EOF_ER
     elif [[ $why == *"$want"* ]]; then
       echo "control: extra_records refuses the planted $c, as it must: $why" >> "$OUT/c-tracerplants.txt"
     else echo "control: extra_records refuses the planted $c for another reason: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+  done
+  # extra_records' chain spec, on traces made from the plain v2/hand5-own, the spec its replaced node's on_iwant with
+  # its own chain: itself passes; a record line changed; the nodes line changed outside the chains (the replaced
+  # node's replaced emptied, the first entry's IWANT_WINDOW and its payload type's M each plus 1); another entry's
+  # chains given a name more; the replaced node's chain of on_iwant changed: each refused, for its own reason.
+  # Setting the chains aside removes that one member of each entry and nothing else
+  rm -f "$OUT"/c-erc-*.jsonl.gz "$OUT/c-erc.spec"
+  if ! $PY - "$OUT/v2/hand5-own.jsonl.gz" "$OUT/c-erc" <<'EOF_ERC'
+import gzip
+import json
+import sys
+src, out = sys.argv[1], sys.argv[2]
+with gzip.open(src, "rt") as f:
+    lines = f.read().splitlines()
+NL = 2                  # the nodes line: after the content line and the header
+nodes = json.loads(lines[NL])["nodes"]
+at = next(j for j, e in enumerate(nodes) if "on_iwant" in e["replaced"])
+node, chain = nodes[at]["n"][0], nodes[at]["chains"]["on_iwant"]
+rec = next(j for j, x in enumerate(lines) if x.startswith('{"n"') and json.loads(x)["fn"] != "N")
+
+
+def with_nodes(change):
+    d = json.loads(lines[NL])
+    change(d["nodes"])
+    return lines[:NL] + [json.dumps(d, separators=(",", ":"))] + lines[NL + 1:]
+
+
+r = json.loads(lines[rec])
+r["args"] = r["args"] + [0]
+cases = {
+    "record": lines[:rec] + [json.dumps(r, separators=(",", ":"))] + lines[rec + 1:],
+    "replaced": with_nodes(lambda ns: ns[at].update(replaced=[])),
+    "const": with_nodes(lambda ns: ns[0]["consts"].update(IWANT_WINDOW=ns[0]["consts"]["IWANT_WINDOW"] + 1)),
+    "type": with_nodes(lambda ns: ns[0]["types"]["payload"].update(M=ns[0]["types"]["payload"]["M"] + 1)),
+    "other-chain": with_nodes(lambda ns: ns[0]["chains"].update(may_ask=["planted"])),
+    "planted-chain": with_nodes(lambda ns: ns[at]["chains"].update(on_iwant=chain + ["planted"])),
+}
+assert at != 0, "the replaced node's entry is the first"
+for name, ls in cases.items():
+    with gzip.open(f"{out}-{name}.jsonl.gz", "wt") as f:
+        f.write("\n".join(ls) + "\n")
+with open(f"{out}.spec", "w") as f:
+    f.write(f"{node}\n{json.dumps(chain)}\n")
+EOF_ERC
+  then
+    echo "control: extra_records' chain fixtures were not made  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
+  fi
+  local cnode cchain
+  cnode=$(sed -n 1p "$OUT/c-erc.spec" 2> /dev/null); cchain=$(sed -n 2p "$OUT/c-erc.spec" 2> /dev/null)
+  if [ -n "$cnode" ] && extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/v2/hand5-own.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" > /dev/null; then
+    echo "control: extra_records with node $cnode's chain of on_iwant passes v2/hand5-own against itself, as it must" >> "$OUT/c-tracerplants.txt"
+  else echo "control: extra_records with node ${cnode:-?}'s chain of on_iwant refuses v2/hand5-own against itself  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+  for c in record replaced const type other-chain planted-chain; do
+    case $c in
+      record) want="is neither the first trace's next line" ;;
+      replaced|const|type) want="the nodes line differs outside its chains" ;;
+      other-chain) want="a chain other than the planted node's differs from the first's" ;;
+      planted-chain) want="the planted node's chain of on_iwant is" ;;
+    esac
+    if [ -z "$cnode" ] || ! gzip -t "$OUT/c-erc-$c.jsonl.gz" 2> /dev/null; then
+      echo "control: the chain fixture $c is not a whole trace  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
+    elif why=$(extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/c-erc-$c.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" 2> /dev/null); then
+      echo "control: extra_records passes the chain fixture $c  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
+    elif [[ $why == *"$want"* ]]; then
+      echo "control: extra_records refuses the chain fixture $c, as it must: $why" >> "$OUT/c-tracerplants.txt"
+    else echo "control: extra_records refuses the chain fixture $c for another reason: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
   [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 9 ] || no "not 9 plants under v2 as written (c-tracerplants.txt)"
