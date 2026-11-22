@@ -2,15 +2,19 @@ import SpecTwin.V2.Replay
 
 /-! # A question's row, read and refused: the forms of v2's questions
 
-A row is one tape entry of a question, `[name, args, answer]`, under one form of `NodeV2`'s questions, named by its
-method (`send (a HAVE)` is `send`). `checkRow` reads a row twice, as `runV2` reads a record's tape:
+A row is one tape entry of a question, `[name, args, answer]`, under one form of `NodeV2`'s or `V2Later`'s
+questions, named by its method (`send (a HAVE)` is `send`). An order's row is `["order", place, members]`, and an own
+level's keys `["keys", table, path, keys]` (`rowParts`). `checkRow` reads a row twice, as `runV2` reads a record's
+tape:
 1. The row's arguments are read with the twin's readers into the twin's values, and the form's question is asked
    with them in `NodeV2 R`, over a tape of that one row (`tapeItem` under `docV2`). `askCall` compares the
    question's arguments, as the twin writes them, with the row's. The answer is read by the form's reader, the
    tape must be used up, and the value read, written back in the answer's form, must be the row's answer.
-   `choiceOfSet` is asked with the row's list reversed, so that its comparison as a set is what passes it.
+   `choiceOfSet` and the three orders are asked with the row's members reversed, so that only a permutation of them
+   passes.
 2. The same row with its answer replaced by a wrong form of it (`wrongAnswer`) must be refused by the answer's
-   reader, with a message that starts `tape: {name}: its answer: `.
+   reader, with a message that starts `tape: {name}: its answer: `. `shuffledPeers`' row is `protocol.md`'s
+   `shuffled` entry, refused by that entry's reader in its own words (`refusalOf`).
 
 A row's leaves need not be one consistent state: what is checked is the forms. -/
 
@@ -45,12 +49,28 @@ def coversJson (l : List Cover) : Json := Json.arr (l.map coverJson).toArray
 def famsJson (l : List Fam) : Json := Json.arr (l.map intJson).toArray
 def natJson (n : Nat) : Json := (n : Json)
 def unitJson (_ : Unit) : Json := Json.null
+def groupsJson (l : List Group) : Json := Json.arr (l.map Json.str).toArray
+
+def repairVerdictJson : RepairVerdict → Json
+  | .repaired => Json.str "REPAIRED"
+  | .notRepaired => Json.str "NOT_REPAIRED"
+  | .asked => Json.str "ASKED"
+
+/-- An `after` row's timer, read back from its name and its arguments: the inverse of `timerV2Json`. -/
+def timerV2Of (f : String) (xs : Json) : Except String TimerV2 := do
+  match f, ← xs.getArr? with
+  | "reconsider", #[g, t] => return .reconsider (← Replay.groupKey g) (← floatOf t)
+  | "ask_sample", #[g, i] => return .askSample (← Replay.groupKey g) (← nat i)
+  | "resample", #[g, i, q, b] => return .resample (← Replay.groupKey g) (← nat i) (← nat q) (← boolOf b)
+  | _, _ => throw s!"not one of v2's timers: {f} {xs.compress}"
 
 /-- The form of a row's name: `send (a HAVE)` is `send`. -/
 def formOf (name : String) : String := (name.splitOn " (").headD name
 
-/-- A form's question, asked with the arguments read from its row; its answer written back in the row's form. -/
-def askOf (form : String) (args : Array Json) : Except String (R Json) := do
+/-- A form's question, asked with the arguments read from its row; its answer written back in the row's form. An
+order's question also takes the members the twin holds: the row's answer, reversed, so that only a permutation of
+them passes. -/
+def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Json) := do
   match form, args with
   | "typeOfGroup", #[g] => do
     let g ← Replay.groupKey g
@@ -179,6 +199,53 @@ def askOf (form : String) (args : Array Json) : Except String (R Json) := do
   | "shuffledPairs", #[xs] => do
     let xs ← pairs "index and chunk" nat chunkF xs
     return pairsJson <$> NodeV2.shuffledPairs (m := R) xs
+  | "afterV2", #[d, .str f, xs] => do
+    let d ← floatOf d; let t ← timerV2Of f xs
+    return unitJson <$> NodeV2.afterV2 (m := R) d t
+  | "releaseWantedGroups", #[] =>
+    return unitJson <$> NodeV2.releaseWantedGroups (m := R)
+  | "shuffledPeers", #[xs] => do
+    let xs ← peers xs
+    return natsJson <$> NodeV2.shuffledPeers (m := R) xs
+  | "order", #[.str place] => do
+    let xs ← peers ans
+    return natsJson <$> NodeV2.order (m := R) place xs.reverse
+  | "probeWaitingOrder", #[.str "probe_waiting", .arr #[g]] => do
+    let g ← Replay.groupKey g; let xs ← peers ans
+    return natsJson <$> NodeV2.probeWaitingOrder (m := R) g xs.reverse
+  | "claimsOrder", #[.str "claims", .arr #[]] => do
+    let gs ← (← arr ans).mapM Replay.groupKey
+    return groupsJson <$> NodeV2.claimsOrder (m := R) gs.reverse
+  | "ownInterest", #[g] => do
+    let g ← Replay.groupKey g
+    return intJson <$> NodeV2.ownInterest (m := R) g
+  | "windowRelease", #[p, g, i] => do
+    let p ← nat p; let g ← Replay.groupKey g; let i ← nat i
+    return unitJson <$> V2Later.windowRelease (m := R) p g i
+  | "forwardNode", #[f, p, axes] => do
+    let f ← chunkF f; let p ← nat p; let axes ← optOf giList axes
+    return unitJson <$> NodeV2.forwardNode (m := R) f p axes
+  | "pushRebuiltNode", #[g, xs] => do
+    let g ← Replay.groupKey g; let xs ← natList xs
+    return unitJson <$> NodeV2.pushRebuiltNode (m := R) g xs
+  | "sendHaveNode", #[p, g] => do
+    let p ← nat p; let g ← Replay.groupKey g
+    return unitJson <$> NodeV2.sendHaveNode (m := R) p g
+  | "serveStandingNode", #[g, i] => do
+    let g ← Replay.groupKey g; let i ← nat i
+    return unitJson <$> NodeV2.serveStandingNode (m := R) g i
+  | "owedMissingNode", #[g] => do
+    let g ← Replay.groupKey g
+    return Json.bool <$> NodeV2.owedMissingNode (m := R) g
+  | "repairVerdictNode", #[g] => do
+    let g ← Replay.groupKey g
+    return repairVerdictJson <$> NodeV2.repairVerdictNode (m := R) g
+  | "noteClaimNode", #[p, g] => do
+    let p ← nat p; let g ← Replay.groupKey g
+    return unitJson <$> NodeV2.noteClaimNode (m := R) p g
+  | "knownInScopeNode", #[g] => do
+    let g ← Replay.groupKey g
+    return natJson <$> NodeV2.knownInScopeNode (m := R) g
   | _, _ => throw s!"not a form of v2's questions, or not its arguments: {form} {(Json.arr args).compress}"
 
 /-- The question run over a tape of these rows, each read as a record's tape entry is under protocol-v2.md. The
@@ -240,17 +307,44 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
       | some x => pure (Json.arr #[x])
       | none => throw "shuffledPairs: an empty answer has no first pair"
     | _ => throw s!"shuffledPairs: not a list of pairs: {ans.compress}"
+  | "afterV2" | "releaseWantedGroups" | "windowRelease" | "forwardNode" | "pushRebuiltNode" | "sendHaveNode"
+  | "serveStandingNode" | "noteClaimNode" => p "1"
+  | "shuffledPeers" => match ans with     -- the answer with its first member again at the end
+    | .arr xs => match xs[0]? with
+      | some x => pure (Json.arr (xs.push x))
+      | none => throw "shuffledPeers: an empty answer has no first member"
+    | _ => throw s!"shuffledPeers: not a list of peers: {ans.compress}"
+  | "order" => p "[\"7\"]"
+  | "probeWaitingOrder" => p "[[7]]"
+  | "claimsOrder" => p "[5]"
+  | "ownInterest" => p "[\"+\",1]"
+  | "owedMissingNode" => p "0"
+  | "repairVerdictNode" => p "\"repaired\""
+  | "knownInScopeNode" => p "[\"-\",1]"
   | _ => throw s!"no wrong answer for the form {form}"
 
-/-- The labels of v2's question forms, one row each, in the order of `tools/forms-v2-examples.tsv` (spec 287d575):
-the checker's own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). -/
+/-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row
+is `protocol.md`'s `shuffled` entry, whose reader refuses an answer that is not a permutation of the question
+before any question is asked. -/
+def refusalOf (form q : String) : String :=
+  if form == "shuffledPeers" then "shuffled's answer is not a permutation of its question: "
+  else s!"tape: {q}: its answer: "
+
+/-- The labels of v2's question forms, one row each, in the order of `tools/forms-v2-examples.tsv`: the checker's
+own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). The first 44 are the
+file's at spec 287d575; the last 18 cover the methods of `NodeV2` and `V2Later` that had no row. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
    "links", "linkCover", "coverCandidates", "floorCandidates", "floorLinks", "highCustody", "families",
    "familiesWithDuty", "wantsFamily", "dutyFor", "routeNext", "blockOf", "groupOf", "nodeId", "interestSatisfied",
    "mergeWaiting", "deferredOffers", "openGroupSource", "openLink", "openSamplingLink", "choicePeer", "choiceOfSet",
-   "choiceNat", "choiceCover", "validHaveV2", "sampleCovers", "shuffledPairs"]
+   "choiceNat", "choiceCover", "validHaveV2", "sampleCovers", "shuffledPairs",
+   -- the forms that had no row before protocol-v2.md v0.11.1's sync, with one `afterV2` label per v2 timer
+   "afterV2 (reconsider)", "afterV2 (ask_sample)", "afterV2 (resample)", "releaseWantedGroups", "shuffledPeers",
+   "order", "probeWaitingOrder", "claimsOrder", "ownInterest", "windowRelease",
+   "forwardNode", "pushRebuiltNode", "sendHaveNode", "serveStandingNode", "owedMissingNode", "repairVerdictNode",
+   "noteClaimNode", "knownInScopeNode"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)
@@ -259,23 +353,50 @@ def sendKind : String → Option (String × List String)
   | "send (a relation)" => some ("relation", ["join", "graft", "prune"])
   | _ => none
 
+/-- An `afterV2` row's timer, by its label: the name its arguments must carry second. -/
+def afterTimer : String → Option String
+  | "afterV2 (reconsider)" => some "reconsider"
+  | "afterV2 (ask_sample)" => some "ask_sample"
+  | "afterV2 (resample)" => some "resample"
+  | _ => none
+
+/-- A row's parts: the question's name on the tape, its arguments as the question writes them, its answer, and the
+row rebuilt around another answer. An order's row is `["order", place, members]`, and an own level's keys
+`["keys", table, path, keys]`. Every other row is `[name, args, answer]`, with the call's log of cells as a fourth
+member where the record has one; the rebuilt row keeps it. -/
+def rowParts (row : Json) : Except String (String × Array Json × Json × (Json → Json)) :=
+  match row with
+  | .arr #[.str "order", place, ms] =>
+    pure ("order", #[place], ms, fun a => Json.arr #[Json.str "order", place, a])
+  | .arr #[.str "keys", t, path, ks] =>
+    pure ("keys", #[t, path], ks, fun a => Json.arr #[Json.str "keys", t, path, a])
+  | .arr #[.str q, .arr args, ans] =>
+    pure (q, args, ans, fun a => Json.arr #[Json.str q, Json.arr args, a])
+  | .arr #[.str q, .arr args, ans, log@(.obj _)] =>
+    pure (q, args, ans, fun a => Json.arr #[Json.str q, Json.arr args, a, log])
+  | _ => throw s!"not a row [name, args, answer]: {row.compress}"
+
 /-- A row read, and then refused with a wrong form of its answer: the answer as read and written back, and the
-refusal's message. A `send` row's message must carry its label's wire tag first. -/
+refusal's message. A `send` row's message must carry its label's wire tag first, and an `afterV2` row its label's
+timer. -/
 def checkRow (name : String) (row : Json) : Except String (String × String) := do
   let form := formOf name
-  let #[.str q, .arr args, ans] ← row.getArr? | throw s!"not a row [name, args, answer]: {row.compress}"
+  let (q, args, ans, rebuild) ← rowParts row
   if let some (kind, tags) := sendKind name then
     let m := args[1]?.getD Json.null
     let .ok (.str tag) := m.getArrVal? 0 | throw s!"{name}: the message has no wire tag: {m.compress}"
     if !tags.contains tag then throw s!"{name}: the message is not a {kind}: {tag}"
-  let ask ← askOf form args
+  if let some t := afterTimer name then
+    let f := args[1]?.getD Json.null
+    if f != Json.str t then throw s!"{name}: the timer is not {t}: {f.compress}"
+  let ask ← askOf form args ans
   let v ← onTape [row] ask
   if v != ans then throw s!"the answer read back as {v.compress}, not the row's {ans.compress}"
-  let bad := Json.arr #[Json.str q, Json.arr args, ← wrongAnswer form ans]
+  let bad := rebuild (← wrongAnswer form ans)
   match onTape [bad] ask with
   | .ok w => throw s!"a wrong answer read, as {w.compress}: {bad.compress}"
   | .error e =>
-    if e.startsWith s!"tape: {q}: its answer: " then return (v.compress, e)
+    if e.startsWith (refusalOf form q) then return (v.compress, e)
     throw s!"a wrong answer refused, but not by its reader: {e}"
 
 /-- The checker's three controls, on a file's rows. Each must fail, with a message that starts as given:
@@ -294,10 +415,12 @@ def controls (rows : Array (String × Json)) : List (String × String × Except 
     | _ => Json.null
   let hcRow := row "highCustody"
   let toRow := row "typeOf"
-  [("1, send's urgent flipped", "tape: send[", do onTape [sendRow] (← askOf "send" (a.set! 2 flipped))),
+  [("1, send's urgent flipped", "tape: send[",
+     do onTape [sendRow] (← askOf "send" (a.set! 2 flipped) Json.null)),
    ("2, highCustody's row as linkCover", "tape: link_cover[",
-     do onTape [hcRow] (← askOf "linkCover" (argsOf hcRow))),
-   ("3, typeOf's row twice", "the tape is not used up", do onTape [toRow, toRow] (← askOf "typeOf" (argsOf toRow)))]
+     do onTape [hcRow] (← askOf "linkCover" (argsOf hcRow) Json.null)),
+   ("3, typeOf's row twice", "the tape is not used up",
+     do onTape [toRow, toRow] (← askOf "typeOf" (argsOf toRow) Json.null))]
 
 /-- `replay --forms FILE`. Each line of FILE is a form's name, a tab and its row as compact JSON. Before any row is
 read, the names must be the checker's `labels`, each once: a file with another name, a name twice or a label with

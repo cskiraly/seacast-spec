@@ -364,8 +364,7 @@ sys.path.insert(0, sys.argv[1] + "/tools")
 import layout
 shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns(*layout.NOT_SOURCES, "out"))
 EOF
-  # the Lean that builds the copy: its version read in the copy, where lean-toolchain holds (elan's default may differ)
-  echo "  $(cd "$OUT/twin" && lean --version 2>&1 | head -n 1)"
+  echo "  $(cd "$OUT/twin" && lean --version 2>&1 | head -n 1)"     # the Lean the build uses: elan resolves it by the copy's lean-toolchain
   # SpecTwin.V2 too: it alone imports the guard modules (V2/*Known.lean), whose #guards hold only where they are built
   (cd "$OUT/twin" && lake build replay SpecTwin.V2) > "$OUT/build.txt" 2>&1 || { grep -v '^✔' "$OUT/build.txt" | head -n 40; no "the build failed"; return; }
   [ -x "$REPLAY" ] || { no "the build left no replay"; return; }
