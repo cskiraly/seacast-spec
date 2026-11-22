@@ -13,7 +13,7 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## After v0.10.12 — not yet released
+## v0.11.0 — 2026-11-22
 
 The two protocols get their names, `protocol-v2.md` SEACAST and `protocol.md` SEACAST on gossipsub,
 and the README is rewritten. Text only; no rule changes since v0.10.12.
@@ -36,7 +36,7 @@ and the README is rewritten. Text only; no rule changes since v0.10.12.
   release's `toy/` and `formal/twin/` are those of `f72cb4d`, apart from the record and the files
   whose names end in `.md`. `FILES.sha256` holds `RECORD.md`'s new hash.
 
-## v0.10.12 — 2026-11-22
+## v0.10.12 — 2026-11-22 (`c40847b`)
 
 The next version bounds more of what a peer can make a node keep or serve: asks outside what it
 serves, a WANT's index and group, the relations on a link, the answers to one peer in a heartbeat

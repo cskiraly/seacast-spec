@@ -71,7 +71,7 @@ that implementation differs from the text.
 
 ## Where it stands
 
-- **The latest release is [v0.10.12](https://github.com/cskiraly/seacast-spec/tree/v0.10.12)**,
+- **The latest release is [v0.11.0](https://github.com/cskiraly/seacast-spec/tree/v0.11.0)**,
   2026-11-22. [`CHANGELOG.md`](CHANGELOG.md) says what each release changed; changes after the
   latest tag are on `main`, and the changelog's first entry names them.
 - **SEACAST on gossipsub** (`protocol.md`) was measured on a research implementation, and each

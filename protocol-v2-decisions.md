@@ -434,3 +434,7 @@ carried later than its version.
   This draft carries the first in `on_holding` and `on_offer` (§4.3), and bounds more of what a peer
   can make a node keep or serve: asks outside what it serves, a WANT's index and group, the
   relations on a link, the answers to one peer in a heartbeat and the routed requests it passes on.
+- v0.11.0 (2026-11-22): `protocol.md` is the same but for its version line and its names: its title
+  and a new opening paragraph name it SEACAST on gossipsub, and §5.1 and §9 cite this document and
+  the announcement post by their current names. This draft is named SEACAST; there is nothing to
+  carry.
