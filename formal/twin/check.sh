@@ -1355,7 +1355,10 @@ carried() {             # piece E: R7's tracer-wide depth on a real cell (carrie
   fi
   # (r): a depth state per install (the planted fault): node c's send_join becomes a record of its own inside the
   # question, the bare counts empty, the body E1's with exactly that record inserted. The replay accepts it (each
-  # record checked on the Python's reads): R7 is the tracer's rule, read here by the body and the counts (the limit)
+  # record checked on the Python's reads): R7 is the tracer's rule, read here by the body and the counts (the limit).
+  # The record also carries node c's own now, not the question's (trace3.py's record takes ns["now"]): at 77ebf26,
+  # 5.93 s against the 6.4 s of the records around it. The replay takes a record's t as that record's now alone, and
+  # no check of it compares record times across nodes
   if [ -z "$c" ]; then
     echo "(r) per-node depth, on custody-floor-churn1: not read, for E1 is not as it must be  <-- NOT" >> "$OUT/c-carried.txt"
   elif [ "$(cat "$OUT/chains/plant-r.rc" 2> /dev/null)" != 0 ] || ! has -x "tracerfaults3: per-node-depth-v2, planted 30 times" "$OUT/chains/plant-r.err"; then
@@ -1407,7 +1410,7 @@ sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/
   done
   if grep -q '<-- NOT' "$OUT/c-carried.txt"; then no "the carried cases (c-carried.txt)"; fi
   [ -n "$e1" ] || e1="carried 7 not as it must be"
-  if [ -n "$e2" ]; then e2="$e2, the replay accepting it (the stated limit: R7 is the tracer's rule)"; else e2="(r) not as it must be"; fi
+  if [ -n "$e2" ]; then e2="$e2, the replay accepting it (the stated limit: R7 is the tracer's rule; that record carries node c's own now, not the question's, and no replay check compares record times across nodes)"; else e2="(r) not as it must be"; fi
   if [ "$ok3" = 3 ]; then e3="node 2's held inside hand5-peer's replaced filter_entry counted bare; (s) at node $n3, the state restored on return and on raise; (t), the suppression cleared, two records of held inside"
   else e3="carried 9, (s) or (t) not as it must be"; fi
   echo "  the carried cases: $e1; $e2; $e3"
