@@ -143,8 +143,10 @@ FOREIGN = ("known_id",                     # `queue`, `pending_ids` and `stop_pu
 # `row_reads`), as the header's `row_reads` names them; the replay reads them so in a v2 trace alone, and this list
 # alone. A protocol.md trace has neither
 ROW_READS_V2 = ("owed", "planned", "queue", "tied")
-# under v2, the tape's names whose arguments are written as they are at the call, not after it: v2's send marks an
-# IWANT (`want`) after handing it to enqueue. EAGER_LATE is the planted fault of the self-test (written after the call)
+# under v2, the tape's names whose arguments are written as they are at the call, not after it: a guard against a
+# callee that changes what it was handed before it returns (v2's send sets its IWANT's `want` before it calls
+# enqueue, so there the two forms agree). EAGER_LATE is the planted fault of the self-test (written after the call).
+# No name is both here and in CALLS: a question that raises is written with its arguments as they are at exit
 EAGER_V2 = ("enqueue",)
 EAGER_LATE = [False]
 # §7.1's three, the twin's own. Under protocol.md a cell holds the count and views hold the line and the sends;
@@ -2349,8 +2351,8 @@ class Tracer3(Tracer):
                     return fn(*args, **kw)
                 # the tracer's third state: what the rest of the node reads is behind the tape, but its
                 # accesses of the own tables are logged apart, as the callee's `cr` and `cw`
-                # under v2 an argument the caller changes after the call (send marks its IWANT `want` after the
-                # enqueue) is written as it was handed over: encoded here, before the call (EAGER_V2)
+                # under v2 an argument of EAGER_V2's is written as it was handed over: encoded here, before the call,
+                # so that a callee that changes it does not change its form on the tape
                 early = tr.at_call(name, enc, args, kw)
                 st["ext"] += 1
                 rec.begin_callee()
@@ -2478,6 +2480,9 @@ class Tracer3(Tracer):
         }
         if set(calls) != set(CALLS):
             raise SystemExit(f"trace3: the questions with their own encoders are not CALLS': {sorted(set(calls) ^ set(CALLS))}")
+        if set(EAGER_V2) & set(calls):      # a question's raise writes its arguments as they are at exit (iface)
+            raise SystemExit(f"trace3: EAGER_V2 and CALLS share {', '.join(sorted(set(EAGER_V2) & set(calls)))}: a "
+                             "question's raise writes its arguments as at exit")
         for name, (ea, er) in calls.items():
             enc[name] = lambda r, *a, _ea=ea, _er=er: [_ea(*a), _er(r)]
         # the namespace must agree with the documents' source: no traced function is v2's, and under --doc v2 every
