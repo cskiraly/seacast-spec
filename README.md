@@ -89,16 +89,18 @@ names how SEACAST diffuses.
 
 ## Where SEACAST stands
 
-- **The latest release is [v0.10.11](https://github.com/cskiraly/seacast-spec/tree/v0.10.11)**, 2026-11-21:
-  `protocol.md` at version 0.10.11, v0.10's rules with the text rewritten for readers, its constants
+- **The latest release is [v0.10.12](https://github.com/cskiraly/seacast-spec/tree/v0.10.12)**, 2026-11-22:
+  `protocol.md` at version 0.10.12, v0.10's rules with the text rewritten for readers, its constants
   in three kinds, reference values for gossipsub's two IHAVE limits, the source's choice of when it
   announces (`SOURCE_OFFERS`), an IDONTWANT's stock ids kept as stock gossipsub keeps them, an open
-  question on a coded group's compressed bytes, and a window whose line a writer that cannot write
-  no longer holds, whose next writer is woken when a write starts to wait, and which a closing
-  connection's writer leaves; the toy and its recorded cells, the next version's draft, rewritten
-  for readers and restructured, with its decisions taken, its decision record, its figures and its
-  bindings in companion files, the bindings named by their carriers and a cell group's header in
-  three forms, the proofs in `formal/veil/` on Veil's release, with
+  question on a coded group's compressed bytes, a window whose line a writer that cannot write no
+  longer holds, whose next writer is woken when a write starts to wait, and which a closing
+  connection's writer leaves, and a HAVE or an IHAVE of a group beyond the peer's limit of unknown
+  groups ignored; the toy and its recorded cells, the next version's draft, rewritten for readers
+  and restructured, with its decisions taken, its decision record, its figures and its bindings in
+  companion files, the bindings named by their carriers, a cell group's header in three forms and
+  bounds on what a peer can make a node keep or serve, the proofs in `formal/veil/` on Veil's
+  release, with
   malicious peers, runs that go quiet (Q3) and agreement, which are of v0.8's rules and four later
   ones, the Lean twin of `protocol.md`'s Python with its record, a first piece of a refinement from
   the twin to a Veil model, and a map of how the checks fit together.

@@ -11,7 +11,7 @@ Diffusion, which now names SEACAST's diffusion part (§0, "The parts").*
 
 *This document began as draft 1, of 2026-10-07. It is a sibling of [`protocol.md`](protocol.md),
 which it contains as one setting (§6.1). That document was draft v0.3 when this was written and has
-been v0.10.11 since 2026-11-21, with the same section numbers. Below, `protocol.md` means that
+been v0.10.12 since 2026-11-22, with the same section numbers. Below, `protocol.md` means that
 document as it is now, and "v0.3" means draft v0.3 itself, for its own rules.*
 
 *Each later version of `protocol.md` is carried into this document in the same way; §5 maps what

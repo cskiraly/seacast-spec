@@ -13,7 +13,7 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## After v0.10.11 — not yet released
+## v0.10.12 — 2026-11-22
 
 The next version bounds more of what a peer can make a node keep or serve: asks outside what it
 serves, a WANT's index and group, the relations on a link, the answers to one peer in a heartbeat
@@ -119,7 +119,7 @@ and the routed requests it passes on.
   `protocol-v2.md` §1.1's four arguments.
 - `toy/xcheck.py`: under `--doc v2`, `--xcheck` no longer stops at the first chunk written.
 
-## v0.10.11 — 2026-11-21
+## v0.10.11 — 2026-11-21 (`d940022`)
 
 The next version gives a cell group's header three forms, moves its decisions and its figures to
 files of their own, names its bindings by their carriers, defines the gossipsub binding's extra

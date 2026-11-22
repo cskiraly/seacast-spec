@@ -428,3 +428,9 @@ carried later than its version.
   citation of the draft's figures, now in `protocol-v2-figures.md`. This draft is restructured: its
   decisions and its figures are in files of their own, and its bindings are named by their
   carriers.
+- v0.10.12 (2026-11-22): in `protocol.md`, a HAVE or an offered id of a group beyond the peer's
+  limit of unknown groups (§8.2) is ignored before it leaves any state (`admitted` in `on_have` and
+  `on_ihave`), and §7.1 says which of `write_wait_known.py`'s five cases keep the writer's place.
+  This draft carries the first in `on_holding` and `on_offer` (§4.3), and bounds more of what a peer
+  can make a node keep or serve: asks outside what it serves, a WANT's index and group, the
+  relations on a link, the answers to one peer in a heartbeat and the routed requests it passes on.
