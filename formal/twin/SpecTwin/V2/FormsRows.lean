@@ -257,4 +257,54 @@ def checkRow (name : String) (row : Json) : Except String (String × String) := 
     if e.startsWith s!"tape: {q}: its answer: " then return (v.compress, e)
     throw s!"a wrong answer refused, but not by its reader: {e}"
 
+/-- The checker's three controls, on a file's rows. Each must fail, with a message that starts as given:
+1. `send (a HAVE)` asked with its `urgent` flipped, over the row as it is: the question asked is not the row's;
+2. the `highCustody` row run as the form `linkCover`, which takes the same arguments: a row under another form;
+3. the `typeOf` row twice on the tape: the tape is not used up. -/
+def controls (rows : Array (String × Json)) : List (String × String × Except String Json) :=
+  let row (name : String) : Json := ((rows.find? (·.1 == name)).map (·.2)).getD Json.null
+  let argsOf (j : Json) : Array Json := match j.getArrVal? 1 with
+    | .ok (.arr a) => a
+    | _ => #[]
+  let sendRow := row "send (a HAVE)"
+  let a := argsOf sendRow
+  let flipped : Json := match (a[2]? : Option Json) with
+    | some (Json.bool b) => Json.bool !b
+    | _ => Json.null
+  let hcRow := row "highCustody"
+  let toRow := row "typeOf"
+  [("1, send's urgent flipped", "tape: send[", do onTape [sendRow] (← askOf "send" (a.set! 2 flipped))),
+   ("2, highCustody's row as linkCover", "tape: link_cover[",
+     do onTape [hcRow] (← askOf "linkCover" (argsOf hcRow))),
+   ("3, typeOf's row twice", "the tape is not used up", do onTape [toRow, toRow] (← askOf "typeOf" (argsOf toRow)))]
+
+/-- `replay --forms FILE`. Each line of FILE is a form's name, a tab and its row as compact JSON. Each row is read
+and refused (`checkRow`), and then the three controls are run on the same rows. One line is printed for each,
+and a last line with the counts. The exit code is 1 on any miss, and on a file that is not there. -/
+def formsMain (file : String) : IO UInt32 := do
+  if !(← System.FilePath.pathExists file) then
+    IO.println s!"replay: --forms {file}: no such file"
+    return 1
+  let mut failed := 0
+  let mut rows : Array (String × Json) := #[]
+  for l in ← IO.FS.lines file do
+    if l.isEmpty then continue
+    match l.splitOn "\t" with
+    | [name, row] => match Json.parse row with
+      | .ok j => rows := rows.push (name, j)
+      | .error e => IO.println s!"{name}\tFAIL\tthe row is not JSON: {e}"; failed := failed + 1
+    | _ => IO.println s!"FAIL\tnot a line of a name, a tab and a row: {l}"; failed := failed + 1
+  for (name, j) in rows do
+    match checkRow name j with
+    | .ok (v, e) => IO.println s!"{name}\tread ok\t{v}\trefused\t{e}"
+    | .error e => IO.println s!"{name}\tFAIL\t{e}"; failed := failed + 1
+  for (label, pre, x) in controls rows do
+    match x with
+    | .ok v => IO.println s!"control {label}\tFAIL\tread, as {v.compress}"; failed := failed + 1
+    | .error e =>
+      if e.startsWith pre then IO.println s!"control {label}\trefused\t{e}"
+      else IO.println s!"control {label}\tFAIL\trefused otherwise: {e}"; failed := failed + 1
+  IO.println s!"rows {rows.size}, controls 3, failed {failed}"
+  return if failed == 0 then 0 else 1
+
 end SpecTwin.V2.FormsRows

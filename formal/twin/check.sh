@@ -24,7 +24,9 @@
 #             false #guard fails Lean, its control); twin-sources.txt: each
 #             source file of the twin, this script and record.sh by sha256 (a link among them is refused; a
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
-#             that list, and at the end of the run the sources and the copy still are
+#             that list, and at the end of the run the sources and the copy still are; the forms of v2's
+#             questions, each row of tools/forms-v2-examples.tsv read and refused by `replay --forms`, with its
+#             three controls (a copy with one wrong row fails, its control)
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names protocol-v2.md keeps, gen/schema_v2.py's encoders,
 #             keptcopy.py's, labcites.py's and scan_bindings.py's); and no line of the twin's sources (the
@@ -373,6 +375,33 @@ EOF
      && grep -q -F 'did not evaluate to `true`' "$OUT/guard-control/lean.txt"; then
     echo "  control, a false #guard in a guard module: it fails, as it must"
   else no "control, a false #guard in a guard module: NOT failed (guard-control/lean.txt)"; fi
+  # the forms of v2's questions: each row of the tools' file read and refused by the replay, and the checker's
+  # three controls refused (replay --forms, V2/FormsRows.lean); a file that is not there fails, it is not skipped
+  local forms="$T/forms-v2-examples.tsv" rows
+  [ -f "$forms" ] || { no "no forms file (tools/forms-v2-examples.tsv)"; return; }
+  rows=$(grep -c . "$forms")
+  "$REPLAY" --forms "$forms" > "$OUT/forms.txt" 2>&1 \
+    || { grep -F 'FAIL' "$OUT/forms.txt" | head -n 10 | cut -c1-300; no "the forms: a row not read or not refused, or a control not refused (forms.txt)"; return; }
+  [ "$(tail -n 1 "$OUT/forms.txt")" = "rows $rows, controls 3, failed 0" ] \
+    || { no "the forms: not $rows rows and 3 controls with none failed (forms.txt)"; return; }
+  echo "  the forms: $rows rows read and refused, 3 controls refused (forms-v2-examples.tsv)"
+  # its control: a copy of the file with the typeOf row's answer made 5 fails, naming that row
+  $PY - "$forms" "$OUT/forms-control.tsv" <<'EOF' || { no "control, a wrong row in the forms: the copy could not be made"; return; }
+import json, sys
+out = []
+for line in open(sys.argv[1], encoding="ascii").read().splitlines():
+    name, _, row = line.partition("\t")
+    if name == "typeOf":
+        r = json.loads(row)
+        r[2] = 5
+        line = name + "\t" + json.dumps(r, separators=(",", ":"))
+    out.append(line)
+open(sys.argv[2], "w", encoding="ascii").write("\n".join(out) + "\n")
+EOF
+  if ! "$REPLAY" --forms "$OUT/forms-control.tsv" > "$OUT/forms-control.txt" 2>&1 \
+     && grep -q -F "$(printf 'typeOf\tFAIL\ttape: type_of: its answer: not a type id: 5')" "$OUT/forms-control.txt"; then
+    echo "  control, a wrong row in the forms: it fails, naming the row, as it must"
+  else no "control, a wrong row in the forms: NOT failed for that row (forms-control.txt)"; fi
 }
 s_selftests() {         # each tool's own cases: exit code 0, its own closing line, and (altered3.py's, which closes with no verdict) no case marked `<-- must be`
   local t n=0
