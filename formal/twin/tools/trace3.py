@@ -294,7 +294,8 @@ class MissQuestionView(F.View):
         object.__setattr__(self, "_ask", ask)
 
     def __getitem__(self, k):
-        if self._r.on and self._r.callee is None and not self._p and k not in self._o:
+        if (self._r.on and self._r.callee is None and self._r.observer is None and not self._p
+                and k not in self._o):          # (an observer's own read: the toy's miss, unlogged; class 6)
             self._r.read(self._t, (k,))
             return self._ask(k, self._o)
         return super().__getitem__(k)
@@ -541,8 +542,9 @@ def own_code(name, fn):
 
 def layers_of(name, fn):
     """A name's layers, outermost first: from fn, the closure cell holding a function of the same name, until none
-    does. A layer holds the next as a closure cell (node.py's `doc_on_frame`). Raises ValueError where a layer holds
-    two such functions (no layer is guessed) or the chain loops."""
+    does. A layer holds the next as a closure cell (node.py's `doc_on_frame`). A cell the tracer re-wrapped (an
+    observer's hand-over, a swapped draw's shim: `_trace3_through`) is read as the layer it holds. Raises ValueError
+    where a layer holds two such functions (no layer is guessed) or the chain loops."""
     out, seen = [fn], {id(fn)}
     while True:
         nxt = []
@@ -551,6 +553,8 @@ def layers_of(name, fn):
                 inner = cell.cell_contents
             except ValueError:
                 continue
+            while getattr(inner, "_trace3_through", False):
+                inner = inner.__wrapped__
             if inner is not fn and getattr(getattr(inner, "__code__", None), "co_name", None) == name:
                 nxt.append(inner)
         if not nxt:
@@ -660,6 +664,123 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
 
 
 REWRAP = [True]         # the draws' re-wrap (rewrap_draws); off only in a planted fault
+# Class 6 (step3.md, its design point): an observer's own code is the node's, not the document function's, so under
+# v2 its reads go into no record's log and a write of it stops the tracer (footprint's observer mode). OBSERVE: the
+# handling (off: the tracer of 7e86ac8, the observer's reads logged); HANDOVER: the re-wrap of each observer's cell
+# that holds the next layer, which ends the mode for the document's function (off: the mode runs on through it).
+# Each off only in a planted fault (observers_self_test).
+OBSERVE, HANDOVER = [True], [True]
+
+
+class ObservedLayer:
+    """An observer layer of a traced name at a node, in the recorder's observer mode: the stop's words, and its counts
+    (the calls entered in records, the reads its own code made, unlogged) for the trace's summary."""
+    __slots__ = ("nid", "name", "where", "calls", "reads")
+
+    def __init__(self, nid, name, where):
+        self.nid, self.name, self.where, self.calls, self.reads = nid, name, where, 0, 0
+
+    def words(self, what, why="an observer changes no table"):
+        return f"trace3: node {self.nid}: the observer {self.where} over {self.name} {what}: {why}"
+
+
+def observed_chain(name, ls, lists=None):
+    """Class 6: a traced name's layers (`layers_of`, the document's function last) where each layer above it is an
+    observer (listed, or closure-dependent and one at this node) or a swapped draw (an observer that binds a draw's
+    slot, whose own code reads no table); else None (a changing layer makes the name a question; a lone function is
+    no chain)."""
+    lists = LAYERS if lists is None else lists
+    last = getattr(ls[-1], "__code__", None)
+    if len(ls) < 2 or last is None or last.co_filename not in (DOC_FILE, V2_FILE) or last.co_name != name:
+        return None
+    for f in ls[:-1]:
+        listed = lists.get(layer_key(f)) if getattr(f, "__code__", None) is not None else None
+        if listed is None or listed[0] != name:
+            return None
+        kind = closure_kind(name, f, listed[1]) if isinstance(listed[1], ClosureKind) else listed[1]
+        if kind not in (OBSERVER, SWAPPED_DRAW):
+            return None
+    return ls
+
+
+def handover(rec, nxt, nxt_ob, doc_on, doc_off):
+    """What an observer's cell holds in place of the layer `nxt` it calls: the hand-over from the observer's own code
+    to `nxt`, at a boundary (footprint's `observer_boundary`). Into the next observer (`nxt_ob`) the mode goes on, with
+    that layer named; into the document's function (`nxt_ob` None) it ends until the function returns (`doc_on` and
+    `doc_off`: the record's questions, the mesh's and the gossip history's, around it). Outside the mode (the layer
+    called outside a record, or inside a question) it passes the call through."""
+    def h(*a, **k):
+        prev = rec.observer
+        if prev is None:
+            return nxt(*a, **k)
+        rec.observer_boundary()
+        rec.observer, rec.obs_seen = nxt_ob, {}
+        if nxt_ob is None:
+            doc_on()
+        else:
+            nxt_ob.calls += 1
+        done = False
+        try:
+            r = nxt(*a, **k)
+            done = True
+            return r
+        finally:
+            if done and nxt_ob is not None:     # the next observer's own code, after its own hand-over
+                rec.observer_boundary()
+            if nxt_ob is None:
+                doc_off()
+            rec.observer, rec.obs_seen = prev, {}
+    h._trace3_through, h.__wrapped__ = True, nxt
+    return h
+
+
+def observe(rec, ob, fn, args, kw, doc_on, doc_off):
+    """The outermost observer's call (`fn`, the layer bound under the name) in observer mode, inside a record: its
+    own code's reads go into no log, and a change of an entry it touched stops at its return."""
+    prev = rec.observer
+    rec.observer, rec.obs_seen = ob, {}
+    ob.calls += 1
+    doc_off()
+    done = False
+    try:
+        r = fn(*args, **kw)
+        done = True
+        return r
+    finally:
+        if done:
+            rec.observer_boundary()
+        doc_on()
+        rec.observer, rec.obs_seen = prev, {}
+
+
+def rewrap_observers(rec, nid, name, ls, doc_on, doc_off, lists=None):
+    """At the install: each cell of a handled chain's layers (observed_chain) that holds the next layer, re-wrapped as
+    the hand-over to it; the outermost layer's ObservedLayer (the mode's entry, sec61's), and every layer's, or None
+    where the chain is not handled. A cell already re-wrapped (a swapped draw's shim) is wrapped as it stands."""
+    if not OBSERVE[0] or observed_chain(name, ls, lists) is None:
+        return None, []
+    obs = [ObservedLayer(nid, name, layer_where(f)) for f in ls[:-1]]
+    if HANDOVER[0]:
+        for i, (f, nxt) in enumerate(zip(ls, ls[1:])):
+            cell = cell_holding(f, nxt)
+            cell.cell_contents = handover(rec, cell.cell_contents, obs[i + 1] if i + 1 < len(obs) else None,
+                                          doc_on, doc_off)
+    return obs[0], obs
+
+
+def cell_holding(f, nxt):
+    """The closure cell of layer `f` that holds the layer `nxt` (layers_of found it there), itself or re-wrapped by the
+    tracer (`_trace3_through`)."""
+    for c in f.__closure__ or ():
+        try:
+            x = c.cell_contents
+        except ValueError:
+            continue
+        while x is not nxt and getattr(x, "_trace3_through", False):
+            x = x.__wrapped__
+        if x is nxt:
+            return c
+    raise SystemExit(f"trace3: {layer_where(f)}: no closure cell holds {layer_where(nxt)}")
 
 
 def rewrap_draws(ns, slots, rewrap):
@@ -1812,6 +1933,184 @@ def questions_self_test():
     return bad
 
 
+def observers_self_test():
+    """Class 6 (step3.md, its design point): an observer's own code in the recorder's observer mode, on planted chains
+    over two of protocol-v2.md's tables (`stop_pull`, `received`), with no toy node. The document's function is
+    compiled as protocol-v2.md's. Its reads and writes are the record's; the observer's reads are in no log, before
+    and after the hand-over, and through two observers; a lone document function and a chain with a changing layer
+    are not handled; the re-wrap leaves layers_of's chain as it was; outside the mode (as inside a question) the
+    layer passes the call through. A write of an observer's own code stops, through a view at once and through a
+    bitmap the view handed out at its boundary, with the words naming the node, the layer, the name and the entry.
+    Planted faults: the handling off (the observer's read logged), the hand-over off (the document's reads missing,
+    its write a stop), the stop off (writes let through), each failing its cases. Through iface_of's wrapper, a timer
+    the observer arms stops, and a question it asks runs bare; the control hides the mode from the wrapper, and
+    fails both."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import bits as B                    # noqa: E402: the toy's, beside this repository's documents
+    import wire as Wm                   # noqa: E402
+    tr = object.__new__(Tracer3)
+    tr.Wm, tr.doc_v2 = Wm, True
+    ts = {t.name: t for t in tr.schema(None)}
+    g = bytes([1]) * 32
+    name = "check_completion"
+    doc_src = ("def check_completion(g):\n"                 # the document's: a read of received, a write of stop_pull
+               "    if received[g].has(0):\n"
+               "        stop_pull[g] = True\n")
+
+    def observer(ns, doc, write=None):  # the measurement point's form (node.py's `_v2`): stop_pull before and after
+        def check_completion(g):
+            was = ns["stop_pull"][g]
+            if write == "view":
+                ns["stop_pull"][g] = True
+            elif write == "bitmap":
+                ns["received"][g].set(5)
+            doc(g)
+            return was, ns["stop_pull"][g]
+        return check_completion
+
+    def outer(ns, inner):               # a second observer over it: a read of received
+        def check_completion(g):
+            ns["received"][g].has(1)
+            return inner(g)
+        return check_completion
+
+    def run(make, kind=OBSERVER, mode=True):
+        """`make(ns, doc)` the layers over the document's function, in a record (mode: entered by `observe` as
+        sec61 does, else the layer called with no mode, as inside a question): the tables the record read and
+        wrote, the layers' calls and unlogged reads, layers_of's chain before and after the re-wrap."""
+        rec = F.Recorder()
+        ns = {"stop_pull": B.DefaultMap(False), "received": B.lazy(B.LazyBits)}
+        ns["received"][g].set(0)
+        F.install(rec, ns, [ts["stop_pull"], ts["received"]])
+        exec(compile(doc_src, V2_FILE, "exec"), ns)
+        top = make(ns, ns[name])
+        ls = layers_of(name, top)
+        lists = {layer_key(f): (name, kind) for f in ls[:-1]}
+        ob, obs = rewrap_observers(rec, "stub", name, ls, lambda: None, lambda: None, lists)
+        after = layers_of(name, top)
+        rec.clear()
+        rec.on, rec.tape = True, []
+        try:
+            if ob is not None and mode:
+                observe(rec, ob, top, (g,), {}, lambda: None, lambda: None)
+            else:
+                top(g)
+        finally:
+            rec.on = False
+        reads, _, writes = rec.footprint()
+        return {"read": sorted({e[0] for e in reads}), "wrote": sorted({e[0] for e in writes}),
+                "handled": ob is not None, "calls": [o.calls for o in obs], "unlogged": [o.reads for o in obs],
+                "chain kept": [id(f) for f in after] == [id(f) for f in ls]}
+
+    bad = 0
+
+    def case(what, f, want):
+        nonlocal bad
+        try:
+            got = f()
+        except SystemExit as e:
+            got = f"stop: {e}"
+        ok = want(got) if callable(want) else got == want
+        bad += not ok
+        print(f"observers self-test, {what}: {'ok' if ok else f'got {got!r}  <-- FAIL'}")
+        return ok
+
+    def fault(what, switch, cases):
+        """A planted fault: with `switch` (a module list) off, each of `cases` must fail."""
+        nonlocal bad
+        switch[0] = False
+        try:
+            failed = []
+            for c in cases:
+                try:
+                    got = c[1]()
+                except SystemExit as e:
+                    got = f"stop: {e}"
+                failed.append(not (c[2](got) if callable(c[2]) else got == c[2]))
+        finally:
+            switch[0] = True
+        ok = all(failed)
+        bad += not ok
+        print(f"observers self-test, its planted fault ({what}): "
+              f"{'fails its ' + str(len(cases)) + ' cases, ok' if ok else f'passes {failed.count(False)}  <-- FAIL'}")
+
+    def stops(*parts):
+        return lambda got: isinstance(got, str) and got.startswith("stop: trace3: node stub: the observer ") \
+            and all(p in got for p in parts)
+
+    one = ("one observer: the document's read and write logged, the observer's two reads not",
+           lambda: run(observer),
+           {"read": ["received"], "wrote": ["stop_pull"], "handled": True, "calls": [1], "unlogged": [2],
+            "chain kept": True})
+    two = ("two observers: only the document's read and write logged",
+           lambda: run(lambda ns, doc: outer(ns, observer(ns, doc))),
+           {"read": ["received"], "wrote": ["stop_pull"], "handled": True, "calls": [1, 1], "unlogged": [1, 2],
+            "chain kept": True})
+    view = ("an observer that writes stop_pull through the view: a stop, its words",
+            lambda: run(lambda ns, doc: observer(ns, doc, "view")),
+            stops(".observer.<locals>.check_completion (trace3.py:", " over check_completion writes stop_pull[\"",
+                  ": an observer changes no table"))
+    bitmap = ("an observer that sets a bit of the bitmap the view handed out: a stop at its hand-over, its words",
+              lambda: run(lambda ns, doc: observer(ns, doc, "bitmap")),
+              stops(" over check_completion changed received[\"", "at its first touch there", "at the boundary"))
+    for c in (one, two, view, bitmap):
+        case(*c)
+    case("a lone document function: not handled, its read and write logged",
+         lambda: run(lambda ns, doc: doc),
+         {"read": ["received"], "wrote": ["stop_pull"], "handled": False, "calls": [], "unlogged": [],
+          "chain kept": True})
+    case("a chain with a changing layer: not handled (a question), every read logged",
+         lambda: run(observer, kind=CHANGING),
+         {"read": ["received", "stop_pull"], "wrote": ["stop_pull"], "handled": False, "calls": [], "unlogged": [],
+          "chain kept": True})
+    case("the layer called outside the mode (as inside a question): passed through, every read logged",
+         lambda: run(observer, mode=False),
+         {"read": ["received", "stop_pull"], "wrote": ["stop_pull"], "handled": True, "calls": [0], "unlogged": [0],
+          "chain kept": True})
+    fault("the handling off: the observer's reads logged", OBSERVE, [one, two])
+    fault("the hand-over off: the mode runs on through the document's function", HANDOVER, [one, two])
+    fault("the stop off: writes let through", F.OBSERVER_STOP, [view, bitmap])
+
+    def own_iface(kind, hidden=False):
+        """An observer's own call of an interface name through iface_of's wrapper, in a record at a stub node 1 (as
+        timers_self_test's): `after` (a timer) or a question `q`. Its answer and the record's tape, or the stop.
+        `hidden`: the stub recorder's mode not shown to the wrapper (the cases' control)."""
+        tr = object.__new__(Tracer3)
+        tr.Wm, tr.doc_v2, tr.traced, tr.bare = Wm, True, (), Counter()
+        nd = type("Node", (), {})()
+        nd.id, nd.cfg = 1, {}
+        st = {"depth": 1, "ext": 0, "cur": {"tape": [], "fn": "x"}, "node": 1, "supp": 0}
+
+        class Rec:
+            observer = None if hidden else ObservedLayer("stub", name, "obs (x.py:1)")
+
+            def begin_callee(self):
+                pass
+
+            def end_callee(self):
+                return [], []
+        w = tr.iface_of(nd, st, Rec(), (), {}, lambda: None, lambda: None, kind, lambda *a: "ran",
+                        lambda r, *a: [list(a), None])
+        return [w(7), st["cur"]["tape"]]
+    timer = ("an observer that arms a timer (`after`): a stop, its words",
+             lambda: own_iface("after"), stops(" over check_completion arms a timer (after): an observer changes nothing"))
+    question = ("an observer that asks a question: run bare, no row on the record's tape",
+                lambda: own_iface("q"), ["ran", []])
+    for c in (timer, question):
+        case(*c)
+    failed = []
+    for kind, (_, _, want) in (("after", timer), ("q", question)):
+        try:
+            got = own_iface(kind, hidden=True)
+        except SystemExit as e:
+            got = f"stop: {e}"
+        failed.append(not (want(got) if callable(want) else got == want))
+    bad += not all(failed)
+    print(f"observers self-test, its control (the mode hidden from iface_of's wrapper): "
+          f"{'fails its 2 cases, ok' if all(failed) else f'passes {failed.count(False)}  <-- FAIL'}")
+    return bad
+
+
 def orders_self_test():
     """R9 (step3.md's R9-2 to R9-5, R9-7 and R9-8): the order proxy and its writer, with a stub record and no toy
     node, each case beside its planted fault. One entry per iteration, an empty set's too (R9-2); a membership
@@ -1997,7 +2296,8 @@ def orders_self_test():
 
 def self_test_v2():
     bad = (v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
-           + closure_self_test() + timers_self_test() + questions_self_test() + orders_self_test())
+           + closure_self_test() + timers_self_test() + questions_self_test() + orders_self_test()
+           + observers_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -2030,6 +2330,7 @@ class Tracer3(Tracer):
         #                                   there), for final_check too
         self.type_nodes = []            # under v2, (node, namespace, its types as the install read them), for
         #                                   final_check: the nodes line holds the install's parameters
+        self.observers = []             # under v2, every handled observer layer at each node (class 6), its counts
         self.doc_mid = {}               # and m2_check's reference function, a node's own
         self.cur_nid = None             # the node of the record being written (mid_of's reference)
         self.built_objs = {}            # the chunks the record's publish built (built, content_id_asked)
@@ -3097,6 +3398,11 @@ class Tracer3(Tracer):
 
         @functools.wraps(fn)
         def w(*args, **kw):
+            ob = getattr(rec, "observer", None) if tr.doc_v2 else None
+            if ob is not None:              # asked by an observer's own code (class 6): no question of the record's,
+                if name in TIMER_KINDS:     #   bare; a timer it arms changes the node
+                    raise SystemExit(ob.words(f"arms a timer ({name})", "an observer changes nothing"))
+                return fn(*args, **kw)
             if tr.doc_v2:
                 foreign = st["depth"] and st["node"] != int(nd.id)     # another node's record is open
                 if foreign and not (st["ext"] or st["supp"]):          #   and no question runs: a tape name
@@ -3527,9 +3833,15 @@ class Tracer3(Tracer):
             order_note = order_writer(rec, st, lambda: tr.order_on, nd.id)
             ns["standing"] = OrderPopView(ns["standing"], order_note)
 
+        def own_call(name, fn, args, kw):   # the name's own function in a record: class 6's mode where observed
+            ob = obs_of.get(name)
+            return fn(*args, **kw) if ob is None else observe(rec, ob, fn, args, kw, mesh_on, mesh_off)
+
         def sec61(name, fn):
             @functools.wraps(fn)
             def w(*args, **kw):
+                if tr.doc_v2 and rec.observer is not None:  # called by an observer's own code (class 6): not the
+                    return fn(*args, **kw)                  #   record's, run bare, its reads unlogged, a write a stop
                 if tr.doc_v2 and (st["supp"] or (st["depth"] and st["node"] != int(nd.id))):
                     if st["supp"] or st["ext"]:     # inside a question at another node, or inside a replaced name
                         tr.bare[f"{nd.id} {name}"] += 1     # entered outside any record: bare, and counted
@@ -3553,7 +3865,7 @@ class Tracer3(Tracer):
                             raise SystemExit(f"trace3: node {nd.id}: a chain of {st['defers']} defers in one record, "
                                              f"past the twin's {DEFER_DEPTH} (deferDepth)")
                     try:
-                        r = fn(*args, **kw)
+                        r = own_call(name, fn, args, kw)
                         if name == "message_id":    # its content_id, a question at every call
                             tr.content_id_asked(st["cur"]["tape"], args[0], r, nd.id)
                         if tr.doc_v2 and name == "suppression_scope":   # the set the caller iterates, its order
@@ -3620,7 +3932,7 @@ class Tracer3(Tracer):
                     #                             its own; the view of queue[p] logs the read of the lane
                     args = (ns["queue"][r_["args"][0]],) + tuple(args[1:])
                 try:
-                    r = fn(*args, **kw)
+                    r = own_call(name, fn, args, kw)
                     if name == "message_id":        # its content_id, a question at every call
                         tr.content_id_asked(r_["tape"], args[0], r, nd.id)
                 except Exception as e:              # written with the state it left; the exception goes on
@@ -3793,14 +4105,19 @@ class Tracer3(Tracer):
                     for d, cur in found.items():
                         if getattr(ns.get(d), "_trace3_rewrap", False):
                             ns[d] = cur
+            shim._trace3_through, shim.__wrapped__ = True, inner
             return shim
+        obs_of = {}                         # class 6: each handled name's outermost observer (sec61 enters the mode)
         if tr.doc_v2:                       # each swapped draw's layer, by its key in LAYERS (the chain rule has
             for name in tr.traced:          #   passed every layer): its cell that holds the next layer, the shim
                 ls = layers_of(name, ns[name])
                 for f, nxt in zip(ls, ls[1:]):
                     if LAYERS.get(layer_key(f), (None, None))[1] == SWAPPED_DRAW:
-                        cell = next(c for c in f.__closure__ if c.cell_contents is nxt)
-                        cell.cell_contents = swap_shim(nxt)
+                        cell_holding(f, nxt).cell_contents = swap_shim(nxt)
+                ob, obs = rewrap_observers(rec, nd.id, name, ls, mesh_on, mesh_off)
+                if ob is not None:          # then each observer chain's cells: the hand-overs (rewrap_observers)
+                    obs_of[name] = ob
+                    tr.observers.extend(obs)
         for name in tr.traced:
             ns[name] = iface(name, ns[name], replaced_enc[name]) if name in replaced else sec61(name, ns[name])
         for name, e in enc.items():
@@ -3927,7 +4244,8 @@ def order_writer(rec, st, on, nid):
     [q...]] on the record's tape; anywhere else it writes nothing. A place none of ORDER_PLACES_V2 stops the trace:
     the twin asks no order there."""
     def note(place, members):
-        if not rec.on or st["cur"] is None or st["ext"] or st["supp"] or rec.callee is not None or not on():
+        if (not rec.on or st["cur"] is None or st["ext"] or st["supp"] or rec.callee is not None or not on()
+                or getattr(rec, "observer", None) is not None):     # an observer's own iteration (class 6)
             return
         if place not in ORDER_PLACES_V2:
             raise SystemExit(f"trace3: node {nid}: a set whose order the twin asks is iterated in {place}, at none "
@@ -3987,6 +4305,19 @@ def main(argv):
         raise
     tr.close()
     print(f"trace3: {sum(tr.counts.values())} records, {dict(sorted(tr.counts.items()))}", file=sys.stderr)
+    for line in observers_summary(tr.observers):
+        print(line, file=sys.stderr)
+
+
+def observers_summary(observers):
+    """Class 6's counts, one line per observer layer (by its place, over its name), over the nodes that have it: the
+    nodes, the calls entered in records, the reads its own code made, unlogged."""
+    by = {}
+    for ob in observers:
+        n, c, r = by.get((ob.where, ob.name), (0, 0, 0))
+        by[(ob.where, ob.name)] = (n + 1, c + ob.calls, r + ob.reads)
+    return [f"trace3: observer {w} over {name}: nodes {n}, calls in records {c}, reads unlogged {r}"
+            for (w, name), (n, c, r) in sorted(by.items())]
 
 
 if __name__ == "__main__":

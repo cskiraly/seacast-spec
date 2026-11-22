@@ -136,6 +136,9 @@ CALLEE_ATTRS = {("offers", "listed")}
 # equality and hashing but no order. The order is for serialization only. trace3.py sets it under --doc v2;
 # protocol.md's traces keep the raw sort, and with it their bytes
 SET_ORDER_ENCODED = [False]
+# The recorder's observer mode (trace3.py's class 6): a write by an observer's own code stops, at once through a view
+# or at the next boundary as an entry it touched whose value changed. Off only in a planted fault: writes let through
+OBSERVER_STOP = [True]
 
 
 def _one_order(items, key):
@@ -205,6 +208,8 @@ class Recorder:
         self.callee = None              # a call the block makes on the tape, in progress: its own log
         self.roots = {}                 # table name -> (Table, raw container)
         self.row_reads = frozenset()    # the tables whose rows are read on the way down (the contract's line)
+        self.observer = None            # an observer's own code running (under v2: trace3.py's ObservedLayer), or None
+        self.obs_seen = {}              #   and the entries it touched since its last boundary: (t, p) -> value then
         self.clear()
 
     def reads_rows(self, t):
@@ -303,7 +308,33 @@ class Recorder:
         if call == "w" or (c is not None and e in c["wrote"]):
             self.wrote.add(e)
 
+    # ---- an observer's own code (class 6): its reads are not the record's and go into no log; each entry it touches
+    # is kept with its value then, and a write stops: at once through a view, or at the next boundary (where the
+    # observer hands over to the next layer, or returns) as a kept entry whose value changed
+    def observed(self, t, p):
+        """An entry the observer's code touched: it and, in a table that keeps its rows, the rows above it."""
+        for j in range(1, len(p) + 1) if t.rows else (len(p),):
+            k = (t.name, p[:j])
+            if k not in self.obs_seen:
+                self.obs_seen[k] = (t, self.value(t, p[:j]))
+
+    def observer_writes(self, t, p):
+        if OBSERVER_STOP[0]:
+            raise SystemExit(self.observer.words(f"writes {t.name}{json.dumps(t.path(p))}"))
+
+    def observer_boundary(self):
+        """At an observer's boundary: every entry its code touched since the last one still holds its value then."""
+        for (name, p), (t, v) in self.obs_seen.items() if OBSERVER_STOP[0] else ():
+            now = self.value(t, p)
+            if now != v:
+                raise SystemExit(self.observer.words(f"changed {name}{json.dumps(t.path(p))} ({v!r} at its first "
+                                                     f"touch there, {now!r} at the boundary)"))
+        self.obs_seen = {}
+
     def read(self, t, p):
+        if self.observer is not None:
+            self.observer.reads += 1
+            return self.observed(t, p)
         if t.foreign:
             if self.callee is None:         # in a callee, another section's table is the callee's business
                 self.tape.append(["read", t.name, t.path(p), self.value(t, p)])
@@ -311,6 +342,8 @@ class Recorder:
             self._touch(t, p, "r")
 
     def write(self, t, p):
+        if self.observer is not None:
+            self.observer_writes(t, p)
         if t.foreign:
             if self.callee is None:
                 raise TypeError(f"footprint: the block writes {t.name}{list(p)}, a table of another section")
@@ -318,6 +351,11 @@ class Recorder:
         self._touch(t, p, "w")
 
     def scan(self, t, prefix):
+        if self.observer is not None:
+            self.observer.reads += 1
+            for p in ([prefix] if prefix else []) + self._under(t, prefix):
+                self.observed(t, p)
+            return
         if t.foreign:
             if self.callee is None:
                 raise TypeError(f"footprint: the block scans {t.name}{list(prefix)}, a table of another section")
@@ -332,6 +370,8 @@ class Recorder:
     def keys(self, t, prefix, ks):
         """Another section's level iterated by the block, or an own table's level whose order is asked (`ordered`:
         `list(queue)`; `ordered_levels`): its keys, in the order the Python iterated them, on the tape."""
+        if self.observer is not None:   # an observer's iteration: on no tape
+            return ks
         enc = t.keys[len(prefix)]
         self.tape.append(["keys", t.name, t.path(prefix), [enc(k) for k in ks]])
         return ks
@@ -341,7 +381,7 @@ class Recorder:
         ordered level under it, as the Python will iterate the object the pop hands out, on the tape, outer first. A
         missing level gives nothing."""
         d = len(prefix)
-        if raw is ABSENT or d >= t.depth:
+        if raw is ABSENT or d >= t.depth or self.observer is not None:
             return
         ks = _keys(raw)
         if d in t.ordered_levels:
@@ -352,6 +392,8 @@ class Recorder:
 
     def write_level(self, t, prefix):
         """A whole level assigned or removed: every entry under it before, and (at the end) after."""
+        if self.observer is not None:
+            self.observer_writes(t, prefix)
         if t.foreign:
             if self.callee is None:
                 raise TypeError(f"footprint: the block writes {t.name}{list(prefix)}, a table of another section")
@@ -375,6 +417,8 @@ class Recorder:
         """After a whole level was assigned: the entries it brought. `write_level` touched what was under the
         level before, so one that is not in the log yet was missing before the assignment, and its value before
         the call is "missing", whatever touches it later in the call."""
+        if self.observer is not None:
+            self.observer_writes(t, prefix)
         if t.foreign:
             return
         c = self.callee
