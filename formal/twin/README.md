@@ -1,6 +1,6 @@
-# The Lean twin of the Python in `protocol.md`
+# The Lean twin of the Python in `seacast-lite.md`
 
-This directory holds an executable Lean 4 twin of the Python in the code blocks of `protocol.md`. The twin is a
+This directory holds an executable Lean 4 twin of the Python in the code blocks of `seacast-lite.md`. The twin is a
 transcription of that Python, function by function. It is not an abstract model, and on its own it proves nothing.
 Its value is that it can be checked against the Python, which this directory does by trace replay (below), and
 linked to the Veil models, a link that `formal/refine/` begins (below).
@@ -20,7 +20,7 @@ Some tables use representations specific to the twin.
 
 ## How it is checked: trace replay
 
-A tracer runs the toy (`toy/`), which runs the code blocks of `protocol.md` directly. The tracer writes one record
+A tracer runs the toy (`toy/`), which runs the code blocks of `seacast-lite.md` directly. The tracer writes one record
 for each top-level call of a function that the twin covers; a call of such a function from inside another such
 function is part of the record of its caller. A record holds what the call read and wrote in the node's own
 tables, what it asked of the rest of the node, and what it returned. The twin replays each call from the recorded
@@ -42,7 +42,7 @@ replay compares.
 
 ## Scope
 
-Every function that the code blocks of `protocol.md` define has a twin of the same name. The `scope` step of
+Every function that the code blocks of `seacast-lite.md` define has a twin of the same name. The `scope` step of
 `check.sh` checks this against the document: for each `def` named `NAME`, there must be an `enter "NAME"` in
 `SpecTwin/` and a case for `NAME` in the replay. The table counts the functions by section:
 
@@ -60,12 +60,12 @@ function of the toy that says what a node holds: whether a chunk is in `mine` (ย
 ยง7.2 calls `held`. The files of `SpecTwin/` are named for parts of the document; they do not follow its sections
 one to one.
 
-- The twin leaves out the helpers that `protocol.md` names but does not write out, such as `resolve` and
+- The twin leaves out the helpers that `seacast-lite.md` names but does not write out, such as `resolve` and
   `chunk_of`. The replay answers calls to them from the trace.
-- The twin leaves out the events that `protocol.md` gives in prose: a connection closing, an announcer's offers
+- The twin leaves out the events that `seacast-lite.md` gives in prose: a connection closing, an announcer's offers
   ageing out, and a group expiring.
-- The twin leaves out the functions specific to `protocol-v2.md`. A trace of a cell of the toy under
-  `protocol-v2.md` replays through the functions of `protocol.md` that `protocol-v2.md` keeps.
+- The twin leaves out the functions specific to `seacast.md`. A trace of a cell of the toy under
+  `seacast.md` replays through the functions of `seacast-lite.md` that `seacast.md` keeps.
 
 ## The record
 
@@ -74,7 +74,7 @@ own make. It names every trace of every cell of the toy's `check.py` under both 
 directed sets, each by its hashes; the traces themselves are not kept. A directed set is a set of generated
 states, made to reach what the cells do not, with the toy's own functions called on them. The record also holds
 the reports of the replays and of the controls. The matrix shows which mutants the replay tells apart from the
-twin on the cells under `protocol.md`, two hand traces and the directed sets. `record.sh` makes the traces again,
+twin on the cells under `seacast-lite.md`, two hand traces and the directed sets. `record.sh` makes the traces again,
 and `record.sh --matrix K/N` makes each part of the matrix; `tools/mutants3.py --merge` reads the parts as one.
 
 ## The link to the Veil models
@@ -103,7 +103,7 @@ self-tests of two tools write fixtures to the system's temporary directory: `con
 - **mutants** checks that the text of each mutant occurs once in the twin, and that each mutant type-checks.
 - **screen** traces every cell, under both documents, with no message published, to get its header and its nodes
   line; the replay reads those two lines.
-- **cells** traces and replays the toy's cell `none` (under `protocol.md`); its digest must be the one in the
+- **cells** traces and replays the toy's cell `none` (under `seacast-lite.md`); its digest must be the one in the
   toy's `golden.txt`.
 - **small** traces and replays small hand runs (under both documents); the digest of each must be that of the
   same run untraced.

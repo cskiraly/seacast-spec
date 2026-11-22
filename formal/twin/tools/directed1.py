@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Directed records for protocol.md §1's seven functions (group_id, group_key, K, N, segment_length,
+"""Directed records for seacast-lite.md §1's seven functions (group_id, group_key, K, N, segment_length,
 valid_descriptor, build_group), and §2's message_id. The toy's own functions are called in a toy node's namespace
 on drawn arguments, and trace3.py's tracer logs each call, with the node's whole state (the seven touch none of it).
 

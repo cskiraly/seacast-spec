@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for a cell sent once to a peer, whichever of its two groups the send went through (protocol-v2.md
+"""A known answer for a cell sent once to a peer, whichever of its two groups the send went through (seacast.md
 §4.4's note_push, R4).
 
     python3 rebuilt_once_known.py
@@ -7,7 +7,7 @@
 A cell belongs to a column and to a row. A send of it to a peer, a push or an answer, is noted under every group it
 fills, so the other group's repair, forward or offer does not send it to that peer again.
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), made by hand, on a row the node holds
+On one node of a small rows run (seacast.md, one block, run to its end), made by hand, on a row the node holds
 whole: a cell of it is taken out of its store (the row still decoding), at an index whose column a peer q custodies.
 q sends a standing WANT for that cell on the row, and nothing of the column is known of q. The row is decoded
 (decode_group): the answer goes to q through the row, and push_rebuilt then looks at the column, where q is a
@@ -27,7 +27,7 @@ def main():
     import wire as Wm
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

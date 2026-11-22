@@ -3,7 +3,7 @@ import SpecTwin.Sec71
 import SpecTwin.Sec52
 import SpecTwin.Sec51
 
-/-! # protocol.md §7.2, "Choosing what to send, at the moment of sending" [c8, c9, c12, c14] (v0.10.9)
+/-! # seacast-lite.md §7.2, "Choosing what to send, at the moment of sending" [c8, c9, c12, c14] (v0.10.9)
 
 next_to_send's line at PUBLISH (`if SOURCE_OFFERS == PUBLISH: origin_written(out.chunk)`) came with
 v0.10.4; `origin_written` is §5.1's (Sec51.lean). Every cell runs at ACK: the line runs in
@@ -70,7 +70,7 @@ def rarest (normal : List QEntry) : M m Nat := do
     i := i + 1
   return bestI
 
-/-- `rarest(queue[p])` called alone (v2's choose calls protocol.md's rarest): the lane read, as the Python's
+/-- `rarest(queue[p])` called alone (SEACAST's choose calls seacast-lite.md's rarest): the lane read, as the Python's
 `q.normal` reads it, then rarest -/
 def rarestOf (p : Peer) : M m Nat := do
   rarest ((← lane? p .normal).getD [])

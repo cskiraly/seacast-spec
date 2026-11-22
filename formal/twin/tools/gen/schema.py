@@ -347,7 +347,7 @@ def python_tables(F, key, fbits, lane=None, waits=None, jobs=None, desc=None):
         "waits": waits,
         "slot": int,
         "jobs": jobs,
-        "have": lambda e: [e.bits.v, int(e.ttl)],     # the toy's HaveEntry (v2's two claims are not §4.3's)
+        "have": lambda e: [e.bits.v, int(e.ttl)],     # the toy's HaveEntry (SEACAST's two claims are not §4.3's)
         "obits": lambda b: b.v,                       # 0 is a value
         "ppeerset": lambda s: sorted(s),              # an empty set there is a value
         # the toy's PushEntry, whole: [bits, the first push's time as its 64 bits or null, ttl]

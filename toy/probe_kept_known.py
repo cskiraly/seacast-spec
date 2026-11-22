@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.6's kept probe, against a second marked ask of the same group.
+"""A known answer for seacast.md §4.6's kept probe, against a second marked ask of the same group.
 
     python3 probe_kept_known.py
 
@@ -9,7 +9,7 @@ asker's marked ask of another index of the group is a plain ask (`probe_of_claim
 the kept probe is answered when its cell is stored. An honest member sends one probe per group; only a faulty
 asker sends a second.
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), made by hand, as the claimant, on
+On one node of a small rows run (seacast.md, one block, run to its end), made by hand, as the claimant, on
 a row it holds whole: cell i claimed and not stored (still decoding), cell j stored. Then:
 - peer p sends a marked ask of i (kept), then a marked ask of j;
 - peer r sends a standing ask of i, then a marked ask of i (kept, in place of its standing ask), then a marked
@@ -32,7 +32,7 @@ def main():
     import wire as Wm
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

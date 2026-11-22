@@ -870,7 +870,7 @@ LEFT = {
                               "  if (← origin g).isSome then                               -- `origin[g] if g in origin else mine[g]`\n"
                               "    match ← origin g with\n",
                               "  let o ← origin g\n  if o.isSome then\n    match o with\n"),
-    # `desc` is the twin's own table: as above, by protocol.md:715
+    # `desc` is the twin's own table: as above, by seacast-lite.md:715
     "valid-id-desc-read-once": ("valid_id: desc[g] read once, where the Python reads it twice (`in`, then `[]`)", SEC44,
                                 VALID_DESC,
                                 '    let d ← desc a.group\n    if d.isNone then\n'

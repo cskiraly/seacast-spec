@@ -1,20 +1,20 @@
 # SEACAST: its bindings
 
-> This document is a companion of [`protocol-v2.md`](protocol-v2.md), released with it.
+> This document is a companion of [`seacast.md`](seacast.md), released with it.
 > SEACAST's message encoding and the libp2p stream and Waggle bindings are defined to the byte
 > (§1 to §3); the two bindings onto gossipsub's wires are defined to the field (§4, §5), and the
 > gossipsub binding's extra fields are defined to the byte. The native QUIC binding (§7) is a
 > draft. The toy models the gossipsub binding and the libp2p stream binding.
 > No client speaks these bytes yet, and they are not model-checked.
 
-*This document was written on 2026-11-17 from `protocol-v2.md` §7 of that date, which it takes
+*This document was written on 2026-11-17 from `seacast.md` §7 of that date, which it takes
 over whole, and from the bytes of SEACAST's message encoding and of the libp2p stream and Waggle
-bindings, decided the same day. `protocol-v2.md` §7 now says what every binding provides and which
+bindings, decided the same day. `seacast.md` §7 now says what every binding provides and which
 capabilities the bindings differ in.*
 
 ## 0. How to read this
 
-`protocol-v2.md` defines the protocol on its own messages (its §2) and what any binding must provide
+`seacast.md` defines the protocol on its own messages (its §2) and what any binding must provide
 (its §7). This document defines the bindings:
 - it says how each binding carries the messages;
 - it gives the rules that hold on one binding only;
@@ -23,7 +23,7 @@ capabilities the bindings differ in.*
 §1 defines SEACAST's message encoding once. The four bindings follow, one section per carrier:
 1. **the libp2p stream binding** (§2) is a protocol of its own, on a libp2p stream of its own;
 2. **the Waggle binding** (§3) carries the same protocol in Waggle's framing;
-3. **the gossipsub binding** (§4) is `protocol.md`'s wire, which the toy runs;
+3. **the gossipsub binding** (§4) is `seacast-lite.md`'s wire, which the toy runs;
 4. **the partial-messages binding** (§5) is gossipsub with the Partial Messages Extension.
 
 §6 has the rules on both of gossipsub's wires. A fifth binding, **the native QUIC binding** (§7),
@@ -32,7 +32,7 @@ outside the links. A node may speak more than one binding, and negotiates per li
 peer takes.
 
 **Terms.**
-- A **message** is one of `protocol-v2.md` §2's.
+- A **message** is one of `seacast.md` §2's.
 - A **frame** is the unit a binding writes on the wire, and what it is depends on the binding:
   - on the libp2p stream binding, it is a length prefix and one encoded message (§1.1, §2.2);
   - in Waggle's framing, it is one `ObjectPieces`, which Waggle length-prefixes itself (§3);
@@ -41,7 +41,7 @@ peer takes.
     or a chunk's whole stream (§7.2).
 
   It is not a frame of the layers below (QUIC's, or a stream multiplexer's), which carry these
-  frames as bytes. `protocol-v2.md`'s rules speak of messages; its §7 names frames only to say that
+  frames as bytes. `seacast.md`'s rules speak of messages; its §7 names frames only to say that
   each binding's are its own.
 
 **What is normative:**
@@ -54,13 +54,13 @@ peer takes.
 
 The sizes in §1.5 are informative.
 
-**At a glance**, the table below shows the bindings message by message (`M`: `protocol-v2.md` §1.4).
+**At a glance**, the table below shows the bindings message by message (`M`: `seacast.md` §1.4).
 The native QUIC binding is not in it: §7.2 shows that binding message by message.
 
 | message | the libp2p stream and Waggle bindings (§1 to §3) | the gossipsub binding (§4) | the partial-messages binding (§5) |
 |---|---|---|---|
 | JOIN | kind `0x01`, the first message per object type on a link | subscription; a sampler's is none (§6) | `SubOpts(topic, requestsPartial, supportsSendingPartial)` plus an extension field for duty and `M`; a sampler's `(DECLARED, NONE)` is no subscription (§6) |
-| GRAFT, PRUNE with colour and direction | kinds `0x02`, `0x03`: an accepted GRAFT is answered by one marked `answer`, and a GRAFT for a relation the receiver holds by a yes again; `PRUNE_BACKOFF` `protocol-v2.md`'s (§4.1 there) | stock, accepted in silence as on the partial-messages binding; under `--upkeep on` the toy runs `protocol-v2.md` §4.1's answered exchange instead, `answer` carried beside the GRAFT, with `PRUNE_BACKOFF` from `--prune-backoff` | gossipsub's GRAFT/PRUNE with an extension field for the colour; direction `BOTH` only; no floor per colour; accepted in silence, as gossipsub's: the sender is in the relation from its GRAFT, and the backoff after a PRUNE keeps the ends together (`protocol-v2.md` §4.1) |
+| GRAFT, PRUNE with colour and direction | kinds `0x02`, `0x03`: an accepted GRAFT is answered by one marked `answer`, and a GRAFT for a relation the receiver holds by a yes again; `PRUNE_BACKOFF` `seacast.md`'s (§4.1 there) | stock, accepted in silence as on the partial-messages binding; under `--upkeep on` the toy runs `seacast.md` §4.1's answered exchange instead, `answer` carried beside the GRAFT, with `PRUNE_BACKOFF` from `--prune-backoff` | gossipsub's GRAFT/PRUNE with an extension field for the colour; direction `BOTH` only; no floor per colour; accepted in silence, as gossipsub's: the sender is in the relation from its GRAFT, and the backoff after a PRUNE keeps the ends together (`seacast.md` §4.1) |
 | HAVE, holding | kind `0x04`, flag bit 0 clear | IDONTWANT `HaveBitmap`; `claim_all` and `complete` read from a full bitmap, or carried in a flags byte after the group, under version 4 of the strings (§4; needed for a row member complete at 64; the toy charges no bytes for them) | `partsMetadata.available` plus two flag bits |
 | HAVE, offer | kind `0x04`, flag bit 0 set | IHAVE `HaveBitmap` | `partsMetadata.available` to a peer not being pushed |
 | WANT | kind `0x05`: `standing` and `probe` in one flags byte, `hops` a byte | IWANT `WantIndex`; `standing` and `probe` in a flags byte after the index, and `hops` a byte, under version 4 of the strings: 43 bytes in all (§4; the toy charges no bytes for them) | `partsMetadata.requests`; `standing`, `hops` and `probe` need an extension field, which also asks for the part where the asker has not subscribed (§6) |
@@ -83,7 +83,7 @@ SSZ, compressed for the two chunk kinds (§1.3). The same encoded message travel
 | `0x03` | PRUNE | `PruneMsg` |
 | `0x04` | HAVE, a holding or an offer | `HaveMsg` |
 | `0x05` | WANT | `WantMsg` |
-| `0x06` | CHUNK of the payload | `protocol.md` §2's `Chunk`, compressed |
+| `0x06` | CHUNK of the payload | `seacast-lite.md` §2's `Chunk`, compressed |
 | `0x07` | CHUNK of a cell, in a column or a row | `CellChunk`, compressed |
 | `0x08` | EVIDENCE | reserved: none in this version (`[D6]`) |
 
@@ -91,7 +91,7 @@ SSZ, compressed for the two chunk kinds (§1.3). The same encoded message travel
   version can add kinds. Its frame is held to the largest frame that a known kind allows (§1.4): a
   longer one is a violation.
 - **Types not joined.** A JOIN naming an object type the node does not run, and a GRAFT, PRUNE,
-  offer or WANT naming one the link has not joined, is ignored without penalty (`protocol-v2.md`
+  offer or WANT naming one the link has not joined, is ignored without penalty (`seacast.md`
   §2). Chunks and holdings are taken on any link, since a cell's answer and its acknowledgement can
   name the group of either of its types.
 - **Violations.** A body that does not decode, or one over its kind's bound (§1.4), is a violation:
@@ -105,13 +105,13 @@ FamilyId = uint16                      # the payload 0; a column's index; a row'
 Direction = uint8                      # OUT 0, IN 1, BOTH 2
 InterestKind = uint8                   # ALL 0, DERIVED 1, DECLARED 2
 Duty = uint8                           # NONE 0, FORWARD 1
-MAX_HAVE_BYTES = 1024                  # protocol.md §2's: 8 192 indices
-Bitmap = ByteList[MAX_HAVE_BYTES]      # protocol.md §2's: index i is bit i % 8 of byte i // 8, least significant
+MAX_HAVE_BYTES = 1024                  # seacast-lite.md §2's: 8 192 indices
+Bitmap = ByteList[MAX_HAVE_BYTES]      # seacast-lite.md §2's: index i is bit i % 8 of byte i // 8, least significant
                                        #   bit first; trailing zero bytes dropped
 
 class GroupId(Container):              # one layout for every object type: 35 bytes
     type: TypeId
-    key: Bytes32                       # the payload: its group key (protocol.md §1); a column or a row: the block root
+    key: Bytes32                       # the payload: its group key (seacast-lite.md §1); a column or a row: the block root
     index: uint16                      # the payload: 0; a column: its index; a row: its index (the blob's)
 
 class JoinMsg(Container):              # 0x01
@@ -159,24 +159,24 @@ class CellChunk(Container):            # 0x07
 - **The enums.** For `Direction`, `InterestKind` or `Duty`, a value outside that type's list is a
   violation. A `TypeId` a node does not know names a type it does not run, and its message is
   ignored (§1.1).
-- **The payload's chunk (`0x06`)** is `protocol.md` §2's `Chunk`, unchanged: its proof is a
+- **The payload's chunk (`0x06`)** is `seacast-lite.md` §2's `Chunk`, unchanged: its proof is a
   `List[Bytes32, 14]`, and its header is the descriptor it carries under design A; under design B
-  the bid carries the descriptor and the chunk does not, a choice `protocol.md` §1 leaves open. It
+  the bid carries the descriptor and the chunk does not, a choice `seacast-lite.md` §1 leaves open. It
   is the same bytes in SEACAST's message encoding as on the gossipsub binding, compression aside,
   and its group is `GroupId(0, chunk.group, 0)`.
 - **The consensus types:** `ForkDigest`, `KZGProof`, `BYTES_PER_CELL` and `PartialDataColumnHeader`
   are consensus-specs' (the header from Fulu's partial columns, `specs/fulu/partial-columns/
   p2p-interface.md`, at `2ea9d96a`). The header is optional as partial columns make it optional: a
   list of zero or one.
-- **The fork** (`protocol-v2.md` §7). A link carries an object type only where both ends' JOINs
+- **The fork** (`seacast.md` §7). A link carries an object type only where both ends' JOINs
   for it name the same `fork_digest`, as their `colours` must match. At a fork a node sends its new
   JOIN.
   - *Open:* this draft leaves open what a link's relations do from the fork until both ends' JOINs
     name the new digest. Also open is how the new JOIN sits with the rule that a node sends its JOIN
-    once per link and type, through `send_join` (`protocol-v2.md` §4.1).
+    once per link and type, through `send_join` (`seacast.md` §4.1).
 - **The header** (`CellChunk.header`), in form (b) (§1.6), goes with the first eager push of a group
-  on a link (`protocol-v2.md` §2). It is validated apart from the cell, before the cell is handled
-  (`protocol-v2.md` §7): a copy whose id is seen or waiting still brings it. A header that fails its
+  on a link (`seacast.md` §2). It is validated apart from the cell, before the cell is handled
+  (`seacast.md` §7): a copy whose id is seen or waiting still brings it. A header that fails its
   checks is rejected, as consensus rejects one, and counts against its sender; one that cannot be
   judged yet, which consensus ignores (a slot ahead, a parent not yet seen), waits and counts
   against no one. Neither marks the cell's id.
@@ -188,17 +188,17 @@ class CellChunk(Container):            # 0x07
     that was sent the header on another topic. Sending it once per block and link, not per group, is
     for later study.
 - **A bitmap's length** is the sender's, up to the bound. In a HAVE, bits past the group's count,
-  once known, are the violation `protocol-v2.md` makes them (`valid_have`, `drop_beyond`). In a
+  once known, are the violation `seacast.md` makes them (`valid_have`, `drop_beyond`). In a
   WANT, an index at or beyond the count, or before the count is known at or beyond the most a group
-  of the type has, is ignored without penalty (`protocol-v2.md` §4.5).
-- **A chunk's id** (`chunk_id`, `protocol-v2.md` §3) takes the part of `protocol.md` §2's structured
+  of the type has, is ignored without penalty (`seacast.md` §4.5).
+- **A chunk's id** (`chunk_id`, `seacast.md` §3) takes the part of `seacast-lite.md` §2's structured
   id, which hashes a topic in, on a binding that has no topics. It is 59 bytes:
   - *the payload's chunk:* the id is the chunk's `GroupId`, its index as a little-endian `uint32`,
     and the first 20 bytes of SHA-256 over the decompressed body;
   - *a cell:* a cell has one id whichever group carries it, so that a copy through the other axis,
     or one with a header, is the same chunk to `seen`. The id is the `GroupId` of its column, its
     row as the index, and the first 20 bytes of SHA-256 over the cell and its proof.
-- **A chunk's size** (`wire_size(p, entry)`, `protocol-v2.md` §3) is the size of its frame on the
+- **A chunk's size** (`wire_size(p, entry)`, `seacast.md` §3) is the size of its frame on the
   stream (§2.2), with the header when its write carries one, so that the window counts what the
   link carries.
 
@@ -219,7 +219,7 @@ Each kind has a bound on its body, from its types' static sizes (X6, limits befo
 |---|---|
 | JOIN, GRAFT, PRUNE | 17, 7, 6 (fixed) |
 | HAVE, WANT | 1 064, 1 065 (a full bitmap) |
-| CHUNK of the payload | 33 351 under design A (`MAX_SEGMENT_SIZE`, 14 proof steps, the descriptor's 51 bytes); 33 300 under design B, without the descriptor (`protocol.md` §1, open) |
+| CHUNK of the payload | 33 351 under design A (`MAX_SEGMENT_SIZE`, 14 proof steps, the descriptor's 51 bytes); 33 300 under design B, without the descriptor (`seacast-lite.md` §1, open) |
 | CHUNK of a cell | 199 091 (the header with `MAX_BLOB_COMMITMENTS_PER_BLOCK` commitments) |
 
 - **On the stream,** a receiver reads a frame's length and kind, and refuses a frame that cannot fit
@@ -228,7 +228,7 @@ Each kind has a bound on its body, from its types' static sizes (X6, limits befo
   `32 + n + n / 6`. Its decompressed length is checked against the bound itself.
 - **The epoch's own bound** on a cell's header, its `max_blobs_per_block` commitments, is checked at
   level 1, where consensus checks it.
-- **`protocol-v2.md` §6.3's limits on state stay as they are:** they limit the groups tracked per
+- **`seacast.md` §6.3's limits on state stay as they are:** they limit the groups tracked per
   slot, the relations per link, and the sampling-only links accepted.
 
 ### 1.5 Sizes (informative)
@@ -243,18 +243,18 @@ A message's size on the stream counts its body, then its kind byte and its lengt
 | HAVE, holding or offer | group 35, flags 1, offset 4, bitmap b | 42 + b; 43 + b from b = 87 |
 | WANT, one index i | group 35, flags 1, hops 1, offset 4, bitmap ⌊i/8⌋ + 1 | 44 + ⌊i/8⌋; 45 + ⌊i/8⌋ from i = 680 |
 | CHUNK, a cell | group 35, index 4, cell 2 048, proof 48, offset 4; header (if sent) 4 + 340 + 48 a blob | 2 142; with a 48-blob header, 4 790 |
-| CHUNK, the payload | `protocol.md`'s `Chunk`: 135 under design A (the descriptor's 51 bytes in it), 84 under design B, + 32 a proof step + data | 138 or 139 under design A, 86 to 88 under design B, + 32 a proof step + data |
+| CHUNK, the payload | `seacast-lite.md`'s `Chunk`: 135 under design A (the descriptor's 51 bytes in it), 84 under design B, + 32 a proof step + data | 138 or 139 under design A, 86 to 88 under design B, + 32 a proof step + data |
 
 The table gives a chunk's size before compression.
 
 ### 1.6 A cell group's header: three forms
 
 A cell group's header travels in one of three forms. The object type's definition fixes the form
-(`header_of`, `protocol-v2.md` §1.1), and no topic mixes two forms. The three forms are the same on
+(`header_of`, `seacast.md` §1.1), and no topic mixes two forms. The three forms are the same on
 the libp2p stream binding and the gossipsub binding, and each binding says how it carries them
 (§2.3, §3, §4, §5).
 - **(a) From the block.** No header travels on the wire. A cell waits in `defer` until its block's
-  header is validated (`on_header_validated`, `protocol-v2.md` §4.2).
+  header is validated (`on_header_validated`, `seacast.md` §4.2).
 - **(b) In every cell message.** Each cell's message carries the header. A binding that can vary a
   message per link carries it more cheaply, as the libp2p stream binding does once per group and
   link (§2.3): a cell's id leaves the header out (§1.2), so a copy with the header and a copy
@@ -264,7 +264,7 @@ the libp2p stream binding and the gossipsub binding, and each binding says how i
   their header is in flight, and a guard against headers with no cells after them. This version
   defines no bytes for the header message.
 
-In the toy a cell's header is available from its first cell on both wires (`protocol-v2.md` §4.2),
+In the toy a cell's header is available from its first cell on both wires (`seacast.md` §4.2),
 so no cell waits for its block. The libp2p stream binding's wire charges the header on the first
 eager push of each group and link, form (b). The gossipsub binding's wire charges no header: that is
 form (a) for a node that holds the block before the cells, and the toy does not model a block that
@@ -272,16 +272,16 @@ comes after its cells.
 
 **Open: a cell before its block, under form (a).** A cell's message names its group (the block root
 and the column or the row, §1.2) but not its slot, and under form (a) no header comes with it.
-`protocol-v2.md` §4.2's `on_chunk` checks the slot's live window before the cell can wait in
+`seacast.md` §4.2's `on_chunk` checks the slot's live window before the cell can wait in
 `defer`, and `tie` keeps the slot too. How a receiver admits, bounds and expires a cell whose slot
 it does not know yet, or whether the cell's message names its slot under form (a), is for a later
 release.
 
 ## 2. The libp2p stream binding
 
-This binding is a protocol of its own, carrying `protocol-v2.md` §2's messages with every rule of
+This binding is a protocol of its own, carrying `seacast.md` §2's messages with every rule of
 that document: interest without subscription, a push relation per family and colour with a floor
-and a direction, the answered GRAFT, and scoring on these messages (`protocol-v2.md` §7's
+and a direction, the answered GRAFT, and scoring on these messages (`seacast.md` §7's
 capabilities, all of them).
 
 ### 2.1 The protocol id and the streams
@@ -291,7 +291,7 @@ capabilities, all of them).
   skip (§1.1). A node negotiates per link which binding, and which version, a peer takes.
 - **One outbound stream per peer.** Each node opens one stream to each peer with the protocol id,
   and writes its frames there. It reads the peer's frames on the stream the peer opened.
-- **The writer's order.** Frames go in the order the writer chooses them (`protocol-v2.md` §4.12),
+- **The writer's order.** Frames go in the order the writer chooses them (`seacast.md` §4.12),
   each written whole.
 - **For later study:** a second outbound stream would carry frames without a chunk, so that a
   holding need not wait behind a chunk being written to the same peer (the urgent lane at the
@@ -331,7 +331,7 @@ binding, as on a stream of its own; only the framing changes.
   part in the type. What it receives is said per link, in its JOIN and its WANTs, and the group
   tells one family's chunks from another's.
   - *Open:* a cell asked for in its row can come back naming its column, and its holding can
-    name the column too (`protocol-v2.md` §2). Which topic's stream carries them, where the two
+    name the column too (`seacast.md` §2). Which topic's stream carries them, where the two
     nodes share only the row type's topic, is left open; the libp2p stream binding carries every
     type on its one stream.
 - **JOIN** is the first message the node sends that peer on the type's topic. Waggle sends to a peer
@@ -349,7 +349,7 @@ binding, as on a stream of its own; only the framing changes.
 - **A cell group's header** (§1.6) travels as on the libp2p stream binding (§2.3):
   `CellChunk.header` is empty under form (a) and carries the header under form (b), and form (c)
   needs a message of its own, which this version does not define.
-- **Whom a node pushes, tells and asks is `protocol-v2.md` §4's.** SEACAST's rules take the place of
+- **Whom a node pushes, tells and asks is `seacast.md` §4's.** SEACAST's rules take the place of
   the draft's dissemination prose (a new piece to the peers whose metadata shows it missing,
   metadata to some others), which lets the application choose the peers ("latency or other
   application-defined criteria").
@@ -368,63 +368,63 @@ the topic lives.
 
 ## 4. The gossipsub binding
 
-This binding is `protocol.md`'s wire (its §2): chunks travel as gossipsub messages, and holdings,
+This binding is `seacast-lite.md`'s wire (its §2): chunks travel as gossipsub messages, and holdings,
 offers and asks travel as message-id strings inside existing control fields. Nothing here adds a
-protobuf field or a gossipsub message type. The toy runs `protocol-v2.md` on it.
+protobuf field or a gossipsub message type. The toy runs `seacast.md` on it.
 
-- **What it gives up** (`protocol-v2.md` §7's capabilities) is the same as on the partial-messages
+- **What it gives up** (`seacast.md` §7's capabilities) is the same as on the partial-messages
   binding (§5).
 - **The two ends of a relation** agree through gossipsub's backoff, as on the partial-messages
   binding (§5).
 - **The fork** is in the topic's name.
-- **A chunk's id** is `protocol.md` §2's structured `message_id`.
+- **A chunk's id** is `seacast-lite.md` §2's structured `message_id`.
 - **A cell group's header** (§1.6). A router forwards a message as it was published, to every peer
   alike, so a header cannot go to one link and not another:
   - in form (a), no cell's message carries it;
   - in form (b), every copy of each cell's message carries it;
   - in form (c), the source publishes a header message of its own on each family's topic with the
     group's first cells, and it is forwarded as any message. This version defines no bytes for it.
-- **An IDONTWANT's entries** are read as `protocol.md` §4.1 reads them. An IDONTWANT names no
+- **An IDONTWANT's entries** are read as `seacast-lite.md` §4.1 reads them. An IDONTWANT names no
   topic, so beside the `HaveBitmap`s its entries can be stock message ids, such as another topic's.
-  An entry is a holding (`protocol-v2.md` §4.3's `on_holding`) if it opens with `HaveBitmap`'s
+  An entry is a holding (`seacast.md` §4.3's `on_holding`) if it opens with `HaveBitmap`'s
   MAGIC and a version this binding writes, and holds after them a group and, at version 4, the
   claims' flags byte with no reserved bit set. The versions this binding writes are version 1 of
-  `protocol.md` §2, which its `is_have_bitmap` tests, and version 4, below. Any other entry, one
+  `seacast-lite.md` §2, which its `is_have_bitmap` tests, and version 4, below. Any other entry, one
   cut short included, is an opaque id, kept in `unwanted[p]` with stock gossipsub's admission and
-  lifetime, where `on_want` reads it (`protocol-v2.md` §4.5); it is not read as a holding. Both are
-  handled after the frame's asks, as `protocol-v2.md` §4's `on_frame` handles holdings.
+  lifetime, where `on_want` reads it (`seacast.md` §4.5); it is not read as a holding. Both are
+  handled after the frame's asks, as `seacast.md` §4's `on_frame` handles holdings.
 - **An IHAVE's entries** are offers only as `HaveBitmap`s. Any other entry is ignored, without
-  penalty, where `protocol.md` §4.4 reads it as a structured id: this draft offers by bitmap only.
+  penalty, where `seacast-lite.md` §4.4 reads it as a structured id: this draft offers by bitmap only.
 - **The extra fields** are carried in version 4 of the strings: a holding's `claim_all` and
   `complete`, and the WANT's `standing`, `hops` and `probe`. The toy charges no bytes for them.
   - *A holding* travels in an IDONTWANT as `"HAVE"` ‖ `0x04` ‖ the group (32) ‖ flags (1: bit 0
-    `claim_all`, bit 1 `complete`) ‖ the bitmap. The bitmap is `protocol.md` §2's: least significant
+    `claim_all`, bit 1 `complete`) ‖ the bitmap. The bitmap is `seacast-lite.md` §2's: least significant
     bit first, trailing zero bytes dropped, at most `MAX_HAVE_BYTES`.
   - *A WANT* travels in an IWANT as `"WANT"` ‖ `0x04` ‖ the group (32) ‖ the index (4) ‖ flags (1:
     bit 0 `standing`, bit 1 `probe`) ‖ `hops` (1): 43 bytes. The index is a little-endian `uint32`,
-    as `protocol.md` §2 states for `WantIndex`. The research harness writes it big-endian, a
+    as `seacast-lite.md` §2 states for `WantIndex`. The research harness writes it big-endian, a
     difference of that implementation.
   - *An offer* keeps version 1, which has no flags.
-  - *The group* is 32 bytes: `protocol.md` §2's group key, which is the whole id of a payload group.
+  - *The group* is 32 bytes: `seacast-lite.md` §2's group key, which is the whole id of a payload group.
     A column's or a row's `GroupId` also has a type and an index (§1.2), and an IDONTWANT or an
     IWANT names no topic, so how these strings name such a group is left open (below).
   - *An entry with a reserved bit set,* a WANT of the wrong length, or a WANT whose `hops` is over
-    its type's `ROUTE_HOPS` (`protocol-v2.md` §6.3) is ignored without penalty. For an IDONTWANT
+    its type's `ROUTE_HOPS` (`seacast.md` §6.3) is ignored without penalty. For an IDONTWANT
     entry, ignored means not read as a holding: the entry stays an opaque id, as above.
 - **Open: the strings for cell groups, and the versions written.** Five points are left for a later
   release:
   - the 32 bytes that name a column's or a row's group;
-  - a cell's id on this binding: `protocol.md` §2's `message_id` names a 32-byte group key, and a
+  - a cell's id on this binding: `seacast-lite.md` §2's `message_id` names a 32-byte group key, and a
     cell travels on its column's topic and on its row's, where §1.2 gives it one id;
-  - which version a node writes when every extra field has its default value, since a `protocol.md`
+  - which version a node writes when every extra field has its default value, since a `seacast-lite.md`
     node reads version 1 only;
-  - how a node under `protocol-v2.md` reads a version 1 `WantIndex`;
+  - how a node under `seacast.md` reads a version 1 `WantIndex`;
   - whether every binding ignores a WANT whose `hops` is over `ROUTE_HOPS`, as this one does.
 - **EVIDENCE** would travel as a full gossipsub message on the family's rendezvous topic, as on the
   partial-messages binding (§0's table). None is defined in this version (`[D6]`), so this carrier
   is reserved, as SEACAST's message encoding reserves its kind `0x08` (§1.1).
 - **Gossipsub's IHAVE limits:** offers are IHAVEs, so a stock gossipsub client applies its own
-  (`protocol-v2.md` §4.3).
+  (`seacast.md` §4.3).
 - **The mapping** is §0's table, middle column.
 
 ## 5. The partial-messages binding
@@ -432,7 +432,7 @@ protobuf field or a gossipsub message type. The toy runs `protocol-v2.md` on it.
 This binding is gossipsub with the Partial Messages Extension: it is the binding for columns while
 the extension is the deployed path. It keeps the rollout inside existing topics.
 
-- **What it gives up** (`protocol-v2.md` §7's capabilities):
+- **What it gives up** (`seacast.md` §7's capabilities):
   - it gives up interest without subscription, but for a sampler's (§6);
   - it gives up the push relation's floor and direction;
   - it gives up the answered GRAFT: when a GRAFT is accepted, it is accepted in silence;
@@ -440,10 +440,10 @@ the extension is the deployed path. It keeps the rollout inside existing topics.
 - **The two ends of a relation agree through gossipsub's backoff.** With the GRAFT accepted in
   silence, what keeps the ends' views of a relation together is gossipsub's backoff after a PRUNE:
   each end holds it from a PRUNE it sends or receives, and refuses the peer's GRAFT within it.
-  (`protocol-v2.md`'s own `PRUNE_BACKOFF` is held only by the end that receives a PRUNE, and it
+  (`seacast.md`'s own `PRUNE_BACKOFF` is held only by the end that receives a PRUNE, and it
   refuses no GRAFT. It needs neither the hold at both ends nor the refusal, since its GRAFT is
   answered.) The ends must be able to rely on gossipsub's backoff, so it must outlast the link's
-  longest round trip at each end that may prune (`protocol-v2.md` §4.1's Rationale). With a
+  longest round trip at each end that may prune (`seacast.md` §4.1's Rationale). With a
   shorter one, a GRAFT that crosses a PRUNE can reach its peer as the backoff ends and be accepted
   at that end alone; at exactly the round trip it turns on whether a GRAFT at the backoff's last
   instant is within it, which gossipsub does not say. With a longer one, the ends agree in every
@@ -467,7 +467,7 @@ the extension is the deployed path. It keeps the rollout inside existing topics.
 
   Their bytes are the extension's to define, beside its own fields.
 - **Gossipsub's IHAVE limits:** offers travel as `partsMetadata`, not as IHAVEs. Whether the
-  extension limits them is not checked here (`protocol-v2.md` §4.3).
+  extension limits them is not checked here (`seacast.md` §4.3).
 - **The mapping** is §0's table, right column.
 
 ## 6. A sampler on gossipsub's wires
@@ -483,16 +483,16 @@ A sampler subscribes to nothing for the families it only samples, and these rule
   these wires and counts as queued at once, so a sampler's links for a type are the peers from
   which it has received a subscription to one of the type's topics. A peer that has subscribed to
   none of a type's topics is read as `(DECLARED, NONE)` for that type: its WANTs are its interest
-  and stand (`protocol-v2.md` §4.5), and nothing is pushed or offered to it; it receives only the
+  and stand (`seacast.md` §4.5), and nothing is pushed or offered to it; it receives only the
   answers to its WANTs. At the serving end such a peer counts as joined for the type (`joined`), as
   if its JOIN had been received. A node that subscribes to some of the type's topics, a custodian,
   samples another family through the WANT's `standing` flag, which every sampler sets
-  (`protocol-v2.md` §4.10).
+  (`seacast.md` §4.10).
 - **Answers admitted by their WANT.** A node accepts a chunk on a topic it has not subscribed to
   only as the answer to a WANT it sent: the group's chunk at that index, from the peer the WANT
   went to, until the group expires. Nothing else on such a topic is accepted, no other index and no
   other peer; a copy from a peer asked earlier is accepted and acknowledged like any duplicate
-  (`protocol-v2.md` §4.10). A forwarder's own WANT for a routed request (`protocol-v2.md` §4.5,
+  (`seacast.md` §4.10). A forwarder's own WANT for a routed request (`seacast.md` §4.5,
   `route_want`) is admitted the same way, so a forwarder subscribes to nothing new either. Where a
   receive path drops a message on a topic the node has not subscribed to, the admission is an
   exception to that drop, and an admitted chunk is then checked and validated as any other.
@@ -504,7 +504,7 @@ A sampler subscribes to nothing for the families it only samples, and these rule
 Rejected: the draft rejects approximating `DECLARED` interest by subscribing, either to the sampled
 families (the disclosure above) or to every family of the type (every family pushed to the
 sampler). The libp2p stream and Waggle bindings need none of this: their JOIN goes per link and
-names no sample (`protocol-v2.md` §1.2).
+names no sample (`seacast.md` §1.2).
 
 ## 7. The native QUIC binding (draft)
 
@@ -515,7 +515,7 @@ names no sample (`protocol-v2.md` §1.2).
 
 The native QUIC binding carries SEACAST directly on QUIC (RFC 9000), on a QUIC connection of its
 own: the *native connection*. It uses the message encoding of §1, and it is meant to keep every
-rule of `protocol-v2.md`, as the libp2p stream binding (§2) does. Since it does not order a chunk
+rule of `seacast.md`, as the libp2p stream binding (§2) does. Since it does not order a chunk
 with any other message, whether it keeps them all is open (§7.9). It adds three things that libp2p
 does not give for free: a stream per chunk with no protocol negotiation, stream credit under its
 own control where the QUIC listener allows that (§7.9), and priorities between streams.
@@ -524,10 +524,10 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
 
 - **The ALPN is `seacast/2`.** QUIC's TLS handshake names the application protocol by ALPN. An
   incompatible change of these rules or of the encoding changes the number.
-- **The link.** The link (`protocol-v2.md` §3) opens when the native connection's handshake
+- **The link.** The link (`seacast.md` §3) opens when the native connection's handshake
   completes, and closes when the native connection closes. It carries an object type once both
   ends' JOINs for the type are exchanged and pass §1.2's checks: the same `fork_digest`, and
-  matching `colours` (`links(T)`, `protocol-v2.md` §4.1). A connection opened for a fetch is not a
+  matching `colours` (`links(T)`, `seacast.md` §4.1). A connection opened for a fetch is not a
   link (§7.6).
 - **The stream credit.** A node grants its peer enough unidirectional streams for the chunks the
   peer may have in flight to it, and raises the count as chunk streams end. QUIC's `MAX_STREAMS`
@@ -577,7 +577,7 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
 
 - **The control stream.** Each node opens one unidirectional stream to its peer first, and writes
   on it every message except a chunk. Frames are as on the libp2p stream binding: a length, then
-  the encoded message (§2.2). They go in the order the writer chooses them (`protocol-v2.md`
+  the encoded message (§2.2). They go in the order the writer chooses them (`seacast.md`
   §4.12), each written whole. A node reads the peer's control messages on the first unidirectional
   stream that the peer opened: stream 2 from the dialer, stream 3 from the listener (RFC 9000 §2.1).
   The control stream stays open while the connection does: a node that sees it end or reset closes
@@ -591,7 +591,7 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
 - **Chunks before the JOIN.** A receiver reads the start of a chunk stream, as far as the chunk's
   kind and group (for a compressed kind, the start of the decompressed block), and reads the rest
   only once the link carries an object type of the chunk (§7.1): the group's, or for a cell either
-  of its two, since a cell answered in its row can name its column (`protocol-v2.md` §2). Until
+  of its two, since a cell answered in its row can name its column (`seacast.md` §2). Until
   then the rest of the stream waits unread, and the stream credit the receiver granted caps how much
   of it can arrive (§7.1). This binding's rule is narrower than §1.1's, which takes a chunk on any
   link: an honest node sends a chunk only on a link that carries one of its types, as a push, an
@@ -610,20 +610,20 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   or behind one written after it.
 - **The writer and the transport.** A writer writes one chunk stream at a time, and starts the next
   when the last write has returned. Where a write returns once its bytes are sent, this keeps
-  `protocol.md` §7.3's rule (less than one chunk unsent per connection) as one stream per peer keeps
+  `seacast-lite.md` §7.3's rule (less than one chunk unsent per connection) as one stream per peer keeps
   it. Where the implementation buffers a stream's bytes and returns sooner, as quic-go can, the
   writer must count the connection's unsent bytes itself. How it does so is open (§7.9).
-- **A chunk's size** (`wire_size(p, entry)`, `protocol-v2.md` §3) is its encoded message's length,
+- **A chunk's size** (`wire_size(p, entry)`, `seacast.md` §3) is its encoded message's length,
   with the header when its write carries one.
 - **A cell group's header** travels in the form its object type fixes (§1.6). Where it is a header
   message of its own, it goes on the control stream, before the group's first chunk stream to that
   peer is opened. A chunk stream that arrives before the header waits for it, as any cell that comes
-  before its header does (`protocol-v2.md` §4.2).
+  before its header does (`seacast.md` §4.2).
 
 ### 7.3 Cancel by reset
 
 - **A sender resets a chunk stream that has become useless.** When `filter_entry`
-  (`protocol-v2.md` §4.6) would drop a queued chunk because the peer has said it holds it (cancel,
+  (`seacast.md` §4.6) would drop a queued chunk because the peer has said it holds it (cancel,
   `[c8]`), the sender resets the chunk's stream if the chunk is already written. QUIC then sends
   none of the stream's bytes not yet sent, and resends none of those lost (RFC 9000 §3.1, §13.3). A
   reset takes back nothing already delivered. Once all of a stream's bytes and its end are sent
@@ -632,7 +632,7 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   Since `filter_entry` clears the probe's mark once the answer is written, the sender marks the
   answer's stream as exempt when it writes the answer.
 - **A receiver may stop a chunk stream** (QUIC's `STOP_SENDING`) whose chunk it already holds,
-  except the answer to a probe of its own that is not yet judged (`protocol-v2.md` §4.6). The
+  except the answer to a probe of its own that is not yet judged (`seacast.md` §4.6). The
   sender then resets the stream as RFC 9000 §3.5 requires. If some of the stream's bytes, or its
   end, are not yet sent, it resets the stream at once. Once all are sent, it may wait until they are
   acknowledged or declared lost: it resets the stream if any are declared lost, and lets it finish
@@ -641,10 +641,10 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   QUIC. It is not a duplicate that `[c14]` acknowledges, and a header it carries is not read. What
   a receiver sends for a stopped copy is open (§7.9). The sender's room for the chunk comes back
   when a later valid holding from the receiver reports the chunk's index, even one the receiver
-  reported before (`on_holding`, `protocol-v2.md` §4.3), or when the room times out, as below.
+  reported before (`on_holding`, `seacast.md` §4.3), or when the room times out, as below.
 - **The window.** A reset changes nothing in the window: the chunk's room comes back at the peer's
   holding, or when it times out, as for any chunk (`window_release`, `window_timeout`,
-  `protocol-v2.md` §4.11).
+  `seacast.md` §4.11).
 
 ### 7.4 Priorities
 
@@ -658,7 +658,7 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   and only after whatever is already queued on the control stream. In quic-go v0.62.0, every
   stream's retransmissions go before new stream data, so such a holding, offer or ask does not go
   ahead of the chunk's retransmissions. This is the urgent lane at the transport, beside the
-  writer's (`protocol-v2.md` §4.12).
+  writer's (`seacast.md` §4.12).
 - **Without priorities,** the implementation's own sharing between streams applies. With streams
   taking turns per packet, a control message still waits about one packet rather than the rest of
   a chunk.
@@ -679,7 +679,7 @@ This version sends no datagrams (RFC 9221). Two uses are considered:
   compresses well. A payload chunk of the default unit also fits only if it compresses well, and a
   payload's last chunk fits if it is short enough. The study's payload was compressed before it was
   cut into chunks. Its chunks fit only with a builder's unit far below the default; for a payload of
-  1 MiB, such a unit gives more chunks than `protocol.md`'s `MAX_CHUNKS` allows a coded group.
+  1 MiB, such a unit gives more chunks than `seacast-lite.md`'s `MAX_CHUNKS` allows a coded group.
   Offering a chunk whose datagram was lost, when its room in the window times out, would be a new
   action: today the timeout frees the room (`window_timeout`).
 
@@ -688,20 +688,20 @@ Datagrams count against the connection's congestion window like any data (RFC 92
 ### 7.6 A fetch outside the links
 
 - **Its connection.** A node fetches a sample from a node of the known node set that is not a link
-  (`protocol-v2.md` §7, `[D12]`). It opens a native connection for the fetch, with the same ALPN
+  (`seacast.md` §7, `[D12]`). It opens a native connection for the fetch, with the same ALPN
   and identity. Such a connection is not a link; how the server tells it from a link's connection
   is open (§7.9).
 - **Its messages.** The WANT goes on the control stream, and the answer comes on a chunk stream. On
   a connection opened for a fetch, a WANT is answered without a JOIN. The fetch's privacy rule and
-  the serving limits apply as `protocol-v2.md` §7 says.
+  the serving limits apply as `seacast.md` §7 says.
 - **Its end.** The connection closes once the answer has come, or once the sampler's wait for that
-  sample has passed (`SAMPLE_RETRY` or `SAMPLE_RETRY2`, `protocol-v2.md` §4.10).
+  sample has passed (`SAMPLE_RETRY` or `SAMPLE_RETRY2`, `seacast.md` §4.10).
 - **The server's limits.** A server admits connections for fetches up to a limit of its own, and
   may validate a client's address first (QUIC's Retry, RFC 9000 §8.1).
 
 ### 7.7 What it gives up and adds
 
-In `protocol-v2.md` §7's table, the native binding has a column of its own. It matches the libp2p
+In `seacast.md` §7's table, the native binding has a column of its own. It matches the libp2p
 stream binding's column, with three changes:
 - **the urgent lane at the transport:** yes, where the implementation orders streams (§7.4);
 - **a frame:** one message, as on the libp2p stream binding; a chunk's frame is its stream;
@@ -738,7 +738,7 @@ This draft leaves these questions open:
   verified, or nothing, in which case the sender's room for the chunk comes back when a later valid
   holding from the receiver reports the chunk's index, or when that room times out; and
   whether a receiver may stop a stream that carries a header it has not yet validated;
-- which rules of `protocol-v2.md` rely on a chunk arriving in order with the messages written before
+- which rules of `seacast.md` rely on a chunk arriving in order with the messages written before
   and after it;
 - how a server tells a connection opened for a fetch from a link's connection (§7.6): by an ALPN of
   its own, or by a WANT that comes before any JOIN;
@@ -828,7 +828,7 @@ specifications, and it does not give priorities between streams.
 
 ## 8. A fetch outside the links: its transports
 
-`protocol-v2.md` §7 defines the fetch and its privacy rule: a node sends a WANT to a node of the
+`seacast.md` §7 defines the fetch and its privacy rule: a node sends a WANT to a node of the
 known node set that is not a link, and that node answers with a CHUNK. The binding decides how the
 fetch is carried. The transports considered are these:
 - one is an ephemeral libp2p connection, short-lived and admitted above the peer limit (FullDAS's

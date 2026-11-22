@@ -17,7 +17,7 @@ custody or row setting's network in place of the toy's own draws (sim.py reads c
 Recorder counts what the harness's xcheck line counts (its xcheck_test.go): at the sender's
 transmit, after the writer's filter, as the harness counts at the stream write; at the receiver's
 delivery; in the document's filter_entry (cancel); and in its acquire_slot (acquire_room under
-protocol-v2.md) and track_in_flight (the window). It reads node state with get(), so no map grows;
+seacast.md) and track_in_flight (the window). It reads node state with get(), so no map grows;
 its delivery hook keeps the name the digest records, and it schedules nothing: a run's events and
 digest are the same with it or without it. Per message it resets at the publish and is read at the
 horizon, publish + 3 s.
@@ -26,11 +26,11 @@ Each invariant is a count that must be zero, apart from the lawful cases that bu
 name:
 - budget: forwarding nodes that sent one chunk unasked more often than their push degree (R_NODE).
   Like the harness's line, it counts every copy sent unasked, so the copies of a rebuilt chunk that
-  repair pushes count too. Under protocol.md, and under protocol-v2.md with REPAIR_BUDGET off,
+  repair pushes count too. Under seacast-lite.md, and under seacast.md with REPAIR_BUDGET off,
   repair's pushes of rebuilt chunks go to peers short of K, each up to its shortfall, with no R_NODE
   bound on one chunk's copies, so what repair adds to the count breaks no rule;
-- window: nodes whose room in flight exceeded their window: W slots under protocol.md, W_BYTES bytes
-  under protocol-v2.md (§4.11 there). An empty window there takes one chunk of any size, so a window
+- window: nodes whose room in flight exceeded their window: W slots under seacast-lite.md, W_BYTES bytes
+  under seacast.md (§4.11 there). An empty window there takes one chunk of any size, so a window
   smaller than a chunk can count a node that broke no rule;
 - overlap: an ask for a chunk decided while an earlier ask for it was open (inside IWANT_WINDOW,
   the chunk not yet held), timed at may_ask, where the harness's request ledger also times asks
@@ -39,7 +39,7 @@ name:
   peer_has, §4.4) for them had reached the sender earlier in the message, whether or not the sender
   still holds it: the harness's ledger reads it the same way. late_live, a diagnostic, counts those
   whose HAVE the sender still held. Cancel (card 8), when it is on, drops such a send, and under
-  protocol-v2.md it lets a probe's exempt answer through; a send that cancel would not drop complies
+  seacast.md it lets a probe's exempt answer through; a send that cancel would not drop complies
   with card 8;
 - fault: chunks sent by silent nodes, answers sent by withholders.
 """
@@ -343,7 +343,7 @@ class Recorder:
         self.c = defaultdict(Counter)           # node id -> counter by KEYS and invariants
         self.pushes = defaultdict(Counter)      # node id -> (group, index) -> eager pushes
         self.asked = defaultdict(dict)          # node id -> (group, index) -> time of the last ask
-        self.peak = Counter()                   # node id -> most room in flight (slots; bytes under protocol-v2.md)
+        self.peak = Counter()                   # node id -> most room in flight (slots; bytes under seacast.md)
         self.have_ever = {}                     # (node, peer, group) -> every HAVE bit the peer sent it
         self.times = {"ihave": [], "push": [], "answer": []}   # the source's sends, s after publish
         self.asks_sent = Counter()              # (node, group, index) -> asks it has written for the chunk
@@ -400,13 +400,13 @@ class Recorder:
             rec.peak[nid] = max(rec.peak[nid], ns["in_flight"])
             return got
 
-        def track_in_flight(p, f, *rest):   # protocol-v2.md's takes the room too: (p, f, need)
+        def track_in_flight(p, f, *rest):   # seacast.md's takes the room too: (p, f, need)
             out = spec_track(p, f, *rest)
             rec.peak[nid] = max(rec.peak[nid], ns["in_flight"])
             return out
         ns["filter_entry"], ns["acquire_slot"], ns["track_in_flight"] = filter_entry, acquire_slot, track_in_flight
         ns["may_ask"] = may_ask
-        if "acquire_room" in ns:            # protocol-v2.md takes room in bytes here, not a slot (§4.11)
+        if "acquire_room" in ns:            # seacast.md takes room in bytes here, not a slot (§4.11)
             spec_room = ns["acquire_room"]
 
             def acquire_room(p, need):

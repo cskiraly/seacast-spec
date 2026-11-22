@@ -6,7 +6,8 @@ are the outputs of the runs: the manifest of the traces, the reports of the repl
 the reports of the controls, with the log of the script that started the quick check. Each is as the runs wrote
 it, but for one substitution in four files, which the end of this file names. `FILES.sha256` gives the SHA-256
 hash of every other file in this directory, this file included. `FILES.sha256` was made when the record was
-frozen. The traces themselves are not kept, because they take about 50 GB uncompressed (`manifest/sizes.txt`).
+frozen, and its line for this file was made again on 2026-11-22, when v0.12.0 added the sentences on its names.
+The traces themselves are not kept, because they take about 50 GB uncompressed (`manifest/sizes.txt`).
 `record.sh` makes them again, and the hashes in the manifest tell whether a new run made the same traces.
 
 This file uses the terms of the twin's README (`../README.md`). The toy (`toy/`) runs the Python in the code
@@ -27,18 +28,27 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 - **The record's run and the quick check started from one commit.** Each started from a fresh clone of the spec at
   commit `9f33f60`, with nothing added to it. That commit is in the published history of the spec, before the
   commit that adds this record. It holds the two documents (`protocol.md` and `protocol-v2.md`), the toy, the twin
-  in `formal/twin`, and the twin's tools. Its toy is the same as this release's, apart from the files whose names
-  end in `.md`. Its documents differ from this release's only outside their code. The matrix was not run again: it
+  in `formal/twin`, and the twin's tools. Its toy is the same as v0.11.1's (`1370aa0`), apart from the files whose
+  names end in `.md`. Its documents differ from v0.11.1's only outside their code. The matrix was not run again: it
   is v0.10.12's, carried into this record, as "How the matrix is tied to this record" says.
 - **The content line and the list of the sources of the twin tie the record to what ran**
   (`manifest/content.line`, the first line of every trace, and `manifest/twin-sources.txt`; the content line is
   described below). Both are made from the files of a tree, and a reader can make both on any tree:
   `tools/content.py` makes the content line, and the build step of `check.sh` writes the list of the sources of
-  the twin, each with its SHA-256 hash. This release holds the same `toy/` and `formal/twin/` as `9f33f60`, file
-  for file, apart from `formal/twin/record/` and the files whose names end in `.md`. The content line leaves out
-  the files in `toy/` and `formal/twin/tools/` whose names end in `.md`. Run on the tree of this release,
+  the twin, each with its SHA-256 hash. v0.11.1 (`1370aa0`) holds the same `toy/` and `formal/twin/` as `9f33f60`,
+  file for file, apart from `formal/twin/record/` and the files whose names end in `.md`. The content line leaves out
+  the files in `toy/` and `formal/twin/tools/` whose names end in `.md`. Run on v0.11.1's tree,
   `tools/content.py` gives the line in `manifest/content.line`. The sources of the twin there, by path and hash,
   are those that `manifest/twin-sources.txt` lists.
+- **Since v0.12.0 the spec carries this record under new names, with no new run.** v0.12.0 renamed files and
+  names and changed nothing else (its entry in `CHANGELOG.md`): `protocol.md` is now `seacast-lite.md`,
+  `protocol-v2.md` is now `seacast.md`, `toy/golden-v2.txt` is now `toy/golden-seacast.txt`, and the toy's
+  `--doc v2` and `--doc v03` are now `--doc seacast` and `--doc lite`. This file and the outputs of the runs keep
+  the names of `9f33f60` and v0.11.1. On v0.12.0's tree, `tools/content.py` gives another line than
+  `manifest/content.line`, since the line names files by their paths, and a new trace's header says
+  `--doc seacast`. The list of the twin's sources differs from `manifest/twin-sources.txt` too, since the rename
+  changed comments in the twin's Lean files and names in `check.sh`. Built from v0.12.0's sources with Lean 4.35.0,
+  the replay's SHA-256 is still the one in the manifest's `replay` line.
 - **These files show the clone and the toolchain of some of the runs.** The record's Lean is in
   `controls/check.txt` and its Python in the manifest. The quick check's clone, Lean and Python are in
   `quick-check/run.log`. The clone of the record's run, and the clone, Lean and Python of each part of the matrix,
@@ -70,7 +80,7 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
   committed or not, and a link among them is refused. So a change to a document outside its code, or to a README,
   leaves the content line as it was, and a change to the code changes it. The manifest also gives the SHA-256 of
   the bytes of each document, in its `documents` line. Those hashes are of the documents at `9f33f60`. If a
-  document of this release differs from its counterpart at `9f33f60` only outside its code, the SHA-256 of its
+  document of v0.11.1 differs from its counterpart at `9f33f60` only outside its code, the SHA-256 of its
   bytes is not the one in the `documents` line, and the SHA-256 of its code is still the one in the content line.
   The `documents` line is for information: `tools/against.py`, which compares a new run with this record, reports
   a difference in it and decides nothing by it.

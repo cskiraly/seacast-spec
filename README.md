@@ -12,21 +12,22 @@ This repository holds SEACAST's specification, written as Python-like code in th
 Ethereum's consensus specs; a small simulator, the toy, runs that code as written. The
 specification defines two protocols:
 
-- **SEACAST**, in [`protocol-v2.md`](protocol-v2.md), is the main one. It is checked in the toy
+- **SEACAST**, in [`seacast.md`](seacast.md), is the main one. It is checked in the toy
   only, and no client runs it yet.
-- **SEACAST on gossipsub**, in [`protocol.md`](protocol.md), diffuses an execution payload over
+- **SEACAST Lite**, in [`seacast-lite.md`](seacast-lite.md), diffuses an execution payload over
   gossipsub. It is the one that was measured and proved: the measurements ran a research
   implementation of it, and the proofs are of models of its rules. SEACAST contains it as one of
-  its settings, tier 4, with the differences that `protocol-v2.md` §6.1 lists.
+  its settings, tier 4, with the differences that `seacast.md` §6.1 lists.
 
-The file names are older than the protocols' names, and the toy runs SEACAST with `--doc v2`.
-Release numbers are this repository's, not either protocol's; `protocol.md` shows at its top the
+The toy runs SEACAST with `--doc seacast`. Up to v0.11.1 the files had older names: `protocol.md`
+for SEACAST Lite, `protocol-v2.md` and `protocol-v2-*.md` for SEACAST, and `--doc v2`.
+Release numbers are this repository's, not either protocol's; `seacast-lite.md` shows at its top the
 release it belongs to.
 
 ## Why SEACAST
 
 - **Fast.** In simulations of 500 nodes, each with 16 connections, 50 Mbps up and 100 down, 99 % of
-  the nodes held enough chunks to rebuild a 1 MiB payload after 0.64 s with SEACAST on gossipsub,
+  the nodes held enough chunks to rebuild a 1 MiB payload after 0.64 s with SEACAST Lite,
   against 0.76 s with FullDAS (every node sampling every cell) and 0.97 s with ECBroadcast's
   Reed–Solomon mode; with today's gossipsub, 99 % held the whole payload after 4.5 s. Each time is
   the median over ten simulated networks; checking proofs, waiting for the block and decoding are
@@ -34,7 +35,7 @@ release it belongs to.
 - **Lean.** In the same runs, a node received about 1.3 MiB on the wire (the nodes' average, at the
   median over the networks): about 60 % of what it received with FullDAS, and about a third of what
   it received with ECBroadcast or today's gossipsub.
-- **Elastic.** With every node's links cut to a fifth (10 Mbps up, 20 down), SEACAST on gossipsub
+- **Elastic.** With every node's links cut to a fifth (10 Mbps up, 20 down), SEACAST Lite
   took 1.8 s instead of 0.64 s to reach 99 % of the nodes, with about the same bytes. Today's
   gossipsub took 25 s.
 - **Broadcast and sampling in one protocol.** SEACAST treats execution payloads, PeerDAS columns and
@@ -45,39 +46,39 @@ release it belongs to.
   Extension, and, as a draft, on native QUIC. The toy models two of them, the gossipsub and libp2p
   stream bindings.
 - **A specification that runs, and is checked.** The toy runs both documents' code as written,
-  against recorded runs and known answers. For SEACAST on gossipsub, there are proofs in Veil of
+  against recorded runs and known answers. For SEACAST Lite, there are proofs in Veil of
   models of its rules written by hand. Under the assumptions they state, they show for any number
   of nodes that an honest node is never penalised, and that, for one object, once nothing is left
   to happen, every honest node reachable from the source along the mesh of that moment has
   completed. The models have v0.8's rules and four later changes. A Lean transcription of
-  `protocol.md`'s code, function by function, replays traces of the toy's runs.
+  `seacast-lite.md`'s code, function by function, replays traces of the toy's runs.
 
-The numbers come from the announcement post, which calls SEACAST on gossipsub simply SEACAST. The
-four protocols ran in one simulator, on a virtual clock. SEACAST on gossipsub ran there as its
-research implementation (Prysm with a modified gossipsub library), and `protocol.md` §9 lists where
+The numbers come from the announcement post, which calls SEACAST Lite simply SEACAST. The
+four protocols ran in one simulator, on a virtual clock. SEACAST Lite ran there as its
+research implementation (Prysm with a modified gossipsub library), and `seacast-lite.md` §9 lists where
 that implementation differs from the text.
 
 ## What to read
 
 | To | Read |
 |---|---|
-| learn SEACAST, the main protocol | [`protocol-v2.md`](protocol-v2.md); its §0 says how to read it |
-| carry it on a transport | [`protocol-v2-bindings.md`](protocol-v2-bindings.md) |
-| see SEACAST's decisions and the figures behind them | [`protocol-v2-decisions.md`](protocol-v2-decisions.md) and [`protocol-v2-figures.md`](protocol-v2-figures.md) |
-| read SEACAST on gossipsub, which the measurements and the proofs are about | [`protocol.md`](protocol.md); its §0 says how to read it |
+| learn SEACAST, the main protocol | [`seacast.md`](seacast.md); its §0 says how to read it |
+| carry it on a transport | [`seacast-bindings.md`](seacast-bindings.md) |
+| see SEACAST's decisions and the figures behind them | [`seacast-decisions.md`](seacast-decisions.md) and [`seacast-figures.md`](seacast-figures.md) |
+| read SEACAST Lite, which the measurements and the proofs are about | [`seacast-lite.md`](seacast-lite.md); its §0 says how to read it |
 | run either protocol, or try a rule before implementing it | [`toy/`](toy/) |
 | know what is checked, and how far | [`formal/README.md`](formal/README.md) |
 | see what each release changed | [`CHANGELOG.md`](CHANGELOG.md) |
 
 ## Where it stands
 
-- **The latest release is [v0.11.1](https://github.com/cskiraly/seacast-spec/tree/v0.11.1)**,
+- **The latest release is [v0.12.0](https://github.com/cskiraly/seacast-spec/tree/v0.12.0)**,
   2026-11-22. [`CHANGELOG.md`](CHANGELOG.md) says what each release changed; changes after the
   latest tag are on `main`, and the changelog's first entry names them.
-- **SEACAST on gossipsub** (`protocol.md`) was measured on a research implementation, and each
+- **SEACAST Lite** (`seacast-lite.md`) was measured on a research implementation, and each
   results record names the code it ran. [`formal/README.md`](formal/README.md) says what each check
   of it shows: the proofs, the Lean twin with its record, and the first piece of a refinement.
-- **SEACAST** (`protocol-v2.md`) is checked in the toy only: no client runs it, and the research
+- **SEACAST** (`seacast.md`) is checked in the toy only: no client runs it, and the research
   implementation's simulations ran only designs that SEACAST contains as settings.
 - **Results.** The announcement post, *[SEACAST: fast, lean, sampled broadcast for Ethereum, with an
   executable spec and a formal model](https://ethresear.ch/t/seacast-fast-lean-sampled-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)*
@@ -93,17 +94,17 @@ python3 run.py --nodes 100 --msgs 4    # tier 4, 100 nodes on 50/100 Mbps links,
 python3 check.py                       # the document still runs as recorded
 ```
 
-These run SEACAST on gossipsub; with `--doc v2`, either runs SEACAST. The toy needs only Python 3
+These run SEACAST Lite; with `--doc seacast`, either runs SEACAST. The toy needs only Python 3
 and its standard library (tested with 3.12).
 [`toy/README.md`](toy/README.md) describes the options, the network model and what the toy adds to
 the documents.
 
 ## Background
 
-Up to v0.5, the protocol that is now SEACAST on gossipsub was published as *Informed Diffusion*, a
+Up to v0.5, the protocol that is now SEACAST Lite was published as *Informed Diffusion*, a
 design of segmented payload diffusion studied for
 [EIP-8411](https://eips.ethereum.org/EIPS/eip-8411) (Fast Execution Payload Broadcast).
-*Informed Diffusion* was also `protocol.md`'s title up to v0.10.3, and now names how SEACAST
+*Informed Diffusion* was also `seacast-lite.md`'s title up to v0.10.3, and now names how SEACAST
 diffuses.
 
 - [Wen fast payload broadcast? Segment, code, push, pull, and everything in between](https://ethresear.ch/t/wen-fast-payload-broadcast-segment-code-push-pull-and-everything-in-between/25913)

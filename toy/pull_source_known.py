@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.7's publish of a pull-only type (EAGER off): the source pushes nothing and
+"""A known answer for seacast.md §4.7's publish of a pull-only type (EAGER off): the source pushes nothing and
 offers every chunk at publish, since with nothing pushed no acknowledgement can come.
 
     python3 pull_source_known.py
@@ -23,7 +23,7 @@ def build(args):
 
 
 def one(eager):
-    sim = build(["--doc", "v2", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    sim = build(["--doc", "seacast", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     cfg = sim.cfg
     for nd in sim.nodes.values():
         nd._types["payload"].params.EAGER = eager

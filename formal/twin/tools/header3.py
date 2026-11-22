@@ -9,8 +9,8 @@ and the reason names the first name whose hash differs (a document's code, any o
 this one is made against the tree itself. cells3.py asks it of each trace it has just made.
 
 What the replay does not check of the header, the second line: the tracer's name, and that the functions traced
-(`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc v2,
-the block's names that are protocol.md's all the way down (trace3.v2_kept), computed here from TOYDIR's documents;
+(`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc seacast,
+the block's names that are seacast-lite.md's all the way down (trace3.seacast_kept), computed here from TOYDIR's documents;
 and that it claims the whole state exactly where it is a directed set's. A trace that passes is printed with its
 kind.
 
@@ -35,20 +35,20 @@ KINDS = {tuple(sorted(trace3.BLOCK)): f"the block's {len(trace3.BLOCK)} function
          tuple(sorted(trace3.SEC61)): f"§6.1's {len(trace3.SEC61)} alone"}
 
 
-def v2_kind(toy):
-    """v2's kept names, sorted, from TOYDIR's documents: the toy's node.py makes their extracted code."""
+def seacast_kind(toy):
+    """SEACAST's kept names, sorted, from TOYDIR's documents: the toy's node.py makes their extracted code."""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node                         # noqa: E402: the pinned toy, from TOYDIR
-    return tuple(sorted(n for n in trace3.v2_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
-                        if n not in trace3.SEC71))      # the window's six are not traced under v2
+    return tuple(sorted(n for n in trace3.seacast_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
+                        if n not in trace3.SEC71))      # the window's six are not traced under SEACAST
 
 
 def kind_of(toy, traced, args):
-    """The name of a traced list's kind, or None. A trace run with --doc v2 has one kind, v2's kept, and a trace run
-    without it never has that one: the block's list under --doc v2 does not pass."""
+    """The name of a traced list's kind, or None. A trace run with --doc seacast has one kind, SEACAST's kept, and a trace run
+    without it never has that one: the block's list under --doc seacast does not pass."""
     t = tuple(traced) if isinstance(traced, list) else None
-    if trace3.doc_of(args or []) == "v2":           # the words of the trace's arguments: see trace3.doc_of
-        return f"v2's kept, {len(t)} functions" if t is not None and t == v2_kind(toy) else None
+    if trace3.doc_of(args or []) == "seacast":           # the words of the trace's arguments: see trace3.doc_of
+        return f"SEACAST's kept, {len(t)} functions" if t is not None and t == seacast_kind(toy) else None
     return KINDS.get(t)
 
 
@@ -94,7 +94,7 @@ def check(toy, trace):
     why = content_why(toy, line1)
     traced = h.get("traced")
     if kind_of(toy, traced, h.get("args")) is None:
-        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept, "
+        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc seacast SEACAST's kept, "
                    "sorted")
     for name, v in want(toy).items():
         got = h.get(name)

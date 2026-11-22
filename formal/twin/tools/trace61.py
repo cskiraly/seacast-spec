@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""protocol.md §6.1's functions wrapped in a toy cell: the base of trace3.py's tracer.
+"""seacast-lite.md §6.1's functions wrapped in a toy cell: the base of trace3.py's tracer.
 
 No program, and no tracer of its own: trace3.py's Tracer3 is the tracer, and takes from this file its base class
 (the wrappers' frame and the encodings) and the names SEC61 and CONSTS. The record described below is the one

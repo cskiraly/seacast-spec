@@ -24,15 +24,15 @@
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
 #             that list, and at the end of the run the sources and the copy still are
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
-#             matrixdiff.py, and trace3.py's of the names protocol-v2.md keeps)
+#             matrixdiff.py, and trace3.py's of the names seacast.md keeps)
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); the views' own cases (footprint_test.py)
-#   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
+#   scope     every function seacast-lite.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
 #             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused
 #   mutants   every mutant's text stands in the twin once (--places), and each type-checks alone against the build
 #   screen    every cell's header and nodes line, under both documents, read by the replay; a nodes line without a
 #             constant refused
 #   cells     `none`, traced and replayed: its digest is golden.txt's (the tracer perturbs nothing)
-#   small     hand5 (whole; §6.1's twelve alone; at PUBLISH), late16, and hand5 twice under protocol-v2.md: each
+#   small     hand5 (whole; §6.1's twelve alone; at PUBLISH), late16, and hand5 twice under seacast.md: each
 #             traced and replayed, its digest the untraced run's with the same arguments
 #   directed  the 22 directed sets, traced and replayed
 #   replays   every replay above read a trace that is not empty, to its trailer, with no record mismatched and no
@@ -48,8 +48,8 @@
 #
 # With --record (record.sh): the record's run, hours on a server. The same steps under the same contract, and:
 #   cells     every cell of the toy's check.py, not `none` alone: each digest golden.txt's, each replayed
-#   v2cells   every cell under protocol-v2.md: each digest golden-v2.txt's, each replayed (its records are of the
-#             names that are protocol.md's all the way down); the tracer's self-test of those names
+#   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of the
+#             names that are seacast-lite.md's all the way down); the tracer's self-test of those names
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
 #   viewcontrols     22 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
@@ -63,7 +63,7 @@
 #             (fullid.py): none in a cell's trace under either document, where the nodes ask by index
 #   manifest  record-manifest.txt: the content line's sha256, the Python and the platform, each document's file
 #             sha256 (for provenance: the content line names the documents by their code), and the two hashes of
-#             each of the record's 55 traces (15 cells, three hand traces, 22 directed sets, 15 v2 cells)
+#             each of the record's 55 traces (15 cells, three hand traces, 22 directed sets, 15 SEACAST cells)
 # The steps `replays`, `headers` and the hashes then cover the record's traces.
 # With --against DIR too (a record: a directory with a run's record-manifest.txt and content.line), a last step:
 #   against   the run's manifest against the record's (against.py): as recorded; or another content and the same
@@ -71,7 +71,7 @@
 #
 # With --matrix K/N (record.sh --matrix K/N): the Kth of N parts of the mutants' matrix, hours on a server each.
 # The twin is built, the 15 cells, the hand traces and the 22 directed sets are traced and replayed as in the
-# record's run (no cell under protocol-v2.md: no mutant is replayed there), and then:
+# record's run (no cell under seacast.md: no mutant is replayed there), and then:
 #   matrix    every Nth mutant from the Kth (mutants3.py --part), each built and replayed on the records that
 #             reach its function or touch its table: first on the directed sets, where each must be told from
 #             the twin; then on the 15 cells with hand5 and hand5-publish. In matrix/out: the two reports, a line
@@ -95,7 +95,7 @@ TOY=${SPEC_TOY:-$ROOT/toy}
 OUT=$HERE/out/check
 J=4
 ALL="build selftests tables scope mutants screen cells small directed replays headers picks controls perturbed"
-RECORD_ALL="build selftests tables scope mutants screen cells v2cells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols seeds sizes manifest"
+RECORD_ALL="build selftests tables scope mutants screen cells seacastcells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols seeds sizes manifest"
 MATRIX_ALL="build mutants cells small directed replays headers matrix"
 RECORD=
 PART=
@@ -140,7 +140,7 @@ elif [ -n "$SAMPLE" ]; then echo "check.sh: --sample goes with --matrix K/N"; ex
 [ -n "$STEPS" ] || STEPS=$ALL
 for s in $STEPS; do case " $ALL " in *" $s "*) ;; *) echo "check.sh: no step $s (the steps: $ALL)"; exit 2 ;; esac; done
 if [ "$STEPS" = "$ALL" ]; then rm -rf "$OUT"; fi
-mkdir -p "$OUT/traces" "$OUT/directed" "$OUT/v2" || exit 2
+mkdir -p "$OUT/traces" "$OUT/directed" "$OUT/seacast" || exit 2
 OUT=$(cd "$OUT" && pwd)
 LOG=$OUT/check.txt
 REPLAY=$OUT/twin/.lake/build/bin/replay
@@ -173,14 +173,14 @@ if [ -n "$FEWCELLS" ]; then
   CELLS=$CELLS_GIVEN
 fi
 SEEDCELLS=$(for c in withholders loss-thin; do case " $CELLS " in *" $c "*) echo "$c" ;; esac; done)   # traced twice
-SMALL="traces/late16 v2/hand5 v2/hand5-own"         # the check's small traces that are not the record's
+SMALL="traces/late16 seacast/hand5 seacast/hand5-own"         # the check's small traces that are not the record's
 if [ -z "$RECORD" ]; then
-  TRACES="traces/none traces/hand5 traces/hand5-sec61 traces/late16 traces/hand5-publish v2/hand5 v2/hand5-own $(for d in $DIRS; do echo "directed/$d"; done)"
-elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under protocol-v2.md
+  TRACES="traces/none traces/hand5 traces/hand5-sec61 traces/late16 traces/hand5-publish seacast/hand5 seacast/hand5-own $(for d in $DIRS; do echo "directed/$d"; done)"
+elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under seacast.md
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
   TRACES="$RTRACES $SMALL"
 else                    # the record's 55, then the three small ones
-  RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "v2/$c"; done)"
+  RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "seacast/$c"; done)"
   TRACES="$RTRACES $SMALL"
 fi
 
@@ -254,7 +254,7 @@ commentsonly.py --self-test ^self-test: ([0-9]+) of \1 known answers
 fullid.py --self-test ^ok: every case as it must be$
 against.py --self-test ^ok: every case as it must be$
 matrixdiff.py --self-test ^ok: every case as it must be$
-trace3.py --self-test-v2 ^ok: 
+trace3.py --self-test-seacast ^ok: 
 EOF_SELF
   rm -f "$OUT/selftest.out"
   [ "$n" = 8 ] || no "not 8 tools' self-tests passed"
@@ -267,8 +267,8 @@ s_tables() {
   $PY "$T/footprint_test.py" > "$OUT/views.txt" 2>&1 || no "the views' own cases (views.txt)"
   tail -n 1 "$OUT/views.txt" | sed 's/^/  /'
 }
-s_scope() {             # the twin's scope held to the document: every `def` of protocol.md's code blocks, by name
-  $PY - "$(dirname "$TOY")/protocol.md" "$HERE/SpecTwin" > "$OUT/scope.txt" 2>&1 <<'EOF'
+s_scope() {             # the twin's scope held to the document: every `def` of seacast-lite.md's code blocks, by name
+  $PY - "$(dirname "$TOY")/seacast-lite.md" "$HERE/SpecTwin" > "$OUT/scope.txt" 2>&1 <<'EOF'
 import ast, re, sys
 from collections import Counter
 from pathlib import Path
@@ -309,11 +309,11 @@ gone = names[0]                              # the control: a twin with one name
 ctl = missing(entered - {gone}, cases)
 print(f"control, the twin without {gone}: {'refused, as it must be' if ctl and gone in ctl[0] else 'NOT refused  <-- FAIL'}")
 if bad or not ctl:
-    print(f"NOT every function of protocol.md's code blocks has its twin: {len(bad)} without")
+    print(f"NOT every function of seacast-lite.md's code blocks has its twin: {len(bad)} without")
     sys.exit(1)
-print(f"{len(names)} of {len(names)} functions of protocol.md's code blocks have their twin, by name")
+print(f"{len(names)} of {len(names)} functions of seacast-lite.md's code blocks have their twin, by name")
 EOF
-  [ $? = 0 ] || no "a function of protocol.md's code blocks without its twin, or the scope's control (scope.txt)"
+  [ $? = 0 ] || no "a function of seacast-lite.md's code blocks without its twin, or the scope's control (scope.txt)"
   sed 's/^/  /' "$OUT/scope.txt"
 }
 s_mutants() {
@@ -325,7 +325,7 @@ s_mutants() {
 }
 s_screen() {
   local f doc
-  for doc in v03 v2; do
+  for doc in lite seacast; do
     f=$OUT/nodeslines-$doc.txt
     $PY "$T/cells3.py" "$TOY" "$OUT/nodeslines-$doc" -j "$J" --replay "$REPLAY" --doc "$doc" --nodes-lines > "$f" 2>&1 || no "a header or a nodes line refused under $doc ($f)"
     has -x ok "$f" || no "no verdict under $doc"
@@ -349,14 +349,14 @@ s_cells() {
     echo "  $(grep -c ', digest as golden.txt, ' "$OUT/cells.txt") of $(echo $CELLS | wc -w) cells: digest as golden.txt, replayed (cells.txt)"
   fi
 }
-s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2.txt's; the records are protocol.md's names
-  $PY "$T/trace3.py" --self-test-v2 > "$OUT/v2-self-test.txt" 2>&1 || no "the tracer's self-test of v2's kept names (v2-self-test.txt)"
-  if [ -z "$CELLS" ]; then echo "  no v2 cell (a rehearsal)"; echo ok > "$OUT/cells-v2.txt"; return; fi
+s_seacastcells() {            # every cell under seacast.md: its digest golden-seacast.txt's; the records are seacast-lite.md's names
+  $PY "$T/trace3.py" --self-test-seacast > "$OUT/seacast-self-test.txt" 2>&1 || no "the tracer's self-test of SEACAST's kept names (seacast-self-test.txt)"
+  if [ -z "$CELLS" ]; then echo "  no SEACAST cell (a rehearsal)"; echo ok > "$OUT/cells-seacast.txt"; return; fi
   # shellcheck disable=SC2086
-  $PY "$T/cells3.py" "$TOY" "$OUT/v2" -j "$J" --doc v2 --replay "$REPLAY" $CELLS > "$OUT/cells-v2.txt" 2>&1 || no "a v2 cell (cells-v2.txt)"
-  has -x ok "$OUT/cells-v2.txt" || no "no verdict on the v2 cells"
-  [ "$(grep -c ', digest as golden-v2.txt, ' "$OUT/cells-v2.txt")" = "$(echo $CELLS | wc -w)" ] || no "not every v2 cell's digest is golden-v2.txt's"
-  echo "  $(grep -c ', digest as golden-v2.txt, ' "$OUT/cells-v2.txt") of $(echo $CELLS | wc -w) v2 cells: digest as golden-v2.txt, replayed (cells-v2.txt)"
+  $PY "$T/cells3.py" "$TOY" "$OUT/seacast" -j "$J" --doc seacast --replay "$REPLAY" $CELLS > "$OUT/cells-seacast.txt" 2>&1 || no "a SEACAST cell (cells-seacast.txt)"
+  has -x ok "$OUT/cells-seacast.txt" || no "no verdict on the SEACAST cells"
+  [ "$(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt")" = "$(echo $CELLS | wc -w)" ] || no "not every SEACAST cell's digest is golden-seacast.txt's"
+  echo "  $(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt") of $(echo $CELLS | wc -w) SEACAST cells: digest as golden-seacast.txt, replayed (cells-seacast.txt)"
 }
 small() {               # $1: a name; $2: its directory; $3: the tracer's environment setting, or ""; the rest: run.py's arguments
   local name=$1 dir=$2 setting=$3 got plain; shift 3
@@ -374,10 +374,10 @@ s_small() {
     par small hand5-sec61 traces TRACE3_ONLY=sec61 $HAND5
     par small late16 traces "" $LATE16
     par small hand5-publish traces "" $HAND5 --source-offers publish
-    par small hand5 v2 "" $HAND5 --doc v2
-    par small hand5-own v2 "" $HAND5 --rebuilt none --fault sil30 --doc v2; }
+    par small hand5 seacast "" $HAND5 --doc seacast
+    par small hand5-own seacast "" $HAND5 --rebuilt none --fault sil30 --doc seacast; }
   par_end || no "a small cell was not traced, or its digest is not the untraced run's"
-  cat "$OUT"/traces/*.digest "$OUT"/v2/*.digest 2> /dev/null | tee "$OUT/digests.txt" | sed 's/^/  /'
+  cat "$OUT"/traces/*.digest "$OUT"/seacast/*.digest 2> /dev/null | tee "$OUT/digests.txt" | sed 's/^/  /'
   [ "$(grep -c ': the same$' "$OUT/digests.txt")" = 6 ] || no "not six digests the same"
 }
 one_directed() {
@@ -415,8 +415,8 @@ s_headers() {
   $PY "$T/header3.py" "$TOY" $(for t in $TRACES; do echo "$OUT/$t.jsonl.gz"; done) > "$OUT/headers.txt" 2>&1 || no "a header is not these tools' and these documents' (headers.txt)"
   [ "$(grep -c "tracing §6.1's 12 alone\$" "$OUT/headers.txt")" = 1 ] && has -E "/hand5-sec61\.jsonl\.gz: .*tracing §6.1's 12 alone\$" "$OUT/headers.txt" \
     || no "hand5-sec61 alone must be of §6.1's twelve"
-  [ "$(grep -c -E "/v2/hand5(-own)?\.jsonl\.gz: .*tracing v2's kept, " "$OUT/headers.txt")" = 2 ] || no "the two small v2 traces must be of v2's kept names"
-  [ "$(grep -c -E "/v2/[a-z0-9-]+\.jsonl\.gz: .*tracing v2's kept, " "$OUT/headers.txt")" = "$(grep -c -E '/v2/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a v2 trace is not of v2's kept names"
+  [ "$(grep -c -E "/seacast/hand5(-own)?\.jsonl\.gz: .*tracing SEACAST's kept, " "$OUT/headers.txt")" = 2 ] || no "the two small SEACAST traces must be of SEACAST's kept names"
+  [ "$(grep -c -E "/seacast/[a-z0-9-]+\.jsonl\.gz: .*tracing SEACAST's kept, " "$OUT/headers.txt")" = "$(grep -c -E '/seacast/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a SEACAST trace is not of SEACAST's kept names"
   echo "  $(grep -c . "$OUT/headers.txt") headers read (headers.txt)"
   # each trace's two hashes, by its name under --out: two runs of one tree, on any machine, give the same file
   # shellcheck disable=SC2046
@@ -444,7 +444,7 @@ s_controls() {
   #    (the traces in the order altered3.py takes them: each group of its controls is of one set's records)
   # shellcheck disable=SC2046
   SPEC_TWIN_REPLAY=$REPLAY $PY "$T/altered3.py" "$OUT/traces/hand5-sec61.jsonl.gz" "$OUT/c-altered" "$OUT/directed/directed.jsonl.gz" "$OUT/traces/hand5.jsonl.gz" \
-      "$OUT/directed/directed44.jsonl.gz" "$OUT/directed/directed42.jsonl.gz" "$OUT/v2/hand5.jsonl.gz" \
+      "$OUT/directed/directed44.jsonl.gz" "$OUT/directed/directed42.jsonl.gz" "$OUT/seacast/hand5.jsonl.gz" \
       $(for d in directed4b directed7 directed1 directed6o directed64 directed64h directed46 directed43 directed41 directed46d directed3v directed52 directed53 directed54 directed7p; do echo "$OUT/directed/$d.jsonl.gz"; done) \
       "$OUT/traces/hand5-publish.jsonl.gz" "$OUT/directed/directed71.jsonl.gz" "$OUT/directed/directed51.jsonl.gz" > "$OUT/c-altered.txt" 2>&1; rc=$?
   if [ "$rc" = 0 ] && ! has -E 'wrong$|<-- ' "$OUT/c-altered.txt" && [ "$(grep -c '^ok: every control of ' "$OUT/c-altered.txt")" -ge 1 ]; then
@@ -579,8 +579,8 @@ s_tracercontrols() {
       alias-start) want="^trace3: node [0-9]*: one queue entry's control stands in two places, .*, at the record's start" ;;
       alias-message) want="^trace3: node [0-9]*: one queue control message stands in two places" ;;
       defer-chain) want="^trace3: node [0-9]*: a chain of 3 defers in one record, past the twin's 2" ;;
-      replaced) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither protocol.md's own code nor a listed wrapper of it: replaced\.<locals>" ;;
-      false-wrapper) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither protocol.md's own code nor a listed wrapper of it: .*a listed wrapper's name, without the document's may_ask in its closure" ;;
+      replaced) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither seacast-lite.md's own code nor a listed wrapper of it: replaced\.<locals>" ;;
+      false-wrapper) want="^trace3: node [0-9]*: may_ask is traced, and its function here is neither seacast-lite.md's own code nor a listed wrapper of it: .*a listed wrapper's name, without the document's may_ask in its closure" ;;
       late-rebind) want="^trace3: node [0-9]*: may_ask was bound again after the tracer was installed, to what is neither the tracer's wrapper nor a listed wrapper of it: late_rebind\.<locals>" ;;
       rebind-after-records) want="^trace3: node [0-9]*: may_ask was bound again after the tracer was installed, to what is neither the tracer's wrapper nor a listed wrapper of it: rebind_after_records\.<locals>" ;;
       limit-fraction) want="^trace3: node [0-9]*: MAX_IHAVE_LENGTH is no count: 2\.5" ;;
@@ -711,7 +711,7 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
     echo "python $($PY -c 'import sys, platform; print(platform.python_version(), platform.machine(), sys.platform)')"
     echo "replay $(sha256sum < "$REPLAY" | cut -c1-64)"
     echo "twin $(sha256sum < "$OUT/twin-sources.txt" | cut -c1-64) ($(wc -l < "$OUT/twin-sources.txt") files: twin-sources.txt)"
-    echo "documents protocol.md $(sha256sum < "$TOY/../protocol.md" | cut -c1-64) protocol-v2.md $(sha256sum < "$TOY/../protocol-v2.md" | cut -c1-64) (each file's sha256: reported, it decides nothing)"
+    echo "documents seacast-lite.md $(sha256sum < "$TOY/../seacast-lite.md" | cut -c1-64) seacast.md $(sha256sum < "$TOY/../seacast.md" | cut -c1-64) (each file's sha256: reported, it decides nothing)"
     $PY -c 'import sys, hashlib; sys.path.insert(0, sys.argv[1]); import mutants3 as M; n = list(M.MUTANTS); print("mutants", len(n), hashlib.sha256("\n".join(n).encode()).hexdigest(), "(their names, in the tool'"'"'s order)")' "$T"
     # shellcheck disable=SC2046
     (cd "$OUT" && $PY "$T/content.py" --hashes $(for t in $RTRACES; do echo "$t.jsonl.gz"; done))

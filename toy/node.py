@@ -22,17 +22,17 @@ from bits import (AutoMap, Bits, DefaultMap, HaveEntry, LazyBits, LazyList, Lazy
 from extract import DOC, generate
 
 SPEC_SRC = generate()
-SPEC = compile(SPEC_SRC, "protocol.md (extracted)", "exec")
-DOC2 = DOC.parent / "protocol-v2.md"
+SPEC = compile(SPEC_SRC, "seacast-lite.md (extracted)", "exec")
+DOC2 = DOC.parent / "seacast.md"
 _SPEC2 = None
 
 
 def spec2():
-    """protocol-v2.md's blocks, compiled once; they run after protocol.md's in the same namespace
-    (--doc v2), redefining what version 2 changes and keeping what it says carries over."""
+    """seacast.md's blocks, compiled once; they run after seacast-lite.md's in the same namespace
+    (--doc seacast), redefining what SEACAST changes and keeping what it says carries over."""
     global _SPEC2
     if _SPEC2 is None:
-        _SPEC2 = compile(generate(DOC2), "protocol-v2.md (extracted)", "exec")
+        _SPEC2 = compile(generate(DOC2), "seacast.md (extracted)", "exec")
     return _SPEC2
 
 COLLECTING, DECODING, COMPLETE, INVALID = "COLLECTING", "DECODING", "COMPLETE", "INVALID"
@@ -136,7 +136,7 @@ class GossipHistory:
 
 class GroupIndex:
     __slots__ = ("group", "index")
-    standing, hops, probe = False, 0, False   # an ask by message id carries no WANT fields (protocol-v2.md §2)
+    standing, hops, probe = False, 0, False   # an ask by message id carries no WANT fields (seacast.md §2)
 
     def __init__(self, group, index):
         self.group, self.index = group, index
@@ -165,7 +165,7 @@ class Node:
         self.custody = None             # the custody setting: this node's columns
         self.sampler = self.id in cfg.get("sampler_ids", ())    # interest DECLARED, duty NONE (§4.10)
         self.samples = {}               # a sampler's declared interest: group -> Bits, per block
-        self.unreachable = {}           # samples no link could serve: group -> Bits (protocol-v2.md before [D12]; now none)
+        self.unreachable = {}           # samples no link could serve: group -> Bits (seacast.md before [D12]; now none)
         self.sample_log = {}            # [D12] a sampler's asks per sample: (group, index) -> [(peer, forwarded, when)]
         self.sample_from = {}           # [D12] the first arrival of each sample: (group, index) -> (peer, when)
         self._uprng = None              # --upkeep on: the node's own draws for §3's candidates
@@ -179,15 +179,15 @@ class Node:
         self.reconstructor = self.supernode or self.id in cfg.get("reconstructor_ids", ())   # rows: 64 columns or more, decodes its row at K
         self.row_subnet = None          # rows: the node's designated row subnet (EIP-8371)
         self.liar = cfg.get("claim") and self.id in cfg.get("faulty", ())   # rows: claims a row it did not rebuild
-        self.hoarder = cfg.get("hoard") and self.id in cfg.get("faulty", ())   # v2: rebuilds and claims, passes the probe, repairs nothing
+        self.hoarder = cfg.get("hoard") and self.id in cfg.get("faulty", ())   # SEACAST: rebuilds and claims, passes the probe, repairs nothing
         self.hoard_served = self.hoard_refused = 0      # a hoarder's rebuilt chunks: asks answered (probes), asks refused
         self.member_checks = 0                          # (R5) the member check: verified claims not taken, custody cells missing
         self.repair_verdicts = Counter()                # (R5, option) the repair sample's verdicts
         self.bias_drawn = self.bias_uncovered = 0       # --repair-bias: cells put first from uncovered columns, and
                                                         #   the uncovered cells lacked where it drew (option 1)
         self._retry_armed = set()       # asks whose delayed first try is scheduled (deferred offers, [D8])
-        self.held_back = 0              # --ihave-limits: asks held back to the next heartbeat (protocol.md §4.4)
-        self.blocks_waiting = set()     # --late-block: the roots of the blocks not installed here yet (protocol.md §4.2)
+        self.held_back = 0              # --ihave-limits: asks held back to the next heartbeat (seacast-lite.md §4.4)
+        self.blocks_waiting = set()     # --late-block: the roots of the blocks not installed here yet (seacast-lite.md §4.2)
         self.reserved = Counter()       # --late-block: peer -> its deferred copies in the bounded store (§8.2)
         self.late = Counter()           # --late-block: its counters (run.py reports them)
         self.alarm = Counter()          # --alarm-wait, --fault hoardcol: their counters (run.py reports them)
@@ -196,9 +196,9 @@ class Node:
         self.alarm_rng = random.Random(cfg["seed"] * 7919 + 7307 + nid)   #   its own draws: the jitter, the member
         ns = self._namespace()
         exec(SPEC, ns)
-        self.v2 = cfg.get("doc") == "v2"
-        if self.v2:
-            self._v2_names(ns)
+        self.seacast = cfg.get("doc") == "seacast"
+        if self.seacast:
+            self._seacast_names(ns)
             exec(spec2(), ns)
         self._override(ns)
         if ns["MAX_IHAVE_MESSAGES"] < math.inf or ns["MAX_IHAVE_LENGTH"] < math.inf:
@@ -209,8 +209,8 @@ class Node:
                 self.held_back += over
                 return over
             ns["over_ihave_limits"] = over_ihave_limits
-        if self.v2:
-            self._v2(ns)
+        if self.seacast:
+            self._seacast(ns)
             if "column" in self._types and (cfg.get("repair_push", "push") == "offer" or self._keepers_to is not None):
                 self._repair_variants(ns)
             if cfg.get("keeper_claims", "defer") == "ignore" and self.supernode:
@@ -248,7 +248,7 @@ class Node:
         for every other cell, and serves nothing of the hidden one to anyone, its hidden cell in the column group
         included (the probe-shaped answer aside). Meant with --rebuilt-seen on, which run.py requires. An honest
         node counts its probes at the hidden index: none while the probed index was the lowest lacked; drawn at random
-        (protocol-v2.md §4.6), it can be the hidden one."""
+        (seacast.md §4.6), it can be the hidden one."""
         node = self
         if self.hoarder:
             doc_push_rebuilt, spec_on_want = self._doc_push_rebuilt, ns["on_want"]
@@ -544,12 +544,12 @@ class Node:
         ns["push_rebuilt"] = push_rebuilt
 
     def set_mesh(self, mesh, colour_meshes=None):
-        """The topology's mesh for this node; under v2 it is also the push relation both ways. With
+        """The topology's mesh for this node; under SEACAST it is also the push relation both ways. With
         colour_meshes ({colour: this node's mesh for it}, the variant C setting) the relation
         carries one colour per mesh and `mesh` becomes their union."""
         self.ns["mesh"] = set(mesh)
-        if self.v2:
-            self._v2_relations(mesh, colour_meshes)
+        if self.seacast:
+            self._seacast_relations(mesh, colour_meshes)
 
     # ---- interest, as the world sees it (the invariants checker's ground truth)
 
@@ -572,7 +572,7 @@ class Node:
 
     def own_interest_bits(self, g):
         """The node's own interest, its state's: what it declared, and for a supernode every row, which its
-        columns bring it whole and no link is asked for (protocol-v2.md §4.6, the second phase)."""
+        columns bring it whole and no link is asked for (seacast.md §4.6, the second phase)."""
         if self.supernode and self.sim.gtype.get(g) == "row":
             return Bits(-1)
         return self.interest_bits(g)
@@ -620,13 +620,13 @@ class Node:
             "D_LAZY": c["D_LAZY"], "GOSSIP_FACTOR": c["GOSSIP_FACTOR"],
             "GOSSIP_RETRANSMISSION": c["GOSSIP_RETRANSMISSION"],
             "MAX_PENDING_GROUPS": c.get("MAX_PENDING_GROUPS", math.inf),     # the client's (§8.2): no limit
-            "SERVE_BUDGET": c.get("SERVE_BUDGET", math.inf),     # protocol-v2.md §6.3: the client's; no limit
+            "SERVE_BUDGET": c.get("SERVE_BUDGET", math.inf),     # seacast.md §6.3: the client's; no limit
             "MAX_IHAVE_MESSAGES": c.get("MAX_IHAVE_MESSAGES", math.inf),     # the client's (§8.2): no limit
             "MAX_IHAVE_LENGTH": c.get("MAX_IHAVE_LENGTH", math.inf),         #   unless --ihave-limits
             "HAVE_TTL": c["HAVE_TTL"], "PUSH_TTL": c["PUSH_TTL"],
             "CANCEL": c["card8"], "RAREST": c["card9"], "PROJECT": c["card12"], "PACED": c["card15"],
             "ANSWERS_FIRST": c.get("answers_first", "off") == "on",
-            "ACK": "ACK", "PUBLISH": "PUBLISH",                      # SOURCE_OFFERS (protocol.md §5.1, protocol-v2.md §4.7): ACK, unless
+            "ACK": "ACK", "PUBLISH": "PUBLISH",                      # SOURCE_OFFERS (seacast-lite.md §5.1, seacast.md §4.7): ACK, unless
             "SOURCE_OFFERS": "PUBLISH" if c.get("source_offers") == "publish" else "ACK",   #   --source-offers publish
             "DESCRIPTOR_IN_CHUNK": True,
             # state (§8.1); missing entries read as empty
@@ -823,7 +823,7 @@ class Node:
                 del groups[g]
             return ns["chunks"][g][i]
 
-        def merge_waiting(p, h):                        # protocol-v2.md §4.2 [P4]: a holding of h's group to p
+        def merge_waiting(p, h):                        # seacast.md §4.2 [P4]: a holding of h's group to p
             node.merged[1] += 1                         #   still in our queue names its bits and h's, with h's
             for e in ns["queue"][p].urgent:             #   claims; with writes completing at once, only those
                 items = e.control.items if e.chunk is None and e.control else ()   # queued before the writer ran
@@ -937,7 +937,7 @@ class Node:
         ns["WantIndex"] = Wm.WantIndex
         if not self.cfg["card14"]:
             ns["W"] = math.inf
-            ns["W_BYTES"] = math.inf                # protocol-v2.md §4.11's window, off with the card too
+            ns["W_BYTES"] = math.inf                # seacast.md §4.11's window, off with the card too
         spec_message_id = ns["message_id"]
 
         def message_id(f):              # computed once per chunk object
@@ -989,7 +989,7 @@ class Node:
 
     def _no_source_offers(self, ns):
         """To measure card 3 at the source: publish without offering the chunks to the relation
-        peers that were not pushed them (v0.3 §5.1's last loop, protocol-v2.md §4.7's)."""
+        peers that were not pushed them (v0.3 §5.1's last loop, seacast.md §4.7's)."""
         spec_publish = ns["publish"]
 
         def publish(*a):
@@ -1022,7 +1022,7 @@ class Node:
         ns["publish"] = publish
 
     def _writer_variants(self, ns, mode):
-        """protocol-v2.md §4.12's choice of the next entry against the forms measured on 2026-10-07
+        """seacast.md §4.12's choice of the next entry against the forms measured on 2026-10-07
         (toy/README.md). v03 is v0.3's order: rarest-first up to the first control-only entry, no
         source rule. oldest sends the oldest queued answer first, before a source's own chunks too;
         line does that and lets the answer's writer take room ahead of the window's line; others is
@@ -1197,20 +1197,20 @@ class Node:
                 ns["PROMISE"] = scaled
         ns.update(fill=fill, close_promises=close_promises, filter_entry=filter_entry)
 
-    # ---- version 2 (protocol-v2.md): the tier 4 setting on the gossipsub binding
+    # ---- SEACAST (seacast.md): the tier 4 setting on the gossipsub binding
 
-    def _v2_names(self, ns):
-        """Names protocol-v2.md's annotations use before its own classes define them."""
+    def _seacast_names(self, ns):
+        """Names seacast.md's annotations use before its own classes define them."""
         for k in ("Callable", "Dict", "Set", "Header", "GroupId", "FamilyId", "NodeId", "Bitmap",
                   "TypeId", "TypeParams", "ObjectType", "InterestKind", "Duty", "Direction",
                   "AnnounceWidth", "Proof", "boolean", "uint16", "Ask", "PeerId", "GroupState",
                   "HaveEntry", "PushEntry", "Join", "Have", "Want", "Graft", "Prune", "ChunkMsg", "BlockId"):
             ns.setdefault(k, Wm.uint32)                 # an annotation-only type (wire._Ann)
 
-    def _v2(self, ns):
-        """What protocol-v2.md leaves to the environment, under the tier 4 setting (its §6.1): the
+    def _seacast(self, ns):
+        """What seacast.md leaves to the environment, under the tier 4 setting (its §6.1): the
         payload object type and its parameters, the join tables, the relations behind the mesh,
-        and the binding of the v2 messages onto gossipsub (protocol-v2-bindings.md §4)."""
+        and the binding of the SEACAST messages onto gossipsub (seacast-bindings.md §4)."""
         node, c = self, self.cfg
         Have, Want, Graft, Prune, Join = ns["Have"], ns["Want"], ns["Graft"], ns["Prune"], ns["Join"]
         ns.update(ALL="ALL", DERIVED="DERIVED", DECLARED="DECLARED", FORWARD="FORWARD", NONE="NONE",
@@ -1230,7 +1230,7 @@ class Node:
         P.project = lambda f: [(f.group, f.index)]
         P.cross = lambda g, i: []
         P.family = lambda g: 0
-        P.derived_interest = lambda g, h, nid, j: Bits(-1)   # protocol-v2.md §1.1: (g, header, node id, JOIN)
+        P.derived_interest = lambda g, h, nid, j: Bits(-1)   # seacast.md §1.1: (g, header, node id, JOIN)
         prm = Obj()                                     # §6.1: the tier 4 setting
         prm.M, prm.F_LO, prm.F_HI, prm.D_OUT, prm.D_OUT_FAST, prm.D_OUT_MAX = 1, 6, 12, 8, 8, 12
         prm.SYMMETRIC = bool(c.get("upkeep")) and c.get("symmetric", "on") == "on"   # §6.1: v0.3's mesh, kept as
@@ -1238,7 +1238,7 @@ class Node:
         #   where nodes at F_HI would otherwise be pruned at the first heartbeat
         prm.PRUNE_BACKOFF = c.get("prune_backoff", 0.0)      # §4.1 (--prune-backoff; 0: none)
         prm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
-        prm.MAX_INDICES = 8192                          # §6.3: protocol.md's MAX_PLAIN_CHUNKS
+        prm.MAX_INDICES = 8192                          # §6.3: seacast-lite.md's MAX_PLAIN_CHUNKS
         prm.ANNOUNCE_EXTRA, prm.START_DELAY, prm.SERVE_LIMIT, prm.EVIDENCE = "SAMPLE", 0.0, math.inf, None
         prm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
         prm.EAGER, prm.DEFER_WINDOW = True, c.get("DEFER_WINDOW", 0.5)
@@ -1393,7 +1393,7 @@ class Node:
         def type_of(tid):
             return types[tid]
 
-        def runs_type(tid):                             # protocol-v2.md §3's helper: a type id the node runs
+        def runs_type(tid):                             # seacast.md §3's helper: a type id the node runs
             return tid in types
 
         def links(T):                                   # §4.1: p's JOIN for T received, ours queued, not owed; without
@@ -1416,10 +1416,10 @@ class Node:
         def node_id(p):
             return node.sim.peer_id(p)
 
-        def own_id():                                   # protocol-v2.md §3's helper: the node's own id
+        def own_id():                                   # seacast.md §3's helper: the node's own id
             return node.sim.peer_id(node.id)
 
-        def cell_groups(root):                          # protocol-v2.md §3's helper: a block's column and row groups
+        def cell_groups(root):                          # seacast.md §3's helper: a block's column and row groups
             return [g for g, h in node.sim.ghdr.items() if h.block == root]   # (the toy calls on_header_validated
                                                         #   only in its known answers: a cell's header rides with it)
 
@@ -1443,11 +1443,11 @@ class Node:
                     if h in ns["want_p"].get(p, {}):
                         del ns["want_p"][p][h]
 
-        def release_wanted_groups():                    # protocol-v2.md §3's helper, at each heartbeat
+        def release_wanted_groups():                    # seacast.md §3's helper, at each heartbeat
             for p in list(node.want_unknown):
                 release_places(p)
 
-        def admitted_group(p, g):                       # protocol-v2.md §3's helper: a WANT's group within p's own
+        def admitted_group(p, g):                       # seacast.md §3's helper: a WANT's group within p's own
             if g in ns["hdr"] or g in ns["T_of"]:       #   limit of unknown groups named in WANTs; the toy sets no
                 return True                             #   limit unless MAX_PENDING_GROUPS is given
             release_places(p)
@@ -1459,7 +1459,7 @@ class Node:
             seen[g] = ns["now"]
             return True
 
-        def offers_in(e):                               # protocol-v2.md §3's helper: the offers an entry carries
+        def offers_in(e):                               # seacast.md §3's helper: the offers an entry carries
             if e is None or not e.control:
                 return []
             return [(hb.group, hb.bits) for m in e.control.items if m.kind == "ihave"
@@ -1647,7 +1647,7 @@ class Node:
         def wire_size(p, e):                            # §4.11: the entry's chunk's bytes on the wire to p, as the links
             return node.sim.chunk_bytes(node, p, e)     #   will charge them
 
-        def send(p, msg, urgent=False):                 # the gossipsub binding (protocol-v2-bindings.md §4); true if the
+        def send(p, msg, urgent=False):                 # the gossipsub binding (seacast-bindings.md §4); true if the
             if isinstance(msg, Have):                   #   queue admitted it, as v0.5's enqueue
                 hb = Wm.HaveBitmap(msg.group, msg.bits)
                 if not msg.offer:                       # the two claims: version 4's flags byte (bindings §4)
@@ -1693,7 +1693,7 @@ class Node:
         ns["keep_floor"] = keep_floor
         doc_on_frame = ns["on_frame"]
 
-        def on_frame(p, frame):                         # a gossipsub frame read as v2's messages
+        def on_frame(p, frame):                         # a gossipsub frame read as SEACAST's messages
             haves, stock = [], []
             for hb in frame.ihave.ids:
                 if isinstance(hb, Wm.HaveBitmap):
@@ -1704,7 +1704,7 @@ class Node:
                     full = d is not None and hb.bits.v == all_bits(ns["N"](d)).v
                     haves.append(Have(group=hb.group, bits=hb.bits, offer=False,
                                       claim_all=full or hb.claim_all, complete=full or hb.complete))
-                else:                                   # any other entry is a stock id (protocol-v2-bindings.md §4)
+                else:                                   # any other entry is a stock id (seacast-bindings.md §4)
                     stock.append(hb)
             for j in frame.join:                        # --upkeep on: a JOIN first, as on the wire (§4.1)
                 ns["on_join"](p, j)
@@ -1713,7 +1713,7 @@ class Node:
             r.grafts, r.prunes = list(frame.graft), [x for x in frame.prune if hasattr(x, "family")]
             out = doc_on_frame(p, r)
             for h in stock:                             # kept as stock keeps it, after the frame's asks (an ask and a
-                ns["unwanted"][p].add(h)                #   stock IDONTWANT for one id: the ask first, protocol.md §4.1);
+                ns["unwanted"][p].add(h)                #   stock IDONTWANT for one id: the ask first, seacast-lite.md §4.1);
             return out                                  #   only on_want reads unwanted[p]
         ns["on_frame"] = on_frame
         doc_check = ns["check_completion"]
@@ -1885,7 +1885,7 @@ class Node:
             union.add(1)
         ns["mesh"] = union
 
-    def _v2_relations(self, mesh, colour_meshes=None):
+    def _seacast_relations(self, mesh, colour_meshes=None):
         ns, P = self.ns, self._P
         for q in self.peers:
             ns["join_recv"][q][P] = ns["join_sent"][q][P] = self._joins[P]
@@ -1904,7 +1904,7 @@ class Node:
         ns["mesh"] = union                              # what the toy's v0.3-side options read as "the mesh"
 
     def install_block(self, root):
-        """--late-block: the block installs here now, and what waited for it resumes (protocol.md §4.2)."""
+        """--late-block: the block installs here now, and what waited for it resumes (seacast-lite.md §4.2)."""
         self.blocks_waiting.discard(root)
         self.late["ties released"] += sum(len(list(bits)) for groups in self.ns["tied"].get(root, {}).values()
                                           for bits in groups.values())
@@ -1950,7 +1950,7 @@ class Node:
             self.sim.after(self, 0.0, self._write, p)
 
     def drop_peer(self, q):
-        """--churn: a connection's close (sim.close_link), by protocol-v2.md §3's lifetimes, which are v0.3 §8.1's.
+        """--churn: a connection's close (sim.close_link), by seacast.md §3's lifetimes, which are v0.3 §8.1's.
         Per-connection entries end: holdings, pushes, the relations, our unanswered GRAFTs, anything owed, the
         queue and the asks in it, the IHAVE counters, the probe's entries for q (its probe kept while we decode
         included), q's offers (in every ordered
@@ -1993,7 +1993,7 @@ class Node:
         for idx in ns["holders"].values():
             for s in idx.values():
                 s.discard(q)
-        for name in ("standing", "routed_standing"):   # protocol-v2.md §4.5: and the entries that empties
+        for name in ("standing", "routed_standing"):   # seacast.md §4.5: and the entries that empties
             tab = ns[name]
             for g in list(tab):
                 idx = tab[g]
@@ -2006,11 +2006,11 @@ class Node:
         if isinstance(ns.get("mesh"), set):
             ns["mesh"].discard(q)
         ns["leave_line"](q)                         # its place in the window's line, per connection (§8.1)
-        getattr(self, "want_unknown", {}).pop(q, None)   # protocol-v2.md §4.5: its WANTs' unknown groups
+        getattr(self, "want_unknown", {}).pop(q, None)   # seacast.md §4.5: its WANTs' unknown groups
         sent = ns["sent"]                           # the room its chunks hold in flight: released when its queue
         for key in [k for k in sent if k[0] == q]:  #   closes (§8.1), as WINDOW_TIMEOUT releases it; but a close
             e = sent.pop(key)                       #   is not the chunk's acknowledgement, which a holding or a
-            if isinstance(e, tuple):                #   window timeout gives (protocol-v2.md §4.7), so not through
+            if isinstance(e, tuple):                #   window timeout gives (seacast.md §4.7), so not through
                 ns["free_room"](e[1])               #   window_timeout, which also acknowledges
             else:
                 ns["free_slot"]()

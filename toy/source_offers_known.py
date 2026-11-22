@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.7's SOURCE_OFFERS: at PUBLISH the source's offers leave at publish and its
+"""A known answer for seacast.md §4.7's SOURCE_OFFERS: at PUBLISH the source's offers leave at publish and its
 holding grows only at a chunk's first write, as before v0.9's rules, so an acknowledgement does nothing.
 
     python3 source_offers_known.py
@@ -14,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 
-ARGS = ["--doc", "v2", "--nodes", "16", "--degree", "8", "--msgs", "1", "--seed", "7", "--send-buffer", "1",
+ARGS = ["--doc", "seacast", "--nodes", "16", "--degree", "8", "--msgs", "1", "--seed", "7", "--send-buffer", "1",
         "--net", "bld", "--builder-mbps", "10"]          # a 10 Mbps source among faster peers: some decode early
 
 

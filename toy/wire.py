@@ -89,9 +89,9 @@ class Shard:
 
 
 class HaveBitmap:
-    """One group's bitmap, as a message-id string (§2). Under protocol-v2.md the two claims of a
-    holding travel in a flags byte in version 4 of the strings (protocol-v2-bindings.md §4). The toy charges no
-    bytes for it, and its v2 receive path also reads both claims from a full bitmap (node.py's on_frame)."""
+    """One group's bitmap, as a message-id string (§2). Under seacast.md the two claims of a
+    holding travel in a flags byte in version 4 of the strings (seacast-bindings.md §4). The toy charges no
+    bytes for it, and its SEACAST receive path also reads both claims from a full bitmap (node.py's on_frame)."""
     __slots__ = ("group", "bits", "claim_all", "complete")
 
     def __init__(self, group, bits):
@@ -106,7 +106,7 @@ class HaveBitmap:
 class WantIndex:
     """An ask by index (§2). Equal asks are one key in the asker's tables."""
     __slots__ = ("group", "index")
-    standing, hops, probe = False, 0, False   # protocol-v2.md §2's WANT fields: a plain ask has none
+    standing, hops, probe = False, 0, False   # seacast.md §2's WANT fields: a plain ask has none
 
     def __init__(self, group, index):
         self.group, self.index = group, index
@@ -125,8 +125,8 @@ class WantIndex:
 
 
 class FlaggedWant(WantIndex):
-    """An ask from a WANT with protocol-v2.md §2's `standing` and `hops` ([D12]) or `probe` (R5), carried
-    in version 4 of the strings (protocol-v2-bindings.md §4). The toy charges it as a plain ask, with the same key
+    """An ask from a WANT with seacast.md §2's `standing` and `hops` ([D12]) or `probe` (R5), carried
+    in version 4 of the strings (seacast-bindings.md §4). The toy charges it as a plain ask, with the same key
     and the same bytes, where version 4's string is two bytes longer than a plain WantIndex."""
     __slots__ = ("standing", "hops", "probe")
 
@@ -142,7 +142,7 @@ def is_have_bitmap(entry):
 def id_len(x):
     if isinstance(x, (HaveBitmap, WantIndex)):
         return x.wire_len()
-    if hasattr(x, "family"):                    # protocol-v2.md §2's GRAFT or PRUNE (--upkeep on)
+    if hasattr(x, "family"):                    # seacast.md §2's GRAFT or PRUNE (--upkeep on)
         return REL_BYTES
     if hasattr(x, "interest") and hasattr(x, "colours"):
         return JOIN_BYTES                       # §2's JOIN (--upkeep on)
@@ -183,7 +183,7 @@ class _IHave(_Msg):
 
 class _IWant(_Msg):
     kind = "iwant"
-    want = False                                # protocol-v2.md: true where the IWANT carries a WANT (§2), set by its send
+    want = False                                # seacast.md: true where the IWANT carries a WANT (§2), set by its send
 
 
 class _IDontWant(_Msg):
@@ -194,7 +194,7 @@ class _Prune(_Msg):
     kind = "prune"
 
 
-class _Graft(_Msg):                             # protocol-v2.md §2's GRAFT, sent only under --upkeep on
+class _Graft(_Msg):                             # seacast.md §2's GRAFT, sent only under --upkeep on
     kind = "graft"
 
 
@@ -292,7 +292,7 @@ def entry_wire(e):
     return data, ctrl
 
 
-# ---- the libp2p stream binding's sizes (protocol-v2-bindings.md §1 and §2; run.py --wire standalone)
+# ---- the libp2p stream binding's sizes (seacast-bindings.md §1 and §2; run.py --wire standalone)
 # Each message is a frame of its own on the stream (§2.2): a uvarint length, a kind byte, the body (§1.2). Sizes are
 # before compression (§1.5), as the toy's data are not real bytes.
 

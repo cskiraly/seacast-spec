@@ -2,7 +2,7 @@ import SpecTwin.Sec42
 import SpecTwin.Sec43
 import SpecTwin.Sec44
 
-/-! # The twin of protocol.md §4.1, "The order of handling", and §4.5, "An IWANT arrives" (v0.10.4, spec 34f60f8):
+/-! # The twin of seacast-lite.md §4.1, "The order of handling", and §4.5, "An IWANT arrives" (v0.10.4, spec 34f60f8):
 `on_frame` (§4.1), `respond` (§4.1) and `on_iwant` (§4.5)
 
 `on_frame`'s branch for an IDONTWANT entry that is not a bitmap (`else: unwanted[p].add(h)`) came

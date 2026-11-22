@@ -1,7 +1,7 @@
 import SpecTwin.Sec52
 import SpecTwin.Sec53
 
-/-! # The twin of protocol.md's `forward` (§5.2), `candidates_for_source` (§5.1)
+/-! # The twin of seacast-lite.md's `forward` (§5.2), `candidates_for_source` (§5.1)
 and `on_mesh_join` (§5.4) (v0.10.4, spec 34f60f8)
 
 - **`forward` at a node that runs something else under the name** (the cells silent and cap-wait: a faulty node

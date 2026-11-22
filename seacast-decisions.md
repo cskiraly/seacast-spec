@@ -1,44 +1,44 @@
 # SEACAST: its decisions
 
-This is the decision record of SEACAST, [`protocol-v2.md`](protocol-v2.md). It lists the design
+This is the decision record of SEACAST, [`seacast.md`](seacast.md). It lists the design
 decisions `[D1]` to `[D12]` and the others that SEACAST took: when each was decided, what was not
-taken and why, and the runs behind it. It also lists the versions of [`protocol.md`](protocol.md)
-that SEACAST has carried. `protocol-v2.md` states the rules and gives their reasons; the comments in
+taken and why, and the runs behind it. It also lists the versions of [`seacast-lite.md`](seacast-lite.md)
+that SEACAST has carried. `seacast.md` states the rules and gives their reasons; the comments in
 its code cite these labels where each decision bites.
 
-In this file, a section number (§) without the name of a document refers to `protocol-v2.md`'s
-sections, and "this document" and "this draft" mean `protocol-v2.md`. The figures behind this record
-are in [`protocol-v2-figures.md`](protocol-v2-figures.md), under the conditions that its preamble
+In this file, a section number (§) without the name of a document refers to `seacast.md`'s
+sections, and "this document" and "this draft" mean `seacast.md`. The figures behind this record
+are in [`seacast-figures.md`](seacast-figures.md), under the conditions that its preamble
 states.
 
 ## The decisions, and where they bite
 
-| decision | where in `protocol-v2.md` |
+| decision | where in `seacast.md` |
 |---|---|
-| `[D1]` identity and bindings (decided: a protocol of its own, carried by its bindings, in their own document since 2026-11-17, three when decided and four by carrier since 2026-11-21; a bridge to the stock path is outside this version) | §7, `protocol-v2-bindings.md`; §0's "what is assumed" |
+| `[D1]` identity and bindings (decided: a protocol of its own, carried by its bindings, in their own document since 2026-11-17, three when decided and four by carrier since 2026-11-21; a bridge to the stock path is outside this version) | §7, `seacast-bindings.md`; §0's "what is assumed" |
 | `[D2]` two bitmaps, WANT per recipient, no need bitmap (decided, as written) | §2 `Want`, `on_want`, `wants_from_me` |
 | `[D3]` two claims (decided, as written) | §2 `Have`, §1.5, §4.6 |
 | `[D4]` repair's parameters (decided: EIP-8371's phases, rebuilt cells pushed to the custodians lacking them, `DEFER_WINDOW` 1 s, `REPAIR_BUDGET` an option, off; the repair floor at least one link to a custodian of each column) | `TypeParams.DECODE_AT_K`, `DECODE_LATER`, `REPAIR_TO`, `DEFER_WINDOW`; §6.3's `REPAIR_SAMPLE`, `REBUILT_SEEN`, `ALARM_WAIT`; §4.6 `check_completion`, `reconsider`, `push_rebuilt` |
 | `[D5]` the announce relation's width (decided: `ALL_JOINED` for columns and rows; `NONE` permitted for columns, never for rows) | `TypeParams.ANNOUNCE_EXTRA`, §4.4 `announce_extra`, §4.8 `send_gossip` |
-| `[D6]` the payload's consistency route (decided: none in this version; the `EVIDENCE` hook stays) | `TypeParams.EVIDENCE`, §4.6 `decode_group`, the payload's leaf rule (`protocol.md` §1's commitment, which §1.1's `verify` checks) |
+| `[D6]` the payload's consistency route (decided: none in this version; the `EVIDENCE` hook stays) | `TypeParams.EVIDENCE`, §4.6 `decode_group`, the payload's leaf rule (`seacast-lite.md` §1's commitment, which §1.1's `verify` checks) |
 | `[D7]` groups per column and per row, cross-fill (decided, as written) | `ObjectType.project`, `family`, §4.2 `on_validated`, §4.4 `forward` |
 | `[D8]` the row pull delay (decided: 1 s; shorter at a cost under liars) | `TypeParams.START_DELAY`, §4.3 `on_offer` |
-| `[D9]` one document or a sibling (decided: a sibling) | `protocol-v2.md`; §6.1 is the merge path |
+| `[D9]` one document or a sibling (decided: a sibling) | `seacast.md`; §6.1 is the merge path |
 | `[D10]` colours (decided: a parameter, with no default) | `TypeParams.M`, `F_LO`, `F_HI`, `D_OUT`, `SYMMETRIC`, §1.4, §4.1 |
-| `[D11]` join = (interest, duty); topics as rendezvous (decided: the join as written; the rendezvous gossipsub topics per family, with the ENR beside them) | §2 `Join`, §1.2, `protocol-v2-bindings.md` §0's rendezvous row |
+| `[D11]` join = (interest, duty); topics as rendezvous (decided: the join as written; the rendezvous gossipsub topics per family, with the ENR beside them) | §2 `Join`, §1.2, `seacast-bindings.md` §0's rendezvous row |
 | `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; the node's `SAMPLE_OUTSTANDING`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
-| the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | `protocol.md` §6.1's `PROMISE`; §6.3's `PROMISE` row |
+| the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | `seacast-lite.md` §6.1's `PROMISE`; §6.3's `PROMISE` row |
 | a source's links in a family it does not custody (decided: it never waits for links; three layers on top of its fanout; a refused push to a fallback link owed) | §4.7 `source_pool`, `candidates_for_source`, `origin_acked`, `unpush`; §6.3's `SOURCE_FLOOR` row |
-| the probe of a claim (R5) (decided: the claimant judged by its own copy; the probe marked and answered whatever the asker holds, once per asker and group; the asker's queue keeps it; its cell drawn at random) | §2 `Want.probe`; §4.2 `on_chunk`, `fill`; §4.5 `on_want`; §4.6 `reconsider`, `defer_on_claim`, `settle_probe`, `probe_answer`, `probe_promise`, `probe_waits`, `probe_of_claim`, `serve_probe`, `filter_entry`; `protocol-v2-bindings.md` §0's WANT row |
+| the probe of a claim (R5) (decided: the claimant judged by its own copy; the probe marked and answered whatever the asker holds, once per asker and group; the asker's queue keeps it; its cell drawn at random) | §2 `Want.probe`; §4.2 `on_chunk`, `fill`; §4.5 `on_want`; §4.6 `reconsider`, `defer_on_claim`, `settle_probe`, `probe_answer`, `probe_promise`, `probe_waits`, `probe_of_claim`, `serve_probe`, `filter_entry`; `seacast-bindings.md` §0's WANT row |
 
 **Decided on 2026-11-13.** Six of the decisions above were chosen on that day, and each entry below
 says what was not taken:
 - **`[D1]` identity and bindings.** SEACAST is its own protocol: it is defined on its own messages
-  and carried by three bindings, which are defined in their own document (`protocol-v2-bindings.md`,
+  and carried by three bindings, which are defined in their own document (`seacast-bindings.md`,
   since 2026-11-17). The three were the standalone binding, the binding onto the Partial Messages
   Extension of gossipsub, and the gossipsub binding. Since 2026-11-21 they are named by their
   carriers: the libp2p stream and Waggle bindings, the gossipsub binding and the partial-messages
-  binding (`protocol-v2-bindings.md` §2 to §5; below, "Decided on 2026-11-21"). §7 states what
+  binding (`seacast-bindings.md` §2 to §5; below, "Decided on 2026-11-21"). §7 states what
   every binding provides and the capabilities that each gives up. The extension alone was not
   taken: it gives up interest without subscription and the floor and direction of the push relation
   (§7). Deciding after a paired test of the signalling cost on both wires was not taken either:
@@ -48,7 +48,7 @@ says what was not taken:
 - **`[D4]` the repair floor.** A node that may rebuild keeps at least `REPAIR_FLOOR` links to
   custodians of each column that it does not custody (§4.6). The parameter is at least 1. Without
   the floor, some runs of the toy's row cell with half the columns withheld left custodians short,
-  each one by a missing link; with a floor of 1, every run completed (protocol-v2-figures.md, §6.2).
+  each one by a missing link; with a floor of 1, every run completed (seacast-figures.md, §6.2).
   Opening a link only when a rebuilt cell has nowhere to go (§4.6) was not taken; it is kept as an
   option.
 - **`[D6]` the payload's consistency route.** This version has no such route: it leaves the
@@ -58,14 +58,14 @@ says what was not taken:
   condition on the consensus side; it stays the route that changes neither the code nor the
   commitment scheme. The payload in blobs would be a change to the bid. The third route is a layout
   in two dimensions.
-- **`[D9]` one document or a sibling.** The draft is a sibling. `protocol.md` is the published and
+- **`[D9]` one document or a sibling.** The draft is a sibling. `seacast-lite.md` is the published and
   measured protocol, and this document contains it as one setting; that setting (§6.1) is the merge
-  path if one document is ever wanted. The cost is that each version of `protocol.md` is carried in
+  path if one document is ever wanted. The cost is that each version of `seacast-lite.md` is carried in
   here (§5). One document was not taken. The case for it is that the payload and the general rules
-  are the same code; folding `protocol.md` into these notions would rewrite text without changing
+  are the same code; folding `seacast-lite.md` into these notions would rewrite text without changing
   behaviour.
 - **`[D10]` colours.** The number of colours, `M`, is a parameter with no default. It is measured
-  at 1 (tier 4, `protocol.md`) and at N (variant C). Values with 1 < M < N are for later study,
+  at 1 (tier 4, `seacast-lite.md`) and at N (variant C). Values with 1 < M < N are for later study,
   which first needs colour negotiation and a floor per colour in the toy. A measured default before
   release was not taken.
 - **`[D11]` the rendezvous.** Every binding uses gossipsub topics per family as the rendezvous, with
@@ -91,14 +91,14 @@ build of the research harness runs them. Nothing measured argues against them.
   (§2, §4.1).
 
 **The promise's length.** §4.13 stretches the ask window on thin links and keeps the promise at
-400 ms, so a peer that does not answer is parked as in `protocol.md` §6.1. A slow honest peer can be
+400 ms, so a peer that does not answer is parked as in `seacast-lite.md` §6.1. A slow honest peer can be
 parked as well: its answer can take longer than the promise while the stretched ask window still
 keeps the asker waiting on it. The option is a promise per peer that follows the
 times its answers took: `max(PROMISE, srtt + 4 · rttvar)`, smoothed as TCP's retransmission timer is
 (RFC 6298); a peer that never answered keeps the floor. In the toy, in the setting of the research
 harness at 12.5 Mbps, the option gave the same completion times and bytes as §4.13's form, parked
-fewer honest (peer, group) pairs than that form and than `protocol.md`, and parked the withholders
-of a 30 % withholding network as before (protocol-v2-figures.md, §4.13). It buys the standing of
+fewer honest (peer, group) pairs than that form and than `seacast-lite.md`, and parked the withholders
+of a 30 % withholding network as before (seacast-figures.md, §4.13). It buys the standing of
 honest peers (and whatever scoring reads from broken promises), not time; it needs per-peer state
 and a sample on every answered ask. It is not measured in the harness. The other form, a promise
 stretched with the window, is rejected (§4.13).
@@ -123,12 +123,12 @@ that names the chunk or for the timeout of a later copy.
 
 **The window's unit** (X3, decided 2026-11-13): the unit is bytes, as §4.11 runs it, and a chunk
 takes its own length of the window. In the toy the column cells gain, at 500 nodes too, and tier 4
-moves little (protocol-v2-figures.md, §4.11). The alternatives not taken were the slots of
-`CHUNK_BYTES` that `protocol.md` uses, and slots per object type, which leave the same capacity
+moves little (seacast-figures.md, §4.11). The alternatives not taken were the slots of
+`CHUNK_BYTES` that `seacast-lite.md` uses, and slots per object type, which leave the same capacity
 question at every boundary between types (§4.11).
 
 **Decided on 2026-11-14.** Two decisions were made after their runs; the rule of §4.12 was also
-decided. The runs are toy checks (`toy/run.py --doc v2`, the flags `--col-announce`,
+decided. The runs are toy checks (`toy/run.py --doc seacast`, the flags `--col-announce`,
 `--row-announce` and `--row-delay`). Each setting is read against the value that every earlier
 measurement ran, paired by seed. A value is *close* if it leaves no more nodes short, and none on a
 seed where the other left none, and moves the custodians' median and 99th percentile, and in the
@@ -140,20 +140,20 @@ row settings a row member's 64th cell, by at most +20 ms at the median over the 
     in custody and in rows with half the columns withheld, and in the honest rows. It sends fewer
     offers, and slightly fewer copies. With a fifth of the nodes lying about their row holdings
     (`claim20`) it is not close: on one seed a custodian is short in more blocks than with
-    `ALL_JOINED`, and on another a row member is short where none was (protocol-v2-figures.md,
+    `ALL_JOINED`, and on another a row member is short where none was (seacast-figures.md,
     [D5]).
   - *At 500 nodes*, it is close in custody, with fewer offers and slightly fewer copies. It is close
     in rows with half the columns withheld and a 1 Gbps proposer, with fewer offers and fewer
     copies. With liars and no withheld columns it is close by the rule as written, the median over
     the seeds, but not on every seed: the custodians' median is inside the bound on the middle seed
     and outside it on another. It is not close with half withheld. No node is short in either
-    (protocol-v2-figures.md, [D5]). Three seeds show a pass or a fail, not a comparison, and do not
+    (seacast-figures.md, [D5]). Three seeds show a pass or a fail, not a comparison, and do not
     show the 60-node shortfall gone.
   - *The rows' `NONE`* left row members short on every seed in every row setting: the rows need
     the offers to every joined peer.
   - *The columns' `SAMPLE`* (the heartbeat's paced gossip) was close where `NONE` was, except in the
     500-node rows with half withheld, where the custodians' 99th percentile on the middle seed is
-    over the bound (protocol-v2-figures.md, [D5]). The rows' `SAMPLE` runs as `NONE`, since a cell
+    over the bound (seacast-figures.md, [D5]). The rows' `SAMPLE` runs as `NONE`, since a cell
     is published under its column and the heartbeat offers it there.
   - `NONE` was not taken as the default for columns. Its saving is mostly control; its failures are
     under liars, where the offers beyond the relation are the fallback; and its passes at 500 nodes
@@ -162,19 +162,19 @@ row settings a row member's 64th cell, by at most +20 ms at the median over the 
   harness ran it: a secondary axis waits for the column path (R7). In the toy at 60 nodes (honest
   rows, rows with a fifth of the nodes lying about their row holdings, rows with half the columns
   withheld), 2 s costs the column path: the custodians complete later at the median, in all three
-  settings (protocol-v2-figures.md, [D8]).
+  settings (seacast-figures.md, [D8]).
   - *It can be shorter, at a cost.* 0.5 s and 0 s move the custodians little at the median. 0.5 s
     brings a row member's 64th cell sooner at the median. But with liars both leave row members
     short on every seed, far more than 1 s does (counted once per block they are short in), and 0 s
-    also leaves more custodians short (protocol-v2-figures.md, [D8]). Without liars neither leaves
+    also leaves more custodians short (seacast-figures.md, [D8]). Without liars neither leaves
     any short. Why this happens was not traced.
   - The draft did not take 2 s, which fails R7. Nor did it take a delay under 1 s as the default.
 - **A source's own chunks go first** (§4.12), under X3's window in bytes. In the toy its clearest
   gain was in custody with a 50 Mbps proposer, and single-group cells run as under v0.3's order,
   which takes the rarest of the chunks ahead of the first control-only entry (card 9)
-  (protocol-v2-figures.md, §4.12). The alternatives not taken were v0.3's order, and dropping the
+  (seacast-figures.md, §4.12). The alternatives not taken were v0.3's order, and dropping the
   source's offers or queueing them after the block's pushes, which delay a fast proposer's
-  completion at the median (protocol-v2-figures.md, §4.12).
+  completion at the median (seacast-figures.md, §4.12).
 
 **The probe of a claim** (R5, decided 2026-11-15, §4.6). The probe judges the claimant only by the
 claimant's own copy of the probed cell, which comes as an answer or a push. Three rules make that
@@ -186,7 +186,7 @@ is drawn at random among the cells that the member lacks. In the toy's rows, ove
 honest or hoarding claimant failed its probe, with the rules of 2026-11-18 or with those of
 2026-11-16; before them, a few failed without the mark and the kept WANT. Liars almost never passed
 in two of the three settings with liars, and passed more often in the one with supernodes
-(protocol-v2-figures.md, §4.6, "The probe"). Since 2026-11-16, the following holds: the probe's
+(seacast-figures.md, §4.6, "The probe"). Since 2026-11-16, the following holds: the probe's
 wait starts at its write; a probe not written when the duty next fires gets no verdict unless the
 claimant's own copy came first, and it is not written later; a claimant still decoding keeps the
 first probe per asker and group and answers it once when the cell is stored; a claimant that leaves
@@ -201,7 +201,7 @@ can read from the member's holdings. The random index is meant to counter a clai
 the cell it expects to be asked; that purpose is not measured, since the toy's liars do not aim.
 SEACAST's message encoding carries `standing` and `probe` in one `Bitvector[8]`; its other bits are
 zero when sent and ignored when received, so that a later flag fits without breaking older readers
-(`protocol-v2-bindings.md` §1.2). On the gossipsub binding the mark is one more bit beside
+(`seacast-bindings.md` §1.2). On the gossipsub binding the mark is one more bit beside
 `standing`, in version 4 of the strings (§4 there). Two alternatives were not taken there: a byte of
 its own for the mark, which every WANT would pay, and a message of its own for the probe, which
 every binding would have to carry.
@@ -223,7 +223,7 @@ subnet custodies.
   known, a view the node does not have.
 - *Where hoarders mark their rebuilt cells seen,* the uniform sample already catches them in the
   model. Beside that option, the runs (a toy check) showed nothing from the bias
-  (protocol-v2-figures.md, §4.6, "Biasing the repair sample").
+  (seacast-figures.md, §4.6, "Biasing the repair sample").
 
 **A sampler's reach** `[D12]`, decided (2026-11-03). The steady state is a coverage floor (§1.3),
 built for diversity. Its size is `SAMPLE_COVER`, a parameter of the object type with a bound of at
@@ -236,7 +236,7 @@ least 1; before, it was a parameter of each object type. One cap per block bound
 block's hunt has in flight, and a cap per type, on a count that the types share, could keep §4.10's
 refill loop from ending. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT`
 and `SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
-60-node cells and its 500-node cells at ten seeds (protocol-v2-figures.md, §6.3). These are kept as
+60-node cells and its 500-node cells at ten seeds (seacast-figures.md, §6.3). These are kept as
 options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours
 (`ROUTE_FLOOR`), and the fetch outside the links (§7). The notes below are kept for later study:
 - *Why diversity, not the fewest links.* There are three reasons. First, one node that holds a
@@ -250,7 +250,7 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   and routed requests, one seed), the proposer, which holds every column, was asked for some of the
   samples, up to most of one sampler's samples in a block, where no other peer was asked for as
   many; with the rule, the proposer was asked for none, and no peer was asked for more than one
-  (protocol-v2-figures.md, [D12]).
+  (seacast-figures.md, [D12]).
 - *The floor's size.* The decision sets `SAMPLE_COVER`, a parameter of the object type, at 2. On
   the toy's graphs, eight samples find eight distinct serving links in nearly every draw with two
   covers; with one, they fall well short of that at 16 links, and a little short at 70. In the
@@ -258,7 +258,7 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   withholders, at 70 links and at 16. One cover did as well at 70 links. At 16 it cost the honest
   tail, and under withholders some sampler-blocks did not confirm. Two covers add more links than
   one, on top of 70 and on top of 16. Three covers, a floor nearer every draw and the one that holds
-  for sixteen samples, would add more again (protocol-v2-figures.md, §6.3). The number of
+  for sixteen samples, would add more again (seacast-figures.md, §6.3). The number of
   sampling-only links that a custodian accepts is a bound, and each node's own number lies within it
   (§6.3); the serving load that these links bring the custodian is not measured.
 - *The floor's lifetime.* The floor is kept across slots and chosen from custody alone. Whether and
@@ -269,7 +269,7 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   toy's graphs, and almost none at 70; without such a floor, it left many more unreached at 16 links
   (§4.10). The routing rules (§1.3, `ROUTE_FLOOR`) are for networks without it; the Kademlia-style
   rule is the cheaper, and the pairs it reaches only at three hops are the case for `ROUTE_HOPS`
-  above one (protocol-v2-figures.md, §4.10, [D12]). A first hop drawn at random is not measured.
+  above one (seacast-figures.md, §4.10, [D12]). A first hop drawn at random is not measured.
   Nothing yet measures what a forwarder learns (one sample of one sampler), a forwarder colluding
   with the proposer, or the time a routed sample takes.
 - *The hunt's cost.* A sample that nobody holds is asked of one fresh peer after another until none
@@ -277,21 +277,21 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   node's links. With half the columns withheld (60 nodes, one seed), a sample took a few asks, more
   with routed requests and more again with the floor of one or two covers as well, and hundreds of
   requests were passed on; before one sample per peer, a sample took more asks, and more requests
-  were passed on (protocol-v2-figures.md, [D12]). Whether to bound the first hops that a sample
+  were passed on (seacast-figures.md, [D12]). Whether to bound the first hops that a sample
   tries, or to let the application's deadline end the hunt, is open.
 - *The cost of one sample per peer.* Under 30 % withholders (the toy, the floor with routed
   requests, one cover, one seed), every sample still arrived, but later at the median and at the
   99th percentile than when a peer could be asked again: the second phase must find a fresh peer
-  each time (protocol-v2-figures.md, [D12]).
+  each time (seacast-figures.md, [D12]).
 - *Small networks.* The floor covers only the families some node other than a source custodies;
   in the toy's 60-node cells a few columns had no custodian but the proposer, and routed requests
-  reached it for them (protocol-v2-figures.md, [D12]).
+  reached it for them (seacast-figures.md, [D12]).
 - *Rows as a second axis.* A row member holds a cell of its row once it has it, and serves it to
   anyone who asks; `serves` counts columns only. In the toy's graphs at 70 links
   (`toy/sampler_graph.py e`), counting half rows (the draft's members stop at 64 of 128) leaves
   fewer samplers with a sample no link serves, more so with 32 row subnets than with 128; whole
   rows (FullDAS's two-dimensional code) leave fewer still. At 16 links rows barely help
-  (protocol-v2-figures.md, [D12]).
+  (seacast-figures.md, [D12]).
 - *LiteDAS's slot start.* A group id names the block, so a WANT waits for the block's header; a
   request keyed by slot would let it go at slot start, as LiteDAS's does. Such a request is not
   proposed.
@@ -303,15 +303,15 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   UDP, a fast QUIC connection or discv5.
 - *Rejected:* the draft rejects narrowing the sample to what the node's links serve (§4.10).
 
-**Decided on 2026-11-21.** Four decisions on the bindings, each given in `protocol-v2-bindings.md`:
+**Decided on 2026-11-21.** Four decisions on the bindings, each given in `seacast-bindings.md`:
 - **The bindings by carrier.** The bindings document defines SEACAST's message encoding once (§1
   there), then one binding per carrier: the libp2p stream binding, the Waggle binding, the gossipsub
   binding and the partial-messages binding (§2 to §5 there), and the native QUIC binding as a draft
-  (§7 there). The gossipsub binding uses gossipsub's wire alone, as `protocol.md` does; the
+  (§7 there). The gossipsub binding uses gossipsub's wire alone, as `seacast-lite.md` does; the
   partial-messages binding is kept beside it.
 - **The gossipsub binding to the byte.** Its extra fields, a holding's `claim_all` and `complete`
   and a WANT's `standing`, `hops` and `probe`, travel in version 4 of the id strings, and a WANT's
-  index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). On that binding,
+  index is a little-endian `uint32`, as `seacast-lite.md` §2 writes it (§4 there). On that binding,
   EVIDENCE is reserved as a full message on the rendezvous topic, as SEACAST's message encoding
   reserves its kind `0x08` (§1.1 there).
 - **A cell group's header in three forms** (§1.6 there): from the block, in every cell, or in a
@@ -327,9 +327,9 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   a cell does not fit one at the study's packet sizes unless it compresses well, and small payload
   chunks in datagrams were slower in the toy.
 
-## The versions of `protocol.md` carried
+## The versions of `seacast-lite.md` carried
 
-**The versions carried.** Each later version of `protocol.md` comes in the same way. Its changes to
+**The versions carried.** Each later version of `seacast-lite.md` comes in the same way. Its changes to
 functions that this document does not redefine apply as written. Its changes to functions that
 this document redefines are carried into them, and an entry gives the date of each one that was
 carried later than its version.
@@ -338,13 +338,13 @@ carried later than its version.
 - v0.5 (2026-10-21, the fixes from a model check of v0.4): its fixes are in §4.3 `on_offer`, §4.4
   `forward` and `announce`, §4.5 `serve_standing`, §4.6 `decode_group` and the repair, §4.7
   `publish`, and §4.11 `next_to_send`.
-- v0.6 (2026-10-21) released this document's draft and changed nothing in `protocol.md`. v0.6.1
+- v0.6 (2026-10-21) released this document's draft and changed nothing in `seacast-lite.md`. v0.6.1
   changed only its §9.
 - v0.7 (2026-10-25) comes in as follows:
   - The live window and the group's key apply as written; §6.1 shows how the cells moved.
   - Gossipsub's IHAVE limits are carried since 2026-10-27 (§4 `on_frame`, §4.3 `on_offer`,
     §4.8).
-  - Its single offer at the source (`protocol.md` §5.1) is carried since 2026-11-04 (§4.7
+  - Its single offer at the source (`seacast-lite.md` §5.1) is carried since 2026-11-04 (§4.7
     `publish`): a chunk is offered only to the peers of its pool that were not chosen to be pushed
     it, so a push that its queue refused, which is owed already, is not offered a second time.
 - v0.8 (2026-10-26) comes in as follows:
@@ -364,85 +364,89 @@ carried later than its version.
   - What the transport below the writer should hold, and the note for operators (its §7.3), apply
     as written (§4.11).
 - v0.10 (2026-11-15) comes in as follows:
-  - The toy's default transport keeps `protocol.md` §7.3's rule, one entry at a time per
-    connection, and both recordings were made again (`protocol-v2-figures.md`'s preamble, §6.1).
-  - What waits for a gate is carried where this document uses `protocol.md`'s functions: `tie`, with
+  - The toy's default transport keeps `seacast-lite.md` §7.3's rule, one entry at a time per
+    connection, and both recordings were made again (`seacast-figures.md`'s preamble, §6.1).
+  - What waits for a gate is carried where this document uses `seacast-lite.md`'s functions: `tie`, with
     `tie_room`'s limits, the limit of unknown groups and the slot it records (`tie_slot`);
-    `close_promises`, which `protocol.md` now gives as code, called from `fill` and `tie`; and
+    `close_promises`, which `seacast-lite.md` now gives as code, called from `fill` and `tie`; and
     `on_block_installed`, which drops at installation a tied index the group, known by then, does
     not have, and whose level 1 for the payload is `validate_chunk` with its new check of the copy's
-    slot (`protocol.md` §3, §4.2).
+    slot (`seacast-lite.md` §3, §4.2).
   - The announcers beyond a chunk's ordered list are tried in the node's own order, in
-    `protocol.md`'s ask path, which this document keeps (`protocol.md` §6.1).
+    `seacast-lite.md`'s ask path, which this document keeps (`seacast-lite.md` §6.1).
   - Since 2026-11-16, this document carries the following where it has functions of its own
     (§4.2, §4.3, §4.8, §1's table):
-    - its `defer` ignores a copy beyond its sender's limit of unknown groups, as `protocol.md`'s
+    - its `defer` ignores a copy beyond its sender's limit of unknown groups, as `seacast-lite.md`'s
       does;
     - its `on_heartbeat` calls `drop_stale_waits`, so what waits for a gate that never opens goes
       at the live window's edge or the group's expiry;
     - its `fill` calls `drop_beyond` when it opens a group, so offers, asks and ties of an index
       beyond the group's count go;
-    - its `on_offer` holds an offer's bitmap to a holding's limits, as `protocol.md`'s `on_ihave`
+    - its `on_offer` holds an offer's bitmap to a holding's limits, as `seacast-lite.md`'s `on_ihave`
       holds an IHAVE's;
     - its `on_header_validated` drops a tied index a cell group, known by then, does not have, and
       removes a sender's `tie_slot` with its last tie under the root, as `on_block_installed` does;
     - a cell's level 1 rejects a copy whose slot is not its header's, as `validate_chunk` does for
       the payload against its block (decided 2026-11-16).
-- Across v0.10.1 (2026-11-15) and v0.10.2 (2026-11-16), the prose and comments of `protocol.md`
+- Across v0.10.1 (2026-11-15) and v0.10.2 (2026-11-16), the prose and comments of `seacast-lite.md`
   were rewritten, with its code the same, and the toy's tables were made faster, with the digests of
   the recorded cells the same; there is nothing to carry.
-- In v0.10.3 (2026-11-18), `protocol.md` groups its constants into three kinds and gives reference
+- In v0.10.3 (2026-11-18), `seacast-lite.md` groups its constants into three kinds and gives reference
   values for gossipsub's two IHAVE limits. It calls what a peer writes on its stream a "frame",
   describes the source's HAVE as "acknowledged", and gives the source a choice of when it announces
   (`SOURCE_OFFERS`). This draft carries them all: the rename (`on_frame`, `frame`, `ihave_frames`),
   the bounds of §6.3 in the kinds of §8.3, the IHAVE values (§4.3, §6.3), "acknowledged" (§4.7), and
   `SOURCE_OFFERS` (§4.7, §6.3).
-- v0.10.4 (2026-11-18): `protocol.md` says what heartbeat gossip tells of the source, names as open
+- v0.10.4 (2026-11-18): `seacast-lite.md` says what heartbeat gossip tells of the source, names as open
   the case of a chunk that is never acknowledged, and keeps an IDONTWANT entry that is not a HAVE
   bitmap as stock gossipsub keeps an id (`on_frame`); the toy follows the documents at a dropped
   group and in its reading of bitmaps and ids. This draft runs on the same toy. It carries the
-  IDONTWANT rule onto the gossipsub binding (`protocol-v2-bindings.md` §4), where the toy now keeps
+  IDONTWANT rule onto the gossipsub binding (`seacast-bindings.md` §4), where the toy now keeps
   such an entry in `unwanted[p]`. §4.7 already says that, for a type that gossips
   (`ANNOUNCE_EXTRA = SAMPLE`), the source's heartbeat gossip draws on every chunk at either setting,
-  and its open item on a chunk that is never acknowledged is the one `protocol.md` §5.1 names.
-- v0.10.5 (2026-11-19): `protocol.md` is the same but for its version line, and the proofs in
+  and its open item on a chunk that is never acknowledged is the one `seacast-lite.md` §5.1 names.
+- v0.10.5 (2026-11-19): `seacast-lite.md` is the same but for its version line, and the proofs in
   `formal/veil/` move to Veil's release. The toy's `accepted` answers whether the id was stored, as
-  `protocol.md`'s helper list says, so under this draft a later copy of a copy that level 1 rejected
+  `seacast-lite.md`'s helper list says, so under this draft a later copy of a copy that level 1 rejected
   no longer passes the probe (R5), and a repeat of a copy under a second id, seen and not stored, is
   not acknowledged (§4.2). This draft runs on the same toy; there is nothing else to carry.
-- v0.10.6 (2026-11-19): `protocol.md` names an open question in §1, whether the protocol fixes a
+- v0.10.6 (2026-11-19): `seacast-lite.md` names an open question in §1, whether the protocol fixes a
   coded group's compressed bytes ("Open: the compressed bytes"); this draft points to it from §1.1's
-  `decode` row, and leaves where the descriptor travels open, as `protocol.md` §1 does.
-- In v0.10.7 (2026-11-20), the window's line in `protocol.md` (§7.1, §7.2) works this way: a free
+  `decode` row, and leaves where the descriptor travels open, as `seacast-lite.md` §1 does.
+- In v0.10.7 (2026-11-20), the window's line in `seacast-lite.md` (§7.1, §7.2) works this way: a free
   slot goes to the first writer in line that can write, and a writer in line that writes control
   first wakes another that can write. This draft carries both into its window in bytes
   (§4.11), with its own `wake_front` over `W_BYTES`, and it wakes on a third path that it has, a
-  control-only entry of the normal lane; `line_stall_known.py --doc v2` shows the first.
-- v0.10.8 (2026-11-21): `protocol.md` is the same but for its version line, and the Lean twin's
+  control-only entry of the normal lane; `line_stall_known.py --doc seacast` shows the first.
+- v0.10.8 (2026-11-21): `seacast-lite.md` is the same but for its version line, and the Lean twin's
   record and a first piece of a refinement come into `formal/`; there is nothing to carry.
-- v0.10.9 (2026-11-21): in `protocol.md`, the wake in the window's line moves to the moment a writer
+- v0.10.9 (2026-11-21): in `seacast-lite.md`, the wake in the window's line moves to the moment a writer
   starts to wait for its transport (§7.1, §7.2). In this draft, `write_waits` wakes the first writer
   in line that can write if the waiting writer is in line and the window has room (§4.11). It
   replaces the wake before the write on the three control paths, and `wake_front` loses `past`;
-  `write_wait_known.py --doc v2` checks it on all three.
-- v0.10.10 (2026-11-21): `protocol.md` is the same but for its version line, and the proofs in
+  `write_wait_known.py --doc seacast` checks it on all three.
+- v0.10.10 (2026-11-21): `seacast-lite.md` is the same but for its version line, and the proofs in
   `formal/veil/` take in four of its rules added after v0.8; there is nothing to carry.
-- v0.10.11 (2026-11-21): `protocol.md` is the same but for its version line, one row of its §8.1
+- v0.10.11 (2026-11-21): `seacast-lite.md` is the same but for its version line, one row of its §8.1
   table, the window's line, which this draft names in §3's lifetimes (`leave_line`), and §5.1's
-  citation of the draft's figures, now in `protocol-v2-figures.md`. This draft is restructured: its
+  citation of the draft's figures, now in `seacast-figures.md`. This draft is restructured: its
   decisions and its figures are in files of their own, and its bindings are named by their
   carriers.
-- v0.10.12 (2026-11-22): in `protocol.md`, a HAVE or an offered id of a group beyond the peer's
+- v0.10.12 (2026-11-22): in `seacast-lite.md`, a HAVE or an offered id of a group beyond the peer's
   limit of unknown groups (§8.2) is ignored before it leaves any state (`admitted` in `on_have` and
   `on_ihave`), and §7.1 says which of `write_wait_known.py`'s five cases keep the writer's place.
   This draft carries the first in `on_holding` and `on_offer` (§4.3), and bounds more of what a peer
   can make a node keep or serve: asks outside what it serves, a WANT's index and group, the
   relations on a link, the answers to one peer in a heartbeat and the routed requests it passes on.
-- v0.11.0 (2026-11-22): `protocol.md` is the same but for its version line and its names: its title
+- v0.11.0 (2026-11-22): `seacast-lite.md` is the same but for its version line and its names: its title
   and a new opening paragraph name it SEACAST on gossipsub, and §5.1 and §9 cite this document and
   the announcement post by their current names. This draft is named SEACAST; there is nothing to
   carry.
-- v0.11.1 (2026-11-22): `protocol.md` is the same but for its version line, so there is nothing to
+- v0.11.1 (2026-11-22): `seacast-lite.md` is the same but for its version line, so there is nothing to
   carry. In this draft, one setting of the node caps a block's second-phase asks in flight across
   the block's sampled types, and the block's held samples are tried while room is left even when
   the group of the ask whose wait ended has expired (§4.10). §3 declares `want_p`.
+- v0.12.0 (2026-11-22): this release changes names only. `protocol.md` is now `seacast-lite.md`,
+  and its protocol is SEACAST Lite, no longer SEACAST on gossipsub; this draft's files,
+  `protocol-v2.md` and `protocol-v2-*.md`, are now `seacast.md` and `seacast-*.md`. No rule
+  changed, so there is nothing to carry.

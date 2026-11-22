@@ -110,7 +110,7 @@ def run(cfg, out=sys.stdout):
         if sum(left) or missing:                        #   and every node completes every payload
             cfg["failed"] = (f"--late-block: {sum(left)} entries still wait at the end, "
                              f"{missing} payloads missing at their nodes")
-    if cfg.get("upkeep"):                       # --upkeep on: protocol-v2.md §4.1's messages on the wire
+    if cfg.get("upkeep"):                       # --upkeep on: seacast.md §4.1's messages on the wire
         tot = sum((nd.relation_msgs for nd in sim.nodes.values()), Counter())
         print(f"  upkeep: {tot['Join']} JOINs, {tot['Graft']} GRAFTs, {tot['Prune']} PRUNEs sent; the coverage floor "
               f"short {sum(nd.cover_gaps for nd in sim.nodes.values())} times, "
@@ -169,14 +169,14 @@ FAULT = r"(wh|sil|claim|hoardcol|hoardm|hoard)(\d+)"       # sim.py's --fault ki
 
 
 def das_dump(ap, a, argv, cfg, topo):
-    """A DAS dump (xcheck.apply_das) under --doc v2 --setting custody or rows. The flags whose values the
+    """A DAS dump (xcheck.apply_das) under --doc seacast --setting custody or rows. The flags whose values the
     dump gives are refused; a running cell's blocks give --withhold and cap --msgs; --fault, if given,
     names the behaviour of the dump's faulty set, whose draw the toy's must equal (both are the harness's
     failSelect), and without it that set withholds or is silent, as the dump says. The header prints the
     dump's values. Returns the notes worth printing."""
     given = lambda flag: any(x == flag or x.startswith(flag + "=") for x in argv)
-    if a.doc != "v2" or a.setting not in ("custody", "rows"):
-        ap.error("a DAS dump runs under --doc v2 --setting custody or rows")
+    if a.doc != "seacast" or a.setting not in ("custody", "rows"):
+        ap.error("a DAS dump runs under --doc seacast --setting custody or rows")
     for flag in ("--row-subnets", "--reconstructors", "--repair-floor", "--source-floor", "--supernodes",
                  "--supernode-link", "--samplers", "--sample-cover", "--cgc", "--blobs"):
         if given(flag):
@@ -230,15 +230,15 @@ def main(argv):
                     help="ps: processor sharing over busy connections (FQ-CoDel's fluid limit); rr: whole entries in turn")
     ap.add_argument("--wire", default="v03", choices=("v03", "standalone"),
                     help="the binding the links charge (the values keep their old names, which scripts and recorded "
-                         "cells use): v03, the gossipsub binding, protocol.md's wire (gossipsub frames, the recorded "
-                         "cells); standalone, the libp2p stream binding, the bytes of protocol-v2-bindings.md §1 and §2, "
+                         "cells use): v03, the gossipsub binding, seacast-lite.md's wire (gossipsub frames, the recorded "
+                         "cells); standalone, the libp2p stream binding, the bytes of seacast-bindings.md §1 and §2, "
                          "each message a frame of its own, a cell's header with the first eager push of its group on a "
-                         "link (--doc v2). A model of bytes: an entry is still delivered as one unit, as on the gossipsub "
+                         "link (--doc seacast). A model of bytes: an entry is still delivered as one unit, as on the gossipsub "
                          "binding")
     ap.add_argument("--send-buffer", type=int, default=None,
                     help="bytes a connection's transport accepts ahead of the link; a writer waits while its backlog "
                          "is at it, as a QUIC stream write blocks. Default 1, one entry at a time per connection: "
-                         "protocol.md §7.3's rule, as the harness's stream writes block. 0: writes complete at once "
+                         "seacast-lite.md §7.3's rule, as the harness's stream writes block. 0: writes complete at once "
                          "(§7.3 not met). With --uplink rr, which has no send buffer, the default is 0 and only 0 is taken")
     ap.add_argument("--rebuilt", default="push", choices=("push", "hold", "announce", "none"),
                     help="what a decoded node does with the chunks it rebuilt: push (the document, §4.6), hold or "
@@ -246,7 +246,7 @@ def main(argv):
     ap.add_argument("--rb-jitter-ms", type=float, default=0.0, help="ms: a random extra wait, up to this, before the decode hands its chunks over")
     ap.add_argument("--rb-max", type=int, default=0, help="push: at most this many chunks per peer (0: its whole shortfall)")
     ap.add_argument("--fault", default="", help="wh<pct> withholders or sil<pct> silent nodes, as the harness picks them; "
-                    "v2: claim<pct> claim their row and never answer, hoard<pct> rebuild and claim, answer only the probe and repair nothing, "
+                    "SEACAST: claim<pct> claim their row and never answer, hoard<pct> rebuild and claim, answer only the probe and repair nothing, "
                     "hoardm<pct> the same but push each row member the row's cells of its custody columns; "
                     "hoardcol<pct> (option, with --rebuilt-seen on) repair every withheld column but one per subnet, serving none of it")
     ap.add_argument("--loss-data", type=int, default=0, help="percent of chunks every node drops at admission")
@@ -254,7 +254,7 @@ def main(argv):
     ap.add_argument("--down", type=float, default=0, help="Mbps: every home node's downlink")
     ap.add_argument("--topology", default="", help="the harness's SEGMENT_XC_DUMP file: run on its graph, latencies, "
                     "link classes, meshes, publishers and faulty set (--net, --nodes, --fault are then ignored); a DAS "
-                    "dump (with a das record) under --doc v2 --setting custody or rows also gives custody, supernodes, "
+                    "dump (with a das record) under --doc seacast --setting custody or rows also gives custody, supernodes, "
                     "reconstructors, row subnets and the withheld columns, and --fault then names its faulty set's behaviour")
     ap.add_argument("--xcheck", action="store_true", help="print the harness's xcheck line per message "
                     "(per-rule counts and invariants at publish + 3 s); on with --topology, but for a DAS dump")
@@ -262,10 +262,10 @@ def main(argv):
     ap.add_argument("--builder-mbps", type=float, default=0, help="Mbps: a datacenter builder's link, both ways (default 1000)")
     ap.add_argument("--latency-only", action="store_true")
     ap.add_argument("--digest", action="store_true", help="also print a hash of every event the run processed (check.py)")
-    ap.add_argument("--doc", default="v03", choices=("v03", "v2"),
-                    help="v03: protocol.md; v2: protocol-v2.md loaded on top of it, under its tier 4 setting (its §6.1)")
+    ap.add_argument("--doc", default="lite", choices=("lite", "seacast"),
+                    help="lite: seacast-lite.md; seacast: seacast.md loaded on top of it, under its tier 4 setting (its §6.1)")
     ap.add_argument("--setting", default="t4", choices=("t4", "c", "custody", "rows"),
-                    help="--doc v2 only. t4: one colour, the mesh (protocol-v2.md §6.1); c: a colour per index with a "
+                    help="--doc seacast only. t4: one colour, the mesh (seacast.md §6.1); c: a colour per index with a "
                          "mesh per colour on the same connections, variant C on one neighbourhood (its §6.2); "
                          "custody: PeerDAS custody, a block of --blobs blobs as 128 column groups, derived interest "
                          "of --cgc columns per node, a mesh per column (its §6.2); rows: custody plus RowDAS's row "
@@ -279,7 +279,7 @@ def main(argv):
     ap.add_argument("--phase2", type=float, default=1.0, help="supernodes: seconds from the block before a supernode rebuilds a row still short")
     ap.add_argument("--phase2-jitter", type=float, default=0.2, help="supernodes: random extra seconds on the second phase's delay")
     ap.add_argument("--supernode-link", default="dc", choices=("dc", "home"), help="supernodes: their access link, the datacenter class (1 Gbps both ways) or the home one")
-    ap.add_argument("--repair-budget", default="off", choices=("off", "on"), help="custody, rows: protocol-v2.md's REPAIR_BUDGET for columns: on, a rebuilt cell goes to "
+    ap.add_argument("--repair-budget", default="off", choices=("off", "on"), help="custody, rows: seacast.md's REPAIR_BUDGET for columns: on, a rebuilt cell goes to "
                          "R_NODE custodians lacking it and is offered to the rest, as its source would push it; off, to every custodian lacking it")
     ap.add_argument("--repair-keepers", default="push", choices=("push", "offer", "skip"), help="custody, rows (exploration): what a rebuilder does "
                          "for a peer that custodies every column, which keeps every row and rebuilds its own (supernodes, the proposer): push the "
@@ -290,10 +290,10 @@ def main(argv):
                          "is offered to the peers it would be pushed to, and each pulls one copy")
     ap.add_argument("--member-check", default="on", choices=("on", "off"), help="rows: off (ablation), a member's duty on its own "
                          "subnet's row ends on a verified claim even when the row's cells in its custody columns have not come "
-                         "(protocol-v2.md's member check, R5, removed)")
+                         "(seacast.md's member check, R5, removed)")
     ap.add_argument("--repair-sample", default="", help="rows (option, R5): after a verified claim, sample the cells we lack "
                          "from their columns' custodians in steps S:L,S:L,... (each extends the last; at most L of S missing passes), "
-                         "e.g. 3:1,6:2; the protocol-v2.md parameter REPAIR_SAMPLE")
+                         "e.g. 3:1,6:2; the seacast.md parameter REPAIR_SAMPLE")
     ap.add_argument("--repair-reask", default="off", choices=("off", "on"), help="rows (option, R5): on, a lost sample cell is "
                          "re-asked of another custodian of its column, with the extension or, at the last step, in one more wait")
     ap.add_argument("--rebuilt-seen", default="off", choices=("off", "on"), help="custody, rows (option): on, a node marks "
@@ -322,64 +322,64 @@ def main(argv):
     ap.add_argument("--cgc", type=int, default=8, help="custody: columns each node custodies")
     ap.add_argument("--floor", type=int, default=6, help="custody: custodian peers a node keeps per custody column")
     ap.add_argument("--source-floor", type=int, default=2, help="custody: custodian peers the proposer keeps per column")
-    ap.add_argument("--repair-floor", type=int, default=1, help="rows: custodian peers each row member keeps per column it does not custody, so that a row it rebuilds reaches every column (the rebuilders' fanout, protocol-v2.md §4.6); 0: only the links it has")
+    ap.add_argument("--repair-floor", type=int, default=1, help="rows: custodian peers each row member keeps per column it does not custody, so that a row it rebuilds reaches every column (the rebuilders' fanout, seacast.md §4.6); 0: only the links it has")
     ap.add_argument("--samplers", type=int, default=0, help="custody: percent of nodes that sample instead of custodying (interest DECLARED, duty NONE)")
     ap.add_argument("--samples", type=int, default=8, help="custody: cells each sampler declares per block")
     ap.add_argument("--sample-retry", type=float, default=2.0, help="custody: seconds a sampler waits before asking another link")
-    ap.add_argument("--sample-cover", type=int, default=0, help="custody: protocol-v2.md's SAMPLE_COVER [D12]: each sampler adds "
+    ap.add_argument("--sample-cover", type=int, default=0, help="custody: seacast.md's SAMPLE_COVER [D12]: each sampler adds "
                     "sampling-only links until every column has this many custodians among its links (the coverage floor, §1.3); 0: its links as drawn")
     ap.add_argument("--cover-high", type=int, default=1, help="custody: COVER_HIGH [D12]: columns a node of high custody (more than "
                     "--cgc, or the proposer) counts for in the coverage floor (§1.3: diversity, not the fewest links); a large value counts it in full")
-    ap.add_argument("--route", default="on", choices=("on", "off"), help="custody: protocol-v2.md's routed sample requests [D12]: a sample "
+    ap.add_argument("--route", default="on", choices=("on", "off"), help="custody: seacast.md's routed sample requests [D12]: a sample "
                     "no link serves goes to a link with duty FORWARD, which passes it one step on (§4.5, §4.10)")
     ap.add_argument("--churn", type=int, default=0, help="with --upkeep on: link replacements per message gap; in "
                     "each, a node other than the source closes one of its links and opens one to a node it has none "
                     "with, at an instant drawn from the churn's own generator (0: none)")
-    ap.add_argument("--keep-floor", default="off", choices=("off", "on"), help="custody, with --upkeep on: protocol-v2.md "
+    ap.add_argument("--keep-floor", default="off", choices=("off", "on"), help="custody, with --upkeep on: seacast.md "
                     "§4.1's keep_floor for the columns, the custodian floor per column the graph is built with (--floor) "
                     "kept at runtime: at its heartbeat a custodian short of it in a column opens links to custodians it "
                     "has none with (off, the ablation: keep_floor finds no candidates, and the floor is met at setup only)")
-    ap.add_argument("--upkeep", default="off", choices=("off", "on"), help="protocol-v2.md §4.1 on the wire: JOINs, "
+    ap.add_argument("--upkeep", default="off", choices=("off", "on"), help="seacast.md §4.1 on the wire: JOINs, "
                     "GRAFTs and PRUNEs sent and read, and the heartbeat's maintain_relations given candidates (off: the "
                     "relations stay as built, the messages are not sent)")
-    ap.add_argument("--symmetric", default="on", choices=("on", "off"), help="the payload's SYMMETRIC (protocol-v2.md "
+    ap.add_argument("--symmetric", default="on", choices=("on", "off"), help="the payload's SYMMETRIC (seacast.md "
                     "§4.1, §6.1: v0.3's mesh, one relation both ways); off: its in- and out-relations kept apart, the "
                     "upkeep before 2026-11-09")
-    ap.add_argument("--prune-backoff", type=float, default=0.0, help="seconds: every type's PRUNE_BACKOFF (protocol-v2.md "
+    ap.add_argument("--prune-backoff", type=float, default=0.0, help="seconds: every type's PRUNE_BACKOFF (seacast.md "
                     "§4.1): after a PRUNE received, its relation is not grafted again before then (0: none)")
     ap.add_argument("--route-hops", type=int, default=1, help="custody: ROUTE_HOPS, the forwarding steps of a routed request (1: two hops)")
     ap.add_argument("--sample-retry2", type=float, default=0.5, help="custody: SAMPLE_RETRY2, the second phase's wait per peer (§4.10)")
     ap.add_argument("--sample-outstanding", type=int, default=4, help="custody: SAMPLE_OUTSTANDING, the node's cap on second-phase sample asks in flight per block, across types (§4.10); at least 1")
     ap.add_argument("--forward-limit", type=float, default=math.inf, help="custody: FORWARD_LIMIT, routed requests a node passes on per peer and block")
-    ap.add_argument("--no-invariants", action="store_true", help="--doc v2: skip the invariants report (invariants.py)")
+    ap.add_argument("--no-invariants", action="store_true", help="--doc seacast: skip the invariants report (invariants.py)")
     ap.add_argument("--answers-first", default="off",
                     choices=("off", "on", "v03", "oldest", "line", "others", "fresh", "late", "othersans"),
-                    help="--doc v2: off and on are protocol-v2.md §4.12's ANSWERS_FIRST (a source's own chunks first either way); "
+                    help="--doc seacast: off and on are seacast.md §4.12's ANSWERS_FIRST (a source's own chunks first either way); "
                          "v03 is v0.3's order; the others are the forms measured against it (node.py _writer_variants, README)")
     ap.add_argument("--source-offers", default="on", choices=("on", "off", "late", "publish"),
                     help="off: publish does not offer the chunks to the peers it did not push them (card 3 at the source); "
                          "late: publish queues those offers after the pushes of every group published at the same instant; "
                          "both act only on offers publish itself makes, so since v0.9's rule (offers at the acknowledgement) "
-                         "they change nothing; publish: SOURCE_OFFERS = PUBLISH (protocol.md §5.1, protocol-v2.md §4.7), the "
+                         "they change nothing; publish: SOURCE_OFFERS = PUBLISH (seacast-lite.md §5.1, seacast.md §4.7), the "
                          "offers at publish and the HAVE growing at a chunk's first write, as before v0.9's rule")
     ap.add_argument("--answer-due", type=float, default=0.100, help="--answers-first late: seconds an answer waits before it goes ahead of pushes")
     ap.add_argument("--promise", type=float, default=0.400, help="seconds an offer's promise runs before the peer is parked for the group (v0.3 §6.1's PROMISE)")
     ap.add_argument("--promise-mode", default="fixed", choices=("fixed", "uplink", "peer"),
-                    help="--doc v2: fixed, protocol-v2.md §4.13 (the promise stays at --promise); uplink: the form §4.13 rejects, "
+                    help="--doc seacast: fixed, seacast.md §4.13 (the promise stays at --promise); uplink: the form §4.13 rejects, "
                          "the promise scaled with the ask window; peer: an option, a promise per peer following its observed "
                          "answer times (srtt + 4 rttvar, floored at --promise)")
-    ap.add_argument("--ask-uplink", type=float, default=50, help="--doc v2: Mbps, protocol-v2.md §4.13's ASK_UPLINK, below which a node's "
+    ap.add_argument("--ask-uplink", type=float, default=50, help="--doc seacast: Mbps, seacast.md §4.13's ASK_UPLINK, below which a node's "
                     "IWANT_WINDOW and PROMISE scale by ASK_UPLINK / its uplink; 0: never (v0.3's fixed clocks)")
     ap.add_argument("--merge-holdings", default="off", choices=("off", "on"),
-                    help="--doc v2: protocol-v2.md §6.3's MERGE_HOLDINGS, an option: a holding of a group the node publishes "
+                    help="--doc seacast: seacast.md §6.3's MERGE_HOLDINGS, an option: a holding of a group the node publishes "
                          "that is still in its queue takes the newer chunks instead of a second holding (§4.2, §4.7)")
     ap.add_argument("--ihave-limits", default="",
-                    help="MESSAGES,LENGTH: gossipsub's two IHAVE limits, the client's (protocol.md §4.4, §8.2; protocol-v2.md "
+                    help="MESSAGES,LENGTH: gossipsub's two IHAVE limits, the client's (seacast-lite.md §4.4, §8.2; seacast.md "
                          "§4.3): offer-bearing RPCs per peer and heartbeat, and asks in reply to them; the asks over either "
                          "wait for the next heartbeat's retry (stock gossipsub: 10,5000). Empty: no limit")
     ap.add_argument("--late-block", default="",
                     help="PCT,MS[,STORE]: PCT percent of the nodes that publish nothing (0 to 100; 0: none) install each block MS milliseconds "
-                         "after its publish, so that the chunks ahead of it take protocol.md §4.2's deferral: each such node "
+                         "after its publish, so that the chunks ahead of it take seacast-lite.md §4.2's deferral: each such node "
                          "keeps at most STORE deferred copies per peer (default 2) and refuses the rest. The payload only")
     a = ap.parse_args(argv)
     send_buffer_default = 1 if a.uplink == "ps" else 0      # §7.3's rule where the toy's link can keep it
@@ -409,7 +409,7 @@ def main(argv):
                repair_budget=a.repair_budget, repair_keepers=a.repair_keepers, keeper_claims=a.keeper_claims, repair_push=a.repair_push, PROMISE=a.promise, ASK_UPLINK=a.ask_uplink * 1e6, promise_mode=a.promise_mode,
                member_check=a.member_check, rebuilt_seen=a.rebuilt_seen, REPAIR_BIAS=a.repair_bias, SAMPLE_WAIT=a.sample_wait, REPAIR_REASK=a.repair_reask == "on",
                REPAIR_SAMPLE=[tuple(int(x) for x in step.split(":")) for step in a.repair_sample.split(",")] if a.repair_sample else None,
-               invariants=(a.doc == "v2" and not a.no_invariants), answers_first=a.answers_first, answer_due=a.answer_due,
+               invariants=(a.doc == "seacast" and not a.no_invariants), answers_first=a.answers_first, answer_due=a.answer_due,
                source_offers=a.source_offers, MERGE_HOLDINGS=a.merge_holdings == "on",
                MAX_IHAVE_MESSAGES=limits[0], MAX_IHAVE_LENGTH=limits[1],
                late_block=(int(late[0]), late[1] / 1000, int(late[2]) if len(late) == 3 else 2) if late else None,
@@ -417,7 +417,7 @@ def main(argv):
     if a.fault.startswith("hoardcol") and a.rebuilt_seen != "on":
         ap.error("--fault hoardcol is meant strict: with --rebuilt-seen on")
     if a.sample_outstanding < 1:
-        ap.error("--sample-outstanding: SAMPLE_OUTSTANDING's bound is at least 1 (protocol-v2.md §6.3)")
+        ap.error("--sample-outstanding: SAMPLE_OUTSTANDING's bound is at least 1 (seacast.md §6.3)")
     if a.payload:
         cfg["payload"], cfg["COMPRESSED"] = a.payload, round(a.payload / CFG["COMPRESSION"])
     for k in filter(None, a.without.split(",")):
@@ -430,8 +430,8 @@ def main(argv):
     cfg["send_buffer"] = a.send_buffer or None
     cfg["classes"] = scenario.net(a.net, a.up * 1e6, a.down * 1e6, a.dc_mbps * 1e6, a.builder_mbps * 1e6)
     cfg.update(rebuilt=a.rebuilt, rb_jitter=a.rb_jitter_ms / 1000, rb_max=a.rb_max, fault=a.fault, loss_data=a.loss_data)
-    if a.wire == "standalone" and a.doc != "v2":
-        ap.error("--wire standalone binds protocol-v2.md's messages: it needs --doc v2")
+    if a.wire == "standalone" and a.doc != "seacast":
+        ap.error("--wire standalone binds seacast.md's messages: it needs --doc seacast")
     cfg["wire"] = a.wire
     cfg["latency"] = scenario.geo_latency(a.seed)
     cfg["topology"] = scenario.topology
@@ -466,7 +466,7 @@ def main(argv):
     recon = (f"{a.reconstructors}%" if cfg.get("das_dump") is None
              else f"{len(cfg['das_dump']['reconstructors'])} (dump)")
     supers = f"{a.supernodes}% ({a.supernode_link})" if cfg.get("das_dump") is None else f"{cfg['supernodes']} (dump)"
-    print(f"toy: doc={a.doc}{' setting=' + a.setting if a.doc == 'v2' else ''}{' wire=standalone' if a.wire == 'standalone' else ''}"
+    print(f"toy: doc={a.doc}{' setting=' + a.setting if a.doc == 'seacast' else ''}{' wire=standalone' if a.wire == 'standalone' else ''}"
           f"{f' blobs={a.blobs} cgc={a.cgc} floor={a.floor}/{a.source_floor}' if a.setting in ('custody', 'rows') else ''}"
           f"{f' subnets={a.row_subnets} reconstructors={recon} withhold={a.withhold} row-delay={a.row_delay:g}s phase3={a.phase3:g}+{a.phase3_jitter:g}s defer={a.defer_window:g}s repair-floor={a.repair_floor}' if a.setting == 'rows' else ''}"
           f"{f' samplers={a.samplers}% samples={a.samples} retry={a.sample_retry:g}s' if a.samplers else ''}"

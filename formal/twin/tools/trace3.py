@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Trace protocol.md's functions (the block, BLOCK below) and §4.2's two readers `held` and `tied_to_root` (the
+"""Trace seacast-lite.md's functions (the block, BLOCK below) and §4.2's two readers `held` and `tied_to_root` (the
 twin's code over its `mine` and `tied`), with what each call reads and writes (format 7).
 
 Format 7. A trace's first line is its content line (content.py): what it was made from, each file by the sha256 of
@@ -16,7 +16,7 @@ The second line is the header: the format, `whole`, the tables' names (`own`, `f
 and the run's arguments. The third is the one nodes line:
   {"nodes": [{"n": [node, ...], "consts": {...}, "replaced": [name, ...]}, ...]}
 one entry per distinct pair of constants and replaced names, with the nodes that have it. A record is replayed with
-its own node's constants. At each node every traced name must be protocol.md's own code, a listed wrapper that holds
+its own node's constants. At each node every traced name must be seacast-lite.md's own code, a listed wrapper that holds
 it, or the node's listed helper (`own_code`); a name on REPLACEABLE that is none of these is a question at that node,
 and the node's entry says so.
 
@@ -24,9 +24,9 @@ and the node's entry says so.
 
 With TRACE3_ONLY=sec61 in its environment it traces §6.1's twelve alone: most of their calls are otherwise inside
 an on_ihave record, and these are the baseline's records. The two readers are then not traced, so their reads are
-the calling record's. With --doc v2 among run.py's arguments it traces the block's names that are protocol.md's all
-the way down (`v2_kept`, 20 at v0.10). The header's `traced` lists the functions traced, sorted: the block's
-(BLOCK), §6.1's twelve, or v2's kept.
+the calling record's. With --doc seacast among run.py's arguments it traces the block's names that are seacast-lite.md's all
+the way down (`seacast_kept`, 20 at v0.10). The header's `traced` lists the functions traced, sorted: the block's
+(BLOCK), §6.1's twelve, or SEACAST's kept.
 
 As trace61.py (whose encodings this file uses), nothing changes in TOYDIR: each node's namespace is wrapped after
 the toy's own overrides, and the cell runs as run.py runs it, printing its digest with --digest, so that a run
@@ -123,7 +123,7 @@ SEC71 = ("front", "wake_front", "write_waits", "acquire_slot", "release_unused_s
 # hand5-publish and directed7p do), origin_acked, and publish
 SEC51 = ("origin_written", "origin_acked",
          "publish")     # the simulation's call, a record a published payload.
-#                         With it the block is every function of protocol.md (and `held`, §4.2's reader)
+#                         With it the block is every function of seacast-lite.md (and `held`, §4.2's reader)
 BLOCK = SEC61 + SEC44 + READERS + SEC42 + SEC42B + SEC72 + SEC1 + SEC2 + SEC61B + SEC64 + SEC46 + SEC43 + SEC41 + SEC3 + SEC52 + SEC53 + SEC54 + SEC71 + SEC51
 DEFER_DEPTH = 2                         # the twin's deferDepth (Sec42.lean): a record's chain of defers stops at the
                                         #   third, where the twin would crash
@@ -134,11 +134,11 @@ FOREIGN = ("known_id",                     # `queue`, `pending_ids` and `stop_pu
            "chunks")     # (`unwanted` is own: on_frame writes it)
 #                                             the writer reads §5.2's (`peer_has` and `holders`, §4.3's, are the
 #                                             twin's own: on_have asks `g in planned`)
-# §7.1's three, the twin's own. Under protocol.md a cell holds the count and views hold the line and the sends;
-# under --doc v2 they are not installed (there the count is bytes and a send's value a pair, and no traced function
-# of protocol.md touches them)
+# §7.1's three, the twin's own. Under seacast-lite.md a cell holds the count and views hold the line and the sends;
+# under --doc seacast they are not installed (there the count is bytes and a send's value a pair, and no traced function
+# of seacast-lite.md touches them)
 WINDOW = ("in_flight", "waiters", "sent")
-V2_FILE = "protocol-v2.md (extracted)"  # the toy compiles protocol-v2.md's blocks under this name (node.py, spec2)
+SEACAST_FILE = "seacast.md (extracted)"  # the toy compiles seacast.md's blocks under this name (node.py, spec2)
 
 
 # the calls the block makes on the tape: each a question, answered from the trace, whoever defines it (install's
@@ -185,16 +185,16 @@ CALLS = ("sha256", "serialize", "snappy_block_encode", "pad_each", "rs_parity", 
          "verify_merkle_proof", "block_root")
 
 
-def v2_kept(names, p_src, v2_src, cut=TAPE):
-    """Under --doc v2: the names of `names` that are protocol.md's all the way down. A def of protocol.md goes if
-    protocol-v2.md defines it (v2 redefines it), or if it names one that goes, through any def of protocol.md, not
+def seacast_kept(names, p_src, seacast_src, cut=TAPE):
+    """Under --doc seacast: the names of `names` that are seacast-lite.md's all the way down. A def of seacast-lite.md goes if
+    seacast.md defines it (SEACAST redefines it), or if it names one that goes, through any def of seacast-lite.md, not
     through the names of `names` alone. A name of `cut` is a call on the tape: a question, answered from the trace
     whoever defines it, so it is not followed, and does not make its caller go. From the documents' own source:
-    `p_src` protocol.md's extracted code, `v2_src` protocol-v2.md's."""
-    v2_defs = {d.name for d in ast.parse(v2_src).body if isinstance(d, ast.FunctionDef)}
+    `p_src` seacast-lite.md's extracted code, `seacast_src` seacast.md's."""
+    seacast_defs = {d.name for d in ast.parse(seacast_src).body if isinstance(d, ast.FunctionDef)}
     defs = {d.name: d for d in ast.parse(p_src).body if isinstance(d, ast.FunctionDef)}
     refs = {n: {x.id for x in ast.walk(d) if isinstance(x, ast.Name)} - set(cut) for n, d in defs.items()}
-    gone = {n for n in set(defs) | set(names) if n in v2_defs and n not in cut}
+    gone = {n for n in set(defs) | set(names) if n in seacast_defs and n not in cut}
     grew = True
     while grew:
         grew = False
@@ -252,36 +252,42 @@ def toy_reads_a_dump(argv):
 
 
 def doc_parsed(argv):
-    """The document the toy runs, as its own parser reads argv (toy_args): "v2" or None."""
+    """The document the toy runs, as its own parser reads argv (toy_args): "seacast" or None."""
     ap, a = toy_args(argv)
-    return "v2" if a.doc == "v2" else None
+    return "seacast" if a.doc == "seacast" else None
+
+
+OLD_DOCS = {"v2": "seacast", "v03": "lite"}  # the values of --doc before v0.12.0, as the headers written then hold them
 
 
 def doc_of(argv):
-    """The document a trace's arguments name (--doc v2 or --doc=v2), or None for protocol.md: read from the words
+    """The document a trace's arguments name (--doc seacast or --doc=seacast), or None for seacast-lite.md: read from the words
     themselves, so that it reads a directed set's arguments too, which are no toy's command line. For a trace of the
     toy's command line the tracer has already refused arguments where this reading and the toy's parser's differ
-    (Tracer3, cli), so a header's arguments read here name the document the toy ran."""
+    (Tracer3, cli), so a header's arguments read here name the document the toy ran. A header written before v0.12.0
+    names the documents by their old values (formal/twin/record/'s SEACAST traces), and is read by OLD_DOCS as the same
+    document under its new name."""
     for i, a in enumerate(argv):
         if a == "--doc" and i + 1 < len(argv):
-            return argv[i + 1]
+            return OLD_DOCS.get(argv[i + 1], argv[i + 1])
         if a.startswith("--doc="):
-            return a.split("=", 1)[1]
+            d = a.split("=", 1)[1]
+            return OLD_DOCS.get(d, d)
     return None
 
 
-DOC_FILE = "protocol.md (extracted)"    # the toy compiles protocol.md's blocks under this name (node.py, SPEC)
-# A traced name's function at a node is protocol.md's own code, or one of these.
+DOC_FILE = "seacast-lite.md (extracted)"    # the toy compiles seacast-lite.md's blocks under this name (node.py, SPEC)
+# A traced name's function at a node is seacast-lite.md's own code, or one of these.
 # WRAPPERS: the toy's wrappers of a document's function, each by its qualified name; it must hold the document's
 # function of that name in its closure. Read once each (toy/node.py): message_id stores the id on the chunk;
 # claim_group notes the completion's time; may_ask, add_offer and close_promises keep the toy's index of a chunk's
-# ask keys and an offer's time; over_ihave_limits counts the asks held back; under --doc v2, promise_due notes a
+# ask keys and an offer's time; over_ihave_limits counts the asks held back; under --doc seacast, promise_due notes a
 # broken promise for the invariants. Each then calls the document's function with its own arguments.
 WRAPPERS = {"message_id": "Node._override.<locals>.message_id", "claim_group": "Node._override.<locals>.claim_group",
             "may_ask": "Node._override.<locals>.may_ask", "add_offer": "Node._override.<locals>.add_offer",
             "close_promises": "Node._override.<locals>.close_promises",
             "over_ihave_limits": "Node.__init__.<locals>.over_ihave_limits",
-            "promise_due": "Node._v2.<locals>.promise_due"}
+            "promise_due": "Node._seacast.<locals>.promise_due"}
 # NODE_OWN: a traced name that is no function of the document's, but the node's helper the twin has as its own code
 # (`held`, §8's interface, over the twin's `mine`).
 NODE_OWN = {"held": "Node._namespace.<locals>.held"}
@@ -298,7 +304,7 @@ REPLACEABLE_WHOLE = ("validate_chunk",)
 
 
 def own_code(name, fn):
-    """What a traced name's function is at a node: ("own", where) for protocol.md's own code, a listed wrapper that
+    """What a traced name's function is at a node: ("own", where) for seacast-lite.md's own code, a listed wrapper that
     holds it, or the node's listed helper; ("replaced", where) for anything else."""
     code = getattr(fn, "__code__", None)
     if code is None:
@@ -322,80 +328,80 @@ def own_code(name, fn):
     return "replaced", where
 
 
-def namespace_check(names, traced, v2_defs, ns, replaceable=None):
-    """The namespace against the documents' source: no traced function is v2's, and every name of `names` that
-    protocol-v2.md defines (`v2_defs`) is v2's here. Two derivations of the set, each checking the other. The reason
+def namespace_check(names, traced, seacast_defs, ns, replaceable=None):
+    """The namespace against the documents' source: no traced function is SEACAST's, and every name of `names` that
+    seacast.md defines (`seacast_defs`) is SEACAST's here. Two derivations of the set, each checking the other. The reason
     the namespace is refused, or None.
 
-    A replaceable name that protocol-v2.md defines may be the node's own here, neither document's: the toy's
+    A replaceable name that seacast.md defines may be the node's own here, neither document's: the toy's
     variants of push_rebuilt (--rebuilt none, hold, announce, capped; a silent node's), a silent node's forward.
-    Such a name is not traced under v2 (v2 defines it), and nothing of the check depends on which of the two it is.
-    protocol.md's own function under a name v2 defines is still refused: v2's block was not run over it. (Without
-    the exception, a v2 cell whose nodes run their own push_rebuilt could not be traced.)"""
+    Such a name is not traced under SEACAST (SEACAST defines it), and nothing of the check depends on which of the two it is.
+    seacast-lite.md's own function under a name SEACAST defines is still refused: SEACAST's block was not run over it. (Without
+    the exception, a SEACAST cell whose nodes run their own push_rebuilt could not be traced.)"""
     replaceable = REPLACEABLE if replaceable is None else replaceable
     for name in names:
         file = getattr(getattr(ns.get(name), "__code__", None), "co_filename", None)
-        v2_here = file == V2_FILE
-        if name in traced and v2_here:
-            return f"{name} is traced, but its function here is protocol-v2.md's"
-        if name in v2_defs and not v2_here:
+        seacast_here = file == SEACAST_FILE
+        if name in traced and seacast_here:
+            return f"{name} is traced, but its function here is seacast.md's"
+        if name in seacast_defs and not seacast_here:
             if name in replaceable and file != DOC_FILE:
                 continue
-            return f"protocol-v2.md defines {name}, but its function here is not v2's"
+            return f"seacast.md defines {name}, but its function here is not SEACAST's"
     return None
 
 
-def v2_kept_self_test():
-    """v2_kept's cases on planted sources, and namespace_check's on a planted namespace: each must give what it
+def seacast_kept_self_test():
+    """seacast_kept's cases on planted sources, and namespace_check's on a planted namespace: each must give what it
     states. The namespace's case with a redefined name left in the traced list is the control "a traced list
     computed with one redefined name left in must fail its check"."""
     p = "def a():\n    b()\ndef b():\n    pass\ndef c():\n    d()\ndef d():\n    pass\ndef e():\n    x()\ndef f():\n    c()\n"
     names = ("a", "b", "c", "d", "e", "f")
     cases = [
-        ("v2 redefines d: d goes, c (calls d) and f (calls c) go with it; e's call of x, no name of theirs, is a "
-         "question", v2_kept(names, p, "def d():\n    pass\n"), ("a", "b", "e")),
-        ("v2 redefines x alone, which is none of the names: nothing goes", v2_kept(names, p, "def x():\n    pass\n"),
+        ("SEACAST redefines d: d goes, c (calls d) and f (calls c) go with it; e's call of x, no name of theirs, is a "
+         "question", seacast_kept(names, p, "def d():\n    pass\n"), ("a", "b", "e")),
+        ("SEACAST redefines x alone, which is none of the names: nothing goes", seacast_kept(names, p, "def x():\n    pass\n"),
          names),
-        ("v2 redefines nothing: nothing goes", v2_kept(names, p, ""), names),
-        ("a name protocol.md does not define (a toy helper) stays unless v2 defines it",
-         v2_kept(("a", "h"), p, "def d():\n    pass\n"), ("a", "h")),
-        # the closure through every def of protocol.md, cut at the tape's names
+        ("SEACAST redefines nothing: nothing goes", seacast_kept(names, p, ""), names),
+        ("a name seacast-lite.md does not define (a toy helper) stays unless SEACAST defines it",
+         seacast_kept(("a", "h"), p, "def d():\n    pass\n"), ("a", "h")),
+        # the closure through every def of seacast-lite.md, cut at the tape's names
         ("a name that reaches a redefined def through a helper outside the names goes",
-         v2_kept(("f", "a"), p, "def d():\n    pass\n", cut=()), ("a",)),
-        ("a name that calls a tape name v2 redefines stays: the call is a question",
-         v2_kept(("c", "a"), p, "def d():\n    pass\n", cut=("d",)), ("c", "a")),
+         seacast_kept(("f", "a"), p, "def d():\n    pass\n", cut=()), ("a",)),
+        ("a name that calls a tape name SEACAST redefines stays: the call is a question",
+         seacast_kept(("c", "a"), p, "def d():\n    pass\n", cut=("d",)), ("c", "a")),
     ]
     bad = 0
     for what, got, want in cases:
         ok = got == want
         bad += not ok
-        print(f"v2_kept self-test, {what}: {'ok' if ok else f'got {got}, must be {want}  <-- FAIL'}")
-    # a namespace as the toy makes one: protocol.md's functions compiled under one file name, v2's under V2_FILE
+        print(f"seacast_kept self-test, {what}: {'ok' if ok else f'got {got}, must be {want}  <-- FAIL'}")
+    # a namespace as the toy makes one: seacast-lite.md's functions compiled under one file name, SEACAST's under SEACAST_FILE
     ns = {}
-    exec(compile(p, "protocol.md (extracted)", "exec"), ns)
-    exec(compile("def d():\n    pass\n", V2_FILE, "exec"), ns)
-    kept = v2_kept(names, p, "def d():\n    pass\n")
+    exec(compile(p, "seacast-lite.md (extracted)", "exec"), ns)
+    exec(compile("def d():\n    pass\n", SEACAST_FILE, "exec"), ns)
+    kept = seacast_kept(names, p, "def d():\n    pass\n")
     own = {}
     exec(compile("def d():\n    pass\n", "node.py", "exec"), own)       # a node's own function under the name
     ncases = [
-        ("the computed set, d v2's here: passes", namespace_check(names, kept, {"d"}, ns), None),
-        ("the computed set with d, which v2 redefines, left in: refused",
-         namespace_check(names, kept + ("d",), {"d"}, ns), "d is traced, but its function here is protocol-v2.md's"),
-        ("the computed set, but d protocol.md's here (v2's block not run over it): refused",
+        ("the computed set, d SEACAST's here: passes", namespace_check(names, kept, {"d"}, ns), None),
+        ("the computed set with d, which SEACAST redefines, left in: refused",
+         namespace_check(names, kept + ("d",), {"d"}, ns), "d is traced, but its function here is seacast.md's"),
+        ("the computed set, but d seacast-lite.md's here (SEACAST's block not run over it): refused",
          namespace_check(names, kept, {"d"}, {**ns, "d": ns["b"]}),
-         "protocol-v2.md defines d, but its function here is not v2's"),
-        # a replaceable name v2 defines may be the node's own (neither document's)
+         "seacast.md defines d, but its function here is not SEACAST's"),
+        # a replaceable name SEACAST defines may be the node's own (neither document's)
         ("d replaceable and the node's own here (a function of neither document): passes",
          namespace_check(names, kept, {"d"}, {**ns, "d": own["d"]}, replaceable=("d",)), None),
-        ("d replaceable, but protocol.md's here: refused",
+        ("d replaceable, but seacast-lite.md's here: refused",
          namespace_check(names, kept, {"d"}, {**ns, "d": ns["b"]}, replaceable=("d",)),
-         "protocol-v2.md defines d, but its function here is not v2's"),
+         "seacast.md defines d, but its function here is not SEACAST's"),
         ("d the node's own here, and not replaceable: refused",
          namespace_check(names, kept, {"d"}, {**ns, "d": own["d"]}, replaceable=()),
-         "protocol-v2.md defines d, but its function here is not v2's"),
-        ("d replaceable and left in the traced list, v2's here: refused as before",
+         "seacast.md defines d, but its function here is not SEACAST's"),
+        ("d replaceable and left in the traced list, SEACAST's here: refused as before",
          namespace_check(names, kept + ("d",), {"d"}, ns, replaceable=("d",)),
-         "d is traced, but its function here is protocol-v2.md's"),
+         "d is traced, but its function here is seacast.md's"),
     ]
     for what, got, want in ncases:
         ok = got == want
@@ -432,9 +438,9 @@ class Tracer3(Tracer):
         self.rest_total = 0
         self.doc_message_id = None      # the document's message_id: the tracer's own way to a chunk's id,
         #                                   untraced, storing nothing on the chunk
-        # what is traced: §6.1's twelve alone (TRACE3_ONLY=sec61); under --doc v2, the block's names that are
-        # protocol.md's all the way down; otherwise the block
-        self.doc_v2 = doc_of(argv) == "v2"
+        # what is traced: §6.1's twelve alone (TRACE3_ONLY=sec61); under --doc seacast, the block's names that are
+        # seacast-lite.md's all the way down; otherwise the block
+        self.doc_seacast = doc_of(argv) == "seacast"
         # the toy's command line (cli: this script's own main) is read as the toy's parser reads it (toy_args); a
         # directed set's arguments are no command line of the toy's, and are read by their words
         if (toy_reads_a_dump(argv) if cli else any(a.split("=")[0] in ("--xcheck", "--topology") for a in argv)):
@@ -443,17 +449,17 @@ class Tracer3(Tracer):
             raise SystemExit("trace3: --xcheck and --topology are not traced: a dump is an input the content line "
                              "does not name, and the toy's recorder there keeps the window's count, which is a cell "
                              "of the tracer's here")
-        if cli and doc_parsed(argv) != (doc_of(argv) if doc_of(argv) == "v2" else None):
+        if cli and doc_parsed(argv) != (doc_of(argv) if doc_of(argv) == "seacast" else None):
             raise SystemExit("trace3: the document is given in a form whose words do not name what the toy runs: give "
-                             "it as --doc v2 or --doc=v2, so that the trace's header names it")
-        self.v2_defs = ({d.name for d in ast.parse(N.generate(N.DOC2)).body if isinstance(d, ast.FunctionDef)}
-                        if self.doc_v2 else set())
+                             "it as --doc seacast or --doc=seacast, so that the trace's header names it")
+        self.seacast_defs = ({d.name for d in ast.parse(N.generate(N.DOC2)).body if isinstance(d, ast.FunctionDef)}
+                        if self.doc_seacast else set())
         if self.only61:
             self.traced = SEC61
-        elif self.doc_v2:
-            # (under v2 the window's count is bytes and a send's value a pair, and the three tables are not
+        elif self.doc_seacast:
+            # (under SEACAST the window's count is bytes and a send's value a pair, and the three tables are not
             # installed: the six are not traced there, by name)
-            self.traced = tuple(n for n in v2_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+            self.traced = tuple(n for n in seacast_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
         else:
             self.traced = BLOCK
         for d in (N.DOC, N.DOC2):       # the documents the toy reads are the two the content line names
@@ -585,7 +591,7 @@ class Tracer3(Tracer):
         return [f.group.hex(), int(f.index), int(f.slot), f.beacon_block_root.hex(), self.mid_of(f).hex()]
 
     def admitted_arg(self, x):
-        """What admitted(p, x) is asked of (protocol.md §8): the group a chunk, a HAVE or an offered id names. A HAVE
+        """What admitted(p, x) is asked of (seacast-lite.md §8): the group a chunk, a HAVE or an offered id names. A HAVE
         is written as an IHAVE's bitmap, ["bits", group, bitmap]; an offered id (what expand yields: a full id, or a
         WantIndex) as an ask key; a chunk as the twin reads it. The four shapes differ: a list of three whose first
         member is "bits", a string or a list of two, and a list of five."""
@@ -662,11 +668,11 @@ class Tracer3(Tracer):
 
     def final_check(self):
         """The traced names once more, when the nodes line is written, and again at the trace's end: install runs
-        inside `Node._override`, and the toy binds more after it returns (`Node.__init__`: over_ihave_limits' wrapper; under v2 `_v2`'s names,
+        inside `Node._override`, and the toy binds more after it returns (`Node.__init__`: over_ihave_limits' wrapper; under SEACAST `_seacast`'s names,
         on_frame, promise_due, a liar's send_have; a variant's wrapper of close_promises). A traced name must still
         be the tracer's own wrapper at that node, or a listed wrapper that holds it: anything else runs outside the
         records, unseen where no record calls it and another function's where one does. The names on the tape are
-        not held so: a question rebound later is missing from a tape, which the replay refuses, and under v2 the toy
+        not held so: a question rebound later is missing from a tape, which the replay refuses, and under SEACAST the toy
         rebinds several that no kept function asks."""
         for nd, ns, bound in self.bound:
             for name, w in bound.items():
@@ -747,7 +753,7 @@ class Tracer3(Tracer):
         if fn == "projected":
             p, g = args
             return [p, g.hex()]
-        if fn == "rarest":                                          # v2's choose calls it alone, with `queue[p]`:
+        if fn == "rarest":                                          # SEACAST's choose calls it alone, with `queue[p]`:
             (q,) = args                                             #   the peer is the key whose queue it is, in the
             q = F.unwrap(q)                                         #   node's own queue table (by identity)
             ps = [k for k, v in dict.items(self.cur_queue) if v is q]
@@ -1024,7 +1030,7 @@ class Tracer3(Tracer):
 
     def qmsg(self, m):
         """A control message of an entry: an IWANT's ids as ask keys, an IHAVE's and an IDONTWANT's as IHAVE
-        entries (v2's claims and WANT fields are not written: the twin reads neither). A PRUNE with ids, a GRAFT
+        entries (SEACAST's claims and WANT fields are not written: the twin reads neither). A PRUNE with ids, a GRAFT
         or a JOIN is refused: none is queued in the toy's runs (its stock prunes are none, and --upkeep is off)."""
         if m.kind == "iwant":
             return ["iwant", [self.key(b) for b in m.ids]]
@@ -1165,7 +1171,7 @@ class Tracer3(Tracer):
                 replaced.append(name)
             elif what != "own":
                 raise SystemExit(f"trace3: node {nd.id}: {name} is traced, and its function here is neither "
-                                 f"protocol.md's own code nor a listed wrapper of it: {where}")
+                                 f"seacast-lite.md's own code nor a listed wrapper of it: {where}")
         if self.nodes_written:
             raise SystemExit(f"trace3: node {nd.id} is installed after the trace's first record: its line cannot be "
                              f"written before its records")
@@ -1185,8 +1191,8 @@ class Tracer3(Tracer):
                           and c.cell_contents.__code__.co_name == "message_id")
         self.doc_mid[int(nd.id)] = mid_fn
         rec = F.Recorder()
-        F.install(rec, ns, [t for t in self.schema(ns) if not (self.doc_v2 and t.name in WINDOW)])
-        window = {} if self.doc_v2 else {name: ns[name] for name in WINDOW}    # the installed cell and views: each
+        F.install(rec, ns, [t for t in self.schema(ns) if not (self.doc_seacast and t.name in WINDOW)])
+        window = {} if self.doc_seacast else {name: ns[name] for name in WINDOW}    # the installed cell and views: each
         #                                                                         record's end checks they are still there
         st = {"depth": 0, "ext": 0, "cur": None}
         key, tr = self.key, self
@@ -1257,7 +1263,7 @@ class Tracer3(Tracer):
                 st["cur"], st["depth"], st["reached"], st["defers"] = r_, 1, {name}, 1 if name == "defer" else 0
                 mesh_on()
                 rec.on = True
-                if name == "rarest":            # v2's choose passes the raw queue it took outside a record;
+                if name == "rarest":            # SEACAST's choose passes the raw queue it took outside a record;
                     args = (ns["queue"][r_["args"][0]],)    # the view of queue[p] logs its read of the lane
                 try:
                     r = fn(*args, **kw)
@@ -1416,11 +1422,11 @@ class Tracer3(Tracer):
             raise SystemExit(f"trace3: the questions with their own encoders are not CALLS': {sorted(set(calls) ^ set(CALLS))}")
         for name, (ea, er) in calls.items():
             enc[name] = lambda r, *a, _ea=ea, _er=er: [_ea(*a), _er(r)]
-        # the namespace must agree with the documents' source: no traced function is v2's, and under --doc v2 every
-        # name of the block that v2 defines is v2's here (two derivations of the set, each checking the other)
+        # the namespace must agree with the documents' source: no traced function is SEACAST's, and under --doc seacast every
+        # name of the block that SEACAST defines is SEACAST's here (two derivations of the set, each checking the other)
         if set(enc) != set(TAPE):
             raise SystemExit(f"trace3: the tape's calls are not TAPE's: {sorted(set(enc) ^ set(TAPE))}")
-        why = namespace_check(BLOCK, tr.traced, tr.v2_defs, ns)
+        why = namespace_check(BLOCK, tr.traced, tr.seacast_defs, ns)
         if why:
             raise SystemExit(f"trace3: node {nd.id}: {why}")
         # a traced name this node runs as something else: the node's, a call on the tape where the block's
@@ -1521,6 +1527,6 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] == ["--self-test-v2"]:
-        sys.exit(v2_kept_self_test())
+    if sys.argv[1:] == ["--self-test-seacast"]:
+        sys.exit(seacast_kept_self_test())
     main(sys.argv[1:])

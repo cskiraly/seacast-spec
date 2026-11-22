@@ -1,15 +1,15 @@
 # SEACAST: its figures
 
-This file holds the figures behind SEACAST, [`protocol-v2.md`](protocol-v2.md), and
-behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).
+This file holds the figures behind SEACAST, [`seacast.md`](seacast.md), and
+behind its decision record, [`seacast-decisions.md`](seacast-decisions.md).
 Both documents state the rules and their reasons in words, and they point here for the numbers, as
-`(protocol-v2-figures.md, §4.1)`, or as `(protocol-v2-figures.md, §4.6, "The probe")` for a part of
+`(seacast-figures.md, §4.1)`, or as `(seacast-figures.md, §4.6, "The probe")` for a part of
 an entry. The entries are grouped by the section that cites them, under that section's number and
 heading, in the document's order. The decision record's own figures close the file, each under its
 decision's label, such as `[D12]`.
 
 **Where the figures come from.** The file holds the toy's figures and, marked as such, a few of the
-research harness's. Every figure comes from the toy (`toy/`, `toy/run.py --doc v2`) unless its entry
+research harness's. Every figure comes from the toy (`toy/`, `toy/run.py --doc seacast`) unless its entry
 says in its first line that a figure comes from the research harness of the posts. A figure comes
 from a network of 60 nodes unless its entry gives another size. The toy's graph scripts
 (`toy/sampler_graph.py`, `toy/sampler_match.py`) build the toy's networks and run no events, so
@@ -29,19 +29,19 @@ mechanism, not a measurement. Ranges over ten or more seeds say so. Each entry n
 says where a figure is a mean or a median over seeds. "The median of the seeds, and its range" is
 the median over the seeds of a change, paired by seed, and the range of that change over the seeds.
 
-**The transport.** On 2026-11-15 the toy took `protocol.md` §7.3's rule as its default: one entry at
+**The transport.** On 2026-11-15 the toy took `seacast-lite.md` §7.3's rule as its default: one entry at
 a time per connection (`--send-buffer 1`). With `--uplink rr`, which has no send buffer, writes
 still go at once. Figures and comparisons measured before that change ran with the earlier
 transport, which takes every write at once (`--send-buffer 0`), unless they name `--send-buffer 1`.
 
 **Each entry gives its own conditions:** the network and its size, the degree, the messages, the
 seeds, the operating point (the setting, the source's uplink, the faults), the transport, the
-baseline, and the rules it ran on. The rules are those of `protocol-v2.md` on the date of the run;
-below, the draft of a date means `protocol-v2.md` as it was on that date. An entry gives that date
+baseline, and the rules it ran on. The rules are those of `seacast.md` on the date of the run;
+below, the draft of a date means `seacast.md` as it was on that date. An entry gives that date
 and the commit on this repository's main line that first wrote the figure into the text; a commit
 off the main line is named by its date. It names the later changes of the rules that its figures
-predate, where it can point to them; the versions of `protocol.md` carried since are listed in
-`protocol-v2-decisions.md` ("The versions of `protocol.md` carried"). A condition that the run's
+predate, where it can point to them; the versions of `seacast-lite.md` carried since are listed in
+`seacast-decisions.md` ("The versions of `seacast-lite.md` carried"). A condition that the run's
 record does not give is called unknown.
 
 ## §1.3 Links, joins and relations
@@ -61,7 +61,7 @@ are counted by distinct links, and a peer of high custody counts for at most one
 - Without the coverage floor, a sampler of eight cells holds a sample that no link serves with
   probability 17 % at 70 links and 96 % at 16 [16.6 % and 95.7 %].
 - One cover by the fewest links (a greedy cover, high custody counted in full) adds a median of 2
-  sampling-only links per sampler at 70 links and 13 at 16. `protocol-v2.md` §7 cites the 13.
+  sampling-only links per sampler at 70 links and 13 at 16. `seacast.md` §7 cites the 13.
 - The diversity floor of two covers adds a median of 8 links per sampler on top of 70 and 29 on top
   of 16. The 500-node cells of §6.3's `SAMPLE_COVER` entry built the same floors: their floor links
   equal those of the graph built alone.
@@ -76,7 +76,7 @@ ordered connection with queues of one entry. They explore every interleaving up 
 end's upkeep steps: three unless an item says two. The abstract comparison (`--model`) runs four
 steps per end. A count covers the states reached within the bound. A state "at rest" has nothing
 queued, owed or on the wire. The text checked is the draft of 2026-11-10, with the answered GRAFT,
-the yes again and the symmetric relation (`protocol-v2.md` §4.1); the figures were first written
+the yes again and the symmetric relation (`seacast.md` §4.1); the figures were first written
 into the text on the main line in spec `0d968d8` (2026-11-14). The four modes printed the same
 counts again on the draft of 2026-11-14, and the one-way mode did so on the draft of 2026-11-16; no
 later run is recorded. The controls are the earlier texts kept in `toy/controls/`. The control of
@@ -102,16 +102,16 @@ the answered GRAFT is the text of 2026-11-03, the control of the owed JOIN is th
 
 ### The prune at `F_HI`
 
-**Conditions.** The cell carries the payload in the tier 4 setting (`protocol-v2.md` §6.2), on 60
+**Conditions.** The cell carries the payload in the tier 4 setting (`seacast.md` §6.2), on 60
 nodes at degree 30 in the all-home network (`home`), with six messages and seed 7, under
 `--upkeep on --churn 20`: it replaced 20 links per message gap, 120 over the run. The transport
 then took every write at once (`--send-buffer 0`). The cell ran on 2026-11-09 on the draft with the
 five gaps' rules; on 2026-11-10 the revised text printed the same figures. The figures were first
 written into the text on the main line in spec `0d968d8` (2026-11-14). The run predates the close's
-lifetimes of 2026-11-16 (§3, `protocol.md` §8.1) and the transport of 2026-11-15; it was not run
+lifetimes of 2026-11-16 (§3, `seacast-lite.md` §8.1) and the transport of 2026-11-15; it was not run
 again.
 
-- With a prune only above `F_HI` (`protocol-v2.md` §1.4), no node was ever pruned, and nodes ended
+- With a prune only above `F_HI` (`seacast.md` §1.4), no node was ever pruned, and nodes ended
   at 12 relations at most (`F_HI` is 12 for the payload, §6.1). The relations averaged 8.5 per node
   [8.53].
 - With the prune at `F_HI`, 24 PRUNEs left no node above 11, and the average was 7.9 [7.87].
@@ -122,7 +122,7 @@ again.
 nodes sampling (two covers, routed requests on), the 1 Gbps proposer (`--net bld`) and two blocks a
 run (`--msgs 2`), under `--upkeep on`. They replaced 1 % and 5 % of the links per message gap
 (`--churn 175` and `--churn 875`), with the floor (`--keep-floor on`) and without it. The baseline
-for the share below `F_LO` (`protocol-v2.md` §1.4) is the same cells with upkeep and no churn. The
+for the share below `F_LO` (`seacast.md` §1.4) is the same cells with upkeep and no churn. The
 cells ran at seeds 7 to 16. The figures give ranges across those ten seeds; where a figure gives a
 difference, the comparison pairs runs by seed. The cells ran on 2026-11-08 and 2026-11-09 on the
 toy of 2026-11-08, before the five gaps' text of 2026-11-10. The toy's floor was the one
@@ -130,7 +130,7 @@ toy of 2026-11-08, before the five gaps' text of 2026-11-10. The toy's floor was
 first written into the text on the main line in spec `0d968d8` (2026-11-14). The transport took
 every write at once (`--send-buffer 0`). The runs predate 2026-11-16, when the toy's close began to
 drop the closed peer's offers, tries, promises and ties and to keep its park (§3's lifetimes,
-`protocol.md` §8.1), and the transport of 2026-11-15. They were not run again.
+`seacast-lite.md` §8.1), and the transport of 2026-11-15. They were not run again.
 
 - **The ends of a closed link:** without the floor, 8 to 11 % of the nodes at the ends of a closed
   link had not come back by the run's end to their count of (family, colour) below `F_LO` before the
@@ -146,13 +146,13 @@ drop the closed peer's offers, tries, promises and ties and to keep its park (§
 
 ## §4.3 A holding or an offer arrives
 
-**Conditions.** The cells ran `toy/run.py --doc v2 --ihave-limits 4096,5000`, whose limits are the
-reference values of `protocol.md` §8.3, at 60 nodes and degree 30, with three messages and the
+**Conditions.** The cells ran `toy/run.py --doc seacast --ihave-limits 4096,5000`, whose limits are the
+reference values of `seacast-lite.md` §8.3, at 60 nodes and degree 30, with three messages and the
 default transport (`--send-buffer 1`). The baseline is the same cell with no limit: each run gave
 the same digest as that cell, so the limits changed no event. The cells are these:
 - At seed 7, they are the tier 4 setting's fifteen recorded cells, variant C (`c`,
-  `protocol-v2.md` §6.2), and custody, with and without a fifth of the nodes sampling. They ran on
-  2026-11-18 on the draft carrying `protocol.md` v0.10.3.
+  `seacast.md` §6.2), and custody, with and without a fifth of the nodes sampling. They ran on
+  2026-11-18 on the draft carrying `seacast-lite.md` v0.10.3.
 - At seeds 7 to 9, they are the rows setting. They ran on 2026-11-18 on the same draft. The run's
   record does not name the withheld variant on its line; the text says the runs were with and
   without half the columns withheld.
@@ -191,7 +191,7 @@ that has not yet validated a group's header cannot derive its own interest in th
 
 ## §4.6 Completion, the claims, decoding and repair
 
-**Conditions.** Every figure below comes from the toy (`toy/run.py --doc v2`) in the rows setting
+**Conditions.** Every figure below comes from the toy (`toy/run.py --doc seacast`) in the rows setting
 (`--setting rows`: RowDAS's row on top of PeerDAS custody, 128 columns, rows of 128 cells with K =
 64) or under custody alone (`--setting custody`), as each sub-entry says. "Half the columns
 withheld" is `--withhold 64`: the proposer keeps the last 64 columns, which only reconstruction
@@ -203,7 +203,7 @@ For the figures first written before 2026-11-15, that was the toy's only transpo
 probe's runs of 2026-11-16 and 2026-11-18 and the alarm's runs of 2026-11-18, their command lines
 set it (named in each sub-entry). The toy's default since 2026-11-15 is `--send-buffer 1`. Unless a
 figure says otherwise, the runs made before 2026-11-15 had the probe ask the lowest index the
-member lacked, without the mark and the kept WANT (`protocol-v2.md` §4.6), and let any peer's copy
+member lacked, without the mark and the kept WANT (`seacast.md` §4.6), and let any peer's copy
 pass the claimant. The 60-node rows runs of 2026-10-07 to 2026-10-10 had degree 30, a 1 Gbps
 proposer and 6 row reconstructors (`--reconstructors 10`, percent), as the README states (README
 949, 1032); the probe's runs of November name their own command line. "README" below is
@@ -211,8 +211,8 @@ proposer and 6 row reconstructors (`--reconstructors 10`, percent), as the READM
 figures were first written, and in brackets the commit of the main line that first carried them.
 
 **Rules changed since the October runs** (the runs of the sub-entries dated 2026-10-07 to
-2026-10-10) are these. Those runs predate every version of `protocol.md` after v0.3 that the draft
-carried (`protocol-v2-decisions.md`, "The versions of `protocol.md` carried"), among them v0.5's
+2026-10-10) are these. Those runs predate every version of `seacast-lite.md` after v0.3 that the draft
+carried (`seacast-decisions.md`, "The versions of `seacast-lite.md` carried"), among them v0.5's
 fixes to §4.6's `decode_group` and the repair (2026-10-21), v0.8's rebuilt chunk, which names the
 block of its sources (2026-10-26), v0.9's source holding at the acknowledgement (2026-11-10) and
 v0.10's rules (carried 2026-11-15 and 2026-11-16). They also predate §4.6's own later rules: the
@@ -226,8 +226,8 @@ a chunk fills (2026-11-17). Whether any of these moves a figure is not traced.
 record is the toy's README of that commit and README 979–981. The runs are the 60-node rows cells
 without liars (honest with 32 subnets; half the columns withheld with 16 and with 32 subnets), at
 degree 30, with a 1 Gbps proposer and 6 reconstructors, at one seed (7). They ran under
-`protocol.md`'s slot window (a window counted in 12 KB slots), before the window in bytes (§4.11,
-2026-10-07 04:40), and with `protocol.md`'s `PROMISE` of 400 ms as the probe's promise, the rule
+`seacast-lite.md`'s slot window (a window counted in 12 KB slots), before the window in bytes (§4.11,
+2026-10-07 04:40), and with `seacast-lite.md`'s `PROMISE` of 400 ms as the probe's promise, the rule
 this figure changed. The record gives one figure, not its statistic: whether it is one probe or
 typical is not stated.
 - A reconstructor's answer to a probe left 450 ms after the probe was decided, behind its burst of
@@ -251,13 +251,13 @@ all liars (README 1134–1139).
 
 **On the rules of 2026-11-18.** These figures were first written on 2026-11-18 (08:11) [`0edbdc7`,
 2026-11-18]. The runs used
-`--nodes 60 --degree 30 --msgs 3 --doc v2 --digest --setting rows --send-buffer 0`, through the
+`--nodes 60 --degree 30 --msgs 3 --doc seacast --digest --setting rows --send-buffer 0`, through the
 counting wrapper, on the toy of 2026-11-18, from 07:30 CET that day. The baseline is the runs with
 the rules of 2026-11-16 (below). These figures were not run with the rules changed since: v0.10.5's
 `accepted` (2026-11-19: a later copy of a copy that level 1 rejected no longer passes the probe) and
 v0.10.7's and v0.10.9's wake in the window's line (2026-11-20 and 2026-11-21, §4.11); v0.10.3 and
-v0.10.4 were carried after these runs too (`protocol-v2-decisions.md`, "The versions of
-`protocol.md` carried").
+v0.10.4 were carried after these runs too (`seacast-decisions.md`, "The versions of
+`seacast-lite.md` carried").
 - None of the 1 281 verdicts on honest or hoarding claimants failed, and no such claimant was left
   without a verdict.
 - Every probe got a verdict and was written; none was still unwritten when its window ran out, and
@@ -293,7 +293,7 @@ them those named for the runs of 2026-11-18.
 - The wait from decision to write was 0 ms at the median in every run; the longest was 101 ms
   (101.2 ms, C3), against 62.2 ms in C2 and 60.7 ms in C4.
 - These runs' C4 at seeds 8 and 9 carry v0.10's order of the announcers beyond the list
-  (`protocol.md` §6.1, spec `512efe6`), found by a bisection.
+  (`seacast-lite.md` §6.1, spec `512efe6`), found by a bisection.
 
 **Before 2026-11-16.** These figures were first written in `0d968d8` (2026-11-14). The runs are
 those of the toy's experiment build of 2026-11-14 with each variant's patch and the probe text's own
@@ -629,14 +629,14 @@ seed 7. The rules are those of the supernodes' runs.
 ## §4.7 The source
 
 §4.7's Rationale draws on five campaigns: the checks of the writer's order of 2026-10-07, the runs
-of 2026-10-21 on P4 (`protocol-v2.md` §0) and merging, the single offer's recording of 2026-11-04,
+of 2026-10-21 on P4 (`seacast.md` §0) and merging, the single offer's recording of 2026-11-04,
 the toy check of v0.9's source rules of 2026-11-10, and the `SOURCE_OFFERS` runs of 2026-11-18. Each
 sub-entry gives its own conditions. A figure from fewer than ten seeds is a toy check of a
 mechanism, not a measurement.
 
 ### v0.7's single offer
 
-**Conditions.** The cells are the thirteen that `toy/check.py --doc v2` recorded on 2026-11-04
+**Conditions.** The cells are the thirteen that `toy/check.py --doc seacast` recorded on 2026-11-04
 (60 nodes, degree 30, three payloads, seed 7). The cell `loss-thin` refuses a tenth of
 the data chunks at admission (`--loss-data 10`) on 20 Mbps uplinks (`--up 20`). It ran at one seed.
 It was re-recorded on 2026-11-04, when the draft carried v0.7's single offer; the baseline is the
@@ -927,11 +927,11 @@ column; "without it" means that a node has exactly its 16 links. The method was 
 ### The window's unit (X3), and what it changes
 
 **Conditions.** The figures come from runs of 2026-10-07: those of the custody setting's first
-figures, under `protocol.md`'s slot window (02:16); those of the row setting (03:59); and those of
+figures, under `seacast-lite.md`'s slot window (02:16); those of the row setting (03:59); and those of
 the window in bytes, with the slot window's figures beside it (04:40; the toy's README of that
 commit gives every table). The figures were first written that day [`08fbc3d`, 2026-10-21]. Each
 cell ran at one seed, which the record does not name; the toy's default then was seed 7. The
-baseline is `protocol.md`'s slot window, in the same cell and seed. Every write was taken at once.
+baseline is `seacast-lite.md`'s slot window, in the same cell and seed. Every write was taken at once.
 The custody setting publishes a block of 32 blobs as 128 column groups, gives each node a derived
 custody of 8 columns and a floor of 6 custodian peers (2 for the proposer), and makes node 1 the
 proposer. The row cells at 60 nodes have degree 30, a 1 Gbps proposer and 6 reconstructors; at
@@ -997,16 +997,16 @@ rules and the changes since are those of §4.7's entry for this campaign.
 
 **Conditions.** The figures come from 2026-11-20, from the line skip alone (00:45) and then from
 spec `67cbfba` (01:07), as their commit messages give them. The known answer
-`toy/line_stall_known.py --doc v2` runs on the `push` cell's network (60 nodes, degree 30, seed 7)
+`toy/line_stall_known.py --doc seacast` runs on the `push` cell's network (60 nodes, degree 30, seed 7)
 and publishes its first payload only. It stalls the source's line head when the line first holds
 two writers, watches the two seconds after the stall (its `SPAN`), and counts the chunks sent to
 the other peers from 600 ms after the stall on (past `WINDOW_TIMEOUT`). Since `aba3986`
 (2026-11-20, 01:52), after these figures, the other peers count as held up where none was sent to
 them and chunks still wait for them, whatever the window's state; before, only while the window had
 room. The recorded cells
-(`toy/check.py --doc v2`: 60 nodes, degree 30, three payloads, seed 7) ran at the toy's default
+(`toy/check.py --doc seacast`: 60 nodes, degree 30, three payloads, seed 7) ran at the toy's default
 transport since 2026-11-15, one write per connection at a time (`--send-buffer 1`), except
-`push-deep`, which runs at `--send-buffer 0`. The baseline is v0.10.6's recording, `golden-v2.txt`.
+`push-deep`, which runs at `--send-buffer 0`. The baseline is v0.10.6's recording, `golden-seacast.txt`.
 The figures are of v0.10.7's form: the line skip, with a wake before every control write of a
 writer in line (`67cbfba`). v0.10.9's wake at the wait moves `rr-stripe` and `push-deep` in their
 digest only, and no other cell (§4.11).
@@ -1019,7 +1019,7 @@ digest only, and no other cell (§4.11).
 
 ## §4.12 Which entry goes next
 
-**Conditions.** The figures come from the toy (`toy/run.py --doc v2`), at 60 nodes and degree 30
+**Conditions.** The figures come from the toy (`toy/run.py --doc seacast`), at 60 nodes and degree 30
 unless an entry gives another size. A cell is one configuration of the toy; the median and the tail
 are the 50th and the 99th percentile of a cell's completion times. Each entry names its seeds; a
 figure from fewer than ten seeds is a toy check of a mechanism, not a measurement. The baseline is
@@ -1096,32 +1096,32 @@ harness's own, tier 4's, not this draft's.
 
 ### The toy in the research harness's setting: parked pairs, and the per-peer promise
 
-**Conditions.** The toy (`toy/run.py --doc v2`) ran on 2026-10-19 with 500 nodes and seeds 7, 8 and
+**Conditions.** The toy (`toy/run.py --doc seacast`) ran on 2026-10-19 with 500 nodes and seeds 7, 8 and
 9, in the research harness's setting (`--rebuilt none --stripe on`), at 12.5 Mbps (the 12.5/25 Mbps
-network) unless a figure names another. Each form is compared with the rule off, `protocol.md`'s
+network) unless a figure names another. Each form is compared with the rule off, `seacast-lite.md`'s
 fixed window. Every write was taken at once (`--send-buffer 0`). "Parked" counts the (peer, group)
 pairs parked on a broken promise in a run. The rules are the draft's of 2026-10-19. The rules
 changed since are P4 and v0.5 (2026-10-21), v0.9's source rules (2026-11-11), the line skip
 (2026-11-20) and the wake at the wait (v0.10.9).
 - The ask window alone, §4.13's form, parks 503 to 642 pairs in the all-home network, against 584 to
-  702 with `protocol.md`'s window. With 30 % withholders it parks about 10 700, against about
+  702 with `seacast-lite.md`'s window. With 30 % withholders it parks about 10 700, against about
   12 600. With 10 % of chunks lost it parks 9 054 to 9 313, against 5 575 to 5 864: about 60 % more.
 - The record gives no parked count for the mixed network, which §4.13 names among the networks where
-  the count stayed below `protocol.md`'s.
+  the count stayed below `seacast-lite.md`'s.
 - The per-peer promise (the decision record's "The promise's length") parks 283 to 360 honest pairs
   a run in the all-home network. Its completion times and bytes are those of the ask window alone:
   the tail moves by −3.2, −2.0 and −0.9 % per seed, against −3.0, −2.3 and −0.7 %, and the copies
   are 0.21 fewer in both. With 30 % withholders it parks about 10 200, against about 10 700.
 
-## §6.1 `protocol.md` as a setting
+## §6.1 `seacast-lite.md` as a setting
 
 ### The distance to the recordings, by date
 
 **Conditions.** The figures come from the regression cells in `toy/check.py`. For each cell, the
 script runs `toy/run.py --nodes 60 --degree 30 --msgs 3 --seed 7` with that cell's flags, so each
 cell uses one seed. A figure is a cell's warm median and warm 99th percentile, or its warm copies.
-Each bullet of §6.1's Rationale compares this document's recording (`toy/golden-v2.txt`,
-`check.py --doc v2`) with `protocol.md`'s (`toy/golden.txt`) as both stood after the change the
+Each bullet of §6.1's Rationale compares this document's recording (`toy/golden-seacast.txt`,
+`check.py --doc seacast`) with `seacast-lite.md`'s (`toy/golden.txt`) as both stood after the change the
 bullet names, on the rules of that date. `loss-thin` runs at a 20 Mbps uplink. Before 2026-11-15
 every cell took every write at once (`--send-buffer 0`); the bullet of 2026-11-15 ran with
 `--send-buffer 1`, except `rr-stripe`, whose uplink (`--uplink rr`) has no send buffer. The table
@@ -1141,8 +1141,8 @@ The examples first written on 2026-11-19 are the cells' recorded values of their
 example, `silent` at 678 and 576 ms is the two recordings just before P4 came in.
 
 The bullets give the distances on their dates. Since 2026-11-15 both recordings have moved again.
-`protocol.md` §7.1's and §7.2's window line (2026-11-20, `1dc2d93` and `903f12b`) moved
-`protocol.md`'s `ihave-limits` cell (p50 512 to 511 ms, p99 592 to 594 ms, copies 2.05 to 2.06), its
+`seacast-lite.md` §7.1's and §7.2's window line (2026-11-20, `1dc2d93` and `903f12b`) moved
+`seacast-lite.md`'s `ihave-limits` cell (p50 512 to 511 ms, p99 592 to 594 ms, copies 2.05 to 2.06), its
 `loss-thin` (p50 789 to 788 ms, p99 888 to 867 ms, copies 1.71 to 1.70) and its `late-block`. This
 document's §4.11 (2026-11-20, `67cbfba`) moved its `loss-thin` (p50 807 to 814 ms, p99 922 to
 894 ms, copies 1.64 to 1.65) and its `late-block`. The wake at the wait (2026-11-21, `5372ebb`)
@@ -1152,10 +1152,10 @@ moved the digests of `rr-stripe` and `push-deep` only. Read from both recordings
 p99 894 against 867 ms, 1.65 against 1.70 copies). `late-block` is 6 ms later at the median and
 11 ms later at the tail. `ihave-limits` is 1 ms sooner at the median and at the tail, with 0.01
 copies more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies). Since
-then, the window's room freed at a holding's repeated bit (`protocol-v2.md` §4.3, 2026-11-21) moved
+then, the window's room freed at a holding's repeated bit (`seacast.md` §4.3, 2026-11-21) moved
 this document's `without-a` (p50 432 to 429 ms, p99 517 to 518 ms, copies 3.99 to 3.97). That cell
 runs without cancel (card 8), so copies reach peers that hold them already, and their holdings
-repeat the bit. It stays within the last bullet's distances of `protocol.md`'s (p50 429 against
+repeat the bit. It stays within the last bullet's distances of `seacast-lite.md`'s (p50 429 against
 427 ms, p99 518 against 528 ms, 3.97 copies each).
 
 - **v0.3's window and the window in bytes** (2026-10-07). With v0.3's window (slots of one payload
@@ -1180,17 +1180,17 @@ repeat the bit. It stays within the last bullet's distances of `protocol.md`'s (
 - **v0.9's rules** (2026-11-11), against v0.9's own recording: eleven cells were within 13 ms at the
   median, 18 ms at the tail and 0.06 copies (`cap-wait` 630 → 643 ms, `without-a` p99 551 →
   533 ms). `loss-thin` was 6 ms later at the median and 0.14 copies lighter (1.80 copies).
-- **The transport** (2026-11-15), against `protocol.md`'s recording: eleven cells were within 8 ms
+- **The transport** (2026-11-15), against `seacast-lite.md`'s recording: eleven cells were within 8 ms
   at the median, 16 ms at the tail and 0.02 copies (`cap-wait` 544 → 552 ms, p99 710 → 726 ms).
   `loss-thin` was 18 ms later at the median and 0.07 copies lighter (1.64 copies).
 
-### `ihave-limits` against `protocol.md`
+### `ihave-limits` against `seacast-lite.md`
 
 **Conditions.** The figures come from the regression's `ihave-limits` cell, which runs as the other
 cells above, with stock gossipsub's two limits (`--ihave-limits 10,5000`), at one seed (7). It ran
 under v0.9's rules:
 - With the toy's transport since 2026-11-15 (`--send-buffer 1`), it ran on 2026-11-15, and the
-  figures were first written on the main line in `2f7ede2` (2026-11-15). `protocol.md`'s side of it
+  figures were first written on the main line in `2f7ede2` (2026-11-15). `seacast-lite.md`'s side of it
   moved on 2026-11-20 (above).
 - With the earlier transport (`--send-buffer 0`), it ran on 2026-11-14, and the figures were first
   written on the main line in `0d968d8` (2026-11-14).
@@ -1200,7 +1200,7 @@ recording of 2026-10-27, with the earlier transport. It was first written on the
 `0d968d8`.
 
 - With `--send-buffer 1`, this document held back 26 667 asks to the next heartbeat, where
-  `protocol.md` held back 26 799. It was 2 ms sooner at the median and 1 ms later at the tail, with
+  `seacast-lite.md` held back 26 799. It was 2 ms sooner at the median and 1 ms later at the tail, with
   0.02 copies more: p50 510 against 512 ms, p99 593 against 592 ms, 2.07 against 2.05 copies.
 - With `--send-buffer 0`, it held back 24 248 asks against 24 538, and it was 3 ms sooner at the
   median and 7 ms sooner at the tail: p50 541 against 544 ms, p99 621 against 628 ms, 2.41 against
@@ -1258,7 +1258,7 @@ column has about ten custodians at this scale.
 **Conditions.** The figures come from the toy but for the last, which comes from the research
 harness of the posts (below). The honest row cell has 60 nodes, degree 30, the 1 Gbps proposer, 6
 row reconstructors, the default 32 row subnets and no supernodes; it ran at seeds 7 to 9, at
-`protocol.md`'s promise of 400 ms and at 0.8 s (`--promise 0.8`). The times of the late answers,
+`seacast-lite.md`'s promise of 400 ms and at 0.8 s (`--promise 0.8`). The times of the late answers,
 and the refusals, are seed 7's. It ran on 2026-10-08; the figures were first written on the main
 line in `08fbc3d` and recorded in the toy's README there. The runs predate the same later rules as
 §6.2's entry, and used the same transport.
@@ -1266,7 +1266,7 @@ line in `08fbc3d` and recorded in the toy's README there. The runs predate the s
 The payload's promise was evaluated with §4.13 on 2026-10-19, and first written on the main line in
 `08fbc3d`. Its figure comes from the research harness, not the toy: every node is at 10 Mbps up and
 20 Mbps down, with 30 % withholders, and the figure is the median of three seeds, each paired with
-the tier 4 cell of the same seed under `protocol.md`'s fixed ask window and promise. The promise was
+the tier 4 cell of the same seed under `seacast-lite.md`'s fixed ask window and promise. The promise was
 scaled with the ask window, to 2 s in place of 400 ms. The text's statement that silent peers were
 not hurt in the toy gives no figure.
 
@@ -1362,7 +1362,7 @@ Both predate v0.9's source at the acknowledgement (2026-11-11) and the transport
 ### `ASK_UPLINK`
 
 **Conditions.** The runs have 500 nodes and seeds 7 to 9, and set the ask window scaled by the
-uplink (§4.13) against `protocol.md`'s fixed 200 ms window, each seed paired with the same cell with
+uplink (§4.13) against `seacast-lite.md`'s fixed 200 ms window, each seed paired with the same cell with
 the rule off. The toy ran in the research harness's setting: no rebuilt chunks pushed
 (`--rebuilt none`) and striping on (`--stripe on`). The networks are all-home at 12.5 Mbps uplinks;
 30 % silent peers; 30 % withholders; 10 % of chunks lost; and the mixed-bandwidth network at 6 Mbps
@@ -1396,12 +1396,12 @@ acknowledgement (2026-11-11) and the transport of 2026-11-15.
 ### The IHAVE limits
 
 **Conditions.** The figures come from the regression's `ihave-limits` cell (§6.1's entry), which
-runs `toy/run.py --doc v2 --ihave-limits M,5000` on 60 nodes at degree 30, with three payloads and
+runs `toy/run.py --doc seacast --ihave-limits M,5000` on 60 nodes at degree 30, with three payloads and
 seed 7, against the same cell with no limit. It ran under v0.9's rules, with the earlier transport
 (`--send-buffer 0`), on 2026-11-14; the figures were first written on the main line in spec
 `0d968d8`. The cell was first swept on 2026-10-27 under the rules of then, with other values; the
 text gives the run of 2026-11-14. It predates the transport of 2026-11-15 and the window line of
-2026-11-20 and 2026-11-21 (§6.1's entry), and it was not run again. At `protocol.md` §8.3's
+2026-11-20 and 2026-11-21 (§6.1's entry), and it was not run again. At `seacast-lite.md` §8.3's
 reference values, the cells and their conditions are those of §4.3's entry.
 
 - Against no limit (p50 461 ms, 2.49 copies): 10 frames cost 80 ms at the median and save 0.08
@@ -1410,12 +1410,12 @@ reference values, the cells and their conditions are those of §4.3's entry.
 
 ## §7 Bindings
 
-`protocol-v2.md` §7 cites §1.3's entry: at 16 links, one cover by the fewest links adds a median of
+`seacast.md` §7 cites §1.3's entry: at 16 links, one cover by the fewest links adds a median of
 13 links.
 
 ## The decision record's figures
 
-These entries hold the figures of `protocol-v2-decisions.md` that no section's entry above holds,
+These entries hold the figures of `seacast-decisions.md` that no section's entry above holds,
 each under its decision's label.
 
 ### [D5] The announce relation's width

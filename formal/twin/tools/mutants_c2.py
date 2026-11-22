@@ -960,7 +960,7 @@ PART6 = [
      'directed51, a record at node 4 with a target in the mesh: what announce reaches and reads for that peer'),
 ]
 
-# v0.10.7's line (protocol.md §7.1 and §7.2 at spec 903f12b): front and wake_front, and the writer in
+# v0.10.7's line (seacast-lite.md §7.1 and §7.2 at spec 903f12b): front and wake_front, and the writer in
 # line that writes control. Written before any was built; C "open" where no cell's reach was counted
 PART7 = [
     ("front-takes-a-writer-mid-write", "front: a writer mid-write taken for the first that can write (the line before v0.10.7)", SEC71,
@@ -993,7 +993,7 @@ PART7 = [
      "asked)"),
 ]
 
-# v0.10.9's wake (protocol.md §7.1 and §7.2 at spec 5372ebb): next_to_send's urgent branch and its branch of owed
+# v0.10.9's wake (seacast-lite.md §7.1 and §7.2 at spec 5372ebb): next_to_send's urgent branch and its branch of owed
 # offers alone no longer call wake_front (release_unused_slot still calls it, for a writer that leaves the line or
 # gives back a slot); write_waits calls it for a writer in line whose write starts to wait. wake_front wakes the
 # line's front only while a slot is free. The rule before it, as mutants (its pre-wakes, calling v0.10.9's

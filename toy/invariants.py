@@ -1,15 +1,15 @@
-"""The invariants every setting of protocol-v2.md must keep, checked on a run.
+"""The invariants every setting of seacast.md must keep, checked on a run.
 
-protocol-v2.md §6.2 names them: every node completes its
+seacast.md §6.2 names them: every node completes its
 interest given a publishing source; no chunk is pushed to a link whose interest excludes it (I3);
 each node's upload stays within the duty bounds; a claim whose probe goes unanswered is detected; a cell
 arriving on one axis fills both groups (R4); and the tier 4 setting reproduces v0.3's cells
-(check.py --doc v2 --golden golden.txt). This module checks the first three on every run of run.py --doc v2 and the
+(check.py --doc seacast --golden golden.txt). This module checks the first three on every run of run.py --doc seacast and the
 fourth and fifth under the row setting, where deferral and cross-fill exist, and reports them after
 the run's results. It also reports how long each class of queue entry waited before it was sent,
 what the asks experienced (from the first ask to the chunk, matched on either axis, who delivered it,
 broken promises and how much later the asked node's answer came, asks it left unanswered and why)
-and the duplicates on arrival by class, which is what protocol-v2.md §4.12's ANSWERS_FIRST acts on. The
+and the duplicates on arrival by class, which is what seacast.md §4.12's ANSWERS_FIRST acts on. The
 checker observes the queues (the time an entry was queued), the links (Sim.transmit, Sim._deliver)
 and the nodes' state; it schedules nothing, so a run's digest is the same with it or without it.
 """
@@ -284,7 +284,7 @@ class Checker:
         incomplete = sim.incomplete()
         unsampled = [(i, g) for i, g in incomplete if sim.nodes[i].sampler]
         incomplete = [(i, g) for i, g in incomplete if not sim.nodes[i].sampler]
-        if unsampled:                                   # a sample nobody delivered is missing (protocol-v2.md §4.10),
+        if unsampled:                                   # a sample nobody delivered is missing (seacast.md §4.10),
             print(f"  samples not delivered: {len(unsampled)} (sampler, group) pairs "   # the samples line's verdict
                   f"over {len({i for i, _ in unsampled})} samplers", file=out)
         if incomplete:
@@ -295,7 +295,7 @@ class Checker:
         return not (self.outside or bad or incomplete)
 
     def report_reach(self, sim, samplers, out):
-        """[D12] how the samples reached the samplers (protocol-v2.md §1.3, §4.10): the coverage floor's
+        """[D12] how the samples reached the samplers (seacast.md §1.3, §4.10): the coverage floor's
         links, by which ask each sample first arrived, asks per sample, the forwarders' load, and the
         most samples of one block one peer was asked for by one sampler (I6)."""
         how, asks, per_peer, declared, missing, of_source = Counter(), [], Counter(), 0, 0, 0

@@ -2,7 +2,7 @@
 """A known answer for `discard_queued`, which `drop_group` calls (§4.6, §8.1): a dropped group's chunks, IHAVEs and
 IWANTs leave every queue, with what is owed of it; its HAVEs stay, and so does everything of another group.
 
-    python3 discard_queued_known.py     # protocol.md, then protocol-v2.md on top of it
+    python3 discard_queued_known.py     # seacast-lite.md, then seacast.md on top of it
 
 §4.6: "It removes the group's chunks, IHAVEs and IWANTs from every queue, with what is owed of it; its HAVEs stay."
 §8.1's list: `discard_queued` "removes a group's chunks, IHAVEs and IWANTs from every queue, and what is owed of it,
@@ -21,7 +21,7 @@ both groups. After `drop_group(g)` every part naming g must be gone but the HAVE
 Three of these entries have shapes the documents' code never queues in the toy; they are made by hand because
 `discard_queued` treats each message of an entry alike, whatever built the entry, and each puts a part of g beside
 something the helper must keep or treat apart:
-- (1) the entry with an IHAVE of g and one of h is `with_owed`'s, built here by `with_owed` itself (protocol.md
+- (1) the entry with an IHAVE of g and one of h is `with_owed`'s, built here by `with_owed` itself (seacast-lite.md
   §7.2), which builds it only at the write, after the entry has left the queue: the IHAVE counterpart of an answer
   carrying asks of both groups, which §4.1's `respond` does queue;
 - (2) the IHAVE by id, and the ask by id that one brings (§4.4's `expand`): the toy's nodes always announce by
@@ -30,9 +30,9 @@ something the helper must keep or treat apart:
   HAVE alone, and `with_owed` adds owed IHAVEs to an urgent one only at the write.
 
 An entry that loses its chunk and keeps control is no longer an answer: its `solicited` mark goes with the chunk.
-Every entry the documents queue as an answer has a chunk (§4.1's `respond`, §7.2's owed answer, protocol-v2.md's
-`serve_standing` and `serve_waiting_probe`), and protocol-v2.md §4.12's `choose`, under `ANSWERS_FIRST`, takes the
-rarest marked entry by its chunk. So no entry may be marked after the drop but h's answer, and with `--doc v2`
+Every entry the documents queue as an answer has a chunk (§4.1's `respond`, §7.2's owed answer, seacast.md's
+`serve_standing` and `serve_waiting_probe`), and seacast.md §4.12's `choose`, under `ANSWERS_FIRST`, takes the
+rarest marked entry by its chunk. So no entry may be marked after the drop but h's answer, and with `--doc seacast`
 `choose` (`ANSWERS_FIRST`, card 9) must take h's answer from peer 1's normal lane.
 """
 import sys
@@ -52,7 +52,7 @@ def check(doc):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     ns = got["sim"].nodes[NODE].ns
     bad = 0
 
@@ -129,7 +129,7 @@ def check(doc):
     marked = [show(e) for q in (qp, qq) for lane in (q.urgent, q.normal) for e in lane if e.solicited]
     line("the entries still marked as answers, after: h's answer alone (an entry whose chunk went is no answer)",
          marked, ["chunk h1; iwant h#3; prune prune"])
-    if doc == "v2":                                         # protocol-v2.md §4.12's choose lists every answer, and
+    if doc == "seacast":                                         # seacast.md §4.12's choose lists every answer, and
         ns["received"][H].set(0)                            #   pick reads its chunk; h0's push forwards a chunk the
         ns["ANSWERS_FIRST"], ns["RAREST"] = True, True      #   node received, so it is not a source's own (§1.6)
         try:
@@ -143,7 +143,7 @@ def check(doc):
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         print(f"--doc {doc}:")
         bad += check(doc)
     print("ok" if not bad else "FAIL")

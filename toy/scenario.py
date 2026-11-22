@@ -114,7 +114,7 @@ def topology(n, d, D, rng):
     return conns, gossip_mesh(conns, D, 6, 12, rng)
 
 
-# ---- the custody setting (protocol-v2.md §6.2): columns, custodians, a mesh per column
+# ---- the custody setting (seacast.md §6.2): columns, custodians, a mesh per column
 
 NUMBER_OF_COLUMNS = 128
 
@@ -176,10 +176,10 @@ def custody_topology(n, d, D, rng, custody, floor=6, source_floor=2, row_subnets
     member adds fellow members until it has `floor`. The mesh of a column or a row subnet is
     gossipsub's, built on the subgraph of its members, without the source. Last, with
     `repair_floor`, each row member adds custodian peers until it has that many for every column
-    it does not custody (the rebuilders' fanout, protocol-v2.md §4.6), drawn from `repair_rng` after
+    it does not custody (the rebuilders' fanout, seacast.md §4.6), drawn from `repair_rng` after
     the meshes, so that the graph and the meshes are the same with and without it and these links
     are in no mesh. With `sample_cover` = t, each of `samplers` then adds sampling-only links until
-    every column has t custodians among its links (protocol-v2.md §1.3, the coverage floor), by
+    every column has t custodians among its links (seacast.md §1.3, the coverage floor), by
     `sample_cover_links`, drawn from `cover_rng`, a node custodying more than `base_custody` columns
     counting for at most `cover_high` of them (the diversity floor); node 1, the block's proposer,
     counts so where it is already a link and is never added (proposers rotate). Returns the connections, the meshes, the
@@ -246,7 +246,7 @@ def given_meshes(conns, D, rng, custody, row_subnets=None):
 
 
 def sample_cover_links(have, cands, t, rng, cover_high=1):
-    """protocol-v2.md §4.1's keep_coverage on column masks: the candidates (node, mask, high) added, each
+    """seacast.md §4.1's keep_coverage on column masks: the candidates (node, mask, high) added, each
     the one covering the most columns still short of t custodians, ties at random, until every column
     has t among `have` (the (mask, high) of the links already there) and the added; a node of high
     custody covers at most `cover_high` of the short columns, its lowest (`counted`). For t = 1 and

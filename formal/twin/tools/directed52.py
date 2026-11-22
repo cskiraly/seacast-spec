@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Directed records for §5.2's announce, unpush, owe and note_push (protocol.md §5.2). The toy's own
+"""Directed records for §5.2's announce, unpush, owe and note_push (seacast-lite.md §5.2). The toy's own
 functions are called in a toy node's namespace on generated states, and trace3.py's tracer logs each call with
 the node's whole state.
 

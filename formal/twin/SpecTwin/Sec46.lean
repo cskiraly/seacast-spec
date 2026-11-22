@@ -1,7 +1,7 @@
 import SpecTwin.Sec42
 import SpecTwin.Sec52
 
-/-! # The twin of protocol.md §4.6, "Decode, the claim, repair and the levels above" [c6, c10] (v0.10.4, spec
+/-! # The twin of seacast-lite.md §4.6, "Decode, the claim, repair and the levels above" [c6, c10] (v0.10.4, spec
 34f60f8): `decode_group`, `push_rebuilt` and `drop_group`
 
 `claim_group` is §4.6's too, and stands in Sec42.lean, before on_validated, which calls it.

@@ -1,7 +1,7 @@
 import Std.Data.HashMap
 import Std.Data.HashSet
 
-/-! # The types of the twin of protocol.md §6.1, §4.4 and §4.2 (v0.10.4, spec 34f60f8)
+/-! # The types of the twin of seacast-lite.md §6.1, §4.4 and §4.2 (v0.10.4, spec 34f60f8)
 
 Ask keys (§2), bitmaps, and `Node61`: everything the block asks of the rest of the node. That is the reads of
 other sections' state, the node's own order of announcers, and the effects (`enqueue`, `after`); §6.1 draws

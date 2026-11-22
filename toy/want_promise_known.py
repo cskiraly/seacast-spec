@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md's rule that a WANT starts no promise at its write (§4.5, §4.10, §5's row
+"""A known answer for seacast.md's rule that a WANT starts no promise at its write (§4.5, §4.10, §5's row
 on v0.5 §7.2): `filter_entry` starts v0.5's promise for an ask made on an offer, and not for an ask that a WANT
 carries, whose sender has its own timers (a sampler's `SAMPLE_RETRY`, the repair sample's `SAMPLE_WAIT`, a
 routed request's sampler); a claim's probe keeps the promise of §4.6.
 
-    python3 want_promise_known.py [--doc v2]
+    python3 want_promise_known.py [--doc seacast]
 
-It runs `protocol-v2.md` either way: `protocol.md` has no WANT.
+It runs `seacast.md` either way: `seacast-lite.md` has no WANT.
 
 The check, on one node of a small network that is built and not run: the node sends a peer a WANT for one
-index of a group, through the binding's `send` (the gossipsub binding, `protocol-v2-bindings.md` §4, where the toy marks
+index of a group, through the binding's `send` (the gossipsub binding, `seacast-bindings.md` §4, where the toy marks
 the IWANT that carries a WANT), and the entry queued for it is written (`filter_entry`). No promise may start
 for that ask. The control: an ask on an offer, an IWANT not so marked, written the same way, must start one.
 And a claim's probe, a WANT that keeps a promise (§4.6): its first write must start one, and so must a write
@@ -26,8 +26,8 @@ G = bytes([0x36]) * 32                              # a group no block commits
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--doc", "v2"]):
-        print("usage: want_promise_known.py [--doc v2]")
+    if sys.argv[1:] not in ([], ["--doc", "seacast"]):
+        print("usage: want_promise_known.py [--doc seacast]")
         return 2
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import run
@@ -37,7 +37,7 @@ def main():
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED),
-              "--doc", "v2"])
+              "--doc", "seacast"])
     node = got["sim"].nodes[NODE]
     ns = node.ns
 
@@ -56,7 +56,7 @@ def main():
     written = out is not None and any(ns["index"](a) == 3 for c in out.iwants() for a in c.ids)
     want_ok = written and not promised(3)
     print(f"a WANT for index 3, written {written}: promises {len(promised(3))}: "
-          f"{'none, as §4.5 says' if want_ok else 'NOT as protocol-v2.md §4.5 says  <-- FAIL'}")
+          f"{'none, as §4.5 says' if want_ok else 'NOT as seacast.md §4.5 says  <-- FAIL'}")
 
     entry = Wm.Entry(control=Wm.IWANT([ns["Ask"](G, 5)]))   # an ask on an offer, as respond queues it
     out = ns["filter_entry"](PEER, entry)
@@ -75,7 +75,7 @@ def main():
         written = out is not None and any(ns["index"](a) == 7 for c in out.iwants() for a in c.ids)
         ok = written and len(promised(7)) == 1
         print(f"the probe of index 7, write {n}, written {written}: promises {len(promised(7))}: "
-              f"{'one, §4.6' if ok else 'NOT as protocol-v2.md §4.6 says  <-- FAIL'}")
+              f"{'one, §4.6' if ok else 'NOT as seacast.md §4.6 says  <-- FAIL'}")
         probe_ok.append(ok)
         for k in promised(7):
             del ns["promises"][k]                       # gone, as a timer or a close would take it

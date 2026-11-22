@@ -1,7 +1,7 @@
 import SpecTwin.Sec42
 import SpecTwin.Sec52
 
-/-! # The twin of protocol.md §5.1, "The source" [c3, P4] (v0.10.4, spec 34f60f8): `publish`,
+/-! # The twin of seacast-lite.md §5.1, "The source" [c3, P4] (v0.10.4, spec 34f60f8): `publish`,
 `origin_acked` and `origin_written`
 
 `origin_written` came with v0.10.4: at

@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""A known answer for §7.1's wake when a write waits (`protocol.md`, and `protocol-v2.md` §4.11): a writer in the
+"""A known answer for §7.1's wake when a write waits (`seacast-lite.md`, and `seacast.md` §4.11): a writer in the
 window's line that writes control wakes the first writer in line that can write when its write starts to wait for
 the transport (`write_waits`), and not before the write.
 
-    python3 write_wait_known.py [--doc v2]
+    python3 write_wait_known.py [--doc seacast]
 
 The check, on one node of a small network that is built and not run, a new network for each case: the window is
 empty, and two peers wait in its line, p first, then q. A run queued for q is an event in the simulator's queue that
 runs q's writer, and the check reads the queue itself. For each way p's writer writes control (an urgent entry; owed
-offers on their own; and, under `protocol-v2.md`, a control-only entry of the normal lane):
+offers on their own; and, under `seacast.md`, a control-only entry of the normal lane):
 - (a) `next_to_send(p)` returns the control, and q has no run queued: the wake does not come before the write.
   v0.10.7 and v0.10.8 woke q here, and this case fails on them.
 - (b) p's writer writes the control, and its transport takes no more after it (the toy's send buffer is full): the
@@ -17,7 +17,7 @@ offers on their own; and, under `protocol-v2.md`, a control-only entry of the no
   after it, with p's write pending; q's run is queued only then.
 - (c) as (b), with p not in line: no run is queued for q.
 - (d) as (b), with the window full: no run is queued for q, since no slot (or room) is free. Under
-  `protocol-v2.md`, also with the window above its cap, as one entry into an empty window can leave it.
+  `seacast.md`, also with the window above its cap, as one entry into an empty window can leave it.
 - (e) as (b), with no send buffer: the write completes at once, and `write_waits` is not called.
 In (a), (b) and (d), p keeps its place at the head of the line.
 The toy is not changed: the check builds the network with `run.py`'s own options and sets the node's tables.
@@ -29,7 +29,7 @@ SEED, NODE, P, Q = 7, 2, 1, 3
 G = bytes([0x37]) * 32                              # a group no block commits
 
 
-def build(doc_v2):
+def build(doc_seacast):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import run
     import sim as S
@@ -38,7 +38,7 @@ def build(doc_v2):
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     try:
         run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED)]
-                 + (["--doc", "v2"] if doc_v2 else []))
+                 + (["--doc", "seacast"] if doc_seacast else []))
     finally:
         run.run = saved
     return got["sim"]
@@ -62,7 +62,7 @@ def setup(sim, kind, in_line, full=False, above=False):
         w.append(P)
     w.append(Q)
     ns["in_flight"] = (ns["W_BYTES"] if "W_BYTES" in ns else ns["W"]) if full else 0   # full, or empty
-    if above:                                       # protocol-v2.md: above its cap (one entry into an empty window)
+    if above:                                       # seacast.md: above its cap (one entry into an empty window)
         ns["in_flight"] = ns["W_BYTES"] + 1
     if "slot_held" in ns:
         ns["slot_held"][P] = False
@@ -75,7 +75,7 @@ def setup(sim, kind, in_line, full=False, above=False):
         q.urgent.append(Wm.Entry(control=ctrl))
     elif kind == "owed offers on their own":
         ns["owed"][P][G] = bitmap({1})
-    else:                                           # a control-only entry of the normal lane (protocol-v2.md)
+    else:                                           # a control-only entry of the normal lane (seacast.md)
         q.normal.append(Wm.Entry(control=ctrl))
     node.writer_blocked.discard(P)
     node.writer_blocked.discard(Q)
@@ -91,8 +91,8 @@ def woken(sim, node):
     return w
 
 
-def before_write(doc_v2, kind):
-    sim = build(doc_v2)
+def before_write(doc_seacast, kind):
+    sim = build(doc_seacast)
     node, ns = setup(sim, kind, True)
     out = ns["next_to_send"](P)
     wrote = out is not None and out is not ns["WAIT"] and not out.chunk
@@ -119,8 +119,8 @@ def trace(sim, node, ns):
     return log
 
 
-def write_waits(doc_v2, kind, in_line, full=False, above=False, buffer=True):
-    sim = build(doc_v2)
+def write_waits(doc_seacast, kind, in_line, full=False, above=False, buffer=True):
+    sim = build(doc_seacast)
     node, ns = setup(sim, kind, in_line, full, above)
     if buffer and sim.send_buffer is None:
         raise SystemExit("write_wait_known.py: the network has no send buffer, so no write can wait")
@@ -132,21 +132,21 @@ def write_waits(doc_v2, kind, in_line, full=False, above=False, buffer=True):
 
 
 def main():
-    if sys.argv[1:] not in ([], ["--doc", "v2"]):
-        print("usage: write_wait_known.py [--doc v2]")
+    if sys.argv[1:] not in ([], ["--doc", "seacast"]):
+        print("usage: write_wait_known.py [--doc seacast]")
         return 2
-    doc_v2 = sys.argv[1:] == ["--doc", "v2"]
+    doc_seacast = sys.argv[1:] == ["--doc", "seacast"]
     kinds = ["an urgent entry", "owed offers on their own"]
-    if doc_v2:
+    if doc_seacast:
         kinds.append("a control-only entry of the normal lane")
     bad = 0
     for kind in kinds:
-        wrote, woke, place = before_write(doc_v2, kind)
+        wrote, woke, place = before_write(doc_seacast, kind)
         ok = wrote and not woke and place
         print(f"(a) p in line, {kind}: next_to_send returns it {wrote}, q woken {woke}, p keeps its place {place}: "
               f"{'no wake before the write' if ok else 'not as the rule says  <-- FAIL'}")
         bad += not ok
-        waits, woke, place, log = write_waits(doc_v2, kind, True)
+        waits, woke, place, log = write_waits(doc_seacast, kind, True)
         order = log == [("handoff", False), ("write_waits", True, False)]
         ok = waits and woke and place and order
         print(f"(b) p in line, {kind}, the write waits {waits}: q woken {woke}, p keeps its place {place}, "
@@ -155,19 +155,19 @@ def main():
         if not order:
             print(f"    p's steps: {log}")
         bad += not ok
-        waits, woke, _, _ = write_waits(doc_v2, kind, False)
+        waits, woke, _, _ = write_waits(doc_seacast, kind, False)
         ok = waits and not woke
         print(f"(c) p not in line, {kind}, the write waits {waits}: q woken {woke}: "
               f"{'q not woken' if ok else 'a wake for a writer not in line  <-- FAIL'}")
         bad += not ok
-        for above in ([False, True] if doc_v2 else [False]):
-            waits, woke, place, _ = write_waits(doc_v2, kind, True, full=True, above=above)
+        for above in ([False, True] if doc_seacast else [False]):
+            waits, woke, place, _ = write_waits(doc_seacast, kind, True, full=True, above=above)
             ok = waits and not woke and place
             print(f"(d) p in line, the window {'above its cap' if above else 'full'}, {kind}, the write waits {waits}: "
                   f"q woken {woke}, p keeps its place {place}: "
                   f"{'q not woken' if ok else 'not as the rule says  <-- FAIL'}")
             bad += not ok
-        waits, _, _, log = write_waits(doc_v2, kind, True, buffer=False)
+        waits, _, _, log = write_waits(doc_seacast, kind, True, buffer=False)
         called = any(s[0] == "write_waits" for s in log)
         handed = ("handoff", False) in log
         ok = handed and not waits and not called

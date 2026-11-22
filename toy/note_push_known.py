@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.4's note_push and §4.7's unpush: a send noted, and undone, under every group
+"""A known answer for seacast.md §4.4's note_push and §4.7's unpush: a send noted, and undone, under every group
 the chunk fills, from the ids alone.
 
     python3 note_push_known.py
@@ -35,7 +35,7 @@ def main():
         bad += got != want
         print(f"{what}: {got}{'' if got == want else f'  <-- must be {want}'}")
 
-    pay = sim_of(["--doc", "v2", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    pay = sim_of(["--doc", "seacast", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     nd = pay.nodes[2]
     ns = nd.ns
     g = pay.msgs[0][1][0]
@@ -54,7 +54,7 @@ def main():
     ns["unpush"](q, g, i)
     line("the payload's push undone (control): noted under its group", ns["pushed"][q][g].has(i), False)
 
-    rows = sim_of(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    rows = sim_of(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     nd = rows.nodes[2]
     ns = nd.ns
     T_row = nd._types["row"]

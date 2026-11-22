@@ -5,11 +5,11 @@
 
 A member that deferred on a claim its probe verified, and gets a custodian's standing WANT for a cell of its row
 that it lacks, asks the claimant for that cell once, as the probe is asked: its promise (DEFER_WINDOW) and the
-alarm's wait start at the ask's write, as the probe's do (protocol-v2.md §4.6). A claimant that cannot be asked,
+alarm's wait start at the ask's write, as the probe's do (seacast.md §4.6). A claimant that cannot be asked,
 because its connection closed or a full queue refuses the ask, or whose connection closes before the promise
 ends, is not judged; the member rebuilds the row if the cell is still missing.
 
-On one node of a small rows run (protocol-v2.md, one block, the alarm on, run to its end), made by hand, on the
+On one node of a small rows run (seacast.md, one block, the alarm on, run to its end), made by hand, on the
 node's own row, which it holds whole: one cell is taken out of its store, the probe of another cell is set as
 verified on claimant q, and custodian c sends the standing WANT. Then:
 - **the write:** nothing starts at the decision; at the write the promise starts, and the alarm's wait is due
@@ -21,7 +21,7 @@ verified on claimant q, and custodian c sends the standing WANT. Then:
   at the close, not judged, it leaves probe_asks, and the member rebuilds.
 Controls: the claimant connected and silent is penalised once and the member rebuilds; the claimant's own copy
 before the wait's end leaves no penalty and no rebuild.
-With the custodian's link not joined to rows, its standing WANT is ignored (protocol-v2.md §2): no ask, no
+With the custodian's link not joined to rows, its standing WANT is ignored (seacast.md §2): no ask, no
 promise, no rebuild, and no error. The custodian's part, on custodian c lacking one cell: it asks no row member
 whose link has not joined rows, and with one member's link joined, only that member. Both fail on the toy whose
 alarm chose members by subnet alone.
@@ -39,7 +39,7 @@ def main():
     import wire as Wm
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED),
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED),
               "--alarm-wait", "3.5"])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])

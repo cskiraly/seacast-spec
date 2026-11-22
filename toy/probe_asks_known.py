@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.6's probe ask once the probe is settled.
+"""A known answer for seacast.md §4.6's probe ask once the probe is settled.
 
     python3 probe_asks_known.py
 
@@ -7,7 +7,7 @@ The probe's ask is exempt from stop-pull while the probe waits (`probe_asks`, `g
 by a pass, a failure or no verdict, the exemption goes: a member that is complete does not pull the probed cell
 from another peer's offer, as it pulls no other cell of the group.
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), made by hand, as the member, on a
+On one node of a small rows run (seacast.md, one block, run to its end), made by hand, as the member, on a
 row it holds, three of whose cells it is made to lack (taken out of its store), with one claimant and stop-pull
 on (the member is complete):
 - **a failure:** the probe written, the duty fires, the row whole in the subnet's view: the claimant is
@@ -33,7 +33,7 @@ def main():
     import sim as S
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Known answers for protocol-v2.md §4.6's probe once it is settled, and for the duty's time it defers (R5).
+"""Known answers for seacast.md §4.6's probe once it is settled, and for the duty's time it defers (R5).
 
     python3 probe_settle_known.py
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), made by hand:
+On one node of a small rows run (seacast.md, one block, run to its end), made by hand:
 
 As the member, on a row it holds, three of whose cells it is made to lack (taken out of its store), with one
 claimant:
@@ -44,7 +44,7 @@ from pathlib import Path
 
 SEED, NODE = 7, 2
 
-# Broken texts that the lines on askers that are not DECLARED must catch (`--controls`): name -> (replacements in protocol-v2.md's extracted
+# Broken texts that the lines on askers that are not DECLARED must catch (`--controls`): name -> (replacements in seacast.md's extracted
 # code, the words of the line that must fail). The lines before them pass every one of them: each uses one asker,
 # peer 1, a DECLARED link, whose asks stand whatever their flag.
 KEEP = "            if flagged and p not in probe_waiting[gi.group]:"
@@ -67,7 +67,7 @@ def use_variant(name):
     for old, new in VARIANTS[name][0]:
         assert src.count(old) == 1, (name, old)
         src = src.replace(old, new)
-    N._SPEC2 = compile(src, f"protocol-v2.md (variant {name})", "exec")
+    N._SPEC2 = compile(src, f"seacast.md (variant {name})", "exec")
 
 
 def controls():
@@ -95,7 +95,7 @@ def main(argv=()):
     import wire as Wm
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

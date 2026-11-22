@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Directed records for §4.1's on_frame and respond, and §4.5's on_iwant (protocol.md at
+"""Directed records for §4.1's on_frame and respond, and §4.5's on_iwant (seacast-lite.md at
 spec 34f60f8). The toy's own functions are called in two toy nodes' namespaces on generated states, and
 trace3.py's tracer logs each call with the node's whole state.
 

@@ -1,7 +1,7 @@
 import Lake
 open Lake DSL
 
--- A twin of protocol.md's Python in Lean 4: core Lean only, so that it can be imported
+-- A twin of seacast-lite.md's Python in Lean 4: core Lean only, so that it can be imported
 -- beside Veil v4.35.0, whose toolchain it shares.
 package spectwin where
 

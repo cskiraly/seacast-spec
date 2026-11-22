@@ -2,7 +2,7 @@
 """A known answer for §4.2's duplicate path in a dropped group: a copy of a chunk the node stored is acknowledged,
 whether or not the group was dropped since.
 
-    python3 dropped_dup_known.py        # protocol.md, then protocol-v2.md on top of it
+    python3 dropped_dup_known.py        # seacast-lite.md, then seacast.md on top of it
 
 `on_chunk` acknowledges a copy of a chunk it has seen if `accepted(mid)`, and §8.1's list says what that is: "the
 id was stored". `drop_group` (§4.6) marks the group invalid and keeps its stored chunks, so a copy of one of them
@@ -38,7 +38,7 @@ def check(doc, level):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "65536", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"])
     sim.publish(1)                                          # the block installs, its chunks exist; nothing delivered
@@ -92,7 +92,7 @@ def check(doc, level):
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         for level in (2, 3):
             print(f"--doc {doc}, level {level} fails:")
             bad += check(doc, level)

@@ -2,13 +2,13 @@
 """Controls that must fail: the hand-counted trace with one field altered, replayed through the twin; each must give
 one mismatch, at the altered record, for the reason the alteration is for.
 
-    python3 altered3.py TRACE61 WORKDIR DIRECTED HAND DIRECTED44 [DIRECTED42 [V2 [DIRECTED4B [DIRECTED7]]]]
+    python3 altered3.py TRACE61 WORKDIR DIRECTED HAND DIRECTED44 [DIRECTED42 [SEACAST [DIRECTED4B [DIRECTED7]]]]
 
 TRACE61 is the 5-node hand-counted cell's trace with §6.1's twelve traced alone (TRACE3_ONLY=sec61): its six
 records are add_offer, parked, outstanding, may_ask, retry_offer, promise_due. HAND is the same cell traced whole:
 its one on_ihave record that reaches §6.1's functions is altered too. DIRECTED and DIRECTED44 are §6.1's directed
-records and directed44.py's, which hold the whole state. V2 is a cell's trace under --doc v2: its header and one of
-its records (`v2_controls`).
+records and directed44.py's, which hold the whole state. SEACAST is a cell's trace under --doc seacast: its header and one of
+its records (`seacast_controls`).
 
 - Alterations of what a record says happened: a return value, a tape, a write's value, a write removed or added.
   The replay compares the state before the tables' notes, so these fail as "return value", "tape" or "post".
@@ -644,7 +644,7 @@ def main(argv):
     pbad = shuffled_controls(directed44, work, head)
     vbad = v010_controls(directed44, work, head)
     fbad = format5_controls(Path(argv[5]), work, head) if len(argv) > 5 else 0
-    v2bad = v2_controls(Path(argv[6]), work, head) if len(argv) > 6 else 0
+    v2bad = seacast_controls(Path(argv[6]), work, head) if len(argv) > 6 else 0
     dbad = deferral_controls(Path(argv[7]), Path(argv[5]), work, head) if len(argv) > 7 else 0
     dbad += writer_controls(Path(argv[8]), work, head) if len(argv) > 8 else 0
     dbad += nodes_controls(Path(argv[8]), work, head) if len(argv) > 8 else 0
@@ -726,19 +726,19 @@ def queue_controls(hand, work, head):
     }, work, head, "queue")
 
 
-def v2_controls(v2trace, work, head):
-    """The controls of a cell's trace under --doc v2, each with the outcome written before it first ran:
-    - header3.py passes its header as v2's kept, and refuses it with on_ihave among its traced (on_ihave calls gated,
-      which v2 redefines), with gated among them (v2 redefines it), and with --doc v2 gone from its args (v2's kept
+def seacast_controls(v2trace, work, head):
+    """The controls of a cell's trace under --doc seacast, each with the outcome written before it first ran:
+    - header3.py passes its header as SEACAST's kept, and refuses it with on_ihave among its traced (on_ihave calls gated,
+      which SEACAST redefines), with gated among them (SEACAST redefines it), and with --doc seacast gone from its args (SEACAST's kept
       is a kind only for a trace run so);
     - one of its may_ask records, alone, replays; with its read of asked_at as now (an ask in flight) it fails at
       that record for the reason hand5's may_ask/read-value fails ("tape": the twin arms no retry).
-    A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-v2)."""
+    A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-seacast)."""
     toy = layout.toy()
     hdr, consts, rec = first(v2trace, lambda d: d["fn"] == "may_ask" and d.get("ret") is True and d["reads"][:1] != []
                              and d["reads"][0][0] == "asked_at" and d["reads"][0][2] is None)
     h = hdr["header"]
-    assert header3.trace3.doc_of(h["args"]) == "v2", "V2 is not a trace run with --doc v2"
+    assert header3.trace3.doc_of(h["args"]) == "seacast", "SEACAST is not a trace run with --doc seacast"
 
     def variant(**change):
         out = copy.deepcopy(hdr)
@@ -748,29 +748,29 @@ def v2_controls(v2trace, work, head):
     args = list(h["args"])
     k = args.index("--doc")
     hcases = {  # name -> (the header line, whether it must pass)
-        "a v2 cell's header, v2's kept": (hdr, True),
+        "a SEACAST cell's header, SEACAST's kept": (hdr, True),
         "with on_ihave among its traced": (variant(traced=sorted(h["traced"] + ["on_ihave"])), False),
         "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False),
         "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False),
         "with §6.1's twelve alone as its traced": (
             variant(traced=sorted(header3.trace3.SEC61)), False),
-        "v2's kept, from a trace not run with --doc v2": (variant(args=args[:k] + args[k + 2:]), False),
+        "SEACAST's kept, from a trace not run with --doc seacast": (variant(args=args[:k] + args[k + 2:]), False),
     }
     bad = 0
     for name, (hl, must) in hcases.items():
-        f = work / f"v2-header3-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
+        f = work / f"seacast-header3-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
         write(f, [hl])
         why = header3.check(toy, f)
         ok = (not why) == must
         bad += not ok
-        print(f"v2, header3, {name}: {'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, "
+        print(f"SEACAST, header3, {name}: {'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, "
               f"must {'pass' if must else 'be refused'}{'' if ok else '  <-- FAIL'}")
     now = copy.deepcopy(rec)
     now["reads"][0][2] = rec["t"]
-    bad += check("v2", {
-        "a may_ask record of a v2 cell, alone": (alone(hdr, consts, rec), 0, None),
+    bad += check("seacast", {
+        "a may_ask record of a SEACAST cell, alone": (alone(hdr, consts, rec), 0, None),
         "the same, its read of asked_at as now": (alone(hdr, consts, now), 1, "]: tape"),
-    }, work, head, "v2")
+    }, work, head, "seacast")
     return bad
 
 
@@ -2413,9 +2413,9 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
     assert ov["args"][0][4] is None and ov["args"][0][1] == 2 ** 32 and not ov["tape"]
     within = copy.deepcopy(ov)
     within["args"][0][1] = 2 ** 32 - 1                          # the last index a uint32 holds
-    # the third: a v2 cell's record with its node said to have replaced push_rebuilt, which v2's kept leaves out
+    # the third: a SEACAST cell's record with its node said to have replaced push_rebuilt, which SEACAST's kept leaves out
     hdr2, nodes2, r2 = first(v2trace, lambda d: d["fn"] == "may_ask" and "raises" not in d)
-    assert "push_rebuilt" not in hdr2["header"]["traced"], "V2's header traces push_rebuilt"
+    assert "push_rebuilt" not in hdr2["header"]["traced"], "SEACAST's header traces push_rebuilt"
     own2 = node_of(nodes2, r2)
     untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {"push_rebuilt"})}]}
     just = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]]}]}
@@ -2427,7 +2427,7 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
         "that chunk given a descriptor": (alone(hdr, nodes, given), 1, "the Python raises AttributeError"),
         "message_id of an index beyond a uint32 raises, as it is": (alone(hdr1, nodes1, ov), 0, None),
         "its index written as the last a uint32 holds": (alone(hdr1, nodes1, within), 1, "the Python raises OverflowError"),
-        "a v2 cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
+        "a SEACAST cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
         "that node said to have replaced push_rebuilt, which the header does not trace": (
             alone(hdr2, untraced, r2), 1, "nodes: has replaced [push_rebuilt], which the header does not list as traced"),
     }, work, head, "carried")
@@ -3015,7 +3015,7 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
         "another footprint.py": (other(f"{T}/footprint.py"), False, f"content: not this tree's: {T}/footprint.py: other bytes"),
         "another gen/schema.py": (other(f"{T}/gen/schema.py"), False, f"content: not this tree's: {T}/gen/schema.py: other bytes"),
         "another directed41.py": (other(f"{T}/directed41.py"), False, f"content: not this tree's: {T}/directed41.py: other bytes"),
-        "another protocol.md": (other("protocol.md"), False, "content: not this tree's: protocol.md: other code"),
+        "another seacast-lite.md": (other("seacast-lite.md"), False, "content: not this tree's: seacast-lite.md: other code"),
         "another toy/node.py": (other("toy/node.py"), False, "content: not this tree's: toy/node.py: other bytes"),
         "a module more in the toy": (other("toy/zz.py"), False, "content: not this tree's: toy/zz.py: only in the second"),
         "no content line": ([RAW, hdr, hdr], False, "content: the first line is no content line"),
