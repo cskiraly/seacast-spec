@@ -168,6 +168,15 @@ def chunkF (j : Json) : Except String ChunkF := do
   if k.group != g || k.index != i then throw s!"a chunk's id is not of its group and index: {j.compress}"
   return { g, i, slot := ← nat slot, root := ← rootKey root, mid := k, wide }
 
+/-- A chunk where the document writes it narrow: `[group, index, slot, root, id]` exactly, read as `chunkF` reads
+it, and a sixth member refused. Under protocol-v2.md a chunk is wide only where it arrives or waits, as its writer
+has it (`tools/records_v2.py`, and trace3.py's `wchunk`); a lane's entry, a read of `chunks`, a decode answer,
+`respond`'s answers and the chunk arguments of the other records are narrow. -/
+def chunkN (j : Json) : Except String ChunkF := do
+  if let .ok a := j.getArr? then
+    if a.size == 6 then throw s!"a chunk here is narrow, five members: {j.compress}"
+  chunkF j
+
 /-- A block as a record writes it: `[slot, the bid's group id or null, the bid's descriptor or
 null]`. -/
 def blockOf (j : Json) : Except String Block := do
@@ -320,6 +329,13 @@ inductive Form where
   | v2
   deriving BEq, Repr, Inhabited
 
+/-- A chunk under a record's document, at a place where protocol-v2.md writes it narrow: `chunkN` under
+protocol-v2.md, and `chunkF` under protocol.md, as before. -/
+def chunkIn (f : Form) (j : Json) : Except String ChunkF :=
+  match f with
+  | .v2 => chunkN j
+  | .v1 => chunkF j
+
 /-- An ask with its flags: `[key, standing, hops, probe]`. A structured id carries no flags, since the Python's is
 bytes, so its ask is `[id, false, 0, false]` and any other is refused. -/
 def askV2Of (j : Json) : Except String AskV2 := do
@@ -361,10 +377,11 @@ def ctl (j : Json) (f : Form := .v1) : Except String Ctl := do
     return .relation r
   | _, _ => throw s!"not a control message of a queue entry: {j.compress}"
 
-/-- A queue entry: `[chunk or null, control or null, solicited]`, its controls in the document's forms. -/
+/-- A queue entry: `[chunk or null, control or null, solicited]`, its chunk and its controls in the document's forms
+(the chunk narrow under protocol-v2.md, `chunkIn`). -/
 def qentry (j : Json) (f : Form := .v1) : Except String QEntry := do
   let #[c, ctrl, .bool sol] ← j.getArr? | throw s!"not a queue entry: {j.compress}"
-  let chunk ← if c == .null then pure none else some <$> chunkF c
+  let chunk ← if c == .null then pure none else some <$> chunkIn f c
   let control ← if ctrl == .null then pure none else some <$> (← arr ctrl).mapM (ctl · f)
   return { chunk, control, solicited := sol }
 

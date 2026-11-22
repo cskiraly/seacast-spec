@@ -262,6 +262,27 @@ def retry3 : String := s!"[\"after\",{w25},\"retry_offer\",[[\"{g6}\",3]]]"
 -- a question with no notes reads none, as before
 #guard readsAs (notesIn "[\"wake\",[7],null]") []
 
+/-- A question's `cr` and `cw` as v2/hand5 writes them (line 107, `on_chunk`'s first `send` to 2 in its urgent lane):
+both lanes of peer 2 read missing, the normal lane written empty, the urgent lane written with one IDONTWANT. -/
+def lane2 : String :=
+  "\"cr\":[[\"queue\",[2,\"urgent\"],null],[\"queue\",[2],null]],\"cw\":[[\"queue\",[2,\"normal\"],[]]," ++
+  "[\"queue\",[2,\"urgent\"],[[null,[[\"idontwant\",[[\"holding\"," ++
+  "\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\",1,false,false]]]],false]]],[\"queue\",[2],true]]"
+
+/-- A question's log, as the replay reads it under protocol-v2.md. -/
+def logOf (s : String) : Except String CallLog := do
+  let (_, log) ← tapeItem (← Json.parse s) docV2
+  let some l := log | throw "no log"
+  return l
+
+-- a note beside a non-empty cr and cw reads as beside empty ones
+#guard readsAs (notesIn (loggedWith ("{" ++ lane2 ++ ",\"timers\":[" ++ retry3 ++ "]}")))
+  [{ delay := w25, timer := .v1 (.retryOffer (.want g6 3)) }]
+-- and the cr and cw beside it are read as they are without it
+#guard match logOf (loggedWith ("{" ++ lane2 ++ ",\"timers\":[" ++ retry3 ++ "]}")), logOf (loggedWith ("{" ++ lane2 ++ "}")) with
+  | .ok a, .ok b => a.cr == b.cr && a.cw == b.cw && a.cr.length == 2 && a.cw.length == 3 && b.timers.isEmpty
+  | _, _ => false
+
 /-- v2's three, as the record's own `after` writes them (`timerV2Json`'s form), and the same target and arguments in
 a note: the note reads them into the timer whose `timerV2Json` is that target and those arguments, so that an entry
 and a note write a timer with one codec. -/
