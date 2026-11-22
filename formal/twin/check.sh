@@ -996,7 +996,7 @@ plant_line() {          # $1: a plant's letter: its planted count and its replay
 }
 chain_cases() {         # the chain cases: the nodes line's chains on real cells, and five plants, each caught; and
   #                       a flipped answer, refused as an observer and replayed as a change
-  local cells plants flips c p why k all=0 good=0 caught=0 miss stop
+  local cells plants flips c p why k all=0 good=0 caught=0 miss stop dhow="" want_stop
   if [ -n "$NODAS" ]; then cells="hand5-peer"; plants="a b e"; flips=
   else cells="hand5-peer das-hoardcol-w16 das-samplers-mcoff"; plants="a b c d e"; flips="h i"; fi
   mkdir -p "$OUT/chains"; : > "$OUT/c-chains.txt"
@@ -1044,17 +1044,24 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
     else echo "(a) the cut chain: the replay refused it otherwise than by its words  <-- NOT" >> "$OUT/c-chains.txt"; fi
   else echo "(a) the cut chain: not made  <-- NOT" >> "$OUT/c-chains.txt"; fi
   # (b)-(e): each traced to its end, its cases failing on what the plant changed and on nothing else; (b) and (d), an
-  # observer's class where the layer is not one, may instead be stopped by the observer's own check, which then says so
+  # observer's class where the layer is not one, may instead be stopped by the observer's own check, which then says
+  # so, naming the planted layer (ObservedLayer.words)
   for p in $plants; do
     case $p in a) continue ;; esac
     if ! has -E "^tracerfaults3: chain-[a-z-]*-v2, planted [1-9][0-9]* times?$" "$OUT/chains/plant-$p.err"; then
       echo "($p) not planted, or its line is not as written  <-- NOT" >> "$OUT/c-chains.txt"; continue
     fi
     if [ "$(cat "$OUT/chains/plant-$p.rc")" != 0 ]; then
-      stop=$(grep -m 1 -E '^trace3: node [0-9]+: the observer ' "$OUT/chains/plant-$p.err")
+      case $p in
+        b) want_stop='Node\._peer_promise\.<locals>\.filter_entry \(node\.py:[0-9]+\) over filter_entry' ;;
+        d) want_stop='Node\._member_check\.<locals>\.owed_missing \(node\.py:[0-9]+\) over owed_missing' ;;
+        *) want_stop= ;;
+      esac
+      stop=$(grep -m 1 -E "^trace3: node [0-9]+: the observer $want_stop " "$OUT/chains/plant-$p.err")
       case $p in
         b|d) if [ -n "$stop" ]; then echo "($p) caught: the tracer stopped: $(echo "$stop" | cut -c1-160)" >> "$OUT/c-chains.txt"; caught=$((caught + 1))
-             else echo "($p) the tracer stopped without an observer's words  <-- NOT" >> "$OUT/c-chains.txt"; fi ;;
+               [ "$p" = d ] && dhow=stop
+             else echo "($p) the tracer stopped without the planted layer's words, as an observer  <-- NOT" >> "$OUT/c-chains.txt"; fi ;;
         *) echo "($p) the tracer stopped  <-- NOT" >> "$OUT/c-chains.txt" ;;
       esac
       continue
@@ -1083,6 +1090,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
     else
       echo "($p) caught: $k case$([ "$k" = 1 ] || echo s) failing as written ($(echo "$miss" | head -n 1 | sed 's/: NOT: /: /' | cut -c1-140)); $(plant_line "$p")" >> "$OUT/c-chains.txt"
       caught=$((caught + 1))
+      [ "$p" = d ] && dhow=replay
     fi
   done
   # (h), (i): owed_missing's answer flipped on das-samplers by a layer of tracerfaults3's own, which calls the member
@@ -1091,27 +1099,36 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
   # line holds the function and its error's first two parts by ":", so not the rest of the tape). (i), listed
   # as changing, its control: the call a question with the flipped answer on the tape, the replay clean. The two run
   # the same toy, the listing alone differing: the same digest, records and flipped calls, or the listing reached it
+  # (h) is held further: no owed_missing row on its tapes (an observer's call is on none), its planted layers one at
+  # each node, and, where the replay names each refused record (20 at most), those records (i)'s with the flipped row
   local flip="the flipped answer:" kf ni="" ki="" di="" chain="owed_flipped_v2.<locals>.plant.<locals>.owed_missing,Node._member_check.<locals>.owed_missing,doc"
+  local nn
+  nn=$(echo "$DAS30" | sed -n -E 's/.*--nodes ([0-9]+) .*/\1/p')
   for p in ${flips:+i h}; do            # (i) first: (h) is held to its counts and digest
     if [ "$(cat "$OUT/chains/plant-$p.rc" 2> /dev/null)" != 0 ]; then
       echo "($p) the flipped answer: the run did not end with 0  <-- NOT" >> "$OUT/c-chains.txt"; continue
     fi
-    kf=$(sed -n -E "s/^tracerfaults3: owed-flipped-[a-z]+-v2, planted [1-9][0-9]* times?; flipped: ([1-9][0-9]*)\$/\1/p" "$OUT/chains/plant-$p.err")
-    if [ -z "$kf" ]; then echo "($p) the flipped answer: not planted, or no call flipped  <-- NOT" >> "$OUT/c-chains.txt"; continue; fi
+    kf=$(sed -n -E "s/^tracerfaults3: owed-flipped-[a-z]+-v2, planted $nn times; flipped: ([1-9][0-9]*)\$/\1/p" "$OUT/chains/plant-$p.err")
+    if [ -z "$kf" ]; then echo "($p) the flipped answer: not planted once at each of the cell's $nn nodes, or no call flipped  <-- NOT" >> "$OUT/c-chains.txt"; continue; fi
     [ "$p" = h ] && k=kept || k=replaced
     if ! $PY "$T/chaincases.py" "$OUT/chains/plant-$p.jsonl.gz" "*:owed_missing:$k:$chain" > "$OUT/chains/plant-$p.cases"; then
       echo "($p) the flipped answer: owed_missing not $k with the flip's chain at every node: $(head -n 1 "$OUT/chains/plant-$p.cases" | cut -c1-200)  <-- NOT" >> "$OUT/c-chains.txt"; continue
     fi
     case $p in
-      h) if [ -z "$ni" ] || [ "$kf" != "$ki" ] || [ "$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-h.replay")" != "$ni" ] \
+      h) $PY "$T/chaincases.py" --rows owed_missing "$OUT/chains/plant-h.jsonl.gz" > "$OUT/chains/plant-h.rows"
+         if [ -z "$ni" ] || [ "$kf" != "$ki" ] || [ "$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-h.replay")" != "$ni" ] \
              || [ "$(sed -n 's/^digest \(.\{16\}\).*/\1/p' "$OUT/chains/plant-h.out" | head -n 1)" != "$di" ]; then
            echo "(h) the flipped answer, listed an observer: not (i)'s run (records $ni, flipped $ki, digest $di): its listing reached the toy, or (i) failed  <-- NOT" >> "$OUT/c-chains.txt"
+         elif ! has -x "chaincases: owed_missing on the tapes: 0 rows" "$OUT/chains/plant-h.rows"; then
+           echo "(h) the flipped answer, listed an observer: owed_missing on its tapes, where an observer's call is on none: $(cut -c13- "$OUT/chains/plant-h.rows" | cut -c1-120)  <-- NOT" >> "$OUT/c-chains.txt"
+         elif [ "$kf" -le 20 ] && ! $PY "$T/chaincases.py" --flipped owed_missing "$OUT/chains/plant-i.jsonl.gz" "$OUT/chains/plant-h.replay" > "$OUT/chains/plant-h.flipped"; then
+           echo "(h) the flipped answer, listed an observer: the records its replay names are not (i)'s with the flipped row: $(cut -c13- "$OUT/chains/plant-h.flipped" | cut -c1-200)  <-- NOT" >> "$OUT/c-chains.txt"
          elif has -E "^replay: [0-9]+ records, [0-9]+ ok, $kf mismatched\$" "$OUT/chains/plant-h.replay" \
              && has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-h.replay" \
              && [ "$(grep '^mismatch ' "$OUT/chains/plant-h.replay" | grep -c -v -E '^mismatch reconsider: tape: the toy asked more: [0-9]+$')" = 0 ] \
              && [ "$(sed -n -E 's/^mismatch reconsider: tape: the toy asked more: ([0-9]+)$/\1/p' "$OUT/chains/plant-h.replay")" = "$kf" ] \
              && parsed_whole "$OUT/chains/plant-h.replay"; then
-           echo "(h) the flipped answer, listed an observer: refused at its $kf record$([ "$kf" = 1 ] || echo s), on (i)'s run: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-h.replay" | cut -c1-120)" >> "$OUT/c-chains.txt"
+           echo "(h) the flipped answer, listed an observer: refused at its $kf record$([ "$kf" = 1 ] || echo s), on (i)'s run: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-h.replay" | cut -c1-120)$([ "$kf" -le 20 ] || echo "; its records not compared with (i)'s: the replay names 20 at most")" >> "$OUT/c-chains.txt"
            flip="$flip refused as an observer at its $kf record$([ "$kf" = 1 ] || echo s) of the same run"
          else echo "(h) the flipped answer, listed an observer: not refused at its $kf flipped record(s) alone, by rule 2's words: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-chains.txt"; fi ;;
       i) $PY "$T/chaincases.py" --rows owed_missing "$OUT/chains/plant-i.jsonl.gz" > "$OUT/chains/plant-i.rows"
@@ -1121,8 +1138,13 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
          else
            ni=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-i.replay"); ki=$kf
            di=$(sed -n 's/^digest \(.\{16\}\).*/\1/p' "$OUT/chains/plant-i.out" | head -n 1)
-           echo "(i) the flipped answer, listed as changing (the control): $(grep -m 1 '^replay: ' "$OUT/chains/plant-i.replay"); $(cut -c13- "$OUT/chains/plant-i.rows"); digest ${di:-none}" >> "$OUT/c-chains.txt"
-           flip="$flip replayed as a change,"
+           if [[ ! $di =~ ^[0-9a-f]{16}$ ]]; then     # an empty digest would match (h)'s empty one
+             echo "(i) the flipped answer, listed as changing: no digest of 16 hex digits in its run's output: ${di:-none}  <-- NOT" >> "$OUT/c-chains.txt"
+             ni=""
+           else
+             echo "(i) the flipped answer, listed as changing (the control): $(grep -m 1 '^replay: ' "$OUT/chains/plant-i.replay"); $(cut -c13- "$OUT/chains/plant-i.rows"); digest ${di:-none}" >> "$OUT/c-chains.txt"
+             flip="$flip replayed as a change,"
+           fi
          fi ;;
     esac
   done
@@ -1135,7 +1157,14 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
   [ "$caught" = "$nplants" ] || plants_said="$caught of $nplants plants caught"
   if [ -n "$NODAS" ]; then
     echo "  the chain cases: $good of $all on hand5-peer, and $plants_said (--no-das: the DAS cells das-hoardcol-w16 and das-samplers-mcoff, plants (c) and (d) on them, and the flipped answer on das-samplers, skipped)"
-  else echo "  the chain cases: $good of $all on three cells, and $plants_said, (d) by its replay too; $flip"; fi
+  else
+    case $dhow in       # how (d) was caught: its cases and its replay, or the tracer's stop at its layer
+      replay) dhow="(d) by its replay too" ;;
+      stop) dhow="(d) by the tracer's stop" ;;
+      *) dhow="(d) not caught" ;;
+    esac
+    echo "  the chain cases: $good of $all on three cells, and $plants_said, $dhow; $flip"
+  fi
 }
 swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell that enters its layer, and two plants
   local hand nd why stop also n=0
@@ -1159,7 +1188,7 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
   rm -f "$OUT/c-draws-f".*
   if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-rewrap-off-v2 . "$OUT/c-draws-f.jsonl.gz" > "$OUT/c-draws-f.out" 2> "$OUT/c-draws-f.err"); then
     echo "(f) the re-wrap off: the run did not end with 0  <-- NOT" >> "$OUT/c-draws.txt"
-  elif ! has -E "^tracerfaults3: draws-rewrap-off-v2, planted $hand times\$" "$OUT/c-draws-f.err"; then
+  elif ! has -E "^tracerfaults3: draws-rewrap-off-v2, planted $hand times?\$" "$OUT/c-draws-f.err"; then
     echo "(f) the re-wrap off: not planted once for each of hand5's $hand keep_floor draws  <-- NOT" >> "$OUT/c-draws.txt"
   elif replay_of c-draws-f; then
     echo "(f) the re-wrap off: the replay passed it  <-- NOT" >> "$OUT/c-draws.txt"
@@ -1167,8 +1196,9 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
     echo "(f) the re-wrap off: the parser refused a line of it, not the twin  <-- NOT" >> "$OUT/c-draws.txt"
   elif ! has -E "^replay: [0-9]+ records, [0-9]+ ok, $hand mismatched\$" "$OUT/c-draws-f.replay"; then
     echo "(f) the re-wrap off: the replay mismatched otherwise than at hand5's $hand keep_floor records: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay")  <-- NOT" >> "$OUT/c-draws.txt"
-  elif ! has -F "tape: sample_without_replacement[[],0] asked, the tape is over logged" "$OUT/c-draws-f.replay"; then
-    echo "(f) the re-wrap off: the replay refused it otherwise than by its words  <-- NOT" >> "$OUT/c-draws.txt"
+  elif [ "$(grep -c '^mismatch ' "$OUT/c-draws-f.replay")" != 1 ] \
+      || ! has -x -F "mismatch keep_floor: tape: sample_without_replacement[[],0] asked, the tape is over logged: $hand" "$OUT/c-draws-f.replay"; then
+    echo "(f) the re-wrap off: the replay refused it otherwise than by its words alone, keep_floor's at each of its $hand records  <-- NOT" >> "$OUT/c-draws.txt"
   else
     echo "(f) the re-wrap off: caught: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay"); $(grep -m 1 -F 'tape: sample_without_replacement[[],0] asked, the tape is over logged' "$OUT/c-draws-f.replay" | cut -c1-160)" >> "$OUT/c-draws.txt"
     n=$((n + 1))
@@ -1778,7 +1808,7 @@ alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's ce
   fi
 }
 s_tracercontrols() {
-  local f want bad
+  local f want bad nm
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
   if (cd "$TOY" && $PY "$T/unlogged3.py" . "$OUT/c-unlogged.jsonl.gz" --n 20000 --seed 1 > "$OUT/c-unlogged.out" 2> "$OUT/c-unlogged.err"); then
     no "the tracer wrote a trace to its end with every twentieth assignment unlogged"
@@ -2025,7 +2055,8 @@ EOF_ERC
   echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 9 plants under v2 as written (five, and four controls), and the checks' controls"
   # under v2, the nodes line's chains: hand5-own traced with its replaced names' chains left out (tracerfaults3's
   # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words, naming the
-  # first it meets: push_rebuilt, which hand5-own (--rebuilt none) replaces at every node
+  # first it meets: a name that a node of the line replaces with no chain there (hand5-own, --rebuilt none: push_rebuilt
+  # at every node, and forward and on_iwant at its silent node)
   rm -f "$OUT/c-chains-omit.jsonl.gz" "$OUT/c-chains-omit.jsonl.gz.bare.json" "$OUT/c-chains-omit.replay" "$OUT/c-chains-omit.replay.rc"
   if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --chains-omit-v2 . "$OUT/c-chains-omit.jsonl.gz" > "$OUT/c-chains-omit.out" 2> "$OUT/c-chains-omit.err"); then
     no "the trace of a nodes line without a replaced name's chain did not end with 0 (c-chains-omit.err)"
@@ -2035,9 +2066,16 @@ EOF_ERC
     no "the replay passed a nodes line without a replaced name's chain (c-chains-omit.replay)"
   elif ! parsed_whole "$OUT/c-chains-omit.replay"; then
     no "the nodes line without a replaced name's chain: the parser refused a line of it, not the twin (c-chains-omit.replay)"
-  elif has -x "nodes: chains: a replaced name with no chain: push_rebuilt" "$OUT/c-chains-omit.replay"; then
-    echo "  a nodes line without its replaced names' chains: refused by the replay, with its words (push_rebuilt)"
-  else no "the replay refused a nodes line without a replaced name's chain otherwise than by its words (c-chains-omit.replay)"; fi
+  elif nm=$(sed -n -E 's/^nodes: chains: a replaced name with no chain: ([A-Za-z_][A-Za-z0-9_]*)$/\1/p' "$OUT/c-chains-omit.replay"); [ -z "$nm" ]; then
+    no "the replay refused a nodes line without a replaced name's chain otherwise than by its words (c-chains-omit.replay)"
+  elif ! $PY -c 'import gzip, json, sys
+for line in gzip.open(sys.argv[1], "rt", encoding="utf-8"):
+    if line.startswith("{\"nodes\""):    # the name the replay names: replaced at a node of the trace, with no chain there
+        sys.exit(0 if any(sys.argv[2] in (e.get("replaced") or ()) and sys.argv[2] not in (e.get("chains") or {})
+                          for e in json.loads(line)["nodes"]) else 1)
+sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
+    no "the replay named $nm, which no node of the nodes line replaces without its chain (c-chains-omit.replay)"
+  else echo "  a nodes line without its replaced names' chains: refused by the replay, with its words ($nm)"; fi
   # the chain cases: the nodes line's chains on three cells against written cases, and five plants, each caught:
   # (a) hand5-peer's trace with close_promises' chain cut to its bound layer, which the replay must refuse with its
   # words; (b) filter_entry's peer layer classed as an observer and (e) owed_missing's member-check layer as changing,

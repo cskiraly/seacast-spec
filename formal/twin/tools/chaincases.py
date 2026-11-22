@@ -5,6 +5,7 @@
     python3 chaincases.py --cut NAME TRACE OUT
     python3 chaincases.py --rows NAME TRACE [FN]
     python3 chaincases.py --drop-arg NAME TRACE OUT
+    python3 chaincases.py --flipped NAME TRACE REPORT
 
 A CASE is `NODE:NAME:replaced|kept:CHAIN`: at node NODE, NAME is in its entry's `replaced` (replaced) or not
 (kept), and its `chains` value is CHAIN, the layers' qualified names joined by commas, outermost first, ending in
@@ -24,7 +25,15 @@ the tapes of the records whose `reached` holds FN alone.
 the records' tapes left out, and nothing else changed: a record line without such a row is written as it was read,
 and one with it is written again in the tracer's form (compact JSON). It says how many rows in how many records;
 exit 2 where none, or where a row has no argument to leave out.
+
+`--flipped`: the records of TRACE that hold a row of the question NAME on their tapes, against the records that
+REPORT, a replay's report of another trace of the same run, names in its `example:` lines. Each record is (node,
+function, its arguments as compact JSON); the record's time is left out. One line: the two counts, and "the same"
+or the records in one and not the other. Exit 0 where the two sets are equal and not empty, 1 where they differ, 2
+where REPORT has more than 20 example lines (the replay names only its first 20 records and each reason's first) or
+an example line it cannot read.
 """
+import re
 import gzip
 import json
 import sys
@@ -179,7 +188,42 @@ def drop_arg(name, trace, out):
     return 0
 
 
+EXAMPLE = re.compile(r"^example: node (\d+) at \S+ ([A-Za-z_][A-Za-z0-9_]*)(\[.*?\]): ")
+
+
+def flipped(name, trace, report):
+    on_tapes = set()
+    with gzip.open(trace, "rt", encoding="utf-8") as f:
+        for line in f:
+            if not line.startswith('{"n"'):
+                continue
+            d = json.loads(line)
+            if any(row and row[0] == name for row in d.get("tape") or ()):
+                on_tapes.add((d["n"], d["fn"], json.dumps(d["args"], separators=(",", ":"))))
+    named = set()
+    with open(report, encoding="utf-8") as f:
+        examples = [line.rstrip("\n") for line in f if line.startswith("example: ")]
+    if len(examples) > 20:
+        print(f"chaincases: {len(examples)} example lines: the replay names only its first 20 records")
+        return 2
+    for line in examples:
+        m = EXAMPLE.match(line)
+        if m is None:
+            print(f"chaincases: an example line not read: {line[:120]}")
+            return 2
+        named.add((int(m.group(1)), m.group(2), m.group(3)))
+    same = on_tapes == named and bool(on_tapes)
+    show = lambda xs: ", ".join(f"node {n} {fn}{a}"[:100] for n, fn, a in sorted(xs)[:3])   # noqa: E731
+    print(f"chaincases: {name}: {len(on_tapes)} record{'s' if len(on_tapes) != 1 else ''} with its rows on the "
+          f"tapes, {len(named)} named by the report's examples: "
+          + ("the same" if same else f"not the same (on the tapes only: {show(on_tapes - named) or 'none'}; "
+                                     f"in the examples only: {show(named - on_tapes) or 'none'})"))
+    return 0 if same else 1
+
+
 def main(argv):
+    if len(argv) == 4 and argv[0] == "--flipped":
+        return flipped(*argv[1:])
     if len(argv) == 4 and argv[0] == "--cut":
         return cut(*argv[1:])
     if len(argv) == 4 and argv[0] == "--drop-arg":
@@ -187,7 +231,7 @@ def main(argv):
     if len(argv) in (3, 4) and argv[0] == "--rows":
         return rows(*argv[1:])
     if len(argv) < 2 or argv[0].startswith("--"):
-        print("usage: " + "; ".join(x.strip() for x in __doc__.strip().splitlines()[2:6]))
+        print("usage: " + "; ".join(x.strip() for x in __doc__.strip().splitlines()[2:7]))
         return 2
     return cases(argv[0], argv[1:])
 
