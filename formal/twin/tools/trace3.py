@@ -80,6 +80,7 @@ import gzip
 import json
 import math
 import os
+import re
 import sys
 from collections import Counter
 from pathlib import Path
@@ -148,6 +149,15 @@ EAGER_LATE = [False]
 # of protocol.md touches them)
 WINDOW = ("in_flight", "waiters", "sent")
 V2_FILE = "protocol-v2.md (extracted)"  # the toy compiles protocol-v2.md's blocks under this name (node.py, spec2)
+# Under --doc v2, protocol-v2.md's own tables (gen/schema_v2.py's, in its order): views too, after protocol.md's in
+# the header's `own`
+OWN_V2 = tuple(t.name for t in schema_v2.TABLES_V2)
+# Under --doc v2, a table of protocol-v2.md's §3 that is another one's: §3's `hdr` is protocol.md's `desc`, and the
+# toy binds both names to one dict (repoint_aliases points `hdr` at desc's view)
+ALIASES_V2 = {"hdr": "desc"}
+# A table of schema_v2.py's that protocol-v2.md's §3 does not declare, with why it is a table all the same. The §3
+# scan stops on one that §3 declares after all: the exception is then dropped
+UNDECLARED_V2 = {"want_p": "read and written by protocol-v2.md's code (§4.1, §4.5), declared in no line of §3"}
 
 
 # the calls the block makes on the tape: each a question, answered from the trace, whoever defines it (install's
@@ -212,6 +222,63 @@ def v2_kept(names, p_src, v2_src, cut=TAPE):
                 gone.add(n)
                 grew = True
     return tuple(n for n in names if n not in gone)
+
+
+def sec3_names(text):
+    """The names protocol-v2.md's §3 declares: each line `name: …` of its code block, in order."""
+    s = text.index("\n## 3. State\n")
+    a = text.index("```python\n", s) + len("```python\n")
+    b = text.index("\n```", a)
+    return [m.group(1) for m in re.finditer(r"^([A-Za-z_]\w*):", text[a:b], re.M)]
+
+
+def sec3_check(names, v2=OWN_V2, undeclared=UNDECLARED_V2):
+    """§3's names against the tables' lists (schema.py's, schema_v2.py's, FOREIGN, the aliases): what differs, as
+    one line each. A name of §3 in no list; a name of schema_v2.py's not in §3, unless it is named in `undeclared`;
+    and a named one that §3 declares after all."""
+    known = set(OWN) | set(v2) | set(FOREIGN) | set(ALIASES_V2)
+    out = [f"{n}: in §3, in no list" for n in names if n not in known]
+    out += [f"{n}: in schema_v2.py, not in §3" for n in v2 if n not in names and n not in undeclared]
+    out += [f"{n}: named as not in §3, and §3 declares it" for n in undeclared if n in names]
+    return out
+
+
+class MissQuestionView(F.View):
+    """`interest` under --doc v2: the toy's InterestMap answers a group it does not hold by `own_interest_bits(g)`
+    and stores nothing (protocol-v2.md §3: ours, computable before any chunk). In a record's own code, not inside a
+    question, that miss is the question `own_interest(g)`: the read logged first, with the group missing, then the
+    question on the tape with its answer. Inside a question, and outside a record, the miss runs as the toy's.
+    `ask(g, raw)` puts the question on the tape and gives its answer."""
+    __slots__ = ("_ask",)
+
+    def __init__(self, view, ask):
+        super().__init__(view._r, view._t, view._p, view._o)
+        object.__setattr__(self, "_ask", ask)
+
+    def __getitem__(self, k):
+        if self._r.on and self._r.callee is None and not self._p and k not in self._o:
+            self._r.read(self._t, (k,))
+            return self._ask(k, self._o)
+        return super().__getitem__(k)
+
+
+def miss_question(rec, enter=lambda: None, leave=lambda: None):
+    """The question `own_interest(g)` of MissQuestionView: the toy's own miss (`__missing__`) run as a question's
+    callee, its accesses of the own tables its `cr` and `cw`; on the tape as `["own_interest", [g], bits]`, the
+    bits in the signed form, as schema_v2.py writes `interest`'s. `enter` and `leave` are the tracer's own around a
+    question (its depth, and the mesh as the node's)."""
+    def ask(g, raw):
+        enter()
+        rec.begin_callee()
+        try:
+            b = raw.__missing__(g)
+        finally:
+            cr, cw = rec.end_callee()
+            leave()
+        rec.tape.append(["own_interest", [g.hex()], schema_v2.signed(b.v)]
+                        + ([{"cr": cr, "cw": cw}] if cr or cw else []))
+        return b
+    return ask
 
 
 _PARSED = {}
@@ -645,8 +712,180 @@ def forms_self_test():
     return bad
 
 
+def views_self_test():
+    """protocol-v2.md's tables as views, at the recorder's level, on the toy's own containers (bits.py's) and no
+    run: the levels whose order is on the tape (`claims`, `probe_waiting[g]`), with two planted faults; the two
+    keys of `probe_asks`; `interest`'s miss as the question `own_interest`, with its planted fault; and the §3 scan,
+    with its planted controls. The control: each view case run again with the tables of protocol.md's install
+    (Tracer3.schema without --doc v2) must fail, and all of them."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import bits as B                    # noqa: E402: the toy's, beside this repository's documents
+    import wire as Wm                   # noqa: E402
+
+    def tables(v2):
+        tr = object.__new__(Tracer3)
+        tr.Wm, tr.doc_v2 = Wm, v2
+        return {t.name: t for t in tr.schema(None)}
+
+    g1, g2, g3 = (bytes([n]) * 32 for n in (1, 2, 3))
+    sid = g1 + (3).to_bytes(4, "little") + bytes(20)        # a structured id of g1's chunk 3: 56 bytes
+
+    class SortingRecorder(F.Recorder):  # the planted fault: a recorder that sorts the keys it puts on the tape
+        def keys(self, t, prefix, ks):
+            return super().keys(t, prefix, sorted(ks))
+
+    def record(ts, names, raw, act, rec=None, unordered=False, hook=True, callee=False):
+        """`act(ns)` in an open record over the views of `names` (raw: their containers); its tape, reads and
+        writes, and what it returned."""
+        rec = rec or F.Recorder()
+        tl = [ts[n] for n in names]
+        if unordered:                   # the planted fault: the table lines without the ordering flags
+            tl = [F.Table(t.name, t.keys, t.value, rows=t.rows, values_ordered=t.values_ordered,
+                          presence_in=t.presence_in) for t in tl]
+        ns = dict(raw)
+        F.install(rec, ns, tl)
+        if hook and "interest" in names:
+            ns["interest"] = MissQuestionView(ns["interest"], miss_question(rec))
+        rec.on, rec.tape = True, []
+        if callee:
+            rec.begin_callee()
+        r = act(ns)
+        cr = rec.end_callee()[0] if callee else None
+        reads, _, writes = rec.footprint()
+        return {"tape": rec.tape, "reads": reads, "writes": writes, "ret": r, "cr": cr}
+
+    def claims_raw():
+        c = B.lazy(B.LazySet)
+        for g, q in ((g3, 5), (g1, 6), (g2, 7)):            # inserted out of order on purpose
+            c[g].add(q)
+        return {"claims": c}
+
+    def waiting_raw():
+        w = B.lazy(B.lazy_dict)
+        for q, i in ((5, 1), (2, 2), (9, 3)):
+            w[g1][q] = i
+        return {"probe_waiting": w}
+
+    class InterestMap(dict):            # the toy's (node.py's `_v2`): the ALL fixture, every index for any group
+        def __missing__(self, g):
+            return B.Bits(-1)
+
+    def interest_raw():
+        m = InterestMap()
+        m[g2] = B.Bits(0)               # a stored 0: a value, which asks nothing
+        return {"interest": m}
+
+    def asks_raw():
+        return {"probe_asks": {Wm.WantIndex(g1, 3)}}
+
+    order_claims = [["keys", "claims", [], [g3.hex(), g1.hex(), g2.hex()]]]
+    order_waiting = [["keys", "probe_waiting", [g1.hex()], [5, 2, 9]]]
+    # (what, the case run over a table set, what it must give)
+    vcases = [
+        ("claims.items() in a record: the groups' order on the tape, as inserted",
+         lambda ts: record(ts, ["claims"], claims_raw(), lambda ns: list(ns["claims"].items()))["tape"], order_claims),
+        ("probe_waiting[g].items() in a record: the peers' order on the tape, as inserted",
+         lambda ts: record(ts, ["probe_waiting"], waiting_raw(),
+                           lambda ns: list(ns["probe_waiting"][g1].items()))["tape"], order_waiting),
+        ("probe_asks: an ask by index, stored, and the same chunk's structured id, not stored: two keys read",
+         lambda ts: (lambda o: (o["reads"], o["ret"]))(record(
+             ts, ["probe_asks"], asks_raw(),
+             lambda ns: (Wm.WantIndex(g1, 3) in ns["probe_asks"], sid in ns["probe_asks"]))),
+         ([["probe_asks", [[g1.hex(), 3]], True], ["probe_asks", [sid.hex()], None]], (True, False))),
+        ("probe_asks.add: a write with no read",
+         lambda ts: (lambda o: (o["reads"], o["writes"]))(record(
+             ts, ["probe_asks"], asks_raw(), lambda ns: ns["probe_asks"].add(Wm.WantIndex(g2, 4)))),
+         ([], [["probe_asks", [[g2.hex(), 4]], True]])),
+        ("interest's miss in a record (ALL): read missing, then own_interest on the tape; nothing stored",
+         lambda ts: (lambda o: (o["tape"], o["reads"], o["writes"], o["ret"].v))(record(
+             ts, ["interest"], interest_raw(), lambda ns: ns["interest"][g1])),
+         ([["own_interest", [g1.hex()], ["-", 1]]], [["interest", [g1.hex()], None]], [], -1)),
+        ("interest's stored 0 in a record: read, and no question",
+         lambda ts: (lambda o: (o["tape"], o["reads"], o["ret"].v))(record(
+             ts, ["interest"], interest_raw(), lambda ns: ns["interest"][g2])),
+         ([], [["interest", [g2.hex()], 0]], 0)),
+        ("interest's miss inside a question: nothing on the tape, the read the question's",
+         lambda ts: (lambda o: (o["tape"], o["cr"]))(record(
+             ts, ["interest"], interest_raw(), lambda ns: ns["interest"][g1], callee=True)),
+         ([], [["interest", [g1.hex()], None]])),
+    ]
+
+    def run(f, ts):
+        try:
+            return f(ts)
+        except Exception as e:          # a table the install does not have, and anything else: the case fails
+            return f"{type(e).__name__}: {e}"
+    bad = 0
+    v2t, p1t = tables(True), tables(False)
+    for what, f, want in vcases:
+        got = run(f, v2t)
+        ok = got == want
+        bad += not ok
+        print(f"views self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    # the planted faults: each must give what its case refuses
+    plants = [
+        ("claims without the ordering flag: no keys on the tape",
+         lambda: record(v2t, ["claims"], claims_raw(), lambda ns: list(ns["claims"].items()), unordered=True)["tape"],
+         order_claims),
+        ("probe_waiting without its ordered level: no keys on the tape",
+         lambda: record(v2t, ["probe_waiting"], waiting_raw(), lambda ns: list(ns["probe_waiting"][g1].items()),
+                        unordered=True)["tape"], order_waiting),
+        ("a recorder that sorts: claims' groups sorted",
+         lambda: record(v2t, ["claims"], claims_raw(), lambda ns: list(ns["claims"].items()),
+                        rec=SortingRecorder())["tape"], order_claims),
+        ("a recorder that sorts: probe_waiting's peers sorted",
+         lambda: record(v2t, ["probe_waiting"], waiting_raw(), lambda ns: list(ns["probe_waiting"][g1].items()),
+                        rec=SortingRecorder())["tape"], order_waiting),
+        ("interest's miss left to the toy's own __missing__: no own_interest on the tape",
+         lambda: record(v2t, ["interest"], interest_raw(), lambda ns: ns["interest"][g1], hook=False)["tape"],
+         [["own_interest", [g1.hex()], ["-", 1]]]),
+    ]
+    for what, f, refused in plants:
+        got = f()
+        ok = got != refused
+        bad += not ok
+        print(f"views self-test, planted: {what}: "
+              f"{f'gives {got!r}, which its case refuses, ok' if ok else 'not seen  <-- FAIL'}")
+    # the control: protocol.md's install has none of these tables, so every view case fails
+    failed = [what for what, f, want in vcases if run(f, p1t) != want]
+    ok = len(failed) == len(vcases)
+    bad += not ok
+    print(f"views self-test, the control (protocol.md's install in v2's place): "
+          f"{f'fails all {len(failed)} view cases, ok' if ok else f'fails only {failed}  <-- FAIL'}")
+    # the §3 scan, on this repository's protocol-v2.md and on copies with a line planted or removed
+    text = (HERE.parents[2] / "protocol-v2.md").read_text()
+    anchor = re.search(r"^rsample_final:.*\n", text, re.M)
+
+    def with_lines(*lines, drop=False):
+        a, b = anchor.span()
+        return text[:a] + ("" if drop else anchor.group(0)) + "".join(f"{x}\n" for x in lines) + text[b:]
+    part_g = ["served_hb: Dict[PeerId, int]", "offered_to: Dict[PeerId, Dict[GroupId, Bitmap]]",
+              "routed_standing: Dict[GroupId, Dict[int, Set[PeerId]]]"]
+    scases = [
+        ("this repository's §3", lambda: sec3_check(sec3_names(text)), []),
+        ("§3 without rsample_final's line", lambda: sec3_check(sec3_names(with_lines(drop=True))),
+         ["rsample_final: in schema_v2.py, not in §3"]),
+        ("§3 with a planted table", lambda: sec3_check(sec3_names(with_lines("planted_t: Dict[GroupId, int]"))),
+         ["planted_t: in §3, in no list"]),
+        ("§3 with part G's three tables", lambda: sec3_check(sec3_names(with_lines(*part_g))),
+         ["served_hb: in §3, in no list", "offered_to: in §3, in no list", "routed_standing: in §3, in no list"]),
+        ("§3 declaring want_p, named as undeclared", lambda: sec3_check(sec3_names(with_lines(
+            "want_p: Dict[PeerId, Dict[GroupId, Bitmap]]"))), ["want_p: named as not in §3, and §3 declares it"]),
+        ("§3 declaring want_p, the exception dropped", lambda: sec3_check(sec3_names(with_lines(
+            "want_p: Dict[PeerId, Dict[GroupId, Bitmap]]")), undeclared={}), []),
+    ]
+    for what, f, want in scases:
+        got = f()
+        ok = got == want
+        bad += not ok
+        print(f"views self-test, the §3 scan, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    print(f"views self-test, the §3 scan names as used and not declared in §3: "
+          f"{'; '.join(f'{n} ({why})' for n, why in UNDECLARED_V2.items())}")
+    return bad
+
+
 def self_test_v2():
-    bad = v2_kept_self_test() + forms_self_test()
+    bad = v2_kept_self_test() + forms_self_test() + views_self_test()
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -725,7 +964,12 @@ class Tracer3(Tracer):
         for d in (N.DOC, N.DOC2):       # the documents the toy reads are the two the content line names
             if Path(d).resolve() != self.toy.parent / Path(d).name:
                 raise SystemExit(f"trace3: the toy reads a document that is not beside it: {d}")
-        hd = {"format": 7, "whole": whole, "own": list(OWN), "foreign": list(FOREIGN)}
+        if self.doc_v2:                 # §3's tables against the lists the views are made from (sec3_check)
+            off = sec3_check(sec3_names(Path(N.DOC2).read_text()))
+            if off:
+                raise SystemExit("trace3: protocol-v2.md's §3 and the tables' lists differ: " + "; ".join(off))
+        hd = {"format": 7, "whole": whole, "own": list(OWN) + (list(OWN_V2) if self.doc_v2 else []),
+              "foreign": list(FOREIGN)}
         if self.doc_v2:
             hd["row_reads"] = list(ROW_READS_V2)
         hd.update({"traced": sorted(self.traced), "tracer": "trace3.py", "args": argv})
@@ -1564,6 +1808,8 @@ class Tracer3(Tracer):
             for t in tables:
                 if t.name in have:
                     t.value = self.have_v2
+            # and protocol-v2.md's own tables, as schema_v2.py writes them (a JOIN, GRAFT or PRUNE as rel_msg does)
+            tables += schema_v2.python_tables_v2(F, key, fbits, self.rel_msg)
         return tables
 
     def types_v2(self, nd, ns):
@@ -1731,6 +1977,22 @@ class Tracer3(Tracer):
         #                                                                         record's end checks they are still there
         st = self.vst if self.doc_v2 else {"depth": 0, "ext": 0, "cur": None}
         key, tr = self.key, self
+        if self.doc_v2:     # protocol-v2.md's own tables are views over the toy's own objects (`hdr` is pointed at
+            for name in OWN_V2:     # desc's by repoint_aliases); and interest's miss is the question own_interest
+                if not isinstance(ns.get(name), F.View) or ns[name]._o is not rec.roots[name][1]:
+                    raise SystemExit(f"trace3: node {nd.id}: {name} is not a view of the toy's table after the install")
+            if not hasattr(type(rec.roots["interest"][1]), "__missing__"):
+                raise SystemExit(f"trace3: node {nd.id}: interest answers no missing group here (the toy's "
+                                 f"InterestMap does, by own_interest_bits)")
+
+            def enter():                    # around the question, as around any other (iface)
+                st["ext"] += 1
+                mesh_off()
+
+            def leave():
+                st["ext"] -= 1
+                mesh_on()
+            ns["interest"] = MissQuestionView(ns["interest"], miss_question(rec, enter, leave))
 
         def sec61(name, fn):
             @functools.wraps(fn)
