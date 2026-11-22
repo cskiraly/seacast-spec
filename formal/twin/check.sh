@@ -226,9 +226,14 @@ else                    # the record's 55, then the three small ones
 fi
 [ -z "$V2STEPS" ] || TRACES="$TRACES $(for c in $CELLS; do echo "v2/$c"; done)"    # v2cells' traces, read too
 
-replay_of() {           # $1: a trace, without its .jsonl.gz: replayed to $1.replay; the status is the replay's
-  zcat "$OUT/$1.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/$1.replay" 2>&1
-  return "${PIPESTATUS[1]}"
+replay_of() {           # $1: a trace, without its .jsonl.gz: replayed to $1.replay; the status is the replay's, kept in
+  zcat "$OUT/$1.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/$1.replay" 2>&1      #   $1.replay.rc
+  local rc=${PIPESTATUS[1]}
+  echo "$rc" > "$OUT/$1.replay.rc"
+  return "$rc"
+}
+parsed_whole() {        # $1: a replay's report: no line its strict reader or its parser refused (Main.lean's two phrases)
+  [ -f "$1" ] && ! has -E '^(lines refused before they were parsed|line [0-9]+: not a line the tracer writes)' "$1"
 }
 digest_of() { sed -n '/^digest /{s/^digest \(.\{16\}\).*/\1/p;q}' "$1"; }
 bare_none() { [ "$(cat "$1.bare.json" 2> /dev/null)" = "{}" ]; }     # $1: a v2 trace: its run counted no bare call
@@ -667,7 +672,7 @@ s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2
 }
 small() {               # $1: a name; $2: its directory; $3: the tracer's environment setting, or ""; the rest: run.py's arguments
   local name=$1 dir=$2 setting=$3 got plain; shift 3
-  rm -f "$OUT/$dir/$name.jsonl.gz" "$OUT/$dir/$name.jsonl.gz.bare.json" "$OUT/$dir/$name.jsonl.gz.calls.json" "$OUT/$dir/$name.replay"
+  rm -f "$OUT/$dir/$name.jsonl.gz" "$OUT/$dir/$name.jsonl.gz.bare.json" "$OUT/$dir/$name.jsonl.gz.calls.json" "$OUT/$dir/$name.replay" "$OUT/$dir/$name.replay.rc"
   (cd "$TOY" && env $setting $PY "$T/trace3.py" . "$OUT/$dir/$name.jsonl.gz" "$@" --digest > "$OUT/$dir/$name.out" 2> "$OUT/$dir/$name.err") || return 1
   replay_of "$dir/$name"
   (cd "$TOY" && $PYPLAIN run.py "$@" --digest > "$OUT/$dir/$name.plain" 2>&1)
@@ -691,7 +696,7 @@ s_small() {
 one_directed() {
   local d=$1 tool
   tool=$(dirtool "$d")
-  rm -f "$OUT/directed/$d.jsonl.gz" "$OUT/directed/$d.replay"
+  rm -f "$OUT/directed/$d.jsonl.gz" "$OUT/directed/$d.replay" "$OUT/directed/$d.replay.rc"
   # shellcheck disable=SC2046
   (cd "$TOY" && $PY "$T/${tool%% *}" . "$OUT/directed/$d.jsonl.gz" --n 20000 --seed 1 $(case "$tool" in *" "*) echo "${tool#* }" ;; esac) \
       > "$OUT/directed/$d.out" 2> "$OUT/directed/$d.err") || return 1
@@ -703,6 +708,10 @@ s_directed() {
   par_end || no "a directed set was not traced, or its replay did not end with status 0"
   echo "  $(ls "$OUT"/directed/*.jsonl.gz 2> /dev/null | wc -l) of 22 directed sets traced"
 }
+by_cells3() {           # $1: a trace of TRACES: replayed by cells3.py, as a cell of check.py, whose verdict requires the
+  case $1 in traces/*|v2/*) case " $CELLS none " in *" ${1#*/} "*) return 0 ;; esac ;; esac   #   replay's code 0
+  return 1
+}
 s_replays() {
   local t f n=0
   : > "$OUT/replays.txt"
@@ -710,6 +719,10 @@ s_replays() {
     f=$OUT/$t.replay
     if [ ! -s "$f" ]; then echo "$t: no replay" >> "$OUT/replays.txt"; no "$t has no replay"; continue; fi
     echo "$t: $(grep '^replay: ' "$f" | head -n 1); $(grep "^reads of the Python's that the twin did not make: " "$f" | head -n 1)" >> "$OUT/replays.txt"
+    if ! by_cells3 "$t" && [ "$(cat "$OUT/$t.replay.rc" 2> /dev/null)" != 0 ]; then
+      no "$t: the replay exited $(cat "$OUT/$t.replay.rc" 2> /dev/null || echo '?')"; continue
+    fi
+    parsed_whole "$f" || { no "$t: the parser refused a line of it"; continue; }
     has -E '^replay: [1-9][0-9]* records, [1-9][0-9]* ok, 0 mismatched$' "$f" || { no "$t: a record mismatched, or none read"; continue; }
     has -x "reads of the Python's that the twin did not make: 0" "$f" || { no "$t: a read of the Python's not made"; continue; }
     case $t in v2/*) bare_none "$OUT/$t.jsonl.gz" || { no "$t: its run counted bare calls ($t.jsonl.gz.bare.json)"; continue; } ;; esac
@@ -751,6 +764,31 @@ s_picks() {
   [ "$(grep -c . "$OUT/picks.txt")" = 4 ] || no "not four lines in picks.txt"
   sed 's/^/  /' "$OUT/picks.txt" | cut -c1-200
 }
+cut_controls() {        # a trace cut short: no trailer, so no pass; and a line the parser refuses: v2/hand5 with one
+  #                       line that is not JSON just before its trailer, which the replay counts and exits 1 on, and
+  #                       which replay_clean refuses by the replay's status, and by the parser's line where the status
+  #                       reads 0
+  local rc n r w1 w2
+  zcat "$OUT/traces/hand5.jsonl.gz" | head -n 50 | "$REPLAY" --content "$CONTENT" > "$OUT/c-cut.replay" 2>&1; rc=${PIPESTATUS[2]}
+  if [ "$rc" = 1 ] && has -E '^trailer: ' "$OUT/c-cut.replay" && parsed_whole "$OUT/c-cut.replay"; then echo "  control, a trace cut short: refused, as it must be: $(grep -m 1 '^trailer: ' "$OUT/c-cut.replay" | cut -c1-120)"
+  else no "control, a trace cut short: rc=$rc, and no line about the trailer, or a line the parser refused"; fi
+  rm -f "$OUT"/c-refused.*
+  n=$(zcat "$OUT/v2/hand5.jsonl.gz" | wc -l)
+  zcat "$OUT/v2/hand5.jsonl.gz" | awk -v n="$n" 'NR == n { print "not JSON" } { print }' | gzip -n > "$OUT/c-refused.jsonl.gz"
+  cp "$OUT/v2/hand5.jsonl.gz.bare.json" "$OUT/c-refused.jsonl.gz.bare.json" 2> /dev/null
+  replay_of c-refused; rc=$?
+  w1=$(replay_clean c-refused)
+  echo 0 > "$OUT/c-refused.replay.rc"
+  w2=$(replay_clean c-refused)
+  r=$(sed -n -E 's/^replay: ([0-9]+) records, [0-9]+ ok, 0 mismatched$/\1/p' "$OUT/v2/hand5.replay" 2> /dev/null)
+  if [ "$rc" = 1 ] && [ -n "$r" ] && [ "$(zcat "$OUT/c-refused.jsonl.gz" | wc -l)" = $((n + 1)) ] \
+      && has -x "replay: $r records, $r ok, 0 mismatched" "$OUT/c-refused.replay" \
+      && has -E "^line $n: not a line the tracer writes: " "$OUT/c-refused.replay" \
+      && has -x "lines refused before they were parsed, or by the parser: 1" "$OUT/c-refused.replay" \
+      && [ "$w1" = "the replay exited 1" ] && [ "$w2" = "the parser refused a line of it" ]; then
+    echo "  control, a line the parser refuses: refused twice, as it must be ($w1; $w2)"
+  else no "control, a line the parser refuses: rc=$rc; replay_clean: '$w1', and with the status 0: '$w2' (c-refused.replay)"; fi
+}
 s_controls() {
   local rc
   # 1. a mutant that compiles, replayed over §6.1's directed set: it must be built, and told by a mismatched record
@@ -770,10 +808,8 @@ s_controls() {
   if [ "$rc" = 0 ] && ! has -E 'wrong$|<-- ' "$OUT/c-altered.txt" && [ "$(grep -c '^ok: every control of ' "$OUT/c-altered.txt")" -ge 1 ]; then
     echo "  control, altered records, headers and nodes lines: $(grep -c '^ok: every control of ' "$OUT/c-altered.txt") groups, each refused as it must be (c-altered.txt)"
   else no "control, altered records: rc=$rc (c-altered.txt)"; fi
-  # 3. a trace cut short: no trailer, so no pass
-  zcat "$OUT/traces/hand5.jsonl.gz" | head -n 50 | "$REPLAY" --content "$CONTENT" > "$OUT/c-cut.replay" 2>&1; rc=${PIPESTATUS[2]}
-  if [ "$rc" = 1 ] && has -E '^trailer: ' "$OUT/c-cut.replay"; then echo "  control, a trace cut short: refused, as it must be: $(grep -m 1 '^trailer: ' "$OUT/c-cut.replay" | cut -c1-120)"
-  else no "control, a trace cut short: rc=$rc, and no line about the trailer"; fi
+  # 3. a trace cut short, and a line the parser refuses (cut_controls)
+  cut_controls
   # 4. the content line: a trace of another tree refused, the same tree at another place the same bytes, edits of
   #    prose and READMEs leaving the line as it was, and a tracer started so that what runs need not be what the
   #    line names refused (contentcontrols.py's own table)
@@ -928,6 +964,8 @@ replay_clean() {        # $1: a trace, without .jsonl.gz: its replay as s_replay
   #                         under --promise-mode peer, decode_group under --rebuilt-seen on): its callees run bare and
   #                         are counted, the stated limit; the count is reported (bare_count), not refused
   [ -s "$f" ] || { echo "no replay"; return 1; }
+  [ "$(cat "$f.rc" 2> /dev/null)" = 0 ] || { echo "the replay exited $(cat "$f.rc" 2> /dev/null || echo '?')"; return 1; }
+  parsed_whole "$f" || { echo "the parser refused a line of it"; return 1; }
   has -E '^replay: [1-9][0-9]* records, [1-9][0-9]* ok, 0 mismatched$' "$f" || { echo "a record mismatched, or none read"; return 1; }
   has -x "reads of the Python's that the twin did not make: 0" "$f" || { echo "a read of the Python's not made"; return 1; }
   [ -s "$OUT/$1.jsonl.gz.bare.json" ] || { echo "its run wrote no .bare.json"; return 1; }
@@ -999,6 +1037,8 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
       && $PY "$T/chaincases.py" --cut close_promises "$OUT/chains/hand5-peer.jsonl.gz" "$OUT/chains/plant-a.jsonl.gz" > "$OUT/chains/plant-a.err"; then
     if replay_of chains/plant-a; then
       echo "(a) the cut chain: the replay passed it  <-- NOT" >> "$OUT/c-chains.txt"
+    elif ! parsed_whole "$OUT/chains/plant-a.replay"; then
+      echo "(a) the cut chain: the parser refused a line of it, not the twin  <-- NOT" >> "$OUT/c-chains.txt"
     elif has -x "nodes: chains: close_promises: its innermost layer is not the document's, and the node has not replaced it" "$OUT/chains/plant-a.replay"; then
       echo "(a) the cut chain: caught: $(cut -c13- "$OUT/chains/plant-a.err"); the replay refused it, with its words" >> "$OUT/c-chains.txt"; caught=$((caught + 1))
     else echo "(a) the cut chain: the replay refused it otherwise than by its words  <-- NOT" >> "$OUT/c-chains.txt"; fi
@@ -1035,7 +1075,8 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
       echo "($p) its cases fail otherwise than written: $(echo "$miss" | head -n 2 | cut -c1-200 | tr '\n' '|')  <-- NOT" >> "$OUT/c-chains.txt"
     elif [ "$p" = d ] && ! { has -E '^replay: [0-9]+ records, [0-9]+ ok, 1 mismatched$' "$OUT/chains/plant-d.replay" \
         && has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-d.replay" \
-        && has -E '^mismatch reconsider: tape: type_of_group\["[0-9a-f]{64}"\] asked, the tape is over logged: 1$' "$OUT/chains/plant-d.replay"; }; then
+        && has -E '^mismatch reconsider: tape: type_of_group\["[0-9a-f]{64}"\] asked, the tape is over logged: 1$' "$OUT/chains/plant-d.replay" \
+        && parsed_whole "$OUT/chains/plant-d.replay"; }; then
       # (d)'s replay half: the twin runs the document's owed_missing where the toy's layer ran none of it, so it asks
       # a question the record's tape does not hold, at the one record that calls owed_missing, and nowhere else
       echo "(d) its replay does not refuse its one record with its words: $(grep -m 1 '^replay: ' "$OUT/chains/plant-d.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-chains.txt"
@@ -1068,7 +1109,8 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
          elif has -E "^replay: [0-9]+ records, [0-9]+ ok, $kf mismatched\$" "$OUT/chains/plant-h.replay" \
              && has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-h.replay" \
              && [ "$(grep '^mismatch ' "$OUT/chains/plant-h.replay" | grep -c -v -E '^mismatch reconsider: tape: the toy asked more: [0-9]+$')" = 0 ] \
-             && [ "$(sed -n -E 's/^mismatch reconsider: tape: the toy asked more: ([0-9]+)$/\1/p' "$OUT/chains/plant-h.replay")" = "$kf" ]; then
+             && [ "$(sed -n -E 's/^mismatch reconsider: tape: the toy asked more: ([0-9]+)$/\1/p' "$OUT/chains/plant-h.replay")" = "$kf" ] \
+             && parsed_whole "$OUT/chains/plant-h.replay"; then
            echo "(h) the flipped answer, listed an observer: refused at its $kf record$([ "$kf" = 1 ] || echo s), on (i)'s run: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-h.replay" | cut -c1-120)" >> "$OUT/c-chains.txt"
            flip="$flip refused as an observer at its $kf record$([ "$kf" = 1 ] || echo s) of the same run"
          else echo "(h) the flipped answer, listed an observer: not refused at its $kf flipped record(s) alone, by rule 2's words: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-chains.txt"; fi ;;
@@ -1121,6 +1163,8 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
     echo "(f) the re-wrap off: not planted once for each of hand5's $hand keep_floor draws  <-- NOT" >> "$OUT/c-draws.txt"
   elif replay_of c-draws-f; then
     echo "(f) the re-wrap off: the replay passed it  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! parsed_whole "$OUT/c-draws-f.replay"; then
+    echo "(f) the re-wrap off: the parser refused a line of it, not the twin  <-- NOT" >> "$OUT/c-draws.txt"
   elif ! has -E "^replay: [0-9]+ records, [0-9]+ ok, $hand mismatched\$" "$OUT/c-draws-f.replay"; then
     echo "(f) the re-wrap off: the replay mismatched otherwise than at hand5's $hand keep_floor records: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay")  <-- NOT" >> "$OUT/c-draws.txt"
   elif ! has -F "tape: sample_without_replacement[[],0] asked, the tape is over logged" "$OUT/c-draws-f.replay"; then
@@ -1223,6 +1267,8 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
     echo "(k) the argument left out: not made, or not in each of the $pr rows  <-- NOT" >> "$OUT/c-rows.txt"
   elif replay_of rows/plant-k; then
     echo "(k) the argument left out: the replay passed it  <-- NOT" >> "$OUT/c-rows.txt"
+  elif ! parsed_whole "$OUT/rows/plant-k.replay"; then
+    echo "(k) the argument left out: the parser refused a line of it, not the twin  <-- NOT" >> "$OUT/c-rows.txt"
   elif ! has -x "replay: $rec records, $((rec - pr)) ok, $pr mismatched" "$OUT/rows/plant-k.replay" \
       || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/rows/plant-k.replay"; then
     echo "(k) the argument left out: not refused at its $pr records alone: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay")  <-- NOT" >> "$OUT/c-rows.txt"
@@ -1282,7 +1328,8 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   if [ -z "$nc" ] || [ "$(cat "$OUT/chains/plant-pc.rc" 2> /dev/null)" != 0 ]; then
     echo "(p)'s control, on hand5-v2: not planted once, or the run did not end with 0  <-- NOT" >> "$OUT/c-stops.txt"
   elif [ -z "$rec" ] || ! has -x "replay: $rec records, $((rec - 1)) ok, 1 mismatched" "$OUT/chains/plant-pc.replay" \
-      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-pc.replay"; then
+      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-pc.replay" \
+      || ! parsed_whole "$OUT/chains/plant-pc.replay"; then
     echo "(p)'s control, on hand5-v2: not refused at one record alone: $(grep -m 1 '^replay: ' "$OUT/chains/plant-pc.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-stops.txt"
   elif [ "$(grep -c '^mismatch ' "$OUT/chains/plant-pc.replay")" != 1 ] || ! has -E "^mismatch $fc: .*: 1\$" "$OUT/chains/plant-pc.replay" \
       || ! has -E "^example: node $nc at [^ ]+ $fc\\[" "$OUT/chains/plant-pc.replay"; then
@@ -1979,13 +2026,15 @@ EOF_ERC
   # under v2, the nodes line's chains: hand5-own traced with its replaced names' chains left out (tracerfaults3's
   # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words, naming the
   # first it meets: push_rebuilt, which hand5-own (--rebuilt none) replaces at every node
-  rm -f "$OUT/c-chains-omit.jsonl.gz" "$OUT/c-chains-omit.jsonl.gz.bare.json" "$OUT/c-chains-omit.replay"
+  rm -f "$OUT/c-chains-omit.jsonl.gz" "$OUT/c-chains-omit.jsonl.gz.bare.json" "$OUT/c-chains-omit.replay" "$OUT/c-chains-omit.replay.rc"
   if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --chains-omit-v2 . "$OUT/c-chains-omit.jsonl.gz" > "$OUT/c-chains-omit.out" 2> "$OUT/c-chains-omit.err"); then
     no "the trace of a nodes line without a replaced name's chain did not end with 0 (c-chains-omit.err)"
   elif ! has -E '^tracerfaults3: chains-omit-v2, planted [1-9][0-9]* times?$' "$OUT/c-chains-omit.err"; then
     no "no replaced name's chain was left out (c-chains-omit.err)"
   elif replay_of c-chains-omit; then
     no "the replay passed a nodes line without a replaced name's chain (c-chains-omit.replay)"
+  elif ! parsed_whole "$OUT/c-chains-omit.replay"; then
+    no "the nodes line without a replaced name's chain: the parser refused a line of it, not the twin (c-chains-omit.replay)"
   elif has -x "nodes: chains: a replaced name with no chain: push_rebuilt" "$OUT/c-chains-omit.replay"; then
     echo "  a nodes line without its replaced names' chains: refused by the replay, with its words (push_rebuilt)"
   else no "the replay refused a nodes line without a replaced name's chain otherwise than by its words (c-chains-omit.replay)"; fi
