@@ -21,7 +21,7 @@ Three more checks hold the manifest. Its own rules (manifest_v2.py's docstring):
 and KEPT share no name, NODE_OWN's keys are in neither, CUT's names are in no other list, REPLACEABLE_WHOLE is
 within KEPT, QUESTIONS shares no name with COVERED or KEPT and holds no key of NODE_OWN, and QUESTIONS_UNLOADED's
 keys are within QUESTIONS. KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
-(header3.py's `v2_kind`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. And QUESTIONS
+(header3.py's `v2_kept_of`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. And QUESTIONS
 by the code: QUESTIONS less QUESTIONS_UNLOADED is what the code asks, name for name, as closure_v2.py's
 `derive_questions` reads it over the same documents and the manifest's lists. These are the globals of COVERED
 functions that no other class takes, the `.params` calls, the type's functions called and the context uses'
@@ -969,12 +969,12 @@ def manifest_rules(m):
 
 @functools.lru_cache(maxsize=None)
 def v2_kept_rule():
-    """trace3.py's v2_kept over the toy's two documents, less §7.1's window: header3.py's v2_kind, over the toy that
+    """trace3.py's v2_kept over the toy's two documents, less §7.1's window: header3.py's v2_kept_of, over the toy that
     layout.py finds (SPEC_TOY, or the repository's toy/). Computed once."""
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
     import header3                      # noqa: E402: tools/, beside gen/
     import layout                       # noqa: E402
-    return frozenset(header3.v2_kind(layout.toy()))
+    return frozenset(header3.v2_kept_of(layout.toy()))
 
 
 def manifest_kept(m):
@@ -991,7 +991,7 @@ def code_reading():
     import closure_v2                   # noqa: E402: tools/, beside gen/
     import layout                       # noqa: E402
     sys.path.insert(0, str(layout.toy()))
-    import node                         # noqa: E402: the toy's, as header3.py's v2_kind imports it
+    import node                         # noqa: E402: the toy's, as header3.py's v2_kept_of imports it
     return closure_v2.Reading(node.SPEC_SRC, node.generate(node.DOC2))
 
 

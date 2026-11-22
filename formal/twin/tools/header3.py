@@ -44,14 +44,18 @@ KINDS = {tuple(sorted(trace3.BLOCK)): f"the block's {len(trace3.BLOCK)} function
          tuple(sorted(trace3.SEC61)): f"§6.1's {len(trace3.SEC61)} alone"}
 
 
-def v2_kind(toy):
-    """v2's kept names and its covered ones (the manifest's COVERED), sorted, the kept from TOYDIR's documents: the
-    toy's node.py makes their extracted code."""
+def v2_kept_of(toy):
+    """v2's kept names, sorted, from TOYDIR's documents, less §7.1's window: the toy's node.py makes their extracted
+    code. gen.py holds the manifest's KEPT and NODE_OWN to it."""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node                         # noqa: E402: the pinned toy, from TOYDIR
-    kept = [n for n in trace3.v2_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
-            if n not in trace3.SEC71]   # the window's six are not traced under v2
-    return tuple(sorted(set(kept) | set(manifest_v2.COVERED)))
+    return tuple(sorted(n for n in trace3.v2_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
+                        if n not in trace3.SEC71))      # the window's six are not traced under v2
+
+
+def v2_kind(toy):
+    """What a v2 trace traces: v2's kept names (v2_kept_of) and its covered ones (the manifest's COVERED), sorted."""
+    return tuple(sorted(set(v2_kept_of(toy)) | set(manifest_v2.COVERED)))
 
 
 def kind_of(toy, traced, args):
