@@ -230,11 +230,12 @@ built for diversity. Its size is `SAMPLE_COVER`, a parameter of the object type 
 least 1, set at two links per family; `COVER_HIGH` is set at 1 (§6.3). Routed sample requests
 take what the floor misses, with one forwarding step by default (§4.10, `ROUTE_HOPS` 1). Both run on
 LiteDAS's two phases: one sample per peer, with peers of high custody as the second phase's
-fallback. Since 2026-11-22 the second phase's asks in flight have one cap per block, counted across
-the block's sampled types: `SAMPLE_OUTSTANDING`, a setting of the node, with a bound of at least 1.
-Before, it was a parameter of each object type. The cap bounds one block's hunt, and a cap per type
-on a shared count could keep the refill loop of §4.10 from ending. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT` and
-`SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
+fallback. Since 2026-11-22, the second phase's asks in flight have one cap per block, counted across
+the block's sampled types. The cap is `SAMPLE_OUTSTANDING`, a setting of the node with a bound of at
+least 1; before, it was a parameter of each object type. One cap per block bounds the asks that a
+block's hunt has in flight, and a cap per type, on a count that the types share, could keep §4.10's
+refill loop from ending. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT`
+and `SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
 60-node cells and its 500-node cells at ten seeds (protocol-v2-figures.md, §6.3). These are kept as
 options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours
 (`ROUTE_FLOOR`), and the fetch outside the links (§7). The notes below are kept for later study:

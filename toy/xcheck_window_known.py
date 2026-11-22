@@ -8,9 +8,10 @@ The check runs `check.py`'s push cell with `--xcheck` and reads every xcheck lin
 that `inv_window` is 0 and that `peak`, the most room any node of the line held in flight, is at most `w`, the
 largest window of those nodes. `protocol.md` counts its window in slots of a chunk (`W`, `acquire_slot`), and
 `protocol-v2.md` counts it in bytes (`W_BYTES`, `acquire_room`, §4.11), so under `protocol-v2.md` both numbers are
-bytes. Under `protocol-v2.md` the recorder read `in_flight` in bytes but compared it with `W` in slots, and it did
-not see `acquire_room`; every honest node then counted as over its window (`inv_window=59` on the lines of 59
-nodes, `peak` about 800,000 against `w=69`), and the check fails there.
+bytes. Before `xcheck.py` was fixed, its recorder read `in_flight` in bytes under `protocol-v2.md` but compared it
+with `W` in slots, and it did not see `acquire_room`. Every honest node then counted as over its window
+(`inv_window=59` on the lines of 59 nodes, `peak` about 800,000 against `w=69`), and this check failed under
+`protocol-v2.md`.
 """
 import re
 import subprocess
@@ -38,7 +39,7 @@ def main():
     for name, f in bad[:6]:
         print(f"  [{name}] inv_window={f.get('inv_window')} peak={f.get('peak')} w={f.get('w')}")
     ok = p.returncode == 0 and len(lines) >= 3 and not bad
-    print("ok" if ok else "FAIL: a line counts a node over its window, or the run printed no lines")
+    print("ok" if ok else "FAIL: a node over its window, a failed run, or fewer than 3 xcheck lines")
     return 0 if ok else 1
 
 

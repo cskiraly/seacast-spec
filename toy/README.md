@@ -145,6 +145,11 @@ and where one has a control that must come out the other way, it is named:
 - `xcheck_observes_known.py [--doc v2]`: `--xcheck` only observes. `check.py`'s push cell runs with
   and without it, and both give the same digest. Under `protocol-v2.md` it fails on the toy before
   its fix, whose wrapper of `track_in_flight` took two arguments where that document passes three.
+- `xcheck_window_known.py [--doc v2]`: `--xcheck`'s window invariant. `check.py`'s push cell runs
+  with it, and every xcheck line must show `inv_window=0` and a `peak` no larger than `w`. `peak`
+  and `w` count slots of a chunk (`W`) under `protocol.md`, and bytes (`W_BYTES`, §4.11) under
+  `protocol-v2.md`. Under `protocol-v2.md` it fails on the toy before its fix, whose recorder
+  compared the bytes in flight with `W` in slots and did not see `acquire_room`.
 - `outside_ask_known.py`: `protocol-v2.md` §4.5, an ask outside what a node serves. Once the gate is
   open, a standing WANT for a column the node neither holds nor custodies keeps no standing request
   and draws no penalty; a sampler's WANT for one adds no bit to its interest. The controls: a column
@@ -157,6 +162,15 @@ and where one has a control that must come out the other way, it is named:
   hops. Two honest runs, custody with samplers and the rows, publish their blocks and ignore no
   ask; it prints how many asks they tested, and fails if none, or if the custody run met
   no routed request. It fails on the document before the rule.
+- `sample_cap_known.py`: `protocol-v2.md` §4.10, the second phase's cap. A custody network with
+  samplers is built and one block published but not run, and one sampler's `resample` and
+  `ask_sample` are driven directly on two column groups of that block. The second group is given its
+  own copy of the column type's parameters. (a) The node's cap holds across the two groups: a freed
+  slot asks the first held sample and stops at the cap, and the other held samples keep their order.
+  (b) A slot freed by an ask whose group has expired still asks a live held sample. A refill loop
+  that runs past 100 calls is stopped. It fails on the document before the fix, which had a cap per
+  type and returned early for an expired group: (a)'s loop does not end, and (b)'s sample stays
+  held.
 - `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the pairs of family and colour a link
   may have (`MAX_RELATIONS`). With the limit set to what the link has, a GRAFT for a new column
   family is ignored without an answer, the node's own GRAFT for one is not sent, and a PRUNE for one
@@ -524,27 +538,31 @@ are the harness's indices plus one.
 With `--topology` (or `--xcheck` alone) the toy prints, after each message, the harness's own
 `xcheck` line per population: what the nodes sent, counted at the sender's transmit after the
 writer's filter (where the harness counts at the stream write), what they received, and the
-invariants the document's rules imply, each a count that must be zero, but for `budget` where repair
-pushes:
+invariants the document's rules imply. Each invariant is a count that must be zero, apart from the
+lawful cases that the `budget`, `window` and `late` entries name:
 
 - `budget`: a forwarding node that sent one chunk unasked more often than its push degree. Like the
   harness's line, it counts every copy sent unasked, so the copies of a rebuilt chunk that repair
-  pushes count too. Repair sends a rebuilt chunk to every peer short of K, with no push-degree bound
-  (`protocol.md`'s rule, and `protocol-v2.md`'s with `REPAIR_BUDGET` off), so a count from it breaks
-  no rule;
-- `window`: a node with more room in flight than its window: `W` slots under `protocol.md`, `W_BYTES`
-  bytes under `protocol-v2.md` (§4.11 there);
+  pushes count too. Under `protocol.md`, and under `protocol-v2.md` with `REPAIR_BUDGET` off,
+  repair's pushes of rebuilt chunks go to peers short of K, each up to its shortfall, with no
+  push-degree bound on one chunk's copies, so what repair adds to the count breaks no rule;
+- `window`: a node with more room in flight than its window: `W` slots under `protocol.md`,
+  `W_BYTES` bytes under `protocol-v2.md` (§4.11 there). An empty window there takes one chunk of any
+  size, so a window smaller than a chunk can count a node that broke no rule;
 - `overlap`: an ask for a chunk decided while an earlier ask for it is open (inside `IWANT_WINDOW`, not
   yet held), timed at `may_ask`, where the harness's request ledger times its asks too;
 - `late`: a chunk sent to a mesh peer whose HAVE for it (in an IDONTWANT, the only carrier that feeds
   `peer_has`) had reached the sender earlier in the message, held or since expired, as the harness's
-  ledger reads it; `late_live` counts those the sender still held, which cancel should have dropped;
+  ledger reads it. `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
+  it is on, drops such a send, and under `protocol-v2.md` it lets a probe's exempt answer through; a
+  send that cancel would not drop complies with card 8;
 - `fault`: a chunk from a silent node, or an answer from a withholder.
 
 The recorder reads node state without creating entries and schedules nothing, so a run's events
-and digest are the same with it or without it. A duplicate is a chunk received before, as the
-harness's seen cache counts it, not one held only since the decode. It counts tier 4's events and
-runs under `--doc v03` only: under `--doc v2` its window hook takes the wrong arguments.
+and digest are the same with it or without it. A duplicate is a chunk the node received before, or
+one delivered to its publisher, as the harness's seen cache counts it, not one held only since the
+decode. The recorder counts tier 4's events. Under both documents, `xcheck_observes_known.py` and
+`xcheck_window_known.py` run it on `check.py`'s push cell.
 
 **A DAS dump** (the research harness's column proxy, 2026-11-01) runs under `--doc v2 --setting
 custody` or `rows`. Besides `net`, it has records of its own:
@@ -893,14 +911,14 @@ it, and the proposer counts where it already is a link and is never added (propo
 `--route on|off` (on) lets a sample that no link serves go as a routed request to a link with duty
 `FORWARD`, which passes it one step on (§4.5), `--route-hops` (1) steps at most; `--sample-retry2`
 (0.5 s), `--sample-outstanding` (4) and `--forward-limit` (none) are the second phase's wait per
-peer, its asks in flight per block and the forwarders' limit. The asks in flight are the node's cap,
-counted per block across the block's sampled types, and at least 1. A sampler asks a peer for at most one
-sample of a block, and a peer of high custody only in the second phase. The `reach` line gives the
-floor's links per sampler, by which ask each sample first arrived, the asks per sample, the routed
-requests passed on per node, the most samples of a block one peer was asked for by one sampler,
-and how many were asked of the block's source. A sample nobody delivered is missing (the document
-no longer gives one up): it is reported on a line of its own, not as a completion violation, which
-stays the custodians' invariant.
+peer, its cap on asks in flight per block and the forwarders' limit. That cap is the node's; it
+counts the asks across the block's sampled types, and it is at least 1. A sampler asks a peer for at
+most one sample of a block, and it asks a peer of high custody directly only in the second phase.
+The `reach` line gives the floor's links per sampler, by which ask each sample first arrived, the
+asks per sample, the routed requests passed on per node, the most samples of a block one peer was
+asked for by one sampler, and how many were asked of the block's source. A sample nobody delivered
+is missing (the document no longer gives one up): it is reported on a line of its own, not as a
+completion violation, which stays the custodians' invariant.
 
 Known answers (2026-10-23; 60 nodes, degree 30, 12 samplers, `--net bld`, seed 7): without samplers
 the custody and row cells' digests are those from before the change, and both `check.py` runs pass.

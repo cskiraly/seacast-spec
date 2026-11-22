@@ -2886,7 +2886,7 @@ def ask_sample(g, i, first=False):                     # one sample to one peer,
     T, b = type_of_group(g), block_of(g)               #   sample of the block (I6): a link that serves it, else
                                                        #   a routed request through another (§4.5, route_want)
     if mine[g].has(i) or expired(g): return
-    if not first and samples_in_flight[b] >= SAMPLE_OUTSTANDING:   # the node's cap, per block across its types
+    if not first and samples_in_flight[b] >= SAMPLE_OUTSTANDING:   # the node's cap per block, across the block's types
         return held_samples[b].append((g, i))          # LiteDAS's cap: asked when a second-phase ask ends
     fresh = [q for q in links(T) if q not in sampled_from[b] and not parked(q, Ask(g, i))]
     direct = [q for q in fresh if serves(q, g, i) and not high_custody(q, T)]
@@ -2907,11 +2907,11 @@ def ask_sample(g, i, first=False):                     # one sample to one peer,
 def resample(g, i, q, first):                          # the wait ran out
     b = block_of(g)
     if not first: samples_in_flight[b] -= 1
-    if not expired(g) and not mine[g].has(i):          # past its lifetime: no state is made again for g
+    if not expired(g) and not mine[g].has(i):          # once g is past its lifetime, no state is made again for it
         park[q][g] = now + PARK_TTL                    # it held or should have held it (a first hop may have had no route)
         ask_sample(g, i)                               # the second phase: another peer, a short wait
-    while held_samples[b] and samples_in_flight[b] < SAMPLE_OUTSTANDING:   # the block's held samples take the room,
-        ask_sample(*held_samples[b].pop(0))            #   g expired or not; each pass takes one off the list
+    while held_samples[b] and samples_in_flight[b] < SAMPLE_OUTSTANDING:   # the room left goes to the held samples,
+        ask_sample(*held_samples[b].pop(0))            #   even if g has expired; each pass takes the oldest off the list
 ```
 
 **A sampler's interest is `DECLARED` and its duty `NONE`** (§1.2). It learns the group ids from the
@@ -2949,15 +2949,17 @@ to the second phase: the peer asked is parked for the group, and the sample is d
 peer that has not been asked for one, a link of ordinary custody that serves it while one is left, a
 routed request through another link after, a peer of high custody last, each with a short wait
 `SAMPLE_RETRY2`. At most `SAMPLE_OUTSTANDING` such asks are in flight per block, counted across the
-block's sampled types; `SAMPLE_OUTSTANDING` is a setting of the node, not of a type. A slot frees
-when its wait ends, and it goes to the block's held samples in their order, even when the group of
-the sample whose wait ended has expired. A sample with no peer to declare it to in the first phase
-(no link of ordinary custody not yet asked serves it, and none routes it) is not declared then, and
-goes to the second phase after the same wait. The hunt ends when no link is left to ask (each has
-been asked for a sample, is parked for the group, or neither serves the sample nor forwards) or the
-group expires, so an unavailable block costs a bounded number of asks. Where the binding offers a fetch from a node
-that is not a link (§7), the second phase may use it before a routed request, under the same rule:
-one sample per node.
+block's sampled types; `SAMPLE_OUTSTANDING` is a setting of the node, not of a type. When a
+second-phase ask's wait ends, its slot frees. If that ask's sample is still missing and its group
+has not expired, the sample's ask of its next peer takes the slot first, when a peer is left to ask.
+The block's held samples are then tried in the order they were held while room is left, even when
+the group of the ask whose wait ended has expired. A sample with no peer to declare it to in the
+first phase (no link of ordinary custody not yet asked serves it, and none routes it) is not
+declared then, and goes to the second phase after the same wait. The hunt ends when no link is left
+to ask (each has been asked for a sample, is parked for the group, or neither serves the sample nor
+forwards) or the group expires, so an unavailable block costs a bounded number of asks. Where the
+binding offers a fetch from a node that is not a link (§7), the second phase may use it before a
+routed request, under the same rule: one sample per node.
 
 **Routed sample requests** `[D12]`: a routed request is a sample request with a hop limit. Where no
 link serves a sample, from the first phase on, the WANT goes as a routed request, `hops` set to

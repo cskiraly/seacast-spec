@@ -1,22 +1,24 @@
 #!/usr/bin/env python3
 """A known answer for protocol-v2.md §4.10's second phase: a sampler keeps one count and one cap per block across
-the block's sampled types (`SAMPLE_OUTSTANDING`, a setting of the node), and a slot that frees when a sample's wait
-ends is refilled from the block's held samples even when that sample's group has expired.
+the block's sampled types (`SAMPLE_OUTSTANDING`, a setting of the node). When a second-phase ask's wait ends and the
+same sample's next ask does not take the freed slot, the block's held samples are tried for it in order, even when
+the timed-out sample's group has expired.
 
     python3 sample_cap_known.py
 
 The check builds a small custody network with samplers (8 nodes, seed 7, half of them samplers), publishes one
 block without running it, and drives one sampler's `resample` and `ask_sample` directly on two column groups A and B
-of the block. B is given its own copy of the column type's parameters, with a smaller cap, so that the block holds two
-types with legal caps (4 and 1); every table still reads B's type as the column type. A wrapper of `ask_sample` stops
-a refill loop that runs past 100 calls, and `send` only records what the sampler asked.
-- (a) The node's cap 2, two second-phase asks in flight, the held samples B, A, B in that order, and A's sample
-  arrived when its wait ends: the refill asks the first held sample and stops at the cap, so one ask is written, B's,
-  the count is back at 2, and A and B are left held in their order. With a cap per type, A's cap 4 lets the loop pop
-  B, whose cap 1 puts it back without asking, and the loop does not end.
-- (b) The last second-phase ask in flight is A's, A has expired when its wait ends, and B's sample is held: the
-  refill asks B. With the early return on an expired group, B stays held with no ask in flight, and nothing would
-  ever ask it.
+of the block. B is given its own copy of the column type's parameters, so that the block holds two types. For a
+document with a cap per type, the two caps are set to legal values (4 and 1 in (a), 4 and 4 in (b)). Every table
+still reads B's type as the column type. A wrapper of `ask_sample` stops a refill loop that runs past 100 calls, and
+`send` only records what the sampler asked.
+- (a) The node's cap is 2, two second-phase asks are in flight, B, A and B are held in that order, and A's sample
+  has arrived when A's wait ends. The refill asks the first held sample and stops at the cap: one ask is recorded,
+  B's, the count is back at 2, and A and B stay held in their order. With a cap per type, A's cap of 4 lets the loop
+  pop B, B's cap of 1 puts it back without an ask, and the loop does not end.
+- (b) The node's cap is 4, the last second-phase ask in flight is A's, A has expired when its wait ends, and B's
+  sample is held. The refill asks B. With the early return that `resample` had for an expired group, B would stay
+  held with no ask in flight, and nothing would ever ask it.
 """
 import contextlib
 import io

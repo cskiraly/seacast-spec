@@ -349,7 +349,7 @@ def main(argv):
                     "§4.1): after a PRUNE received, its relation is not grafted again before then (0: none)")
     ap.add_argument("--route-hops", type=int, default=1, help="custody: ROUTE_HOPS, the forwarding steps of a routed request (1: two hops)")
     ap.add_argument("--sample-retry2", type=float, default=0.5, help="custody: SAMPLE_RETRY2, the second phase's wait per peer (§4.10)")
-    ap.add_argument("--sample-outstanding", type=int, default=4, help="custody: SAMPLE_OUTSTANDING, the node's second-phase sample asks in flight per block, across types, at least 1 (§4.10)")
+    ap.add_argument("--sample-outstanding", type=int, default=4, help="custody: SAMPLE_OUTSTANDING, the node's cap on second-phase sample asks in flight per block, across types (§4.10); at least 1")
     ap.add_argument("--forward-limit", type=float, default=math.inf, help="custody: FORWARD_LIMIT, routed requests a node passes on per peer and block")
     ap.add_argument("--no-invariants", action="store_true", help="--doc v2: skip the invariants report (invariants.py)")
     ap.add_argument("--answers-first", default="off",

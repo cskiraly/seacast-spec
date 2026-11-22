@@ -1292,9 +1292,9 @@ ran on 2026-10-26 on the draft of 2026-10-23, and were recorded in the toy's REA
 reach"). The figures were first written into the text on the main line in spec `0d968d8`
 (2026-11-14). The transport took every write at once (`--send-buffer 0`). `SAMPLE_RETRY` was 2 s,
 `SAMPLE_RETRY2` 0.5 s and `SAMPLE_OUTSTANDING` 4. `SAMPLE_OUTSTANDING` was then a parameter of the
-column type, the only type the samplers drew from, so 4 was also the cap per block across types
-that the node's setting now is. The runs predate ties (2026-10-26), the IHAVE
-limits (2026-10-27), v0.9's source at the acknowledgement (2026-11-11) and the transport
+column type. The samplers sampled only columns, so the 4 also capped a block's second-phase asks in
+flight across its types, as the node's setting does now. The runs predate ties (2026-10-26), the
+IHAVE limits (2026-10-27), v0.9's source at the acknowledgement (2026-11-11) and the transport
 (2026-11-15); they were not run again.
 
 - **`SAMPLE_RETRY`:** the custodians' 99th percentile was 0.67 to 0.70 s, honest [666 to 678 ms at
