@@ -90,6 +90,7 @@ sys.path.insert(0, str(HERE / "gen"))
 import content                          # noqa: E402
 import footprint as F                   # noqa: E402
 import schema                           # noqa: E402: gen/schema.py, the twin's tables, which its Lean is made from too
+import schema_v2                        # noqa: E402: gen/schema_v2.py, v2's (its DIRECTIONS)
 from trace61 import CONSTS, SEC61, Tracer, fbits   # noqa: E402
 
 OWN = tuple(t.name for t in schema.TABLES)
@@ -138,6 +139,10 @@ FOREIGN = ("known_id",                     # `queue`, `pending_ids` and `stop_pu
 # `row_reads`), as the header's `row_reads` names them; the replay reads them so in a v2 trace alone, and this list
 # alone. A protocol.md trace has neither
 ROW_READS_V2 = ("owed", "planned", "queue", "tied")
+# under v2, the tape's names whose arguments are written as they are at the call, not after it: v2's send marks an
+# IWANT (`want`) after handing it to enqueue. EAGER_LATE is the planted fault of the self-test (written after the call)
+EAGER_V2 = ("enqueue",)
+EAGER_LATE = [False]
 # §7.1's three, the twin's own. Under protocol.md a cell holds the count and views hold the line and the sends;
 # under --doc v2 they are not installed (there the count is bytes and a send's value a pair, and no traced function
 # of protocol.md touches them)
@@ -470,6 +475,178 @@ def v2_kept_self_test():
         ok = got == want
         bad += not ok
         print(f"namespace_check self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    return bad
+
+
+def forms_self_test():
+    """The v2 forms of the tracer's encoders (protocol-v2.md's values a record writes where protocol.md's differ),
+    on toy objects made for each case, with no run and no replay; and the same objects under protocol.md, in its
+    forms. The control: each v2 case run again with protocol.md's encoder in the v2 one's place must fail, and
+    exactly those."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import bits as B                    # noqa: E402: the toy's, beside this repository's documents
+    import wire as Wm                   # noqa: E402
+
+    def tracer(v2):
+        tr = object.__new__(Tracer3)
+        tr.Wm, tr.doc_v2 = Wm, v2
+        return tr
+
+    def run(f, v2):
+        try:
+            return f(tracer(v2))
+        except (SystemExit, TypeError) as e:
+            return f"{type(e).__name__}: {e}"
+
+    g, h = bytes(range(32)), bytes(range(32, 64))
+    sid = bytes(range(56))              # a structured id
+    gx, sx = g.hex(), sid.hex()
+
+    def iwant(mark):
+        c = Wm.IWANT([Wm.WantIndex(g, 3), Wm.FlaggedWant(g, 4, True, 2, probe=True), sid])
+        c.items[0].want = mark
+        return c
+
+    def holding(claim_all, complete, group=g, v=0b101):
+        b = Wm.HaveBitmap(group, B.Bits(v))
+        b.claim_all, b.complete = claim_all, complete
+        return b
+
+    def have_entry():
+        e = B.HaveEntry()
+        e.bits, e.ttl, e.claim_all, e.complete = B.Bits(0b1011), 5, True, False
+        return e
+
+    class Join(Wm.Container):           # protocol-v2.md's Join: a Container of the document's (node.py's joins)
+        pass
+
+    def jn(cls):
+        return cls(object_type="column", interest="DERIVED", custody_count=4, duty="FORWARD", colours=1)
+    graft = Wm.Container(object_type="row", family=-3, colour=0, direction="OUT", answer=True)
+    prune = Wm.Container(object_type="row", family=2, colour=1, direction="BOTH")
+
+    def peer_has(tr):                   # the value peer_has's schema line writes
+        (t,) = [t for t in tr.schema(None) if t.name == "peer_has"]
+        return t.value(have_entry())
+
+    def tape_iwant(tr, late=False):     # enqueue's arguments on the tape: the mark set after the call (v2's send)
+        x = iwant(False)
+        EAGER_LATE[0] = late
+        try:
+            early = tr.at_call("enqueue", tr.enqueue_enc, (7, x), {})
+            x.items[0].want = True
+            return tr.tape_row(tr.enqueue_enc, True, (7, x), {}, early)
+        finally:
+            EAGER_LATE[0] = False
+
+    claim_words = "SystemExit: trace3: an IHAVE offers a bitmap with a claim set (claim_all True, complete False)"
+    v2_asks = [[[gx, 3], False, 0, False], [[gx, 4], True, 2, True], [sx, False, 0, False]]
+    # (what, the encoding, under v2, under protocol.md); a case whose two forms differ is a v2 case
+    cases = [
+        ("peer_has's entry", peer_has, [11, 5, True, False], [11, 5]),
+        ("a lane's IWANT: a plain ask, a flagged ask, a structured id, its mark set",
+         lambda tr: tr.qmsg(iwant(True).items[0]), ["iwant", v2_asks, True], ["iwant", [[gx, 3], [gx, 4], sx]]),
+        ("an IWANT on the tape, its mark not set", lambda tr: tr.control(iwant(False)),
+         [["iwant", v2_asks, False]], [["iwant", [[gx, 3], [gx, 4], sx]]]),
+        ("a lane's IDONTWANT of a holding with its claims", lambda tr: tr.qmsg(Wm.IDONTWANT(holding(True, True)).items[0]),
+         ["idontwant", [["holding", gx, 5, True, True]]], ["idontwant", [["bits", gx, 5]]]),
+        ("an IDONTWANT on the tape: a holding, and an opaque id", lambda tr: tr.control(Wm.IDONTWANT([holding(False, True), sid])),
+         [["idontwant", [["holding", gx, 5, False, True], sx]]], [["idontwant", [["bits", gx, 5], sx]]]),
+        ("a JOIN, the document's class", lambda tr: tr.qmsg(Wm.JOIN([jn(Join)]).items[0]),
+         ["join", [["join", "column", "DERIVED", 4, "FORWARD", 1]]],
+         "TypeError: trace3: a queue entry's control message the record cannot hold"),
+        ("a JOIN, a wire Container", lambda tr: tr.qmsg(Wm.JOIN([jn(Wm.Container)]).items[0]),
+         ["join", [["join", "column", "DERIVED", 4, "FORWARD", 1]]],
+         "TypeError: trace3: a queue entry's control message the record cannot hold"),
+        ("a GRAFT on the tape, its family below zero", lambda tr: tr.control(Wm.GRAFT([graft])),
+         [["graft", [["graft", "row", ["-", 3], 0, "OUT", True]]]], "TypeError: not an ask key"),
+        ("a PRUNE of v2", lambda tr: tr.qmsg(Wm.PRUNE([prune]).items[0]), ["prune", [["prune", "row", 2, 1, "BOTH"]]],
+         "TypeError: trace3: a queue entry's control message the record cannot hold"),
+        ("a KeyError on a group", lambda tr: tr.missing_key(g), ["group", gx],
+         "TypeError: trace3: a KeyError on a key that is not a peer"),
+        ("a KeyError on a type by its id", lambda tr: tr.missing_key("row"), ["type", "row"],
+         "TypeError: trace3: a KeyError on a key that is not a peer"),
+        ("a KeyError on a type object", lambda tr: tr.missing_key(Wm.Container(id="column")), ["type", "column"],
+         "TypeError: trace3: a KeyError on a key that is not a peer"),
+        ("a KeyError on a negative integer", lambda tr: tr.missing_key(-2), ["-", 2], -2),
+        ("enqueue's IWANT, marked after the call", tape_iwant,
+         [[7, [["iwant", v2_asks, False]], False], True], [[7, [["iwant", [[gx, 3], [gx, 4], sx]]], False], True]),
+        # the same under both documents
+        ("a KeyError on a peer", lambda tr: tr.missing_key(7), 7, 7),
+        ("gossipsub's PRUNE", lambda tr: tr.qmsg(Wm.PRUNE([]).items[0]), ["prune", []], ["prune", []]),
+        ("an IHAVE of a bitmap, no claim", lambda tr: tr.qmsg(Wm.IHAVE(holding(False, False)).items[0]),
+         ["ihave", [["bits", gx, 5]]], ["ihave", [["bits", gx, 5]]]),
+        ("a lane's IHAVE offering a claim", lambda tr: tr.qmsg(Wm.IHAVE(holding(True, False)).items[0]),
+         claim_words, claim_words),
+        ("an IHAVE on the tape offering a claim", lambda tr: tr.control(Wm.IHAVE([holding(True, False)])),
+         claim_words, claim_words),
+        ("on_ihave's offer with a claim", lambda tr: tr.args_of("on_ihave", (7, Wm.IHAVE(holding(True, False)).items[0])),
+         claim_words, claim_words),
+    ]
+
+    def same(got, want):                # a stop's words: its first part, as the case gives it
+        if isinstance(want, str) and isinstance(got, str):
+            return got.startswith(want)
+        return got == want
+    bad = 0
+    v2cases = []
+    for what, f, want2, want1 in cases:
+        for v2, want in ((True, want2), (False, want1)):
+            got = run(f, v2)
+            ok = same(got, want)
+            bad += not ok
+            print(f"forms self-test, {what}, under {'v2' if v2 else 'protocol.md'}: "
+                  f"{'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+        if not same(want1, want2):
+            v2cases.append((what, f, want2))
+    # the planted fault of the eager encoding: written after the call, the tape holds the mark as set later
+    got = run(lambda tr: tape_iwant(tr, late=True), True)
+    ok = got == [[7, [["iwant", v2_asks, True]], False], True]
+    bad += not ok
+    print(f"forms self-test, the control of the eager encoding (enqueue's argument written after the call): "
+          f"{'holds the later mark, ok' if ok else f'got {got!r}  <-- FAIL'}")
+    # the control: protocol.md's encoder in the v2 one's place fails exactly the v2 cases
+    failed = [what for what, f, want2 in v2cases if not same(run(f, False), want2)]
+    ok = failed == [w for w, _, _ in v2cases]
+    bad += not ok
+    print(f"forms self-test, the control (protocol.md's encoders in v2's place): "
+          f"{f'fails exactly the {len(failed)} v2 cases, ok' if ok else f'fails {failed}  <-- FAIL'}")
+    # the nodes line's type parameters (types_v2)
+    tr = tracer(True)
+
+    class Nd:
+        id = 3
+
+    def prm(**kw):
+        p = Wm.Container(**kw)
+        return tr.type_params(Nd, "row", p)
+    pcases = [
+        ("naturals, booleans, floats (+inf where unbounded), the width, none's two",
+         lambda: prm(M=1, EAGER=False, START_DELAY=0.5, SERVE_LIMIT=math.inf, ANNOUNCE_EXTRA="ALL_JOINED",
+                     EVIDENCE=None, REPAIR_SAMPLE=[(3, 1), (6, 2)], REPAIR_TO=lambda gg: []),
+         {"ANNOUNCE_EXTRA": "ALL_JOINED", "EAGER": False, "EVIDENCE": None, "M": 1, "REPAIR_SAMPLE": [[3, 1], [6, 2]],
+          "SERVE_LIMIT": 9218868437227405312, "START_DELAY": fbits(0.5)}),
+        ("an M of 0", lambda: prm(M=0), "SystemExit: trace3: node 3: type row: M is no natural above 0"),
+        ("an infinite START_DELAY", lambda: prm(START_DELAY=math.inf),
+         "SystemExit: trace3: node 3: type row: START_DELAY is no finite number"),
+        ("an EVIDENCE type", lambda: prm(EVIDENCE=object()),
+         "SystemExit: trace3: node 3: type row: EVIDENCE is an evidence type"),
+        ("a parameter the tracer does not know", lambda: prm(NEW_ONE=1),
+         "SystemExit: trace3: node 3: type row: NEW_ONE is a parameter the tracer does not know"),
+    ]
+    for what, f, want in pcases:
+        try:
+            got = f()
+        except SystemExit as e:
+            got = f"SystemExit: {e}"
+        ok = same(got, want)
+        bad += not ok
+        print(f"forms self-test, a type's parameters, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    return bad
+
+
+def self_test_v2():
+    bad = v2_kept_self_test() + forms_self_test()
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -561,13 +738,14 @@ class Tracer3(Tracer):
         before the first record; a trace with no record has it before its trailer."""
         self.final_check()
         entries = []
-        for nid, consts, replaced in self.nodes:
+        for nid, consts, replaced, types in self.nodes:
             for e in entries:
-                if e["consts"] == consts and e["replaced"] == replaced:
+                if e["consts"] == consts and e["replaced"] == replaced and e.get("types") == types:
                     e["n"].append(nid)
                     break
             else:
-                entries.append({"n": [nid], "consts": consts, "replaced": replaced})
+                entries.append({"n": [nid], "consts": consts, "replaced": replaced}
+                               | ({} if types is None else {"types": types}))
         self.write({"nodes": entries})
         self.nodes_written = True
 
@@ -828,12 +1006,15 @@ class Tracer3(Tracer):
                                  f"what is neither the tracer's wrapper nor a listed wrapper of it: {where}")
 
     def control(self, x):
-        """A control message on the tape: an IWANT's asks as keys (trace61.py), an IDONTWANT's HAVE as a bitmap."""
+        """A control message on the tape: an IWANT's asks as keys (trace61.py), an IDONTWANT's HAVE as a bitmap.
+        Under v2, each message as a lane holds it (qmsg_v2: one encoder for both)."""
         if not isinstance(x, self.Wm.Control):
             raise TypeError(f"the block enqueues control only, got {x!r}")
-        # (announce's IHAVE of a bitmap, written as an IHAVE's entry is)
-        return [[m.kind, [self.ihave_entry(b) if m.kind == "idontwant" or self.Wm.is_have_bitmap(b) else self.key(b)
-                          for b in m.ids]] for m in x.items]
+        if self.doc_v2:
+            return [self.qmsg_v2(m) for m in x.items]
+        # (announce's IHAVE of a bitmap, written as an IHAVE's entry is; an offer with a claim set stops the tracer)
+        return [[m.kind, [self.ihave_entry(b) if m.kind == "idontwant" else self.offer(b) if self.Wm.is_have_bitmap(b)
+                          else self.key(b) for b in m.ids]] for m in x.items]
 
     def args_of(self, fn, args, kw=None):
         kw = kw or {}
@@ -903,7 +1084,7 @@ class Tracer3(Tracer):
             return [g.hex(), int(i), of]
         if fn == "on_ihave":
             p, ih = args
-            return [p, [self.ihave_entry(e) for e in ih.ids]]
+            return [p, [self.offer(e) for e in ih.ids]]
         if fn == "over_ihave_limits":
             (p,) = args
             return [p]
@@ -1109,7 +1290,7 @@ class Tracer3(Tracer):
             raise TypeError("trace3: a frame with a PRUNE, a GRAFT or a JOIN: the stock's, of which a record holds none")
         # (since v0.10.4 an IDONTWANT's entry that is no HAVE bitmap is an opaque id, kept in `unwanted[p]`:
         # ihave_entry writes it as its hex, and raises for an entry that is neither a bitmap nor bytes)
-        return [[self.wchunk(f) for f in fr.chunks], [self.ihave_entry(e) for e in fr.ihave.ids],
+        return [[self.wchunk(f) for f in fr.chunks], [self.offer(e) for e in fr.ihave.ids],
                 [self.ask_key(a) for a in fr.iwant.ids], [self.ihave_entry(h) for h in fr.idontwant]]
 
     @staticmethod
@@ -1163,16 +1344,139 @@ class Tracer3(Tracer):
                 None if c is None else [self.qmsg(m) for m in c.items], bool(e.solicited)]
 
     def qmsg(self, m):
-        """A control message of an entry: an IWANT's ids as ask keys, an IHAVE's and an IDONTWANT's as IHAVE
-        entries (v2's claims and WANT fields are not written: the twin reads neither). A PRUNE with ids, a GRAFT
-        or a JOIN is refused: none is queued in the toy's runs (its stock prunes are none, and --upkeep is off)."""
+        """A control message of an entry, in a lane and in a control on the tape (one encoder for both under v2).
+        Under protocol.md: an IWANT's ids as ask keys, an IHAVE's and an IDONTWANT's as IHAVE entries; a PRUNE with
+        ids, a GRAFT or a JOIN is refused, as none is queued in the toy's runs (its stock prunes are none). Under
+        v2: qmsg_v2."""
+        if self.doc_v2:
+            return self.qmsg_v2(m)
         if m.kind == "iwant":
             return ["iwant", [self.key(b) for b in m.ids]]
-        if m.kind in ("ihave", "idontwant"):
-            return [m.kind, [self.ihave_entry(x) for x in m.ids]]
+        if m.kind == "ihave":
+            return ["ihave", [self.offer(x) for x in m.ids]]
+        if m.kind == "idontwant":
+            return ["idontwant", [self.ihave_entry(x) for x in m.ids]]
         if m.kind == "prune" and not m.ids:
             return ["prune", []]
         raise TypeError(f"trace3: a queue entry's control message the record cannot hold: {m.kind} {m.ids!r}")
+
+    # ---- v2's forms of a control message (protocol-v2.md §2), under --doc v2 alone
+    def qmsg_v2(self, m):
+        """An IWANT is ["iwant", [ask, ...], want], each ask [key, standing, hops, probe] and `want` the message's
+        mark as it is when the value is written; an IDONTWANT is ["idontwant", [entry, ...]], each bitmap a holding
+        with its claims; an IHAVE is as under protocol.md, and refuses an offer with a claim set; a JOIN, a GRAFT
+        or a PRUNE of v2 is [kind, [message]], its one message in the tagged form; gossipsub's PRUNE is
+        ["prune", []]."""
+        if m.kind == "iwant":
+            return ["iwant", [self.ask_v2(a) for a in m.ids], self.flag(m.want, "an IWANT's want")]
+        if m.kind == "ihave":
+            return ["ihave", [self.offer(x) for x in m.ids]]
+        if m.kind == "idontwant":
+            return ["idontwant", [self.holding(x) if self.Wm.is_have_bitmap(x) else self.ihave_entry(x)
+                                  for x in m.ids]]
+        if m.kind == "prune" and not m.ids:
+            return ["prune", []]
+        if m.kind in ("join", "graft", "prune"):
+            if len(m.ids) != 1:
+                raise TypeError(f"trace3: a {m.kind} control with {len(m.ids)} messages, where v2's sends one: "
+                                f"{m.ids!r}")
+            return [m.kind, [self.rel_msg(m.ids[0], m.kind)]]
+        raise TypeError(f"trace3: a queue entry's control message the record cannot hold: {m.kind} {m.ids!r}")
+
+    def enqueue_enc(self, r, p, x, urgent=False):
+        """The tape's enqueue: [[peer, what, urgent], accepted], what an entry, a control or a chunk."""
+        return [[p, ["entry", self.qentry(x)] if isinstance(x, self.Wm.Entry)
+                 else self.control(x) if isinstance(x, self.Wm.Control)
+                 else ["chunk", self.chunk(x)], bool(urgent)], bool(r)]
+
+    def at_call(self, name, enc, args, kw):
+        """Under v2, a name of EAGER_V2: its arguments' form as they are at the call, before it runs (else None)."""
+        if self.doc_v2 and name in EAGER_V2 and not EAGER_LATE[0]:
+            return enc(None, *args, **kw)[0]
+        return None
+
+    @staticmethod
+    def tape_row(enc, r, args, kw, early):
+        """A tape name's [arguments, answer], the arguments as at_call wrote them where it did."""
+        row = enc(r, *args, **kw)
+        if early is not None:
+            row[0] = early
+        return row
+
+    def missing_key(self, miss, e=None):
+        """The key a KeyError names, as a record writes it. Under protocol.md a peer alone, as before. Under v2 a group
+        is ["group", hex], an object type ["type", id], an integer itself or ["-", n] below zero (a peer, a family
+        or a count). Any other key stops the tracer."""
+        if self.doc_v2:
+            if isinstance(miss, bytes):
+                return ["group", miss.hex()]
+            if isinstance(miss, str) and miss:          # a type by its id (a table keyed by `T.id`)
+                return ["type", miss]
+            if isinstance(getattr(miss, "id", None), str):      # a type object (a table keyed by the type itself)
+                return ["type", schema_v2.type_id(miss)]
+            if isinstance(miss, int) and not isinstance(miss, bool):
+                return self.integer(miss)
+            raise TypeError(f"trace3: a KeyError on a key that is neither a group, an object type nor an integer: "
+                            f"{miss!r}") from e
+        if not isinstance(miss, int):
+            raise TypeError(f"trace3: a KeyError on a key that is not a peer: {miss!r}") from e
+        return miss
+
+    @staticmethod
+    def flag(x, what):
+        """A boolean of a v2 form: a Python bool, nothing else."""
+        if not isinstance(x, bool):
+            raise TypeError(f"trace3: {what} is not a boolean: {x!r}")
+        return x
+
+    def ask_v2(self, a):
+        """An ask of a v2 IWANT: [key, standing, hops, probe]. A plain ask (a WantIndex, whose class holds the three
+        as false, 0 and false) or a structured id (which carries none) is [key, false, 0, false]."""
+        k = self.ask_key(a)
+        if isinstance(a, bytes):
+            return [k, False, 0, False]
+        return [k, self.flag(a.standing, "an ask's standing"), self.nat(a.hops), self.flag(a.probe, "an ask's probe")]
+
+    def holding(self, e):
+        """A bitmap of a v2 IDONTWANT: ["holding", group, bits, claim_all, complete], its claims as they are."""
+        return ["holding", e.group.hex(), self.nat(e.bits.v), self.flag(e.claim_all, "a holding's claim_all"),
+                self.flag(e.complete, "a holding's complete")]
+
+    def offer(self, e):
+        """An entry of an IHAVE, under either document. An offer claims nothing: a bitmap offered with a claim set
+        stops the tracer, as an IHAVE's form has no place for the claim (ihave_entry would drop it)."""
+        if self.Wm.is_have_bitmap(e) and (e.claim_all or e.complete):
+            raise SystemExit(f"trace3: an IHAVE offers a bitmap with a claim set (claim_all {e.claim_all!r}, "
+                             f"complete {e.complete!r}): an offer claims nothing, and its form holds no claim")
+        return self.ihave_entry(e)
+
+    def rel_msg(self, m, kind=None):
+        """A JOIN, a GRAFT or a PRUNE of v2 in schema_v2.py's tagged form, in §2's field order:
+        ["join", T, interest, custody_count, duty, colours], ["graft", T, family, colour, direction, answer],
+        ["prune", T, family, colour, direction]; the enumerations as the toy's strings, the family signed. It goes
+        by the fields, not the class: the toy holds a JOIN as the document's Join and as a wire Container (a
+        peer's, set by node.py). A JOIN has interest and colours, a GRAFT a family and an answer, a PRUNE a family
+        and none. Where the control's kind is given, the message's must be it."""
+        has = functools.partial(hasattr, m)
+        got = ("join" if has("interest") and has("colours") else "graft" if has("family") and has("answer")
+               else "prune" if has("family") else None)
+        if got is None:
+            raise TypeError(f"trace3: not a JOIN, a GRAFT or a PRUNE of v2: {m!r}")
+        if kind is not None and kind != got:
+            raise TypeError(f"trace3: a {kind} control holds a {got}: {m!r}")
+
+        def word(x, what):
+            if not isinstance(x, str) or not x:
+                raise TypeError(f"trace3: a {got}'s {what} is not a word: {x!r}")
+            return x
+        t = word(m.object_type, "object type")
+        if got == "join":
+            return ["join", t, word(m.interest, "interest"), self.nat(m.custody_count), word(m.duty, "duty"),
+                    self.nat(m.colours)]
+        if m.direction not in schema_v2.DIRECTIONS:
+            raise TypeError(f"trace3: a {got}'s direction is none of {schema_v2.DIRECTIONS}: {m.direction!r}")
+        head = [got, t, self.integer(m.family), self.nat(m.colour), m.direction]
+        return head + [self.flag(m.answer, "a GRAFT's answer")] if got == "graft" else head
 
     # ---- the checks of installed_block's answers and of pending
     def installed(self, slot, root, r):
@@ -1248,13 +1552,96 @@ class Tracer3(Tracer):
         #                                   encoder calls nothing
 
         # the twin's own tables: one line each in gen/schema.py; then the other sections' that §6.1 reads
-        return schema.python_tables(F, key, fbits, lane=self.lane,
-                                    waits=lambda w: [[int(p), self.wchunk(f)] for p, f in w] or None,
-                                    jobs=lambda js: [[int(q), [key(m) for m in ids], fbits(at)]
-                                                     for q, ids, at in js] or None, desc=desc) + [
+        tables = schema.python_tables(F, key, fbits, lane=self.lane,
+                                      waits=lambda w: [[int(p), self.wchunk(f)] for p, f in w] or None,
+                                      jobs=lambda js: [[int(q), [key(m) for m in ids], fbits(at)]
+                                                       for q, ids, at in js] or None, desc=desc) + [
             F.Table("known_id", [ghex, int], key, foreign=True),
             F.Table("chunks", [ghex, int], self.chunk, foreign=True),      # push_rebuilt's `chunks[g][i]`
         ]
+        if self.doc_v2:                 # a HaveEntry under v2 holds the two claims too (gen/schema.py writes §4.3's)
+            have = {t.name for t in schema.TABLES if t.value == "have"}
+            for t in tables:
+                if t.name in have:
+                    t.value = self.have_v2
+        return tables
+
+    def types_v2(self, nd, ns):
+        """The nodes entry's `types` under v2: each object type `type_of_group` can answer at the node (the node's
+        types, and the payload's, its answer for any other group), by id, with its parameters (protocol-v2.md
+        §6.3): naturals as numbers, booleans, floats as their 64-bit words (SERVE_LIMIT and FORWARD_LIMIT may be
+        +inf, every other float finite), ANNOUNCE_EXTRA as its word, EVIDENCE as null alone, REPAIR_SAMPLE as null
+        or its [S, L] steps. A parameter the type lacks is left out, and the twin's read of it is the toy's
+        AttributeError; the three functions (DECODE_AT_K, DECODE_LATER, REPAIR_TO) are questions on the tape."""
+        tys = dict(getattr(nd, "_types", None) or {})
+        p = getattr(nd, "_P", None)
+        if not tys or p is None:
+            raise SystemExit(f"trace3: node {nd.id}: the toy's object types are not where the tracer reads them "
+                             f"(the node's _types and _P)")
+        tys.setdefault(schema_v2.type_id(p), p)
+        out = {}
+        for tid, T in sorted(tys.items()):
+            if schema_v2.type_id(T) != tid:
+                raise SystemExit(f"trace3: node {nd.id}: the type under {tid!r} has the id {T.id!r}")
+            out[tid] = self.type_params(nd, tid, T.params)
+        return out
+
+    TYPE_NATS = ("M", "F_LO", "F_HI", "D_OUT", "D_OUT_FAST", "D_OUT_MAX", "SAMPLE_OUTSTANDING", "SAMPLE_COVER",
+                 "COVER_HIGH", "ROUTE_HOPS")
+    TYPE_BOOLS = ("SYMMETRIC", "EAGER", "REPAIR_BUDGET", "REPAIR_REASK")
+    TYPE_FLOATS = ("PRUNE_BACKOFF", "START_DELAY", "SAMPLE_RETRY", "SAMPLE_RETRY2", "DEFER_WINDOW", "SAMPLE_WAIT",
+                   "SERVE_LIMIT", "FORWARD_LIMIT")
+    TYPE_UNBOUNDED = ("SERVE_LIMIT", "FORWARD_LIMIT")       # may be +inf, as STRIPE_UPLINK may
+    TYPE_FUNCTIONS = ("DECODE_AT_K", "DECODE_LATER", "REPAIR_TO")
+    ANNOUNCE_WIDTHS = ("ALL_JOINED", "SAMPLE", "NONE")
+
+    def type_params(self, nd, tid, prm):
+        """One type's parameters, each in its form (types_v2); a parameter of no listed kind stops the tracer, so
+        that a new one is given its form before a trace holds it."""
+        def stop(name, v, what):
+            raise SystemExit(f"trace3: node {nd.id}: type {tid}: {name} is {what}: {v!r}")
+        out = {}
+        for name, v in sorted(vars(prm).items()):
+            if name in self.TYPE_FUNCTIONS:
+                continue
+            if name in self.TYPE_NATS:
+                if isinstance(v, bool) or not isinstance(v, int) or v < 0 or (name == "M" and v == 0):
+                    stop(name, v, "no natural" + (" above 0" if name == "M" else ""))
+                out[name] = v
+            elif name in self.TYPE_BOOLS:
+                if not isinstance(v, bool):
+                    stop(name, v, "no boolean")
+                out[name] = v
+            elif name in self.TYPE_FLOATS:
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v) or (
+                        math.isinf(v) and not (v > 0 and name in self.TYPE_UNBOUNDED)):
+                    stop(name, v, "no finite number" + (" nor +inf" if name in self.TYPE_UNBOUNDED else ""))
+                out[name] = fbits(v)
+            elif name == "ANNOUNCE_EXTRA":
+                if v not in self.ANNOUNCE_WIDTHS:
+                    stop(name, v, f"none of {self.ANNOUNCE_WIDTHS}")
+                out[name] = v
+            elif name == "EVIDENCE":
+                if v is not None:
+                    stop(name, v, "an evidence type, which no trace holds")
+                out[name] = None
+            elif name == "REPAIR_SAMPLE":
+                if v is None:
+                    out[name] = None
+                else:
+                    steps = [list(s) for s in v]
+                    if not steps or any(len(s) != 2 or any(isinstance(x, bool) or not isinstance(x, int) or x < 0
+                                                           for x in s) for s in steps):
+                        stop(name, v, "neither none nor a list of [S, L] steps of naturals")
+                    out[name] = steps
+            else:
+                stop(name, v, "a parameter the tracer does not know")
+        return out
+
+    def have_v2(self, e):
+        """`peer_has`'s entry under v2: [bits, ttl, claim_all, complete], the claims a holding carried."""
+        return [self.nat(e.bits.v), self.nat(int(e.ttl)), self.flag(e.claim_all, "a HaveEntry's claim_all"),
+                self.flag(e.complete, "a HaveEntry's complete")]
 
     # ---- the wrappers, per node
     def install(self, nd, ns):
@@ -1294,6 +1681,17 @@ class Tracer3(Tracer):
         if ns["SOURCE_OFFERS"] not in ("ACK", "PUBLISH"):                  # v0.10.4: §5.1's choice of when the
             raise SystemExit(f"trace3: node {nd.id}: SOURCE_OFFERS is {ns['SOURCE_OFFERS']!r}")   # source announces
         consts["SOURCE_OFFERS"] = ns["SOURCE_OFFERS"]
+        types = None
+        if self.doc_v2:     # v2's three more, as the namespace holds them after load; and the node's object types
+            for c in ("ANSWERS_FIRST", "MERGE_HOLDINGS"):
+                if not isinstance(ns[c], bool):
+                    raise SystemExit(f"trace3: node {nd.id}: {c} is no boolean: {ns[c]!r}")
+                consts[c] = ns[c]
+            u = ns["ASK_UPLINK"]            # bits per second: finite, not negative (0 never scales)
+            if isinstance(u, bool) or not isinstance(u, (int, float)) or not math.isfinite(u) or u < 0:
+                raise SystemExit(f"trace3: node {nd.id}: ASK_UPLINK is no finite rate: {u!r}")
+            consts["ASK_UPLINK"] = fbits(u)
+            types = self.types_v2(nd, ns)
         # what each traced name is at this node, and the node's own line
         replaced = []
         for name in self.traced:
@@ -1309,7 +1707,7 @@ class Tracer3(Tracer):
         if self.nodes_written:
             raise SystemExit(f"trace3: node {nd.id} is installed after the trace's first record: its line cannot be "
                              f"written before its records")
-        self.nodes.append((int(nd.id), consts, sorted(replaced)))
+        self.nodes.append((int(nd.id), consts, sorted(replaced), types))
         self.WAIT = ns["WAIT"]                                               # next_to_send's "in line" (§7.2)
         if self.doc_message_id is None:     # the document's function, from the toy's wrapper's closure (own_code
             mid_fn = ns["message_id"]       #   found it there, or found the name to be the document's own)
@@ -1420,9 +1818,7 @@ class Tracer3(Tracer):
                 except Exception as e:              # written with the state it left; the exception goes on
                     if isinstance(e, KeyError):     # which key was missing: the place it raised
                         (miss,) = e.args
-                        if not isinstance(miss, int):
-                            raise TypeError(f"trace3: a KeyError on a key that is not a peer: {miss!r}") from e
-                        finish(raises=type(e).__name__, raises_key=miss)
+                        finish(raises=type(e).__name__, raises_key=tr.missing_key(miss, e))
                     else:
                         finish(raises=type(e).__name__)
                     raise
@@ -1458,6 +1854,9 @@ class Tracer3(Tracer):
                     return fn(*args, **kw)
                 # the tracer's third state: what the rest of the node reads is behind the tape, but its
                 # accesses of the own tables are logged apart, as the callee's `cr` and `cw`
+                # under v2 an argument the caller changes after the call (send marks its IWANT `want` after the
+                # enqueue) is written as it was handed over: encoded here, before the call (EAGER_V2)
+                early = tr.at_call(name, enc, args, kw)
                 st["ext"] += 1
                 rec.begin_callee()
                 mesh_off()
@@ -1475,7 +1874,8 @@ class Tracer3(Tracer):
                         if cr or cw:
                             raise TypeError(f"trace3: {name} raised after touching the own tables")
                         st["cur"]["tape"].append([name, calls[name][0](*args, **kw), {"raises": type(raised).__name__}])
-                st["cur"]["tape"].append([name, *enc(r, *args, **kw)] + ([{"cr": cr, "cw": cw}] if cr or cw else []))
+                row = tr.tape_row(enc, r, args, kw, early)
+                st["cur"]["tape"].append([name, *row] + ([{"cr": cr, "cw": cw}] if cr or cw else []))
                 return r
             return w
 
@@ -1520,11 +1920,9 @@ class Tracer3(Tracer):
             # or of indices (push_rebuilt's)
             "shuffled": lambda r, xs: [[[tr.drawn(a) for a in (xs.m if isinstance(xs, MeshQuestion) else xs)]],
                                        [tr.drawn(a) for a in r]],
-            "valid_have": lambda r, e: [[tr.ihave_entry(e)], bool(r)],    # asked by on_ihave of a bitmap
+            "valid_have": lambda r, e: [[tr.offer(e)], bool(r)],          # asked by on_ihave of a bitmap
             "penalise": lambda r, p: [[p], None],
-            "enqueue": lambda r, p, x, urgent=False: [[p, ["entry", tr.qentry(x)] if isinstance(x, tr.Wm.Entry)
-                                                       else tr.control(x) if isinstance(x, tr.Wm.Control)
-                                                       else ["chunk", tr.chunk(x)], bool(urgent)], bool(r)],
+            "enqueue": tr.enqueue_enc,
             "after": lambda r, delay, fn, *args: [after_args(delay, fn, *args), None],
             # §4.2
             "seen": lambda r, m: [[m.hex()], bool(r)],
@@ -1716,5 +2114,5 @@ def main(argv):
 
 if __name__ == "__main__":
     if sys.argv[1:] == ["--self-test-v2"]:
-        sys.exit(v2_kept_self_test())
+        sys.exit(self_test_v2())
     main(sys.argv[1:])
