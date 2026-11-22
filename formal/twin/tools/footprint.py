@@ -131,6 +131,11 @@ ROW_READS = [True]
 # the attribute reads of an own table that a callee may make, unlogged: the toy's `listed` reads the count
 # that `offers` keeps of the lists each announcer is in. Its answer is on the tape, trusted as it was before
 CALLEE_ATTRS = {("offers", "listed")}
+# A set's members where an entry's keys are listed (a snapshot, the entries under a level) sorted by their encoded
+# key, its JSON, and not by their raw value: protocol-v2.md's `probe_asks` holds WantIndex values, which have
+# equality and hashing but no order. The order is for serialization only. trace3.py sets it under --doc v2;
+# protocol.md's traces keep the raw sort, and with it their bytes
+SET_ORDER_ENCODED = [False]
 
 
 def _one_order(items, key):
@@ -173,12 +178,16 @@ def _peek(raw, k):
     raise TypeError(f"footprint: a container of a kind it does not know: {type(raw).__name__}")
 
 
-def _keys(raw):
+def _keys(raw, enc=None):
+    """A level's keys as listed: a set's members sorted (by `enc`'s JSON where SET_ORDER_ENCODED holds and the
+    level's encoder is given, else by their raw values)."""
     names = ATTR_LEVELS.get(type(raw))
     if names is not None:
         return list(names)
     if isinstance(raw, (set, frozenset)):   # a set iterates in an order that changes from process to process
-        return sorted(raw)                  #   (Python's hash seed): a record must not depend on it
+        if enc is not None and SET_ORDER_ENCODED[0]:    # (Python's hash seed): a record must not depend on it.
+            return sorted(raw, key=lambda k: json.dumps(enc(k)))    # Its members by their encoded key: a set of
+        return sorted(raw)                  #   asks holds WantIndex values, which have no order
     if isinstance(raw, dict):
         return list(dict.keys(raw))
     d = getattr(raw, "_d", None)
@@ -234,10 +243,11 @@ class Recorder:
         raw = self._raw_at(t, prefix)
         if raw is ABSENT:
             return []
+        enc = t.keys[len(prefix)]
         if len(prefix) + 1 == t.depth:
-            return [prefix + (k,) for k in _keys(raw)]
+            return [prefix + (k,) for k in _keys(raw, enc)]
         out = []
-        for k in _keys(raw):
+        for k in _keys(raw, enc):
             if t.rows:                              # a row that is there is an entry of its own
                 out.append(prefix + (k,))
             out.extend(self._under(t, prefix + (k,)))

@@ -498,6 +498,12 @@ REPLACEABLE_V2 = tuple(manifest_v2.REPLACEABLE) + tuple(manifest_v2.REPLACEABLE_
 ASKED_V2 = ("forward", "push_rebuilt", "send_have", "serve_standing", "owed_missing", "repair_verdict", "note_claim",
             "known_in_scope")
 NOASK_V2 = tuple(n for n in manifest_v2.REPLACEABLE if n not in ASKED_V2 and n not in manifest_v2.KEPT)
+# Under v2, the places where the twin asks the order of a set of peers (its NodeV2.order calls): eight iterate
+# `suppression_scope(g)` (fill its union with the sender's ack), and serve_standing the set it pops from `standing`.
+# A record's own code iterating either set writes ["order", place, [q...]] (OrderProxy); TRACE3_ORDER=off, for the
+# cost measure alone, writes none, and shows in no trace
+ORDER_PLACES_V2 = ("fill", "serve_standing", "check_completion", "known_in_scope", "known_across", "reconsider",
+                   "origin_written", "offer_at_publish", "origin_acked")
 # Under v2, the questions an object type answers (its functions, wrapped per node on the type: type_enc_v2; its
 # parameters' three are Tracer3.TYPE_FUNCTIONS, param_enc_v2), and the manifest's questions whose rows an adapter
 # writes (the gossip history's, the mesh's, `interest`'s miss)
@@ -1805,9 +1811,192 @@ def questions_self_test():
     return bad
 
 
+def orders_self_test():
+    """R9 (step3.md's R9-2 to R9-5, R9-7 and R9-8): the order proxy and its writer, with a stub record and no toy
+    node, each case beside its planted fault. One entry per iteration, an empty set's too (R9-2); a membership
+    test, `len` and truth write nothing (R9-3); nothing inside a question, with no record open, or with the order
+    off, and a stop at a place the twin does not ask (R9-4); the place is the frame that creates the iterator,
+    `any(... for q in s)` included (R9-5); `standing[g].pop(i, ())` hands out a proxy of the popped set, or of the
+    empty default (R9-7); and a set of asks listed by its members' encoded keys, whatever their insertion order
+    (R9-8). A planted fault that raises fails its case too."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import wire as Wm                   # noqa: E402: the toy's, beside this repository's documents
+    tr = object.__new__(Tracer3)
+    tr.Wm, tr.doc_v2 = Wm, True
+    ts = {t.name: t for t in tr.schema(None)}
+    g1, g2 = bytes([1]) * 32, bytes([2]) * 32
+    sid = g1 + (3).to_bytes(4, "little") + bytes(20)        # a structured id of g1's chunk 3: 56 bytes
+
+    class Rec:                          # a stub recorder: on, no callee's log open
+        on, callee = True, None
+
+    def state(ext=0, cur=True):
+        return {"cur": {"tape": []} if cur else None, "ext": ext, "supp": 0}
+
+    def writer(st, rec=None, on=True):
+        return order_writer(rec or Rec(), st, lambda: on, "stub")
+
+    def tape(st):
+        return st["cur"]["tape"]
+
+    # protocol-v2.md's places by name, each iterating its set as the document does
+    def fill(s):
+        return [q for q in s]
+
+    def serve_standing(s):
+        return [q for q in s]
+
+    def known_across(s, holder):
+        return any(q == holder for q in s)
+
+    def check_completion(s):
+        return (9 in s, len(s), bool(s))
+
+    def rebuild(s):                     # a toy function's name: none of the nine
+        return [q for q in s]
+
+    bad = 0
+
+    def case(what, got, want):
+        nonlocal bad
+        ok = got == want
+        bad += not ok
+        print(f"orders self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+
+    def fault(what, f):
+        nonlocal bad
+        try:
+            failed = f()
+        except (SystemExit, Exception):
+            failed = True
+        bad += not failed
+        print(f"orders self-test, its planted fault ({what}): {'fails it, ok' if failed else 'NOT failed  <-- FAIL'}")
+
+    s = {9, 16}
+    # R9-2
+    st = state()
+    fill(OrderProxy(s, writer(st)))
+    case("an iteration at fill: one entry, in the set's own order", tape(st), [["order", "fill", list(s)]])
+    st = state()
+    fill(OrderProxy(set(), writer(st)))
+    case("an empty set at fill: one entry, empty", tape(st), [["order", "fill", []]])
+    st = state()
+    fill(OrderProxy({9}, writer(st)) | {16})
+    case("the union with the sender's ack: one entry, in the union's own order", tape(st),
+         [["order", "fill", list({9} | {16})]])
+
+    def nonempty(st):
+        w = writer(st)
+        return lambda place, ms: w(place, ms) if ms else None
+
+    def p2():
+        st = state()
+        fill(OrderProxy(set(), nonempty(st)))
+        return tape(st) != [["order", "fill", []]]
+    fault("entries only for non-empty sets", p2)
+    # R9-3
+    st = state()
+    r = check_completion(OrderProxy(s, writer(st)))
+    case("a membership test, len and truth: nothing on the tape", (tape(st), r), ([], (True, 2, True)))
+
+    class IterContains(OrderProxy):     # the planted fault: a membership test that iterates
+        __slots__ = ()
+
+        def __contains__(self, q):
+            self.note("check_completion", list(self.s))
+            return q in self.s
+
+    def p3():
+        st = state()
+        check_completion(IterContains(s, writer(st)))
+        return tape(st) != []
+    fault("a membership test that iterates", p3)
+    # R9-4
+    st = state(ext=1)
+    fill(OrderProxy(s, writer(st)))
+    case("an iteration inside a question: nothing on the tape", tape(st), [])
+    st = state(cur=False)
+    case("an iteration with no record open: nothing, and the set's members", fill(OrderProxy({9}, writer(st))), [9])
+    st = state()
+    fill(OrderProxy(s, writer(st, on=False)))
+    case("an iteration with the order off (TRACE3_ORDER=off): nothing on the tape", tape(st), [])
+    try:
+        rebuild(OrderProxy({9}, writer(state())))
+        got = "no stop"
+    except SystemExit as e:
+        got = "stopped" if "at none of its places" in str(e) else str(e)
+    case("an iteration in a function that is none of the nine places: the tracer stops", got, "stopped")
+
+    def anydepth(st):
+        return lambda place, ms: tape(st).append(["order", place, [int(q) for q in ms]])
+
+    def p4():
+        st = state(ext=1)
+        fill(OrderProxy(s, anydepth(st)))
+        return tape(st) != []
+    fault("a writer that writes whatever the depth", p4)
+    # R9-5
+    st = state()
+    known_across(OrderProxy(s, writer(st)), 16)
+    case("any(... for q in s) in known_across: the place is known_across", tape(st),
+         [["order", "known_across", list(s)]])
+
+    class Advancing(OrderProxy):        # the planted fault: the place of the frame that advances the iterator
+        __slots__ = ()
+
+        def __iter__(self):
+            def gen():
+                order = list(self.s)
+                self.note(sys._getframe(1).f_code.co_name, order)
+                yield from order
+            return gen()
+
+    def p5():
+        st = state()
+        known_across(Advancing(s, writer(st)), 16)
+        return tape(st) != [["order", "known_across", list(s)]]
+    fault("the place of the frame that advances the iterator", p5)
+    # R9-7
+    def standing(pop_view):
+        rec, st = F.Recorder(), state()
+        ns = {"standing": {g1: {3: {5, 2}}}}
+        F.install(rec, ns, [ts["standing"]])
+        rec.on, rec.tape = True, []
+        if pop_view:
+            ns["standing"] = OrderPopView(ns["standing"], writer(st, rec))
+        a = serve_standing(ns["standing"][g1].pop(3, ()))
+        b = serve_standing(ns["standing"][g1].pop(4, ()))
+        return tape(st), a, b
+    case("standing[g].pop(i, ()) at serve_standing, held and missing: an entry each, the second empty",
+         standing(True), ([["order", "serve_standing", list({5, 2})], ["order", "serve_standing", []]],
+                          list({5, 2}), []))
+    fault("the pop view handing out the raw set", lambda: standing(False)[0] != [
+        ["order", "serve_standing", list({5, 2})], ["order", "serve_standing", []]])
+    # R9-8
+    a1, a2 = Wm.WantIndex(g1, 3), Wm.WantIndex(g2, 4)
+
+    def snap(order):
+        rec, raw = F.Recorder(), set()
+        for x in order:
+            raw.add(x)
+        F.install(rec, {"probe_asks": raw}, [ts["probe_asks"]])
+        return list(rec.snapshot())
+    was = F.SET_ORDER_ENCODED[0]
+    try:
+        F.SET_ORDER_ENCODED[0] = True
+        one, two = snap([a1, a2, sid]), snap([sid, a2, a1])
+        case("probe_asks with two asks by index and a structured id, inserted in two orders: one listing, by "
+             "encoded key", (one == two, len(one), one == sorted(one)), (True, 3, True))
+        F.SET_ORDER_ENCODED[0] = False
+        fault("the members sorted by their raw values", lambda: snap([a1, a2, sid]) is None)
+    finally:
+        F.SET_ORDER_ENCODED[0] = was
+    return bad
+
+
 def self_test_v2():
     bad = (v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
-           + closure_self_test() + timers_self_test() + questions_self_test())
+           + closure_self_test() + timers_self_test() + questions_self_test() + orders_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -1816,6 +2005,7 @@ class Tracer3(Tracer):
     def __init__(self, toy, out, argv, whole=False, cli=False):     # not Tracer's: the header differs
         self.whole = whole
         self.only61 = os.environ.get("TRACE3_ONLY") == "sec61"     # §6.1's twelve alone: the baseline's records
+        self.order_on = os.environ.get("TRACE3_ORDER") != "off"     # v2's order entries; off for the cost measure
         self.toy = Path(toy).resolve()
         self.start_check(out)           # before the toy is imported
         sys.path.insert(0, str(toy))
@@ -1846,6 +2036,7 @@ class Tracer3(Tracer):
         # what is traced: §6.1's twelve alone (TRACE3_ONLY=sec61); under --doc v2, the block's names that are
         # protocol.md's all the way down; otherwise the block
         self.doc_v2 = doc_of(argv) == "v2"
+        F.SET_ORDER_ENCODED[0] = self.doc_v2    # under v2 a set's members are listed by their encoded key
         # under v2, one tracer-wide state of the record and question depth: inside any question, every traced
         # function at every node runs bare, and so does everything inside a replaced name entered outside any
         # record; the calls run bare at another node than the record's, and inside such an entry, are counted, by
@@ -3313,6 +3504,9 @@ class Tracer3(Tracer):
                 return st.pop("notes", [])
             ns["interest"] = MissQuestionView(ns["interest"], miss_question(rec, enter, leave))
 
+            order_note = order_writer(rec, st, lambda: tr.order_on, nd.id)
+            ns["standing"] = OrderPopView(ns["standing"], order_note)
+
         def sec61(name, fn):
             @functools.wraps(fn)
             def w(*args, **kw):
@@ -3342,6 +3536,8 @@ class Tracer3(Tracer):
                         r = fn(*args, **kw)
                         if name == "message_id":    # its content_id, a question at every call
                             tr.content_id_asked(st["cur"]["tape"], args[0], r, nd.id)
+                        if tr.doc_v2 and name == "suppression_scope":   # the set the caller iterates, its order
+                            return OrderProxy(r, order_note)            #   asked there (a record of its own is not)
                         return r
                     finally:
                         st["depth"] -= 1
@@ -3673,6 +3869,69 @@ class _MeshAnd:
     def __iter__(self):
         self.q.tape().append(["mesh_and", self.p, list(self.order)])
         return iter(self.order)
+
+
+class OrderProxy:
+    """Under v2, a set of peers whose order the twin asks where the block iterates it (ORDER_PLACES_V2): the value
+    of a nested `suppression_scope(g)`, and the set `standing[g].pop(i, ())` hands out (OrderPopView). Each
+    iteration calls `note(place, members)`, the members in the order the set itself iterates, empty or not, and
+    `place` the name of the frame that creates the iterator: in `any(... for q in s)` the function's own, which
+    evaluates the generator's outermost iterable. `|` with a set gives the proxy of the real union, which iterates as
+    the untraced code's union does. A membership test and `len` note nothing. The set is not copied, since a copy
+    can iterate in another order. Any other use raises."""
+    __slots__ = ("s", "note")
+
+    def __init__(self, s, note):
+        self.s, self.note = s, note
+
+    def __iter__(self):
+        order = list(self.s)
+        self.note(sys._getframe(1).f_code.co_name, order)
+        return iter(order)
+
+    def __contains__(self, q):
+        return q in self.s
+
+    def __len__(self):
+        return len(self.s)
+
+    def __or__(self, other):
+        if not isinstance(other, (set, frozenset)):
+            raise TypeError(f"trace3: an ordered set | {other!r}: the order's proxy takes a set of peers")
+        return OrderProxy(self.s | other, self.note)
+
+
+def order_writer(rec, st, on, nid):
+    """The note of a node's OrderProxies: an iteration in a record's own code (a record open, the recorder on, no
+    question or replaced name running, no callee's log open) and with the order on (`on()`) puts ["order", place,
+    [q...]] on the record's tape; anywhere else it writes nothing. A place none of ORDER_PLACES_V2 stops the trace:
+    the twin asks no order there."""
+    def note(place, members):
+        if not rec.on or st["cur"] is None or st["ext"] or st["supp"] or rec.callee is not None or not on():
+            return
+        if place not in ORDER_PLACES_V2:
+            raise SystemExit(f"trace3: node {nid}: a set whose order the twin asks is iterated in {place}, at none "
+                             f"of its places ({', '.join(ORDER_PLACES_V2)})")
+        st["cur"]["tape"].append(["order", place, [int(q) for q in members]])
+    return note
+
+
+class OrderPopView(F.View):
+    """`standing` under --doc v2: an entry popped whole, `standing[g].pop(i, ())`, is handed out as an OrderProxy of
+    the popped set, or of the default where the entry is missing, so that serve_standing's iteration notes its order.
+    The pop's own log is the view's. Every level below is one of these."""
+    __slots__ = ("_note",)
+
+    def __init__(self, view, note):
+        super().__init__(view._r, view._t, view._p, view._o)
+        object.__setattr__(self, "_note", note)
+
+    def _sub(self, k, v):
+        return OrderPopView(F.View(self._r, self._t, self._p + (k,), v), self._note)
+
+    def pop(self, k, *default):
+        r = super().pop(k, *default)
+        return OrderProxy(r, self._note) if self._leaf() else r
 
 
 def main(argv):
