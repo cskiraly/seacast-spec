@@ -17,12 +17,17 @@ So nothing in these files is written by hand: not a first line, not a line after
 that compares slices of hand-written files, regions or declarations' bodies, misses text that the slices do not
 hold.)
 
-Two more checks hold the manifest. Its own rules (manifest_v2.py's docstring): no list holds a name twice, COVERED
+Three more checks hold the manifest. Its own rules (manifest_v2.py's docstring): no list holds a name twice, COVERED
 and KEPT share no name, NODE_OWN's keys are in neither, CUT's names are in no other list, REPLACEABLE_WHOLE is
 within KEPT, QUESTIONS shares no name with COVERED or KEPT and holds no key of NODE_OWN, and QUESTIONS_UNLOADED's
-keys are within QUESTIONS. And KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
-(header3.py's `v2_kind`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. The tripwire
-below is the first three files' alone: the manifest's names are plain words that other files may declare.
+keys are within QUESTIONS. KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
+(header3.py's `v2_kind`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. And QUESTIONS
+by the code: QUESTIONS less QUESTIONS_UNLOADED is what the code asks, name for name, as closure_v2.py's
+`derive_questions` reads it over the same documents and the manifest's lists. These are the globals of COVERED
+functions that no other class takes, the `.params` calls, the type's functions called and the context uses'
+questions. A name of QUESTIONS_UNLOADED that the code asks is named too, and so is a name of COVERED or KEPT that
+the documents do not define. The tripwire below is the first three files' alone: the manifest's names are plain
+words that other files may declare.
 
 A tripwire beside it, a heuristic and no proof. It looks in the twin's other files for a declaration of one of
 the 16 names in NAMES, which these files declare (a `def drop` in another namespace, say), and says whether it
@@ -979,6 +984,38 @@ def manifest_kept(m):
             + [f"the manifest: {n} in the manifest, not in v2_kept" for n in sorted(have - rule)])
 
 
+@functools.lru_cache(maxsize=None)
+def code_reading():
+    """closure_v2.py's reading of the toy's two documents (the toy that layout.py finds), made once."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import closure_v2                   # noqa: E402: tools/, beside gen/
+    import layout                       # noqa: E402
+    sys.path.insert(0, str(layout.toy()))
+    import node                         # noqa: E402: the toy's, as header3.py's v2_kind imports it
+    return closure_v2.Reading(node.SPEC_SRC, node.generate(node.DOC2))
+
+
+def manifest_questions(m):
+    """QUESTIONS less QUESTIONS_UNLOADED against what the code asks (closure_v2.py's derive_questions), name for name;
+    a name of QUESTIONS_UNLOADED the code asks; a name of COVERED or KEPT the documents do not define."""
+    import closure_v2                   # noqa: E402: on the path once code_reading has run
+    rd = code_reading()
+    derived, undefined = closure_v2.derive_questions(rd, m)
+    unl = set(m["QUESTIONS_UNLOADED"])
+    have = set(m["QUESTIONS"]) - unl
+    return ([f"the manifest: {n} in QUESTIONS, not asked by the code" for n in sorted(have - set(derived))]
+            + [f"the manifest: {n} asked by the code, not in QUESTIONS" for n in sorted(set(derived) - have - unl)]
+            + [f"the manifest: {n} in QUESTIONS_UNLOADED, asked by the code" for n in sorted(set(derived) & unl)]
+            + [f"the manifest: {u}" for u in undefined])
+
+
+def questions_counts(m):
+    """The derived set's size and its four groups' sizes, for --check's line."""
+    import closure_v2                   # noqa: E402
+    g1, pcalls, _, _, tcalls, _, cq, _, _ = closure_v2.groups(code_reading(), m)
+    return len(closure_v2.derive_questions(code_reading(), m)[0]), len(g1), len(pcalls), len(tcalls), len(cq)
+
+
 def compare(twin):
     """The check itself, which --check prints and every control runs: per generated file (its path, the lines the
     twin's has or None if it is not there, the lines generated, whether the two are the same bytes, the first line
@@ -1023,7 +1060,7 @@ def compare(twin):
     text = replay.read_text() if replay.is_file() else ""
     if len(allowed) != 1 or text.count(unit) != 1 or text.index(unit) != allowed[0][2]:
         insts.append("SpecTwin/Replay.lean: its instance of Tables is not the fixed text")
-    return out, trips, insts, manifest_rules(MANIFEST), manifest_kept(MANIFEST)
+    return out, trips, insts, manifest_rules(MANIFEST), manifest_kept(MANIFEST) + manifest_questions(MANIFEST)
 
 
 def differing(twin):
@@ -1062,8 +1099,12 @@ def check(twin):
         print("the manifest's own rules hold: no name twice in a list, COVERED and KEPT apart, NODE_OWN's keys in "
               "neither, CUT in no other list, REPLACEABLE_WHOLE within KEPT, QUESTIONS apart from COVERED, KEPT and "
               f"NODE_OWN's keys, QUESTIONS_UNLOADED within QUESTIONS ({len(MANIFEST['QUESTIONS'])} questions)")
-    if not kept:
+    if not manifest_kept(MANIFEST):
         print(f"the manifest's KEPT and NODE_OWN are v2_kept's rule over the toy's documents: {len(v2_kept_rule())} names")
+    if not manifest_questions(MANIFEST):
+        n, g1, g2, g3, g5 = questions_counts(MANIFEST)
+        print(f"the manifest's QUESTIONS less QUESTIONS_UNLOADED are what the code asks: {n} names ({g1} globals, "
+              f"{g2} `.params` calls, {g3} type functions, {g5} context uses)")
     total = sum(m for _, _, m, _, _ in files)
     print(f"{len(files)} of {len(files)} generated files are the schema's, whole, {total} lines; {len(TABLES)} tables"
           if not bad else f"{bad} files or names are NOT the schema's")
@@ -1278,7 +1319,8 @@ def controls(twin, work):
     manifest("announce in KEPT too", lambda m: m["KEPT"].append("announce"),
              [MF, "the manifest: announce in both COVERED and KEPT", "the manifest: announce in the manifest, not in v2_kept"])
     manifest("held, a key of NODE_OWN, in COVERED too", lambda m: m["COVERED"].append("held"),
-             [MF, "the manifest: held, a key of NODE_OWN, in COVERED"])
+             [MF, "the manifest: held, a key of NODE_OWN, in COVERED",
+              "the manifest: held in COVERED, not a function of the documents"])
     manifest("window_release, which is cut, in REPLACEABLE", lambda m: m["REPLACEABLE"].append("window_release"),
              [MF, "the manifest: window_release, in CUT, in REPLACEABLE too"])
     manifest("forward in REPLACEABLE_WHOLE", lambda m: m["REPLACEABLE_WHOLE"].append("forward"),
@@ -1286,11 +1328,22 @@ def controls(twin, work):
     manifest("links twice in QUESTIONS", lambda m: m["QUESTIONS"].append("links"),
              [MF, "the manifest: links twice in QUESTIONS"])
     manifest("announce, a covered name, in QUESTIONS too", lambda m: m["QUESTIONS"].append("announce"),
-             [MF, "the manifest: announce in both QUESTIONS and COVERED"])
+             [MF, "the manifest: announce in both QUESTIONS and COVERED",
+              "the manifest: announce in QUESTIONS, not asked by the code"])
     manifest("held, a key of NODE_OWN, in QUESTIONS too", lambda m: m["QUESTIONS"].append("held"),
-             [MF, "the manifest: held, a key of NODE_OWN, in QUESTIONS"])
+             [MF, "the manifest: held, a key of NODE_OWN, in QUESTIONS",
+              "the manifest: held in QUESTIONS, not asked by the code"])
     manifest("own_interest taken out of QUESTIONS", lambda m: m["QUESTIONS"].remove("own_interest"),
              [MF, "the manifest: own_interest in QUESTIONS_UNLOADED, not in QUESTIONS"])
+    # QUESTIONS by the code (closure_v2.py's derive_questions): a name no code asks, a name the code asks left out,
+    # and a name the code asks among QUESTIONS_UNLOADED
+    manifest("never_asked added to QUESTIONS", lambda m: m["QUESTIONS"].append("never_asked"),
+             [MF, "the manifest: never_asked in QUESTIONS, not asked by the code"])
+    manifest("links taken out of QUESTIONS", lambda m: m["QUESTIONS"].remove("links"),
+             [MF, "the manifest: links asked by the code, not in QUESTIONS"])
+    manifest("links added to QUESTIONS_UNLOADED with a reason",
+             lambda m: m["QUESTIONS_UNLOADED"].__setitem__("links", "a reason"),
+             [MF, "the manifest: links in QUESTIONS_UNLOADED, asked by the code"])
     for bad in (["--chek", str(twin)], [], ["--check"], ["--check", str(twin), "x"], ["--control", str(twin)]):
         rc = main(bad, quiet=True)
         ok &= rc == 2

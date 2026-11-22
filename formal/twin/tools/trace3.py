@@ -94,6 +94,7 @@ import schema                           # noqa: E402: gen/schema.py, the twin's 
 import schema_v2                        # noqa: E402: gen/schema_v2.py, v2's (its DIRECTIONS)
 import manifest_v2                      # noqa: E402: gen/manifest_v2.py, protocol-v2.md's manifest, which the replay
 #                                         reads a v2 trace by
+import closure_v2                       # noqa: E402: the closure rule and the call closure, under --doc v2
 from trace61 import CONSTS, SEC61, Tracer, fbits   # noqa: E402
 
 OWN = tuple(t.name for t in schema.TABLES)
@@ -1083,8 +1084,17 @@ def chains_self_test():
     return bad
 
 
+def closure_self_test():
+    """closure_v2's cases and controls, on the toy beside this repository's
+    documents, with the manifest and the tracer's parameter schema."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import node as N                    # noqa: E402: the toy beside this repository's documents
+    return closure_v2.self_test(N, manifest_v2, Tracer3.params_schema(), Tracer3.TYPE_FUNCTIONS)
+
+
 def self_test_v2():
-    bad = v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
+    bad = (v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
+           + closure_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -1171,6 +1181,14 @@ class Tracer3(Tracer):
             off = manifest_check(None if self.only61 else self.traced)  # the lists the replay reads a v2 trace by
             if off:
                 raise SystemExit("trace3: the tracer's lists and protocol-v2.md's manifest differ: " + "; ".join(off))
+            # the closure rule over COVERED, the call closure over COVERED and KEPT, the type's functions and the
+            # context's uses (closure_v2.py); their counts on stderr, nothing in the trace
+            off, lines = closure_v2.check(closure_v2.Reading(N.SPEC_SRC, N.generate(N.DOC2)), manifest_v2,
+                                          self.params_schema(), self.TYPE_FUNCTIONS)
+            if off:
+                raise SystemExit("trace3: protocol-v2.md's code and the closure rule: " + "; ".join(off))
+            for ln in lines:
+                print(ln, file=sys.stderr)
         # under v2 the header's tables are the manifest's, which manifest_check has just held to the tracer's own
         hd = {"format": 7, "whole": whole,
               "own": list(manifest_v2.OWN) if self.doc_v2 else list(OWN),
@@ -2025,8 +2043,17 @@ class Tracer3(Tracer):
         for tid, T in sorted(tys.items()):
             if schema_v2.type_id(T) != tid:
                 raise SystemExit(f"trace3: node {nd.id}: the type under {tid!r} has the id {T.id!r}")
+            off = closure_v2.type_attrs_check(tid, T)       # its attributes are the closure check's list
+            if off:
+                raise SystemExit(f"trace3: node {nd.id}: " + "; ".join(off))
             out[tid] = self.type_params(nd, tid, T.params)
         return out
+
+    @classmethod
+    def params_schema(cls):
+        """The type parameters' names the tracer gives a form (type_params): the closure rule's schema."""
+        return set(cls.TYPE_NATS) | set(cls.TYPE_BOOLS) | set(cls.TYPE_FLOATS) | {"ANNOUNCE_EXTRA", "EVIDENCE",
+                                                                                  "REPAIR_SAMPLE"}
 
     TYPE_NATS = ("M", "F_LO", "F_HI", "D_OUT", "D_OUT_FAST", "D_OUT_MAX", "SAMPLE_OUTSTANDING", "SAMPLE_COVER",
                  "COVER_HIGH", "ROUTE_HOPS")
@@ -2133,6 +2160,10 @@ class Tracer3(Tracer):
             if isinstance(u, bool) or not isinstance(u, (int, float)) or not math.isfinite(u) or u < 0:
                 raise SystemExit(f"trace3: node {nd.id}: ASK_UPLINK is no finite rate: {u!r}")
             consts["ASK_UPLINK"] = fbits(u)
+            # the closure rule's lists held to what the node runs: the nodes line's constants and the enumerations
+            off = closure_v2.consts_keys_check(consts) + closure_v2.enum_check(ns)
+            if off:
+                raise SystemExit(f"trace3: node {nd.id}: the closure rule's lists and the node differ: " + "; ".join(off))
             types = self.types_v2(nd, ns)
         # what each traced name is at this node, and the node's own line
         replaced = []

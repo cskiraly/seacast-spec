@@ -68,7 +68,11 @@ one to one.
   generated from `tools/gen/manifest_v2.py`) lists them, and the questions a trace under it asks. The replay reads
   a trace's document from its header. A trace under `protocol-v2.md` replays through those functions and through
   the functions of `protocol.md` that `protocol-v2.md` keeps. A record of a function that `protocol-v2.md`
-  redefines and the twin does not cover is refused.
+  redefines and the twin does not cover is refused. Before a trace under `protocol-v2.md` starts, the tracer
+  checks that everything a covered function reads from outside is accounted for (`tools/closure_v2.py`): a table
+  the twin has, a constant of the trace's nodes line, a function in the manifest's lists, a question, or a value
+  that holds no node state. A function that a covered or kept function calls must itself be covered, kept or a
+  question. `gen.py --check` holds the manifest's questions to what the code asks.
 
 ## The record
 
