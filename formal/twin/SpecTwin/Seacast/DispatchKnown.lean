@@ -56,6 +56,20 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
 #guard failsWith "header: a document this replay does not read: v3" (headerForm (Json.mkObj (args ["--doc", "v3"])))
 #guard failsWith "header: args is not a list of strings: null" (headerForm (Json.mkObj [("args", Json.null)]))
 #guard failsWith "header: args is not a list of strings: [42]" (headerForm (Json.mkObj [("args", Json.arr #[jn 42])]))
+-- the values of --doc before v0.12.0, as the headers of traces written then hold them: the same documents
+#guard formIs (headerForm (Json.mkObj (args ["--doc", "v2"]))) .v2
+#guard formIs (headerForm (Json.mkObj (args ["--doc=v2"]))) .v2
+#guard formIs (headerForm (Json.mkObj (args ["--doc", "v03"]))) .v1
+#guard formIs (headerForm (Json.mkObj (args ["--doc=v03"]))) .v1
+-- the document word of each header argument list, old values and new, the first --doc of a doubled one; trace3.py's
+-- doc_of reads the same table the same way (OLD_DOCS)
+#guard docOf [] == none
+#guard docOf ["--doc", "v03"] == some "lite" && docOf ["--doc", "lite"] == some "lite"
+#guard docOf ["--doc", "v2"] == some "seacast" && docOf ["--doc", "seacast"] == some "seacast"
+#guard docOf ["--doc=v2"] == some "seacast" && docOf ["--doc=v03"] == some "lite"
+#guard docOf ["--doc", "v3"] == some "v3"
+#guard docOf ["--doc", "v2", "--doc", "v03"] == some "seacast" && docOf ["--doc", "seacast", "--doc", "lite"] == some "seacast"
+#guard docOf ["--doc", "v03", "--doc", "v2"] == some "lite"
 #guard (readHeader (hdSeacast traced43 [("args", strs ["--doc", "v3"])]) none).failures.head?
   == some "header: a document this replay does not read: v3"
 

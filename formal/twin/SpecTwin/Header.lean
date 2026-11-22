@@ -92,11 +92,12 @@ def nodesLine (j : Json) : Except String (List (Nat × Consts × List String)) :
 /-! ## The header, by its document -/
 
 /-- The header's document, from its arguments (`argsOf`, a list of strings where present) as the tracer reads them
-(`docOf`, as `rowReadsOf` reads them): none, or `v03`, is `seacast-lite.md`; `v2` is `seacast.md`. The toy's parser
-takes those two words alone. -/
+(`docOf`, as `rowReadsOf` reads them): none, or `lite`, is `seacast-lite.md`; `seacast` is `seacast.md`. The toy's
+parser takes those two words alone. A header written before v0.12.0 names them `v03` and `v2`, which `docOf` reads
+as the new words. -/
 def headerForm (hd : Json) : Except String Form := do
   match docOf (← argsOf hd) with
-  | none | some "v03" => return .v1
+  | none | some "lite" => return .v1
   | some "seacast" => return .v2
   | some d => throw s!"header: a document this replay does not read: {d}"
 

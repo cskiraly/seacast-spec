@@ -480,11 +480,19 @@ def argsOf (hd : Json) : Except String (List String) :=
       | .str s => .ok s
       | _ => .error bad
 
-/-- The document a trace's arguments name, read from the words as the tracer reads them: `--doc D` or `--doc=D`,
-the first of them; none for seacast-lite.md. -/
+/-- The values of `--doc` before v0.12.0, as the headers of traces written then hold them, each with the value that
+names the same document since: trace3.py's `OLD_DOCS`. -/
+def oldDocs : List (String × String) := [("v2", "seacast"), ("v03", "lite")]
+
+/-- A document word as v0.12.0 names it: an old value is read as its new one, any other word as it is. -/
+def docAlias (d : String) : String := (List.lookup d oldDocs).getD d
+
+/-- The document a trace's arguments name, read from the words as the tracer reads them (trace3.py's `doc_of`):
+`--doc D` or `--doc=D`, the first of them, with an old value read as its new one (`docAlias`); none for
+seacast-lite.md. `headerForm` and `rowReadsOf` both read a header's document here. -/
 def docOf : List String → Option String
-  | "--doc" :: d :: _ => some d
-  | a :: rest => if a.startsWith "--doc=" then some (a.drop 6).toString else docOf rest
+  | "--doc" :: d :: _ => some (docAlias d)
+  | a :: rest => if a.startsWith "--doc=" then some (docAlias (a.drop 6).toString) else docOf rest
   | [] => none
 
 /-- The tables that keep their rows: the only list a header's `row_reads` may give. -/
