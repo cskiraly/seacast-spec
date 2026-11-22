@@ -47,7 +47,7 @@ def decodeRow (c : String) : Json := parse s!"[\"decode\", [\"row\", {gq}, null]
 def decodeAsk (c : String) : Except String Json := do
   let row := decodeRow c
   let .ok (.arr args) := row.getArrVal? 1 | throw "no arguments"
-  FormsRows.onTape [row] (← FormsRows.askOf "decode" args)
+  FormsRows.onTape [row] (← FormsRows.askOf "decode" args Json.null)   -- the answer is an order's alone
 
 #guard isNarrow (decodeAsk chunk6)
 #guard (decodeAsk chunk3).isOk
