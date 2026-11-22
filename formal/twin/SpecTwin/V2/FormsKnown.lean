@@ -221,4 +221,83 @@ def iw (marked standing : Bool) : String := s!"[[\"iwant\", [[[{gq}, 3], {standi
 #guard refusedWith "under protocol-v2.md an IDONTWANT's bitmap is a holding: "
   (msgIn s!"[[\"idontwant\", [[\"bits\", {gq}, 5]]]]" .v2)
 
+/-! ## A question's timer notes
+
+The rows are the tracer's own cases, as it writes them, with its self-test's stub question named `wake` here (a
+question the replay reads, whose answer is none). Group `g6` is `bytes(range(32))`. The delays are 0.25, 0.75, and
+0.625 (a jittered start, `CHECK_TIME` 0.5 plus 0.125). -/
+
+/-- A tape item read under the document `f`, with its notes, or none. -/
+def notesIn (s : String) (f : Form := .v2) : Except String (List Note) := do
+  let (_, log) ← tapeItem (← Json.parse s) (if f == .v2 then docV2 else {})
+  return (log.map (·.timers)).getD []
+
+def g6 : String := "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
+def w25 : UInt64 := 4598175219545276416
+def w75 : UInt64 := 4604930618986332160
+def w625 : UInt64 := 4603804719079489536
+#guard Float.ofBits w25 == 0.25 && Float.ofBits w75 == 0.75 && Float.ofBits w625 == 0.625
+
+/-- A question with the log `{"cr": [], "cw": [], "timers": ns}`, and with a log of its own. -/
+def noted (ns : String) : String := "[\"wake\",[7],null,{\"cr\":[],\"cw\":[],\"timers\":" ++ ns ++ "}]"
+def loggedWith (log : String) : String := "[\"wake\",[7],null," ++ log ++ "]"
+def retry3 : String := s!"[\"after\",{w25},\"retry_offer\",[[\"{g6}\",3]]]"
+
+-- one `after` in a question: one note, with the delay's word, the target and the arguments read
+#guard readsAs (notesIn (noted s!"[{retry3}]")) [{ delay := w25, timer := .v1 (.retryOffer (.want g6 3)) }]
+-- two, in the order armed
+#guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\",[[\"{g6}\",5]]],[\"after\",{w75},\"ask_parked\",[[\"{g6}\",2]]]]"))
+  [{ delay := w25, timer := .v1 (.retryOffer (.want g6 5)) }, { delay := w75, timer := .v1 (.askParked (.want g6 2)) }]
+-- a jittered start of decode_group
+#guard readsAs (notesIn (noted s!"[[\"start\",{w625},\"decode_group\",[\"{g6}\"]]]")) [{ delay := w625, timer := .start g6 }]
+-- §6.1's two others, and the toy callback
+#guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"promise_due\",[[\"{g6}\",3],2,{w75}]]]"))
+  [{ delay := w25, timer := .v1 (.promiseDue (.want g6 3) 2 0.75) }]
+#guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"window_timeout\",[[2,\"{g6}\",3],{w75}]]]"))
+  [{ delay := w25, timer := .v1 (.windowTimeout (2, g6, 3) 0.75) }]
+#guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"Node._alarm.<locals>.alarm_due\",[\"{g6}\",3,2,{w75}]]]"))
+  [{ delay := w25, timer := .alarmDue g6 3 2 0.75 }]
+-- notes beside what the question read and wrote
+#guard readsAs (notesIn (loggedWith s!"\{\"cr\":[],\"cw\":[],\"timers\":[{retry3}]}")) [{ delay := w25, timer := .v1 (.retryOffer (.want g6 3)) }]
+-- a question with no notes reads none, as before
+#guard readsAs (notesIn "[\"wake\",[7],null]") []
+
+/-- v2's three, as the record's own `after` writes them (`timerV2Json`'s form), and the same target and arguments in
+a note: the note reads them into the timer whose `timerV2Json` is that target and those arguments, so that an entry
+and a note write a timer with one codec. -/
+def v2Args : List (String × String) :=
+  [("reconsider", s!"[\"{g6}\",4609434218613702656]"), ("ask_sample", s!"[\"{g6}\",3]"),
+   ("resample", s!"[\"{g6}\",3,9,true]")]
+#guard v2Args.all fun (t, xs) =>
+  match Json.parse xs, (do noteOf (← Json.parse s!"[\"after\",{w25},\"{t}\",{xs}]") : Except String Note) with
+  | .ok x, .ok { timer := .v2 tv, .. } => (timerV2Json tv).1 == t && (timerV2Json tv).2.compress == x.compress
+  | _, _ => false
+#guard v2Args.all fun (t, xs) =>
+  (do tapeItem (← Json.parse s!"[\"after\",[{w25},\"{t}\",{xs}],null]") docV2 : Except String TapeItem) matches .ok _
+-- §6.1's timers as a record's own entry, read by the same codec as before
+#guard match (do entry (← Json.parse s!"[\"after\",[{w25},\"retry_offer\",[[\"{g6}\",3]]],null]") : Except String Entry) with
+  | .ok (.after d (.retryOffer k)) => d == w25 && k == .want g6 3
+  | _ => false
+#guard refusedWith "not a timer of §6.1: " (entry (Json.arr #[.str "after", Json.arr #[(w25.toNat : Json), .str "flush", Json.arr #[]], .null]))
+
+-- refused, each with its words
+#guard refusedWith "timers under protocol.md, whose tracer writes none: " (notesIn (noted s!"[{retry3}]") .v1)
+#guard refusedWith "timers: not a list of notes: " (notesIn (noted s!"\{\"r\":{retry3}}"))
+#guard refusedWith "timers: an empty list, which the tracer does not write: " (notesIn (noted "[]"))
+#guard refusedWith "a timer note is [kind, delay, target, args]: " (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\"]]"))
+#guard refusedWith "a timer note's kind is after or start: " (notesIn (noted s!"[[\"later\",{w25},\"retry_offer\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's delay is a 64-bit word: " (notesIn (noted s!"[[\"after\",-1,\"retry_offer\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's delay is a 64-bit word: " (notesIn (noted s!"[[\"after\",0.25,\"retry_offer\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's target is not one an after arms: " (notesIn (noted s!"[[\"after\",{w25},\"flush\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's target is not one an after arms: " (notesIn (noted s!"[[\"after\",{w25},\"decode_group\",[\"{g6}\"]]]"))
+#guard refusedWith "a timer note's target is not one a start arms: " (notesIn (noted s!"[[\"start\",{w25},\"reconsider\",[\"{g6}\",{w75}]]]"))
+#guard refusedWith "a timer note's arguments are not retry_offer's: " (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\",[[\"{g6}\",3],[\"{g6}\",4]]]]"))
+#guard refusedWith "a timer note's arguments are not retry_offer's: " (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\",\"x\"]]"))
+#guard refusedWith "a timer note's arguments are not retry_offer's: " (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\",[[\"zz\",3]]]]"))
+#guard refusedWith "a timer note's arguments are not ask_sample's: " (notesIn (noted s!"[[\"after\",{w25},\"ask_sample\",[\"{g6}\",3,2]]]"))
+#guard refusedWith "a timer note's arguments are not decode_group's: " (notesIn (noted s!"[[\"start\",{w625},\"decode_group\",[\"{g6}\",1]]]"))
+#guard refusedWith "a call's log with a member other than cr, cw and timers: "
+  (notesIn (loggedWith s!"\{\"cr\":[],\"cw\":[],\"timers\":[{retry3}],\"foo\":1}"))
+#guard refusedWith "a call's log that is empty: " (notesIn (loggedWith "{\"cr\":[],\"cw\":[]}"))
+
 end SpecTwin.V2.FormsKnown

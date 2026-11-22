@@ -1,5 +1,6 @@
 import Lean.Data.Json
 import SpecTwin.Basic
+import SpecTwin.V2.Basic
 
 /-! # What the replay's reading of a record starts from
 
@@ -381,5 +382,85 @@ def haveEntry (j : Json) (f : Form := .v1) : Except String HaveEntry := do
     let #[b, t, .bool ca, .bool c] ← j.getArr?
       | throw s!"not an entry of peer_has under protocol-v2.md, [bits, ttl, claim_all, complete]: {j.compress}"
     return { bits := ← nat b, ttl := ← nat t, claimAll := ca, complete := c }
+
+/-! ### Timers, by their target and arguments: a record's own `after`, and a question's notes -/
+
+/-- §6.1's timers by their target and arguments, as the record's own `after` writes them (the tracer's
+`after_args`). An entry and a note read them with this one codec. -/
+def timerV1Of : String → Array Json → Option (Except String Timer)
+  | "retry_offer", #[a] => some do return .retryOffer (← key a)
+  | "ask_parked", #[a] => some do return .askParked (← key a)
+  | "promise_due", #[a, p, t] => some do return .promiseDue (← key a) (← nat p) (Float.ofBits (← bits64 t))
+  | "window_timeout", #[k, t] => some do return .windowTimeout (← sendKey k) (Float.ofBits (← bits64 t))
+  | _, _ => none
+
+/-- v2's three timers by their target and arguments, in `timerV2Json`'s form: `reconsider [g, at]`,
+`ask_sample [g, i]` and `resample [g, i, q, first]`, with a time as its word. `ask_sample` takes two arguments. -/
+def timerV2Of : String → Array Json → Option (Except String V2.TimerV2)
+  | "reconsider", #[g, t] => some do return .reconsider (← groupKey g) (Float.ofBits (← bits64 t))
+  | "ask_sample", #[g, i] => some do return .askSample (← groupKey g) (← nat i)
+  | "resample", #[g, i, q, f] => some do return .resample (← groupKey g) (← nat i) (← nat q) (← boolOf f)
+  | _, _ => none
+
+/-- The targets an `after` in a note may name: §6.1's four and v2's three. -/
+def timerTargetsV1 : List String := ["retry_offer", "ask_parked", "promise_due", "window_timeout"]
+def timerTargetsV2 : List String := ["reconsider", "ask_sample", "resample"]
+
+/-- The one toy callback a note may name, by its qualified name: the timer that `--alarm-wait`'s `filter_entry`
+arms. -/
+def alarmDue : String := "Node._alarm.<locals>.alarm_due"
+
+/-- What a timer that a question armed runs: one of §6.1's timers, one of v2's three, the toy callback
+`alarm_due (g, i, q, at)`, or `decode_group (g)` by a `start`. -/
+inductive NoteTimer where
+  | v1 (t : Timer)
+  | v2 (t : V2.TimerV2)
+  | alarmDue (g : Group) (i : Nat) (q : Peer) (at_ : Float)
+  | start (g : Group)
+  deriving BEq, Repr
+
+/-- A timer note: the delay handed to the simulator, as its word, and what the timer runs. -/
+structure Note where
+  delay : UInt64
+  timer : NoteTimer
+  deriving BEq, Repr
+
+/-- A note's arguments, read by the target's reader: a list, of the target's form, or refused naming the target. -/
+def noteArgs {α} (name : String) (xs : Json) (p : Array Json → Option (Except String α)) : Except String α := do
+  let bad : Except String α := throw s!"a timer note's arguments are not {name}'s: {xs.compress}"
+  let .arr as := xs | bad
+  match p as with
+  | some r => tryCatch r fun _ => bad
+  | none => bad
+
+/-- A timer note, `[kind, delay, target, args]`: an `after` of §6.1's four, of v2's three or of the toy
+callback, or a `start` of `decode_group`. The delay is a float's word, and the arguments are in the codec of the
+record's own `after`. -/
+def noteOf (n : Json) : Except String Note := do
+  let .arr #[k, d, f, xs] := n | throw s!"a timer note is [kind, delay, target, args]: {n.compress}"
+  let delay ← tryCatch (bits64 d) fun _ => throw s!"a timer note's delay is a 64-bit word: {n.compress}"
+  match k, f with
+  | .str "after", .str t =>
+    if timerTargetsV1.contains t then return { delay, timer := .v1 (← noteArgs t xs (timerV1Of t)) }
+    if timerTargetsV2.contains t then return { delay, timer := .v2 (← noteArgs t xs (timerV2Of t)) }
+    if t == alarmDue then
+      return { delay, timer := ← noteArgs t xs fun
+        | #[g, i, q, a] => some do return .alarmDue (← groupKey g) (← nat i) (← nat q) (Float.ofBits (← bits64 a))
+        | _ => none }
+    throw s!"a timer note's target is not one an after arms: {f.compress}"
+  | .str "start", .str "decode_group" =>
+    return { delay, timer := ← noteArgs "decode_group" xs fun
+      | #[g] => some do return .start (← groupKey g)
+      | _ => none }
+  | .str "start", _ => throw s!"a timer note's target is not one a start arms: {f.compress}"
+  | .str "after", _ => throw s!"a timer note's target is not one an after arms: {f.compress}"
+  | _, _ => throw s!"a timer note's kind is after or start: {n.compress}"
+
+/-- A question's `timers`: its notes in the order armed. The list is never empty, since the tracer writes the
+member only where the question armed a timer. -/
+def notesOf (t : Json) : Except String (List Note) := do
+  let .arr xs := t | throw s!"timers: not a list of notes: {t.compress}"
+  if xs.isEmpty then throw s!"timers: an empty list, which the tracer does not write: {t.compress}"
+  xs.toList.mapM noteOf
 
 end SpecTwin.Replay

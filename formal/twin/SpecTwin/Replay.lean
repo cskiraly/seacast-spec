@@ -103,6 +103,7 @@ a read, with their values then; `cw`, the ones it wrote, with their values at it
 structure CallLog where
   cr : List (Cell × Option Val)
   cw : List (Cell × Option Val)
+  timers : List Note := []                -- the timers it armed, in order (protocol-v2.md only)
   deriving Repr
 
 /-- One item of a record's tape: an entry, and, for a call that touched the twin's tables, what it did to them. -/
@@ -353,12 +354,9 @@ def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
   | "pop_owed_answer", #[p] => return .popOwedAnswer (← nat p) (← chunkF r)
   | "after", #[d, .str f, xs] =>
     if r != .null then throw s!"after returns nothing: {j.compress}"
-    match f, ← xs.getArr? with
-    | "retry_offer", #[a] => return .after (← bits64 d) (.retryOffer (← key a))
-    | "ask_parked", #[a] => return .after (← bits64 d) (.askParked (← key a))
-    | "promise_due", #[a, p, t] => return .after (← bits64 d) (.promiseDue (← key a) (← nat p) (Float.ofBits (← bits64 t)))
-    | "window_timeout", #[k, t] => return .after (← bits64 d) (.windowTimeout (← sendKey k) (Float.ofBits (← bits64 t)))
-    | _, _ => throw s!"not a timer of §6.1: {j.compress}"
+    match timerV1Of f (← xs.getArr?) with
+    | some t => return .after (← bits64 d) (← t)
+    | none => throw s!"not a timer of §6.1: {j.compress}"
   | name, as =>
     if r != .null then throw s!"{name} returns nothing: {j.compress}"
     match name, as with
@@ -370,8 +368,9 @@ def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
     | "release", #[p, f] => return .release (← nat p) (← chunkF f)
     | _, _ => throw s!"not a question of the block: {j.compress}"
 
-/-- A tape's item: an entry, and fourth and last, for a call that touched the twin's tables, `{"cr": [...], "cw": [...]}`.
-A call's entry is its name, its arguments and its answer; the log is a fourth member, never the answer. -/
+/-- A tape's item: an entry, and fourth and last, for a call that touched the twin's tables or armed a timer,
+`{"cr": [...], "cw": [...]}`, with `"timers": [note, ...]` where it armed one (protocol-v2.md only). A call's
+entry is its name, its arguments and its answer; the log is a fourth member, never the answer. -/
 def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
   let a ← j.getArr?
   match (if a.size == 4 then a.back? else none) with
@@ -379,11 +378,17 @@ def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
     let some cr := field o "cr" | throw s!"a call's log without cr: {j.compress}"
     let some cw := field o "cw" | throw s!"a call's log without cw: {j.compress}"
     if let .ok kvs := o.getObj? then
-      if kvs.size != 2 then throw s!"a call's log with more than cr and cw: {j.compress}"
+      if kvs.keys.any (!["cr", "cw", "timers"].contains ·) then
+        throw s!"a call's log with a member other than cr, cw and timers: {j.compress}"
+    let timers ← match field o "timers" with
+      | none => pure []
+      | some t =>
+        if doc.form != .v2 then throw s!"timers under protocol.md, whose tracer writes none: {j.compress}"
+        notesOf t
     let cr ← cells "cr" cr doc.form
     let cw ← cells "cw" cw doc.form
-    if cr.isEmpty && cw.isEmpty then throw s!"a call's log that is empty: {j.compress}"
-    return (← entry (.arr a.pop) doc, some { cr, cw })
+    if cr.isEmpty && cw.isEmpty && timers.isEmpty then throw s!"a call's log that is empty: {j.compress}"
+    return (← entry (.arr a.pop) doc, some { cr, cw, timers })
   | _ => return (← entry j doc, none)
 
 def recordFields : List String :=
