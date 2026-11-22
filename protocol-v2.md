@@ -489,6 +489,7 @@ sent_to: Dict[PeerId, Dict[GroupId, Bitmap]]          # [c12]
 served: Dict[PeerId, Dict[GroupId, int]]              # new: chunks answered (R6)
 served_hb: Dict[PeerId, int]                          # new: answers to p this heartbeat that SERVE_BUDGET counts (§4.5)
 offered_to: Dict[PeerId, Dict[GroupId, Bitmap]]       # new: what we offered p, whose asks the budget does not count
+want_p: Dict[PeerId, Dict[GroupId, Bitmap]]           # new: a DECLARED peer's interest, from its WANTs (§1.2, §4.5)
 promises: Dict[Tuple[Ask, PeerId], float]             # protocol.md §6.1, unchanged
 offers: Dict[Ask, List[PeerId]]
 tried: Dict[Ask, Dict[PeerId, float]]
