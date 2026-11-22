@@ -22,7 +22,8 @@ peer's limit of unknown groups (no offer recorded, the next id taken), each grou
 probability 0.15, drawn from a stream of its own so that every other draw is as without it. The order shows: an
 id of a refused group that reached `expired` and is expired asks no `admitted` (counted from `expired`'s calls,
 which are the scenario's), nor does an id entry of a refused group drawn held, and one call can be refused by
-`admitted` for two ids or more. The counts of these kinds, per call, are printed.
+`admitted` twice or more (an id drawn twice, refused each time, counts twice). The counts of these kinds, per call,
+are printed.
 
 As directed61.py's, the states are drawn without the document's invariants (its docstring lists what that
 allows for §6.1's tables). For the other tables: held_back may hold an ask for a chunk whose group is not
@@ -263,7 +264,7 @@ def main(argv):
             if refusals:
                 order["admitted false for an id"] += 1
             if len(refusals) >= 2:
-                order["admitted false for two ids or more"] += 1
+                order["admitted false twice or more (an id drawn twice counts twice)"] += 1
             # (a full id is expanded only where valid_id holds: this counts the entries drawn so, not the ids that
             # reached held)
             if any(isinstance(e, bytes) and len(e) == 56 and e[:32] in sc.refused and e not in sc.asked

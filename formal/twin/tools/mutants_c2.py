@@ -1103,40 +1103,69 @@ RESTATED_C = {"guard-more-than-r": "open", "guard-no-grace": "open", "guard-empt
               "guard-at-the-grace": "no", "choose-id-not-compared": "no"}
 for _k, _v in RESTATED_C.items():
     PRED[_k]["C"] = _v
-# Six of PARTG's rows, in part restated after their mutants were run and the commit was read (the rows keep what was
+# PARTG's rows, in part restated after their mutants were run and the commit was read (the rows keep what was
 # predicted first):
 # - the H and C columns of two. As first written, only a held id, an expired group's entry or a refusal told them.
 #   Each asks out of the tape's order, though: admitted before expired, or listed (add_offer's read of the offer
 #   table) before admitted. So an IHAVE whose id reaches admitted tells the first: hand5's on_frame record with an
 #   IHAVE of a chunk not held among them, and a cell's, as for ihave-admitted-not-asked. An admitted id for which
 #   add_offer reads listed (the peer not yet in the id's list) tells the second, as hand5's does.
-# - the why and the witness of four more, where they said more than the code does. on_have's two questions are in
-#   the other order only where both are asked, though every HAVE past expired differs at the first; holders is
-#   written only for a new bit; add_offer sets the peer's offered bit always but appends to offers only within its
-#   limits, and an ask follows only past the guards after it.
+# - the why of three, where it said more than the code does: on_have's two questions are in the other order only
+#   where both are asked, though every HAVE past expired differs at the first; add_offer sets the peer's offered bit
+#   always but appends to offers only within its limits, and an ask follows only past the guards after it.
+# - the witness of all seven.
+def _told(trace, record, diff):
+    return f"{trace}, the first record the replay told ({record}): its difference begins `{diff}`"
+
+
+_G2 = '"2222222222222222222222222222222222222222222222222222222222222222"'
+_G5 = '"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6"'
+_LISTED_H5 = _told("hand5", "node 2 at 3.096190, on_frame",
+                   "tape: listed(4) asked, SpecTwin.Replay.Entry.admitted   4   (SpecTwin.Admit.offer "
+                   f"(SpecTwin.Key.want {_G5} 0))")
+_LISTED_D44 = _told("directed44", "node 2 at 0.500000, on_ihave",
+                    "tape: listed(1) asked, SpecTwin.Replay.Entry.admitted   1   (SpecTwin.Admit.offer "
+                    "(SpecTwin.Key.want")
 RESTATED_G = {
-    "ihave-admitted-before-held": {"H": "yes", "C": "yes"},
+    "ihave-admitted-before-held": {
+        "H": "yes", "C": "yes",
+        "witness": "; ".join([
+            _told("directed44", "node 2 at 0.500000, on_ihave",
+                  "tape: admitted(1, SpecTwin.Admit.offer (SpecTwin.Key.want"),
+            _told("hand5", "node 2 at 3.096190, on_frame",
+                  f"tape: admitted(4, SpecTwin.Admit.offer (SpecTwin.Key.want {_G5} 0)) asked, "
+                  "SpecTwin.Replay.Entry.expired")])},
     "ihave-offer-before-admitted": {
         "H": "yes", "C": "yes",
         "why": "an id of a refused group still enters the offer tables (offered always, offers within its limits), "
                "though it is never asked for",
-        "witness": "directed44, an on_ihave record whose tape answers admitted false for an id: the writes (offered, "
-                   "and offers where the list has room); hand5, an on_frame record with an IHAVE of a chunk not held "
-                   "whose peer add_offer reads listed for: the tape (listed asked before admitted)"},
+        "witness": "; ".join([_LISTED_D44, _LISTED_H5])},
+    "have-admitted-not-asked": {
+        "witness": "; ".join([
+            _told("directed43", "node 2 at 1.000000, on_have",
+                  "tape: the toy asked more: [(SpecTwin.Replay.Entry.admitted     55     (SpecTwin.Admit.bitmap "
+                  f"{_G2} 39)     true,   none)]"),
+            _told("hand5", "node 5 at 3.008970, on_frame",
+                  "tape: the toy asked more: [(SpecTwin.Replay.Entry.admitted     1     (SpecTwin.Admit.bitmap "
+                  f"{_G5} 1)     true,")])},
     "have-admitted-before-valid": {
         "why": "a malformed HAVE of a refused group goes unpenalised, and every HAVE past expired asks admitted where "
                "valid_have is asked first (the two in the other order where both are asked)",
-        "witness": "directed43, an on_have record past expired: the tape's first difference, admitted asked where "
-                   "valid_have is; of the kind \"a refused group's HAVE, not valid\": the tape (penalise not asked)"},
+        "witness": "; ".join([
+            _told("directed43", "node 2 at 1.000000, on_have",
+                  f"tape: admitted(55, SpecTwin.Admit.bitmap {_G2} 39) asked, SpecTwin.Replay.Entry.validHave"),
+            _told("hand5", "node 5 at 3.008970, on_frame",
+                  f"tape: admitted(1, SpecTwin.Admit.bitmap {_G5} 1) asked, SpecTwin.Replay.Entry.validHave")])},
     "have-not-admitted-taken": {
-        "witness": "directed43, an on_have record whose tape answers admitted false: the writes (peer_has's entry, and "
-                   "holders where the HAVE brings a new bit)"},
+        "witness": _told("directed43", "node 2 at 1.000000, on_have",
+                         "reached: the twin entered [on_have, window_release], the record has [on_have]")},
     "ihave-admitted-not-asked": {
         "why": "an offer of a group beyond the peer's limit of unknown groups is recorded (offered always, offers "
-               "within its limits), and asked for where the guards after add_offer let it through"},
+               "within its limits), and asked for where the guards after add_offer let it through",
+        "witness": "; ".join([_LISTED_D44, _LISTED_H5])},
     "ihave-not-admitted-taken": {
-        "witness": "directed44, an on_ihave record whose tape answers admitted false for an id: the writes (offered, "
-                   "and offers where the list has room) and, past the guards after add_offer, the asks returned"},
+        "witness": _told("directed44", "node 2 at 7.000000, on_ihave",
+                         f"tape: listed(5) asked, SpecTwin.Replay.Entry.expired {_G2} false logged")},
 }
 for _k, _v in RESTATED_G.items():
     PRED[_k].update(_v)
