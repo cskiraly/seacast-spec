@@ -524,10 +524,16 @@ are the harness's indices plus one.
 With `--topology` (or `--xcheck` alone) the toy prints, after each message, the harness's own
 `xcheck` line per population: what the nodes sent, counted at the sender's transmit after the
 writer's filter (where the harness counts at the stream write), what they received, and the
-invariants the document's rules imply, each a count that must be zero:
+invariants the document's rules imply, each a count that must be zero, but for `budget` where repair
+pushes:
 
-- `budget`: a forwarding node that pushed one chunk more often than its push degree;
-- `window`: a node with more slots in flight than `W`;
+- `budget`: a forwarding node that sent one chunk unasked more often than its push degree. Like the
+  harness's line, it counts every copy sent unasked, so the copies of a rebuilt chunk that repair
+  pushes count too. Repair sends a rebuilt chunk to every peer short of K, with no push-degree bound
+  (`protocol.md`'s rule, and `protocol-v2.md`'s with `REPAIR_BUDGET` off), so a count from it breaks
+  no rule;
+- `window`: a node with more room in flight than its window: `W` slots under `protocol.md`, `W_BYTES`
+  bytes under `protocol-v2.md` (§4.11 there);
 - `overlap`: an ask for a chunk decided while an earlier ask for it is open (inside `IWANT_WINDOW`, not
   yet held), timed at `may_ask`, where the harness's request ledger times its asks too;
 - `late`: a chunk sent to a mesh peer whose HAVE for it (in an IDONTWANT, the only carrier that feeds
