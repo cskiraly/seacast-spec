@@ -2,7 +2,7 @@ import SpecTwin.Seacast.Replay
 
 /-! # SEACAST's replay: its known answer
 
-The replay's known answer, written before `V2/Replay.lean`.
+The replay's known answer, written before `Seacast/Replay.lean`.
 Each record is a JSON line in the tracer's form, read by `Replay.record` with seacast.md's reading (`docSeacast`)
 and replayed by `runSeacast`, with the node's constants built here. A case passes where `runSeacast` returns a "fewer"
 count of 0, and fails where its error starts with the quoted prefix (and, for the order entry, holds the quoted words). A

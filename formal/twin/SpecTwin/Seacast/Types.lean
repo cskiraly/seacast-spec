@@ -14,7 +14,7 @@ negative HAVE in places, but no run makes one. -/
 namespace SpecTwin.Seacast
 
 /-- A bitmap that can be complemented: a Python int (`Bits.v`), negative where it holds every index but finitely
-many. Its operations are in `V2/Basic.lean`. -/
+many. Its operations are in `Seacast/Basic.lean`. -/
 abbrev IBits := Int
 
 /-- An object type, by its id (`"payload"`, `"column"`, `"row"` in the toy): two types are equal where their ids

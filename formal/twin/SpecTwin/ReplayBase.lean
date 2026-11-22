@@ -30,11 +30,11 @@ inductive Val where
   | int (n : Int)                         -- a signed count, not zero (the window's `in_flight`)
   | ids (l : List Hex)                    -- a set of opaque ids as hex, sorted (`unwanted[p]`)
   -- seacast.md's (tools/gen/schema_seacast.py)
-  | typeId (t : V2.TypeId)                -- an object type's id (`T_of`)
-  | ibits (b : V2.IBits)                  -- a bitmap that can be complemented (`interest`, `want_p`); 0 is a value
-  | join (m : V2.Join)                    -- a JOIN (`join_recv`, `join_sent`)
+  | typeId (t : Seacast.TypeId)                -- an object type's id (`T_of`)
+  | ibits (b : Seacast.IBits)                  -- a bitmap that can be complemented (`interest`, `want_p`); 0 is a value
+  | join (m : Seacast.Join)                    -- a JOIN (`join_recv`, `join_sent`)
   | colours (l : List Nat)                -- a set of colours, sorted; empty is no value
-  | relations (l : List V2.Relation)      -- relation messages in order (`owed_relations`); empty is no value
+  | relations (l : List Seacast.Relation)      -- relation messages in order (`owed_relations`); empty is no value
   | verdict (v : Option Bool)             -- `probe_ok`'s verdict: true, false, or a stored None
   | indices (l : List Nat)                -- indices in order (`rsample`); empty is no value
   | gis (l : List GI)                     -- groups and indices in order (`held_samples`); empty is no value
@@ -227,7 +227,7 @@ def intOf (j : Json) : Except String Int := do
 /-! ### seacast.md's keys and values, in the forms the tracer writes -/
 
 /-- An object type's id: its string, as the toy names it (`"payload"`, `"column"`, `"row"`), not empty. -/
-def typeId (j : Json) : Except String V2.TypeId := do
+def typeId (j : Json) : Except String Seacast.TypeId := do
   let .str s := j | throw s!"not a type id: {j.compress}"
   if s.isEmpty then throw "not a type id: the empty string"
   return s
@@ -240,7 +240,7 @@ def boolOf (j : Json) : Except String Bool := do
   return b
 
 /-- A direction, as the toy's string: `"OUT"`, `"IN"` or `"BOTH"`. -/
-def direction (j : Json) : Except String V2.Direction :=
+def direction (j : Json) : Except String Seacast.Direction :=
   match j with
   | .str "OUT" => pure .outward
   | .str "IN" => pure .inward
@@ -252,28 +252,28 @@ def colourDir (j : Json) : Except String ColourDir := do
   let #[c, d] ← j.getArr? | throw s!"not a colour and a direction: {j.compress}"
   return (← nat c, ← direction d)
 
-def interestKind (j : Json) : Except String V2.InterestKind :=
+def interestKind (j : Json) : Except String Seacast.InterestKind :=
   match j with
   | .str "ALL" => pure .all
   | .str "DERIVED" => pure .derived
   | .str "DECLARED" => pure .declared
   | _ => throw s!"not an interest: {j.compress}"
 
-def duty (j : Json) : Except String V2.Duty :=
+def duty (j : Json) : Except String Seacast.Duty :=
   match j with
   | .str "FORWARD" => pure .forward
   | .str "NONE" => pure .none
   | _ => throw s!"not a duty: {j.compress}"
 
 /-- A JOIN: `["join", T, interest, custody_count, duty, colours]`. -/
-def joinMsg (j : Json) : Except String V2.Join := do
+def joinMsg (j : Json) : Except String Seacast.Join := do
   let #[.str "join", t, i, c, d, k] ← j.getArr? | throw s!"not a JOIN: {j.compress}"
   return { objectType := ← typeId t, interest := ← interestKind i, custodyCount := ← nat c, duty := ← duty d,
            colours := ← nat k }
 
 /-- A relation message: a JOIN, `["graft", T, family, colour, direction, answer]` or
 `["prune", T, family, colour, direction]`; a family in the signed form. -/
-def relation (j : Json) : Except String V2.Relation := do
+def relation (j : Json) : Except String Seacast.Relation := do
   match ← j.getArr? with
   | #[.str "join", _, _, _, _, _] => return .join (← joinMsg j)
   | #[.str "graft", t, f, c, d, a] =>
@@ -283,7 +283,7 @@ def relation (j : Json) : Except String V2.Relation := do
     return .prune { objectType := ← typeId t, family := ← intOf f, colour := ← nat c, direction := ← direction d }
   | _ => throw s!"not a relation message: {j.compress}"
 
-def relationList (j : Json) : Except String (List V2.Relation) := do (← arr j).mapM relation
+def relationList (j : Json) : Except String (List Seacast.Relation) := do (← arr j).mapM relation
 
 /-- `probe_ok`'s value: `true`, `false`, or `["none"]` for a stored None. -/
 def probeVerdict (j : Json) : Except String (Option Bool) :=
@@ -425,7 +425,7 @@ def timerV1Of : String → Array Json → Option (Except String Timer)
 
 /-- SEACAST's three timers by their target and arguments, in `timerV2Json`'s form: `reconsider [g, at]`,
 `ask_sample [g, i]` and `resample [g, i, q, first]`, with a time as its word. `ask_sample` takes two arguments. -/
-def timerV2Of : String → Array Json → Option (Except String V2.TimerSeacast)
+def timerV2Of : String → Array Json → Option (Except String Seacast.TimerSeacast)
   | "reconsider", #[g, t] => some do return .reconsider (← groupKey g) (Float.ofBits (← bits64 t))
   | "ask_sample", #[g, i] => some do return .askSample (← groupKey g) (← nat i)
   | "resample", #[g, i, q, f] => some do return .resample (← groupKey g) (← nat i) (← nat q) (← boolOf f)
@@ -443,7 +443,7 @@ def alarmDue : String := "Node._alarm.<locals>.alarm_due"
 `alarm_due (g, i, q, at)`, or `decode_group (g)` by a `start`. -/
 inductive NoteTimer where
   | v1 (t : Timer)
-  | v2 (t : V2.TimerSeacast)
+  | v2 (t : Seacast.TimerSeacast)
   | alarmDue (g : Group) (i : Nat) (q : Peer) (at_ : Float)
   | start (g : Group)
   deriving BEq, Repr

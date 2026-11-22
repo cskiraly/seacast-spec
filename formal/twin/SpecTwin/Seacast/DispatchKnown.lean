@@ -3,7 +3,7 @@ import SpecTwin.Seacast.ReplayKnown
 
 /-! # The dispatch by document: its known answer
 
-The readers of `Header.lean` and the route of `V2/Replay.lean`, case by case, written before them. A reader passes
+The readers of `Header.lean` and the route of `Seacast/Replay.lean`, case by case, written before them. A reader passes
 where it gives `.ok`, with the value named, and fails where its error starts with the quoted words. The header's
 cases are of `readHeader`, whose failures are the lines the replay prints. The nodes line's are of `nodesLineSeacast`
 under seacast.md and of `nodesLine` under seacast-lite.md. -/

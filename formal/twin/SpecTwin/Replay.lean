@@ -286,7 +286,7 @@ def ownKeys (t : String) (path : Array Json) (ks : Json) : Except String Entry :
   | _, _ => throw s!"not a level whose order the twin asks: {t} {(Json.arr path).compress}"
 
 /-- What reading a record takes from its trace's document. The defaults are `seacast-lite.md`'s; seacast.md's replay
-passes its own (`V2/Replay.lean`).
+passes its own (`Seacast/Replay.lean`).
 - `entry`: a reader of the document's own tape entries, asked first: `some` for an entry it reads, `none` to leave
   the entry to `entry`'s.
 - `raisesKey`: a `KeyError`'s key, as the twin's crash names it. Under `seacast-lite.md` it is a peer, a natural

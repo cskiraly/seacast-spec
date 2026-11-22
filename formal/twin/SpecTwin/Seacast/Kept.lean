@@ -17,7 +17,7 @@ builds is one a record under v2 writes in SEACAST's form: the toy has one IWANT 
 
 - The monad is `M2 m`, and `paceTurns` takes seacast-lite.md's context as `(← read).base`.
 - A function of seacast-lite.md's Lean runs through `v1`. The node's questions and the tables are called as they are.
-- A call that the Python binds late names SEACAST's function: `V2.sendGossip`, `V2.paceTurns` and `V2.onValidated`.
+- A call that the Python binds late names SEACAST's function: `Seacast.sendGossip`, `Seacast.paceTurns` and `Seacast.onValidated`.
   SEACAST's `on_validated` takes no fuel, since it does not recurse through `defer`.
 - The no-bid branch of `on_block_installed` is reached under v2, for a block of columns. There the Python calls
   `ledger(None)`: it enters `ledger`, asks the connected topic peers, and reads `offered[q][None]` for each,
@@ -29,7 +29,7 @@ namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [V2Later m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [SeacastLater m]
 
 /-- The turns of `on_pace_tick`'s loop under v2, at most `fuel`: seacast-lite.md's, with SEACAST's `send_gossip`. -/
 def paceTurns : Nat → M2 m Unit
@@ -49,13 +49,13 @@ def paceTurns : Nat → M2 m Unit
         branch "on_pace_tick: the job of a peer that left dropped"
         paceTurns fuel
       else
-        V2.sendGossip job.q job.ids
+        Seacast.sendGossip job.q job.ids
         branch "on_pace_tick: one job's gossip sent"        -- one peer per tick, even if nothing was left to send
 
 /-- `on_pace_tick()` under v2: seacast-lite.md's, with SEACAST's turns -/
 def onPaceTick : M2 m Unit := do
   enter "on_pace_tick"
-  V2.paceTurns (← paceJobs .jobs).length
+  Seacast.paceTurns (← paceJobs .jobs).length
 
 /-- `on_block_installed(root)` under v2: seacast-lite.md's, with SEACAST's `on_validated`, and its no-bid branch entering `ledger` -/
 def onBlockInstalled (root : Root) : M2 m Unit := do
@@ -65,7 +65,7 @@ def onBlockInstalled (root : Root) : M2 m Unit := do
   for (p, f) in waits do
     setPendingId (← v1 (messageId f)) false                      -- `pending_ids.discard(message_id(f))`
     release p f                                             -- the reservation goes back
-    V2.onValidated p f (← v1 (validateChunk f))          -- `on_validated(p, f, validate_chunk(f))`
+    Seacast.onValidated p f (← v1 (validateChunk f))          -- `on_validated(p, f, validate_chunk(f))`
   let g0 ← bidGroup root                                    -- the group this root's bid commits
   for (p, groups) in ← v1 (popTiedRoot root) do                  -- `for p, groups in tied.pop(root, {}).items():` the
     let _ ← tieSlot? root p                                 --   copies that waited for this root;

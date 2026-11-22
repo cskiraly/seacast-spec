@@ -8,7 +8,7 @@ when no file is named, so that a gzipped trace goes through `zcat`) through the 
 what did not, and how often each branch of the twin ran.
 
 `replay --forms FILE`: the rows of SEACAST's questions in FILE, each read and refused by the twin's readers, and the
-checker's controls (`V2/FormsRows.lean`).
+checker's controls (`Seacast/FormsRows.lean`).
 
 A trace's first line is its content line: what it was made from, each document by the sha256 of its code and each
 file of the toy and the tools by the sha256 of its bytes (`tools/content.py`). `--content FILE` gives the line the
@@ -201,7 +201,7 @@ def main (args : List String) : IO UInt32 := do
         headerOk := false
         continue
       nodesSeen := true
-      if form == .SEACAST then                -- under seacast.md: its members, and its checks, are the reader's
+      if form == .v2 then                -- under seacast.md: its members, and its checks, are the reader's
         match (do members "the nodes line" j ["nodes"] ["nodes"]; nodesLineSeacast nj whole (traced?.getD []) : Except String _) with
         | .ok l => nodesSeacast := l.foldl (fun m (n, cfg) => m.insert n cfg) nodesSeacast
         | .error e =>
@@ -235,7 +235,7 @@ def main (args : List String) : IO UInt32 := do
     if !nodesSeen then throw (IO.userError "a record before the nodes line")
     t := { t with records := t.records + 1 }
     let r ← match (do
-        let r ← record j (if form == .SEACAST then V2.docSeacast else {})   -- the values in the trace's document's forms
+        let r ← record j (if form == .v2 then Seacast.docSeacast else {})   -- the values in the trace's document's forms
         -- the line must end with the two members a subset is picked by, saying what the record says
         if tail? != some (r.reached, r.tables) then throw "its line does not end with reached and tables, as the record has them"
         -- and a call reaches only functions the tracer traced
@@ -243,7 +243,7 @@ def main (args : List String) : IO UInt32 := do
           if let some f := r.reached.find? (!tr.contains ·) then
             throw s!"reached: a function the header does not list as traced: {f}"
         -- and it is a record of a node the nodes line names
-        if !(if form == .SEACAST then nodesSeacast.contains r.n else nodes.contains r.n) then
+        if !(if form == .v2 then nodesSeacast.contains r.n else nodes.contains r.n) then
           throw s!"n: a node the nodes line does not name: {r.n}"
         pure r : Except String Record) with
       | .ok r => pure r
@@ -258,9 +258,9 @@ def main (args : List String) : IO UInt32 := do
     byFn := byFn.insert counted (byFn.getD counted 0 + 1)
     let (n, ok) := t.perFn.getD r.fn (0, 0)
     let res : Except String (Array String × Nat) ← match form with   -- by the trace's document
-      | .SEACAST => do
+      | .v2 => do
         let some cfg := nodesSeacast[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
-        pure (V2.runSeacast cfg.c cfg.c2 (fun T => cfg.types.lookup T) cfg.replaced (traced?.getD []) r rowReads)
+        pure (Seacast.runSeacast cfg.c cfg.c2 (fun T => cfg.types.lookup T) cfg.replaced (traced?.getD []) r rowReads)
       | .v1 => do
         let some (c, rp) := nodes[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
         pure (run c rp (traced?.getD []) r rowReads)

@@ -8,7 +8,7 @@ import SpecTwin.Sec72
 The twin of `fill` (§4.2, v0.11.1's text);
 §4.6's `push_rebuilt_as_source`, `push_rebuilt`, `arm`, `check_completion`, `defer_on_claim`, `reconsider`,
 `decode_group`, `claims_close` and `note_claim`; and `filter_entry`, `seacast-lite.md` §7.2's with the probe's
-lines. Each comes after every function it calls (`V2/Relations.lean`'s rule).
+lines. Each comes after every function it calls (`Seacast/Relations.lean`'s rule).
 
 - **No two of them call each other directly in a cycle:** `arm` reaches `reconsider` through a timer
   (`afterSeacast`), and `check_completion` and `reconsider` start `decode_group` through `start`, a question, as
@@ -52,12 +52,12 @@ def pushRebuiltAsSource (g2 : Group) (items : List (Nat × ChunkF)) : M2 m Unit 
     let r := (← read).base.c.R_NODE
     for q in cands.take r do                                  -- the per-chunk budget [c17]
       if ← enqueue q (.chunk f) false then
-        V2.notePush q g2 i2
+        Seacast.notePush q g2 i2
       else
         v1 (owe q g2 (1 <<< i2))                              -- refused: offered instead (v0.5)
         branch "push_rebuilt_as_source: a push refused, owed"
     for q in cands.drop r do
-      V2.announce q g2 (1 <<< i2)                             -- [c3] offered to the rest
+      Seacast.announce q g2 (1 <<< i2)                             -- [c3] offered to the rest
   branch "push_rebuilt_as_source: pushed"
 
 /-- `push_rebuilt(g, new)` (§4.6, [c10]): `seacast-lite.md` §4.6's, over each group a rebuilt chunk fills -/
@@ -96,10 +96,10 @@ def pushRebuilt (g : Group) (new : List Nat) : M2 m Unit := do
       let lacks ← NodeSeacast.shuffledPairs (items.filter fun (x, _) => !known.has x && want.has x)
       for (i2, f) in lacks.take short.toNat do                --   so that decoded neighbours differ
         if !(← param T2 "EAGER" (·.EAGER)) then
-          V2.announce q g2 (1 <<< i2)                         -- rows: offered, pulled when wanted
+          Seacast.announce q g2 (1 <<< i2)                         -- rows: offered, pulled when wanted
           continue
         if ← enqueue q (.chunk f) false then
-          V2.notePush q g2 i2
+          Seacast.notePush q g2 i2
         else
           v1 (owe q g2 (1 <<< i2))                            -- refused: offered instead (v0.5)
           branch "push_rebuilt: a push refused, owed"
@@ -422,7 +422,7 @@ def filterEntry (p : Peer) (entry : QEntry) : M2 m (Option QEntry) := do
       let skip ← if c.PROJECT && !entry.solicited then projected p f.g else pure false
       if skip then
         e := { e with chunk := none }                         -- [c12]
-        V2.unpush p f.g f.i                                   -- [c3] not made: offered instead
+        Seacast.unpush p f.g f.i                                   -- [c3] not made: offered instead
         branch "filter_entry: projected away"
       else
         setSentTo p f.g ((← sentToBits p f.g).set f.i)       -- `sent_to[p][f.group].set(f.index)`

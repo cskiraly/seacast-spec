@@ -8,7 +8,7 @@ import SpecTwin.Sec61
 /-! # seacast.md's arrivals: §4.4's `forward`, §4.2's chunk, §4.3's holding and offer
 
 The twin of `forward` (§4.4), `on_validated`, `defer` and `on_chunk` (§4.2), and `on_holding` and `on_offer`
-(§4.3). Each comes after every function it calls (`V2/Relations.lean`'s rule).
+(§4.3). Each comes after every function it calls (`Seacast/Relations.lean`'s rule).
 
 - **No recursion through `defer`.** `on_validated` calls `defer` on a `DEFER` verdict, and SEACAST's
   `defer` calls `on_validated` only on another verdict, which never calls `defer` again. So `on_validated` is
@@ -20,7 +20,7 @@ The twin of `forward` (§4.4), `on_validated`, `defer` and `on_chunk` (§4.2), a
   `over_ihave_limits` and `may_ask`. The node's helpers are `Node61`'s questions: `seen`, `accepted`,
   `mark_seen`, `live`, `admitted`, `reserve`, `penalise`, `authenticable`, `shuffled`, and
   `gossip_history.put`; `valid_have(h)` and `deferred_offers(p, h)` are `NodeSeacast`'s, with the whole holding.
-- **`window_release`** is cut at every node this cycle: `on_holding` calls it through `V2Later`.
+- **`window_release`** is cut at every node this cycle: `on_holding` calls it through `SeacastLater`.
 - **`T.project(f)`** is asked each time the Python calls it: three times in `on_validated`.
 - **`forward`'s axes** are an `Option`: none projects the chunk's own, and an empty list forwards on none. The
   Python's `None` and `[]` are two values there, and the twin keeps them apart. -/
@@ -29,7 +29,7 @@ namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [V2Later m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [SeacastLater m]
 
 /-- `forward(f, from_peer, axes)` (§4.4): pushes and offers on each axis we forward on -/
 def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit := do
@@ -67,14 +67,14 @@ def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit
     let targets ← v1 (choosePush f cands budget false)        -- seacast-lite.md §5.3 unchanged
     for q in targets do
       if ← enqueue q (.chunk f) false then
-        V2.notePush q g i                                     -- [c7, c16]
+        Seacast.notePush q g i                                     -- [c7, c16]
       else
         v1 (owe q g (1 <<< i))                                -- [c3] refused: offered instead (v0.5)
         branch "forward: a push refused, owed"
     for q in cands do
-      if !targets.contains q then V2.announce q g (1 <<< i)   -- [c3] offered instead
+      if !targets.contains q then Seacast.announce q g (1 <<< i)   -- [c3] offered instead
     for q in ← announceExtra g i do                           -- [D5] width beyond the relation
-      V2.announce q g (1 <<< i)
+      Seacast.announce q g (1 <<< i)
     branch "forward: an axis"
   if (← state? f.g) != some .invalid then gossipPut f         -- heartbeat gossip (§4.8); never a dropped group's
 
@@ -208,11 +208,11 @@ def onHolding (p : Peer) (h : Have) : M2 m Unit := do
       branch "on_holding: a claim on a link not joined"
   for i in newly.toList do
     setHolders g i ((← holdersOf g i).insert p)               -- [c9] distinct live holders
-    V2Later.windowRelease p g i                               -- [c14] a slot to p frees when p holds i
+    SeacastLater.windowRelease p g i                               -- [c14] a slot to p frees when p holds i
     if ← planned g then originAcked g i                       -- [c3, P4] a copy of i exists elsewhere (§4.7)
   -- `for i in h.bits & ~newly:` [c14] a bit p held already: a copy written to it since frees its slot
   for i in (Bits.minus h.bits newly).toList do
-    V2Later.windowRelease p g i
+    SeacastLater.windowRelease p g i
   branch (if newly == 0 then "on_holding: nothing new" else "on_holding: new indices")
 
 /-- `on_offer(p, h)` (§4.3): `seacast-lite.md` §4.4's `on_ihave` over one group's bitmap; the asks -/

@@ -20,12 +20,12 @@
 #
 # The steps, and what each must show:
 #   build     a copy of the twin's sources, built from nothing with `lake build replay SpecTwin.Seacast` (SpecTwin.Seacast for
-#             the guard modules, V2/*Known.lean, whose #guards hold only where they are built; a copy of one with a
+#             the guard modules, Seacast/*Known.lean, whose #guards hold only where they are built; a copy of one with a
 #             false #guard fails Lean, its control); twin-sources.txt: each
 #             source file of the twin, this script and record.sh by sha256 (a link among them is refused; a
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
 #             that list, and at the end of the run the sources and the copy still are; the forms of SEACAST's
-#             questions, each row of tools/forms-SEACAST-examples.tsv read and refused by `replay --forms`, with its
+#             questions, each row of tools/forms-seacast-examples.tsv read and refused by `replay --forms`, with its
 #             three controls (a copy with one wrong row fails, its control)
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names seacast.md keeps, gen/schema_seacast.py's encoders,
@@ -33,7 +33,7 @@
 #             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
 #             cites the notes beside which they were developed (labcites.py), a citation planted in
 #             README.md's copy reported
-#   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of seacast-lite.md's
+#   tables    the twin's generated files are the schema's (gen.py, makers.py); Seacast/Kept.lean's copies of seacast-lite.md's
 #             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
 #             (footprint_test.py)
 #   scope     every function seacast-lite.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
@@ -354,7 +354,7 @@ import layout
 shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns(*layout.NOT_SOURCES, "out"))
 EOF
   echo "  $(cd "$OUT/twin" && lean --version 2>&1 | head -n 1)"     # the Lean the build uses: elan resolves it by the copy's lean-toolchain
-  # SpecTwin.Seacast too: it alone imports the guard modules (V2/*Known.lean), whose #guards hold only where they are built
+  # SpecTwin.Seacast too: it alone imports the guard modules (Seacast/*Known.lean), whose #guards hold only where they are built
   (cd "$OUT/twin" && lake build replay SpecTwin.Seacast) > "$OUT/build.txt" 2>&1 || { grep -v '^✔' "$OUT/build.txt" | head -n 40; no "the build failed"; return; }
   [ -x "$REPLAY" ] || { no "the build left no replay"; return; }
   twin_list "$OUT/twin" 2> /dev/null | cmp -s - "$OUT/twin-sources.txt" || { no "the copy that was built is not the twin's sources as listed"; return; }
@@ -363,10 +363,10 @@ EOF
   local k g=()
   for k in "$OUT"/twin/SpecTwin/Seacast/*Known.lean; do
     k=$(basename "$k" .lean)
-    grep -q -E "Built SpecTwin\.V2\.$k( |\$)" "$OUT/build.txt" || { no "the guard module $k was not built (build.txt)"; return; }
+    grep -q -E "Built SpecTwin\.Seacast\.$k( |\$)" "$OUT/build.txt" || { no "the guard module $k was not built (build.txt)"; return; }
     g+=("$k")
   done
-  [ ${#g[@]} -gt 0 ] || { no "no guard module under SpecTwin/V2"; return; }
+  [ ${#g[@]} -gt 0 ] || { no "no guard module under SpecTwin/Seacast"; return; }
   echo "  the guards: ${#g[@]} modules of SpecTwin.Seacast built, each #guard held (${g[*]})"
   # its control: a copy of a guard module with a false #guard, given to Lean beside the built copy, fails
   mkdir -p "$OUT/guard-control"
@@ -376,15 +376,15 @@ EOF
     echo "  control, a false #guard in a guard module: it fails, as it must"
   else no "control, a false #guard in a guard module: NOT failed (guard-control/lean.txt)"; fi
   # the forms of SEACAST's questions: each row of the tools' file read and refused by the replay, and the checker's
-  # three controls refused (replay --forms, V2/FormsRows.lean); a file that is not there fails, it is not skipped
-  local forms="$T/forms-SEACAST-examples.tsv" rows
-  [ -f "$forms" ] || { no "no forms file (tools/forms-SEACAST-examples.tsv)"; return; }
+  # three controls refused (replay --forms, Seacast/FormsRows.lean); a file that is not there fails, it is not skipped
+  local forms="$T/forms-seacast-examples.tsv" rows
+  [ -f "$forms" ] || { no "no forms file (tools/forms-seacast-examples.tsv)"; return; }
   rows=$(grep -c . "$forms")
   "$REPLAY" --forms "$forms" > "$OUT/forms.txt" 2>&1 \
     || { grep -F 'FAIL' "$OUT/forms.txt" | head -n 10 | cut -c1-300; no "the forms: a row not read or not refused, or a control not refused (forms.txt)"; return; }
   [ "$(tail -n 1 "$OUT/forms.txt")" = "rows $rows, controls 3, failed 0" ] \
     || { no "the forms: not $rows rows and 3 controls with none failed (forms.txt)"; return; }
-  echo "  the forms: $rows rows read and refused, 3 controls refused (forms-SEACAST-examples.tsv)"
+  echo "  the forms: $rows rows read and refused, 3 controls refused (forms-seacast-examples.tsv)"
   # its control: a copy of the file with the typeOf row's answer made 5 fails, naming that row
   $PY - "$forms" "$OUT/forms-control.tsv" <<'EOF' || { no "control, a wrong row in the forms: the copy could not be made"; return; }
 import json, sys
@@ -461,7 +461,7 @@ s_tables() {
     || no "a generated file is not the schema's, or a Tables value is made elsewhere (tables.txt)"
   tail -n 1 "$OUT/tables.txt" | sed 's/^/  /'
   $PY "$T/keptcopy.py" --twin "$OUT/twin" > "$OUT/keptcopy.txt" 2>&1 \
-    || no "a copy of seacast-lite.md's Lean in V2/Kept.lean differs from its original beyond the named differences (keptcopy.txt)"
+    || no "a copy of seacast-lite.md's Lean in Seacast/Kept.lean differs from its original beyond the named differences (keptcopy.txt)"
   tail -n 1 "$OUT/keptcopy.txt" | sed 's/^/  /'
   $PY "$T/footprint_test.py" > "$OUT/views.txt" 2>&1 || no "the views' own cases (views.txt)"
   tail -n 1 "$OUT/views.txt" | sed 's/^/  /'
@@ -523,9 +523,9 @@ import manifest_seacast
 twin = Path(sys.argv[2])
 covered = list(manifest_seacast.COVERED)
 entered = set()
-for f in sorted((twin / "V2").glob("*.lean")):
+for f in sorted((twin / "Seacast").glob("*.lean")):
     entered |= set(re.findall(r'enter "([A-Za-z_0-9]+)"', f.read_text()))
-text = (twin / "V2" / "Replay.lean").read_text()
+text = (twin / "Seacast" / "Replay.lean").read_text()
 body = text[text.index("\ndef runSeacast "):]                 # runSeacast's cases, not the tape reader's
 cases = set(re.findall(r'^\s*\| "([A-Za-z_0-9]+)", #\[', body, re.M))
 FORM_ALONE = {"respond"}
@@ -578,13 +578,13 @@ def asks(files):                              # each name an askCall reads, with
                 out.setdefault(n, f"{f.relative_to(twin.parent)}:{k}")
     return out
 asked = asks(sorted(twin.rglob("*.lean")))
-entries = set(CASE.findall(body(twin / "Replay.lean", "entry"))) | set(CASE.findall(body(twin / "V2" / "Replay.lean", "entrySeacast")))
-# The reverse direction reads the names asked under V2/ and by SEACAST's tape reader. A kept function asks through
+entries = set(CASE.findall(body(twin / "Replay.lean", "entry"))) | set(CASE.findall(body(twin / "Seacast" / "Replay.lean", "entrySeacast")))
+# The reverse direction reads the names asked under Seacast/ and by SEACAST's tape reader. A kept function asks through
 # Replay.lean's instance, shared with seacast-lite.md's functions, so its questions are not told apart here; gen.py's
 # manifest_questions holds them, over the Python's closure of the covered and kept functions.
-asked_seacast = asks(sorted((twin / "V2").glob("*.lean")))
-calls_seacast = body(twin / "V2" / "Replay.lean", "callNamesSeacast").split(":=", 1)[1].split("\n\n")[0]
-for n in re.findall(r'"([A-Za-z_0-9]+)"', calls_seacast) + sorted(CASE.findall(body(twin / "V2" / "Replay.lean", "entrySeacast"))):
+asked_seacast = asks(sorted((twin / "Seacast").glob("*.lean")))
+calls_seacast = body(twin / "Seacast" / "Replay.lean", "callNamesSeacast").split(":=", 1)[1].split("\n\n")[0]
+for n in re.findall(r'"([A-Za-z_0-9]+)"', calls_seacast) + sorted(CASE.findall(body(twin / "Seacast" / "Replay.lean", "entrySeacast"))):
     asked_seacast.setdefault(n, "SpecTwin/Seacast/Replay.lean's tape reader")
 
 def wrong(questions, asked_seacast):
@@ -602,7 +602,7 @@ ok1 = any(c.startswith("links: asked by the twin under seacast.md (") for c in c
 print(f"control, QUESTIONS without links: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
 ctl2 = wrong(questions, {**asked_seacast, "made_up": "a planted askCall"})
 ok2 = "made_up: asked by the twin under seacast.md (a planted askCall), in no list of the manifest" in ctl2
-print(f"control, an askCall of made_up under V2/: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
+print(f"control, an askCall of made_up under Seacast/: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
 ctl3 = wrong(questions + ["made_up"], asked_seacast)
 ok3 = "made_up: in QUESTIONS, read by no askCall and no tape entry of the twin" in ctl3
 print(f"control, QUESTIONS with made_up: {'refused, as it must be' if ok3 else 'NOT refused  <-- FAIL'}")
@@ -875,25 +875,25 @@ s_tracercontrols() {
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
   local also
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-SEACAST raw-alias-SEACAST other-node-SEACAST unscanned-layer-SEACAST raw-chunk-id-SEACAST hdr-other-SEACAST alias-missing-SEACAST other-node-tape-SEACAST rebound-scanned-SEACAST rebind-tape-SEACAST rebind-view-SEACAST stale-id-bare-SEACAST close-keyerror-SEACAST; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2; do
     also=
     case $f in
-      rebind-tape-SEACAST) want="^trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding" ;;
-      rebind-view-SEACAST) want="^trace3: node [0-9]*: offers was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: a OfferMap" ;;
-      close-keyerror-SEACAST) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs"
+      rebind-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding" ;;
+      rebind-view-v2) want="^trace3: node [0-9]*: offers was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: a OfferMap" ;;
+      close-keyerror-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs"
         also="^trace3: \(at the close, after the stop\) KeyError: 'planted at the close'$" ;;   # the close's, a note
-      rebound-scanned-SEACAST) want="^trace3: node [0-9]*: popcount_again is bound to a function of the toy's that the scan of its bindings does not name: popcount \(bits\.py:[0-9]*\)" ;;
-      other-node-tape-SEACAST) want="^trace3: node [0-9]*: peer_id_bytes is called while node [0-9]*'s record is open and no question runs" ;;
-      raw-chunk-id-SEACAST) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
-      hdr-other-SEACAST) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
-      alias-missing-SEACAST) want="^trace3: node [0-9]*: chunk_id is missing under SEACAST" ;;
-      unscanned-layer-SEACAST) want="^trace3: node [0-9]*: on_frame is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.on_frame \(node\.py:2\)" ;;
-      early-install-SEACAST) want="^trace3: node [0-9]*: the closure rule's lists and the node differ: ALL is not in the namespace" ;;
+      rebound-scanned-v2) want="^trace3: node [0-9]*: popcount_again is bound to a function of the toy's that the scan of its bindings does not name: popcount \(bits\.py:[0-9]*\)" ;;
+      other-node-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes is called while node [0-9]*'s record is open and no question runs" ;;
+      raw-chunk-id-v2) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
+      hdr-other-v2) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
+      alias-missing-v2) want="^trace3: node [0-9]*: chunk_id is missing under SEACAST" ;;
+      unscanned-layer-v2) want="^trace3: node [0-9]*: on_frame is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.on_frame \(node\.py:2\)" ;;
+      early-install-v2) want="^trace3: node [0-9]*: the closure rule's lists and the node differ: ALL is not in the namespace" ;;
         # An install before _seacast is still refused, and refused first by what it lacks: the install-time check of the
-        # closure rule's lists. The last-binding check keeps its coverage through rebind-tape-SEACAST and rebind-view-SEACAST,
+        # closure rule's lists. The last-binding check keeps its coverage through rebind-tape-v2 and rebind-view-v2,
         # which reach it. If a later install-time check moves the first stop again, these words move with it.
-      raw-alias-SEACAST) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
-      other-node-SEACAST) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs" ;;
+      raw-alias-v2) want="^trace3: node [0-9]*: hdr is not the installed desc" ;;
+      other-node-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs" ;;
       made-rows-off) want="^trace3: the views' log does not account for the state" ;;
       alias) want="^trace3: node [0-9]*: one queue entry stands in two places" ;;
       alias-control) want="^trace3: node [0-9]*: one queue entry's control stands in two places" ;;
@@ -930,22 +930,22 @@ s_tracercontrols() {
   # entry's chains set aside, that node's chain of on_iwant the plant's, every other the plain trace's
   : > "$OUT/c-tracerplants.txt"; bad=0
   local plain line node k want why chain spec also_chain
-  for f in bare-in-question-SEACAST bare-in-question-SEACAST-per-node suppressed-entry-SEACAST suppressed-entry-SEACAST-off bare-replaced-SEACAST bare-timer-SEACAST bare-timer-SEACAST-now hdr-read-SEACAST hdr-read-SEACAST-raw; do
+  for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2 bare-timer-v2-now hdr-read-v2 hdr-read-v2-raw; do
     chain=
     case $f in      # the plant's own function at the planted node, its chain of on_iwant
-      suppressed-entry-SEACAST|suppressed-entry-SEACAST-off) chain='["suppressed_entry_seacast.<locals>.install.<locals>.on_iwant"]' ;;
-      bare-replaced-SEACAST) chain='["bare_in_question_seacast.<locals>.install.<locals>.on_iwant"]' ;;
+      suppressed-entry-v2|suppressed-entry-v2-off) chain='["suppressed_entry_seacast.<locals>.install.<locals>.on_iwant"]' ;;
+      bare-replaced-v2) chain='["bare_in_question_seacast.<locals>.install.<locals>.on_iwant"]' ;;
     esac
     case $f in     # k: the control's extra records of N; - for a plant read by its line alone (its read adds to a record)
-      bare-in-question-SEACAST) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c N: 1$" ;;
-      bare-in-question-SEACAST-per-node) plain=seacast/hand5; k=1; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; records inside: 1; bare c N: 0$" ;;
-      suppressed-entry-SEACAST) plain=seacast/hand5-own; k=0; line=", planted 2 times; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 2; entry 2: raised; supp after the raise: 0$" ;;
-      suppressed-entry-SEACAST-off) plain=seacast/hand5-own; k=2; line=", planted 2 times; records inside: 2; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 0; entry 2: raised; supp after the raise: 0$" ;;
-      bare-replaced-SEACAST) plain=seacast/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the replaced body ran: 1; bare c on_iwant: 1$" ;;
-      bare-timer-SEACAST) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 1; fired from the simulator, outside the question: 1$" ;;
-      bare-timer-SEACAST-now) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 0; fired from the simulator, outside the question: 0$" ;;
-      hdr-read-SEACAST) plain=seacast/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1$" ;;
-      hdr-read-SEACAST-raw) plain=seacast/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0$" ;;
+      bare-in-question-v2) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; bare c N: 1$" ;;
+      bare-in-question-v2-per-node) plain=seacast/hand5; k=1; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; records inside: 1; bare c N: 0$" ;;
+      suppressed-entry-v2) plain=seacast/hand5-own; k=0; line=", planted 2 times; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 2; entry 2: raised; supp after the raise: 0$" ;;
+      suppressed-entry-v2-off) plain=seacast/hand5-own; k=2; line=", planted 2 times; records inside: 2; node s: [0-9]+; entry 1: returned; supp after the return: 0; bare s N: 0; entry 2: raised; supp after the raise: 0$" ;;
+      bare-replaced-v2) plain=seacast/hand5-own; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the replaced body ran: 1; bare c on_iwant: 1$" ;;
+      bare-timer-v2) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 1; fired from the simulator, outside the question: 1$" ;;
+      bare-timer-v2-now) plain=seacast/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 0; fired from the simulator, outside the question: 0$" ;;
+      hdr-read-v2) plain=seacast/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1$" ;;
+      hdr-read-v2-raw) plain=seacast/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0$" ;;
     esac
     rm -f "$OUT/c-tp-$f.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz.bare.json"    # nothing left from an earlier run counts
     if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$f" . "$OUT/c-tp-$f.jsonl.gz" > "$OUT/c-tp-$f.out" 2> "$OUT/c-tp-$f.err"); then
@@ -959,9 +959,9 @@ s_tracercontrols() {
     fi
     node=$(sed -n -E 's/.*(node a, node c: [0-9]+, |node s: )([0-9]+).*/\2/p' "$OUT/c-tp-$f.err" | head -n 1)
     case $f in      # the .bare.json, exactly
-      bare-in-question-SEACAST) want="{\"$node N\": 1}" ;;
-      suppressed-entry-SEACAST) want="{\"$node N\": 2}" ;;
-      bare-replaced-SEACAST) want="{\"$node on_iwant\": 1}" ;;
+      bare-in-question-v2) want="{\"$node N\": 1}" ;;
+      suppressed-entry-v2) want="{\"$node N\": 2}" ;;
+      bare-replaced-v2) want="{\"$node on_iwant\": 1}" ;;
       *) want="{}" ;;
     esac
     if [ "$(cat "$OUT/c-tp-$f.jsonl.gz.bare.json" 2> /dev/null)" != "$want" ]; then
@@ -981,7 +981,7 @@ s_tracercontrols() {
     else echo "$f: the body not $plain's and $k records of N at node $node$also_chain: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
   # the check that no SEACAST trace counts a bare call (s_replays) itself fails on a planted count
-  if bare_none "$OUT/c-tp-bare-in-question-SEACAST.jsonl.gz"; then
+  if bare_none "$OUT/c-tp-bare-in-question-v2.jsonl.gz"; then
     echo "control: the check of no bare call passes the plant's count  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
   else echo "control: the check of no bare call fails on the plant's count, as it must" >> "$OUT/c-tracerplants.txt"; fi
   # extra_records' own controls, on traces made from the plain seacast/hand5: itself with k 0 passes; two record lines
@@ -1106,11 +1106,11 @@ EOF_ERC
   [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 9 ] || no "not 9 plants under SEACAST as written (c-tracerplants.txt)"
   echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 9 plants under SEACAST as written (five, and four controls), and the checks' controls"
   # under SEACAST, the nodes line's chains: hand5-own traced with its replaced name's chain left out (tracerfaults3's
-  # --chains-omit-SEACAST) is written to the end, and the replay's reader must refuse it, with its own words
+  # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words
   rm -f "$OUT/c-chains-omit.jsonl.gz" "$OUT/c-chains-omit.jsonl.gz.bare.json" "$OUT/c-chains-omit.replay"
-  if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --chains-omit-SEACAST . "$OUT/c-chains-omit.jsonl.gz" > "$OUT/c-chains-omit.out" 2> "$OUT/c-chains-omit.err"); then
+  if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --chains-omit-v2 . "$OUT/c-chains-omit.jsonl.gz" > "$OUT/c-chains-omit.out" 2> "$OUT/c-chains-omit.err"); then
     no "the trace of a nodes line without a replaced name's chain did not end with 0 (c-chains-omit.err)"
-  elif ! has -E '^tracerfaults3: chains-omit-SEACAST, planted [1-9][0-9]* times?$' "$OUT/c-chains-omit.err"; then
+  elif ! has -E '^tracerfaults3: chains-omit-v2, planted [1-9][0-9]* times?$' "$OUT/c-chains-omit.err"; then
     no "no replaced name's chain was left out (c-chains-omit.err)"
   elif replay_of c-chains-omit; then
     no "the replay passed a nodes line without a replaced name's chain (c-chains-omit.replay)"

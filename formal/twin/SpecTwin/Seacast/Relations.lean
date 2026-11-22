@@ -6,7 +6,7 @@ import SpecTwin.Readers
 The twin of `colour_of` (§1.4), §2's `joined`, and §4.1's functions that the cycle covers: `send_join`, `interest_of_peer`,
 `wants_from_me`, `prune`, `yes`, `no`, `send_relation`, `queue_owed_relations`, `serves`, `counted`,
 `keep_coverage` and `keep_floor`. `join_push`, §4.1's too, calls §4.4's `announce`, so it is in
-`V2/Announce.lean`. `graft` comes with v0.10.12's text.
+`Seacast/Announce.lean`. `graft` comes with v0.10.12's text.
 
 SEACAST's files follow the calls, not the sections: each function comes after every function it calls, and §4's
 sections call each other both ways (`seacast-lite.md`'s twin does the same, README.md's Scope).

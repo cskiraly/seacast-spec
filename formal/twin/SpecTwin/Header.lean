@@ -8,7 +8,7 @@ A trace's header (its second line) names the document it was made under in its a
 `seacast-lite.md`), and the document decides the rest: the tables the header must name, the functions `traced` may
 list, the names a subset may pick, the members of each nodes entry, and the names a node may replace. Under
 `seacast-lite.md` every list is this twin's own, as the replay has always read them. Under `seacast.md` the lists
-are its manifest's (`V2/Manifest.lean`, generated from `tools/gen/manifest_seacast.py`). `Main.lean`'s loop calls these
+are its manifest's (`Seacast/Manifest.lean`, generated from `tools/gen/manifest_seacast.py`). `Main.lean`'s loop calls these
 readers and prints each failure they give. -/
 
 namespace SpecTwin.Header
@@ -105,13 +105,13 @@ the twin's own tables as the schema names them (`ownTables`, generated) and the 
 twin's own); under `seacast.md` the manifest's two lists. -/
 def docTables : Form → List String × List String
   | .v1 => (ownTables, ["known_id", "chunks"])
-  | .v2 => (V2.Manifest.own, V2.Manifest.foreign)
+  | .v2 => (Seacast.Manifest.own, Seacast.Manifest.foreign)
 
 /-- Under `seacast.md`, what is wrong with the header's `traced`: a name the manifest cuts at every node first,
 then the names it does not list as covered, kept or the node's own. -/
 def tracedSeacast (traced : List String) : Option String :=
-  let known := V2.Manifest.covered ++ V2.Manifest.kept ++ V2.Manifest.nodeOwn.map (·.1)
-  match traced.find? V2.Manifest.cut.contains, traced.filter (!known.contains ·) with
+  let known := Seacast.Manifest.covered ++ Seacast.Manifest.kept ++ Seacast.Manifest.nodeOwn.map (·.1)
+  match traced.find? Seacast.Manifest.cut.contains, traced.filter (!known.contains ·) with
   | some f, _ => some s!"header: traced holds {f}, which is cut at every node"
   | none, [] => none
   | none, l => some s!"header: traced names that seacast.md's manifest does not list: {", ".intercalate l}"
@@ -165,7 +165,7 @@ def readHeader (hd : Json) (only? : Option String) : HeaderRead := Id.run do
 where replaced and are not among what the record reached there. -/
 def asksNames : Form → List String
   | .v1 => replaceable
-  | .v2 => V2.Manifest.replaceable ++ V2.Manifest.replaceableWhole
+  | .v2 => Seacast.Manifest.replaceable ++ Seacast.Manifest.replaceableWhole
 
 /-- A record's line asks `f` on the tape, by the tape entry's text, `["NAME",`, anywhere in the line, for the
 replaceable names of the trace's document alone: the tape is not at the line's end, and the line is not parsed
@@ -184,7 +184,7 @@ def constNamesSeacast : List String :=
 JSON's booleans; `ASK_UPLINK` is a float as its 64-bit word, finite and not negative; `SAMPLE_OUTSTANDING` is a
 JSON integer of at least 1; `SERVE_BUDGET` is one too, or `null` for no limit (the toy's `math.inf`, written as a
 limit the client does not set is). -/
-def constsSeacast (j : Json) : Except String (Consts × V2.ConstsSeacast) := do
+def constsSeacast (j : Json) : Except String (Consts × Seacast.ConstsSeacast) := do
   members "consts" j (constNames ++ constNamesSeacast) (constNames ++ constNamesSeacast)
   let .ok kvs := j.getObj? | throw "consts: not an object"
   let c ← consts (Json.mkObj (kvs.toList.filter fun (k, _) => !constNamesSeacast.contains k))
@@ -231,9 +231,9 @@ def chainsOf (j : Json) : Except String (List (String × List String)) := do
 /-- One node's configuration under `seacast.md`. -/
 structure NodeV2Cfg where
   c : Consts
-  c2 : V2.ConstsSeacast
+  c2 : Seacast.ConstsSeacast
   /-- the parameters of each type the node can answer `type_of_group` with, the payload's always -/
-  types : List (V2.TypeId × V2.TypeParams)
+  types : List (Seacast.TypeId × Seacast.TypeParams)
   replaced : List String
 
 /-- The nodes line under `seacast.md`: its entries, each `{"n": [...], "consts": {...}, "replaced": [...],
@@ -250,15 +250,15 @@ def nodesLineSeacast (j : Json) (whole : Bool) (traced : List String) : Except S
     let rp ← names "nodes: replaced" (← e.getObjVal? "replaced")
     let ids ← (← (← e.getObjVal? "n").getArr?).toList.mapM (·.getNat?)
     let some n0 := ids.head? | throw "nodes: an entry of no node"
-    if let some f := rp.find? V2.Manifest.cut.contains then
+    if let some f := rp.find? Seacast.Manifest.cut.contains then
       throw s!"nodes: node {n0} has replaced {f}, which is cut at every node"
-    if let some f := rp.find? (!(V2.Manifest.replaceable ++ V2.Manifest.replaceableWhole).contains ·) then
+    if let some f := rp.find? (!(Seacast.Manifest.replaceable ++ Seacast.Manifest.replaceableWhole).contains ·) then
       throw s!"nodes: a replaced function the twin has no question for: {f}"
-    if !whole && rp.any V2.Manifest.replaceableWhole.contains then
-      throw s!"nodes: node {n0} has replaced {rp.filter V2.Manifest.replaceableWhole.contains}, which only a trace of the whole state may"
+    if !whole && rp.any Seacast.Manifest.replaceableWhole.contains then
+      throw s!"nodes: node {n0} has replaced {rp.filter Seacast.Manifest.replaceableWhole.contains}, which only a trace of the whole state may"
     if rp.any (!traced.contains ·) then
       throw s!"nodes: node {n0} has replaced {rp.filter (!traced.contains ·)}, which the header does not list as traced"
-    let types ← (V2.typesOf (← e.getObjVal? "types")).mapError ("nodes: " ++ ·)
+    let types ← (Seacast.typesOf (← e.getObjVal? "types")).mapError ("nodes: " ++ ·)
     let ch ← (chainsOf (← e.getObjVal? "chains")).mapError ("nodes: " ++ ·)
     if let some (k, _) := ch.find? (!traced.contains ·.1) then
       throw s!"nodes: chains: a name the header does not list as traced: {k}"

@@ -50,17 +50,17 @@ structure State where
   waiters : Std.HashMap LineKey (List Peer) := {}
   sent : Std.HashMap SendKey Float := {}
   unwanted : Std.HashMap Peer (Std.HashSet Hex) := {}
-  joinRecv : Std.HashMap Peer (Std.HashMap V2.TypeId V2.Join) := {}
-  joinSent : Std.HashMap Peer (Std.HashMap V2.TypeId V2.Join) := {}
-  pushOut : Std.HashMap Peer (Std.HashMap V2.TypeId (Std.HashMap V2.Fam (Std.HashSet Nat))) := {}
-  pushIn : Std.HashMap Peer (Std.HashMap V2.TypeId (Std.HashMap V2.Fam (Std.HashSet Nat))) := {}
-  graftedOut : Std.HashMap Peer (Std.HashMap V2.TypeId (Std.HashMap V2.Fam (Std.HashSet Nat))) := {}
-  graftedIn : Std.HashMap Peer (Std.HashMap V2.TypeId (Std.HashMap V2.Fam (Std.HashSet Nat))) := {}
-  owedRelations : Std.HashMap Peer (List V2.Relation) := {}
-  backoff : Std.HashMap Peer (Std.HashMap V2.TypeId (Std.HashMap V2.Fam (Std.HashMap ColourDir Float))) := {}
-  tOf : Std.HashMap Group V2.TypeId := {}
+  joinRecv : Std.HashMap Peer (Std.HashMap Seacast.TypeId Seacast.Join) := {}
+  joinSent : Std.HashMap Peer (Std.HashMap Seacast.TypeId Seacast.Join) := {}
+  pushOut : Std.HashMap Peer (Std.HashMap Seacast.TypeId (Std.HashMap Seacast.Fam (Std.HashSet Nat))) := {}
+  pushIn : Std.HashMap Peer (Std.HashMap Seacast.TypeId (Std.HashMap Seacast.Fam (Std.HashSet Nat))) := {}
+  graftedOut : Std.HashMap Peer (Std.HashMap Seacast.TypeId (Std.HashMap Seacast.Fam (Std.HashSet Nat))) := {}
+  graftedIn : Std.HashMap Peer (Std.HashMap Seacast.TypeId (Std.HashMap Seacast.Fam (Std.HashSet Nat))) := {}
+  owedRelations : Std.HashMap Peer (List Seacast.Relation) := {}
+  backoff : Std.HashMap Peer (Std.HashMap Seacast.TypeId (Std.HashMap Seacast.Fam (Std.HashMap ColourDir Float))) := {}
+  tOf : Std.HashMap Group Seacast.TypeId := {}
   rebuilt : Std.HashMap Group Bits := {}
-  interest : Std.HashMap Group V2.IBits := {}
+  interest : Std.HashMap Group Seacast.IBits := {}
   knownAt : Std.HashMap Group Float := {}
   standing : Std.HashMap Group (Std.HashMap Nat (Std.HashSet Peer)) := {}
   routedStanding : Std.HashMap Group (Std.HashMap Nat (Std.HashSet Peer)) := {}
@@ -80,14 +80,14 @@ structure State where
   rsampleFinal : Std.HashSet Group := {}
   served : Std.HashMap Peer (Std.HashMap Group Nat) := {}
   offeredTo : Std.HashMap Peer (Std.HashMap Group Bits) := {}
-  wantP : Std.HashMap Peer (Std.HashMap Group V2.IBits) := {}
+  wantP : Std.HashMap Peer (Std.HashMap Group Seacast.IBits) := {}
   probeServed : Std.HashMap Peer (Std.HashMap Group Bool) := {}
   probeAnswers : Std.HashMap Peer (Std.HashMap Group Bits) := {}
   probeWaiting : Std.HashMap Group (Std.HashMap Peer Nat) := {}
   sampledFrom : Std.HashMap BlockId (Std.HashSet Peer) := {}
   samplesInFlight : Std.HashMap BlockId Int := {}
   heldSamples : Std.HashMap BlockId (List GI) := {}
-  forwarded : Std.HashMap Peer (Std.HashMap V2.TypeId Nat) := {}
+  forwarded : Std.HashMap Peer (Std.HashMap Seacast.TypeId Nat) := {}
   servedHb : Std.HashMap Peer Nat := {}
 
 /-- An entry of §6.1's tables: the table and its keys, down to the level at which the code reads values (the
@@ -134,14 +134,14 @@ inductive Cell where
   | waiters (e : LineKey)
   | sent (k : SendKey)
   | unwanted (p : Peer)
-  | joinRecv (p : Peer) (T : V2.TypeId)
-  | joinSent (p : Peer) (T : V2.TypeId)
-  | pushOut (p : Peer) (T : V2.TypeId) (fam : V2.Fam)
-  | pushIn (p : Peer) (T : V2.TypeId) (fam : V2.Fam)
-  | graftedOut (p : Peer) (T : V2.TypeId) (fam : V2.Fam)
-  | graftedIn (p : Peer) (T : V2.TypeId) (fam : V2.Fam)
+  | joinRecv (p : Peer) (T : Seacast.TypeId)
+  | joinSent (p : Peer) (T : Seacast.TypeId)
+  | pushOut (p : Peer) (T : Seacast.TypeId) (fam : Seacast.Fam)
+  | pushIn (p : Peer) (T : Seacast.TypeId) (fam : Seacast.Fam)
+  | graftedOut (p : Peer) (T : Seacast.TypeId) (fam : Seacast.Fam)
+  | graftedIn (p : Peer) (T : Seacast.TypeId) (fam : Seacast.Fam)
   | owedRelations (p : Peer)
-  | backoff (p : Peer) (T : V2.TypeId) (fam : V2.Fam) (cd : ColourDir)
+  | backoff (p : Peer) (T : Seacast.TypeId) (fam : Seacast.Fam) (cd : ColourDir)
   | tOf (g : Group)
   | rebuilt (g : Group)
   | interest (g : Group)
@@ -171,7 +171,7 @@ inductive Cell where
   | sampledFrom (b : BlockId)
   | samplesInFlight (b : BlockId)
   | heldSamples (b : BlockId)
-  | forwarded (p : Peer) (T : V2.TypeId)
+  | forwarded (p : Peer) (T : Seacast.TypeId)
   | servedHb (p : Peer)
   deriving BEq, Repr
 

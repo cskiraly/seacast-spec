@@ -22,10 +22,10 @@ import SpecTwin.Seacast.Manifest
   with its two claims, and a lane's controls with SEACAST's IWANT, holdings and relation controls. Each position has
   one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
-- **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `V2/Manifest.lean`). It runs SEACAST's 68
+- **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `Seacast/Manifest.lean`). It runs SEACAST's 68
   functions by their Python names, hands a record of one of `seacast-lite.md`'s functions that v2 keeps, or of the
   node's own `held` (`keptSeacast`), to `Replay.run`, runs the three that take another form under v2 (`keptFormsSeacast`) in
-  their v2 forms (`V2/Kept.lean`), and refuses every other name,
+  their v2 forms (`Seacast/Kept.lean`), and refuses every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
@@ -437,14 +437,14 @@ instance : NodeSeacast R where
   knownInScopeNode g := askCall "known_in_scope" [Json.str g] nat
 
 /-- The functions that the 71 call and this cycle leaves out: a question at every node until transcribed. -/
-instance : V2Later R where
+instance : SeacastLater R where
   windowRelease p g i := askCall "window_release" [(p : Json), Json.str g, (i : Json)] nothing
 
 /-! ## One record -/
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name and that take another form under v2: the two
 that call a name v2 redefines, and `respond`, whose IWANT a record under v2 writes in SEACAST's form. The replay serves
-them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`. -/
+them with their v2 forms (`Seacast/Kept.lean`), not with `Replay.run`. -/
 def keptFormsSeacast : List String := ["on_pace_tick", "on_block_installed", "respond"]
 
 /-- SEACAST's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
@@ -460,7 +460,7 @@ def keptSeacast : List String := Manifest.kept ++ Manifest.nodeOwn.map (·.1)
 inductive Route where
   /-- SEACAST's own code, by one of `runSeacast`'s cases -/
   | v2
-  /-- a kept function's v2 form (`V2/Kept.lean`) -/
+  /-- a kept function's v2 form (`Seacast/Kept.lean`) -/
   | form
   /-- `seacast-lite.md`'s code, by `Replay.run` with SEACAST's forms -/
   | kept
@@ -587,7 +587,7 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "on_pace_tick", #[] => do exec onPaceTick none_
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_
     | "respond", #[p, asks, answers, prunes] => do
-      exec (V2.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkN) (← nat prunes)) none_
+      exec (Seacast.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkN) (← nat prunes)) none_
     | f, _ => throw s!"not a function of the twin under seacast.md, or not its arguments: {f}"
   judge traced r res rs
 

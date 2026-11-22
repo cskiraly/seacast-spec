@@ -4,7 +4,7 @@ named differences alone.
 
 Under seacast.md the Python runs `on_pace_tick` and `on_block_installed` as seacast-lite.md writes them, and they
 call SEACAST's `send_gossip` and `on_validated`, since the Python binds a name when it calls it. The twin binds a name
-when the function is defined, so `V2/Kept.lean` holds a copy of each, written in SEACAST's monad and calling SEACAST's
+when the function is defined, so `Seacast/Kept.lean` holds a copy of each, written in SEACAST's monad and calling SEACAST's
 functions. It also holds a copy of `respond`, whose IWANT a record under v2 writes in SEACAST's form, so that the copy
 builds SEACAST's constructor. This check keeps each copy from drifting from its original.
 
@@ -48,17 +48,17 @@ FUNCTIONS = {
     "paceTurns": ("SpecTwin/Sec64.lean", [
         (M2, "def paceTurns : Nat → M m Unit", "def paceTurns : Nat → M2 m Unit", 1),
         ("the context: seacast-lite.md's, as SEACAST's base", "      let ctx ← read\n", "      let ctx := (← read).base\n", 1),
-        (LATE, "        sendGossip job.q job.ids", "        V2.sendGossip job.q job.ids", 1),
+        (LATE, "        sendGossip job.q job.ids", "        Seacast.sendGossip job.q job.ids", 1),
     ]),
     "onPaceTick": ("SpecTwin/Sec64.lean", [
         (M2, "def onPaceTick : M m Unit", "def onPaceTick : M2 m Unit", 1),
-        (LATE, "  paceTurns (← paceJobs .jobs).length", "  V2.paceTurns (← paceJobs .jobs).length", 1),
+        (LATE, "  paceTurns (← paceJobs .jobs).length", "  Seacast.paceTurns (← paceJobs .jobs).length", 1),
     ]),
     "onBlockInstalled": ("SpecTwin/Sec42.lean", [
         (M2, "def onBlockInstalled (root : Root) : M m Unit", "def onBlockInstalled (root : Root) : M2 m Unit", 1),
         (V1, "(← messageId f)", "(← v1 (messageId f))", 1),
         (LATE + " (SEACAST's on_validated takes no fuel)", "onValidated deferDepth p f (← validateChunk f)",
-         "V2.onValidated p f (← v1 (validateChunk f))", 1),
+         "Seacast.onValidated p f (← v1 (validateChunk f))", 1),
         (V1, "← popTiedRoot root", "← v1 (popTiedRoot root)", 1),
         (V1, "        dropTie p g bits ", "        v1 (dropTie p g bits) ", 1),
         (V1, "← N (← desc g)", "← v1 (N (← desc g))", 1),

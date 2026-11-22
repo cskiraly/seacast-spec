@@ -2,7 +2,7 @@ import SpecTwin.Seacast.Replay
 
 /-! # A question's row, read and refused: the forms of SEACAST's questions
 
-A row is one tape entry of a question, `[name, args, answer]`, under one form of `NodeSeacast`'s or `V2Later`'s
+A row is one tape entry of a question, `[name, args, answer]`, under one form of `NodeSeacast`'s or `SeacastLater`'s
 questions, named by its method (`send (a HAVE)` is `send`). An order's row is `["order", place, members]`, and an own
 level's keys `["keys", table, path, keys]` (`rowParts`). `checkRow` reads a row twice, as `runSeacast` reads a record's
 tape:
@@ -221,7 +221,7 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
     return intJson <$> NodeSeacast.ownInterest (m := R) g
   | "windowRelease", #[p, g, i] => do
     let p ← nat p; let g ← Replay.groupKey g; let i ← nat i
-    return unitJson <$> V2Later.windowRelease (m := R) p g i
+    return unitJson <$> SeacastLater.windowRelease (m := R) p g i
   | "forwardNode", #[f, p, axes] => do
     let f ← chunkF f; let p ← nat p; let axes ← optOf giList axes
     return unitJson <$> NodeSeacast.forwardNode (m := R) f p axes
@@ -330,9 +330,9 @@ def refusalOf (form q : String) : String :=
   if form == "shuffledPeers" then "shuffled's answer is not a permutation of its question: "
   else s!"tape: {q}: its answer: "
 
-/-- The labels of SEACAST's question forms, one row each, in the order of `tools/forms-v2-examples.tsv`: the checker's
+/-- The labels of SEACAST's question forms, one row each, in the order of `tools/forms-seacast-examples.tsv`: the checker's
 own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). The first 44 are the
-file's at spec 287d575; the last 18 cover the methods of `NodeSeacast` and `V2Later` that had no row. -/
+file's at spec 287d575; the last 18 cover the methods of `NodeSeacast` and `SeacastLater` that had no row. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",

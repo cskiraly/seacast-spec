@@ -2,7 +2,7 @@ import SpecTwin.Seacast.ReplayKnown
 
 /-! # The v2 forms of `on_pace_tick`, `on_block_installed` and `respond`: their known answer
 
-The cases were written before their forms in `V2/Kept.lean`. Each record is a JSON line in the tracer's form,
+The cases were written before their forms in `Seacast/Kept.lean`. Each record is a JSON line in the tracer's form,
 hand-built from seacast-lite.md's Python of the functions and seacast.md's `send_gossip`, or taken from a trace
 under v2 and written in SEACAST's forms. Each is replayed in two ways: `asSeacast` replays it with `runSeacast`, which runs the v2
 forms, and `asV1` with `Replay.run`, which runs seacast-lite.md's forms. A pass is a "fewer" count of 0, and a failure

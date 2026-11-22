@@ -94,27 +94,27 @@ class TablesWhole (m : Type → Type) where
   /-- every `unwanted` -/
   allUnwanted : m (List (Peer × Std.HashSet Hex))
   /-- every `join_recv` -/
-  allJoinRecvAll : m (List (Peer × List (V2.TypeId × V2.Join)))
+  allJoinRecvAll : m (List (Peer × List (Seacast.TypeId × Seacast.Join)))
   /-- every `join_sent` -/
-  allJoinSentAll : m (List (Peer × List (V2.TypeId × V2.Join)))
+  allJoinSentAll : m (List (Peer × List (Seacast.TypeId × Seacast.Join)))
   /-- every `push_out` -/
-  allPushOutAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  allPushOutAll : m (List (Peer × List (Seacast.TypeId × List (Seacast.Fam × Std.HashSet Nat))))
   /-- every `push_in` -/
-  allPushInAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  allPushInAll : m (List (Peer × List (Seacast.TypeId × List (Seacast.Fam × Std.HashSet Nat))))
   /-- every `grafted_out` -/
-  allGraftedOutAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  allGraftedOutAll : m (List (Peer × List (Seacast.TypeId × List (Seacast.Fam × Std.HashSet Nat))))
   /-- every `grafted_in` -/
-  allGraftedInAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  allGraftedInAll : m (List (Peer × List (Seacast.TypeId × List (Seacast.Fam × Std.HashSet Nat))))
   /-- every `owed_relations` -/
-  allOwedRelations : m (List (Peer × List V2.Relation))
+  allOwedRelations : m (List (Peer × List Seacast.Relation))
   /-- every `backoff` -/
-  allBackoffAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × List (ColourDir × Float)))))
+  allBackoffAll : m (List (Peer × List (Seacast.TypeId × List (Seacast.Fam × List (ColourDir × Float)))))
   /-- every `T_of` -/
-  allTOf : m (List (Group × V2.TypeId))
+  allTOf : m (List (Group × Seacast.TypeId))
   /-- every `rebuilt` -/
   allRebuilt : m (List (Group × Bits))
   /-- every `interest` -/
-  allInterest : m (List (Group × V2.IBits))
+  allInterest : m (List (Group × Seacast.IBits))
   /-- every `known_at` -/
   allKnownAt : m (List (Group × Float))
   /-- every `standing` -/
@@ -164,7 +164,7 @@ class TablesWhole (m : Type → Type) where
   /-- every `held_samples` -/
   allHeldSamples : m (List (BlockId × List GI))
   /-- every `forwarded` -/
-  allForwarded : m (List (Peer × List (V2.TypeId × Nat)))
+  allForwarded : m (List (Peer × List (Seacast.TypeId × Nat)))
   /-- every `served_hb` -/
   allServedHb : m (List (Peer × Nat))
 
@@ -381,49 +381,49 @@ class Tables (m : Type → Type) extends TablesWhole m where
   /-- `unwanted[p].add(h)` -/
   setUnwanted : Peer → Std.HashSet Hex → m Unit
   /-- `join_recv[p][T]`: what p declared to us, or none (a KeyError in the Python) -/
-  joinRecv? : Peer → V2.TypeId → m (Option V2.Join)
+  joinRecv? : Peer → Seacast.TypeId → m (Option Seacast.Join)
   /-- `join_recv[p][T] = j` -/
-  setJoinRecv : Peer → V2.TypeId → V2.Join → m Unit
+  setJoinRecv : Peer → Seacast.TypeId → Seacast.Join → m Unit
   /-- `join_sent[p][T]`: what we declared to p, or none (a KeyError in the Python) -/
-  joinSent? : Peer → V2.TypeId → m (Option V2.Join)
+  joinSent? : Peer → Seacast.TypeId → m (Option Seacast.Join)
   /-- `join_sent[p][T] = j` -/
-  setJoinSent : Peer → V2.TypeId → V2.Join → m Unit
+  setJoinSent : Peer → Seacast.TypeId → Seacast.Join → m Unit
   /-- `push_out[p][T][fam]`: the colours we push p -/
-  pushOutOf : Peer → V2.TypeId → V2.Fam → m (Std.HashSet Nat)
+  pushOutOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `push_out[p][T][fam].add(c)`, `.discard(c)` -/
-  setPushOut : Peer → V2.TypeId → V2.Fam → Std.HashSet Nat → m Unit
+  setPushOut : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
   /-- `push_in[p][T][fam]`: the colours p pushes us -/
-  pushInOf : Peer → V2.TypeId → V2.Fam → m (Std.HashSet Nat)
+  pushInOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `push_in[p][T][fam].add(c)`, `.discard(c)` -/
-  setPushIn : Peer → V2.TypeId → V2.Fam → Std.HashSet Nat → m Unit
+  setPushIn : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
   /-- `grafted_out[p][T][fam]`: the colours we offered to push p, unanswered -/
-  graftedOutOf : Peer → V2.TypeId → V2.Fam → m (Std.HashSet Nat)
+  graftedOutOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `grafted_out[p][T][fam].add(c)`, `.discard(c)` -/
-  setGraftedOut : Peer → V2.TypeId → V2.Fam → Std.HashSet Nat → m Unit
+  setGraftedOut : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
   /-- `grafted_in[p][T][fam]`: the colours we asked p to push us, unanswered -/
-  graftedInOf : Peer → V2.TypeId → V2.Fam → m (Std.HashSet Nat)
+  graftedInOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `grafted_in[p][T][fam].add(c)`, `.discard(c)` -/
-  setGraftedIn : Peer → V2.TypeId → V2.Fam → Std.HashSet Nat → m Unit
+  setGraftedIn : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
   /-- `owed_relations[p]`: the JOINs, GRAFTs and PRUNEs a full queue refused, in order -/
-  owedRelationsOf : Peer → m (List V2.Relation)
+  owedRelationsOf : Peer → m (List Seacast.Relation)
   /-- `owed_relations[p]` after an append or a `pop(0)` -/
-  setOwedRelations : Peer → List V2.Relation → m Unit
+  setOwedRelations : Peer → List Seacast.Relation → m Unit
   /-- `backoff[p][T][fam].get((c, direction))`: until when we do not graft p, or none -/
-  backoff? : Peer → V2.TypeId → V2.Fam → ColourDir → m (Option Float)
+  backoff? : Peer → Seacast.TypeId → Seacast.Fam → ColourDir → m (Option Float)
   /-- `backoff[p][T][fam][(c, direction)] = t` -/
-  setBackoff : Peer → V2.TypeId → V2.Fam → ColourDir → Float → m Unit
+  setBackoff : Peer → Seacast.TypeId → Seacast.Fam → ColourDir → Float → m Unit
   /-- `T_of[g]`, as `g in T_of` or `T_of[g]`: the group's type, or none -/
-  tOf? : Group → m (Option V2.TypeId)
+  tOf? : Group → m (Option Seacast.TypeId)
   /-- `T_of[g] = T` -/
-  setTOf : Group → V2.TypeId → m Unit
+  setTOf : Group → Seacast.TypeId → m Unit
   /-- `rebuilt[g]`: the chunks from a decode -/
   rebuiltBits : Group → m Bits
   /-- `rebuilt[g].set(i)`, `|=` -/
   setRebuilt : Group → Bits → m Unit
   /-- `interest[g]` where it is stored, or none (the Python then asks `own_interest(g)`) -/
-  interest? : Group → m (Option V2.IBits)
+  interest? : Group → m (Option Seacast.IBits)
   /-- `interest[g] = b`, `interest[g] |= b` -/
-  setInterest : Group → V2.IBits → m Unit
+  setInterest : Group → Seacast.IBits → m Unit
   /-- `known_at[g]`, `known_at.setdefault(g, now)`: when the group id became known, or none -/
   knownAt? : Group → m (Option Float)
   /-- `known_at[g] = t`, `known_at.setdefault(g, now)` where it is missing -/
@@ -511,11 +511,11 @@ class Tables (m : Type → Type) extends TablesWhole m where
   /-- `offered_to[p][g] = offered_to[p][g] | bits` -/
   setOfferedTo : Peer → Group → Bits → m Unit
   /-- `want_p[p].get(g)`: what p asked us for, or none (`EMPTY` in the Python) -/
-  wantP? : Peer → Group → m (Option V2.IBits)
+  wantP? : Peer → Group → m (Option Seacast.IBits)
   /-- `want_p[p][g] = b` -/
-  setWantP : Peer → Group → V2.IBits → m Unit
+  setWantP : Peer → Group → Seacast.IBits → m Unit
   /-- every `want_p` -/
-  allWantPAll : m (List (Peer × List (Group × V2.IBits)))
+  allWantPAll : m (List (Peer × List (Group × Seacast.IBits)))
   /-- `probe_served[p][g]` -/
   probeServed : Peer → Group → m Bool
   /-- `probe_served[p][g] = True` -/
@@ -545,9 +545,9 @@ class Tables (m : Type → Type) extends TablesWhole m where
   /-- `held_samples[b]` after an append or a `pop(0)` -/
   setHeldSamples : BlockId → List GI → m Unit
   /-- `forwarded[p][T]`: routed requests of type T from p passed on this slot -/
-  forwardedCount : Peer → V2.TypeId → m Nat
+  forwardedCount : Peer → Seacast.TypeId → m Nat
   /-- `forwarded[p][T] += 1` -/
-  setForwarded : Peer → V2.TypeId → Nat → m Unit
+  setForwarded : Peer → Seacast.TypeId → Nat → m Unit
   /-- `served_hb[p]`: the answers to p this heartbeat that SERVE_BUDGET counts -/
   servedHbCount : Peer → m Nat
   /-- `served_hb[p] += 1` -/

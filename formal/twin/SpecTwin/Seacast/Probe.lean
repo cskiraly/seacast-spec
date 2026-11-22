@@ -5,7 +5,7 @@ import SpecTwin.Seacast.Announce
 The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`, `probe_promise`,
 `probe_waits`, `probe_settled`, `probe_of_claim` and `serve_probe`; §4.5's `serve_standing`,
 `drop_wants_beyond` and `serve_waiting_probe`; and §4.6's `known_in_scope`, `known_across`, `ask_custodian`,
-`repair_verdict` and `owed_missing`. Each comes after every function it calls (`V2/Relations.lean`'s rule).
+`repair_verdict` and `owed_missing`. Each comes after every function it calls (`Seacast/Relations.lean`'s rule).
 `serve_standing` and `drop_wants_beyond` are v0.11.1's text.
 
 - **An ask with its flags** is an `AskSeacast`. `group_index(a)` is the twin's own: an ask by
@@ -19,7 +19,7 @@ The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`,
   or not, and `suppression_scope`'s in `known_in_scope` and `known_across`. `probe_waiting[g].items()` is a
   table's level, whose keys' order is asked with `probeWaitingOrder`, a `keys` entry on the tape.
 - **`interest[g2]`** reads the table, and asks `own_interest(g2)` where it has no entry, storing nothing.
-- **Writes** follow `V2/Relations.lean`'s rule: `probe_asks.discard`, a set's member, is a write with no read,
+- **Writes** follow `Seacast/Relations.lean`'s rule: `probe_asks.discard`, a set's member, is a write with no read,
   as the tracer's view of a set logs it (`tools/footprint.py`, `add` and `discard`).
 - **`repair_verdict`'s steps:** a `None` list crashes as `TypeError` at its first subscript, a step
   past the list as `IndexError`; `want` is an `Int`, and the loop stops at `want == 0` alone. -/

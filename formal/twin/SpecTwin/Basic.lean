@@ -42,7 +42,7 @@ blocks (`block_of`); 64 lowercase hex digits. -/
 abbrev BlockId := String
 
 /-- `backoff`'s inner key (`seacast.md` §3): a colour and a direction. -/
-abbrev ColourDir := Nat × V2.Direction
+abbrev ColourDir := Nat × Seacast.Direction
 
 /-- A set of chunk indices: bit `i` is index `i`. -/
 abbrev Bits := Nat
@@ -272,7 +272,7 @@ inductive Ctl where
   each with its flags -/
   | iwantSeacast (want : Bool) (asks : List AskSeacast)
   /-- seacast.md's JOIN, GRAFT or PRUNE, queued by `send` under upkeep -/
-  | relation (m : V2.Relation)
+  | relation (m : Seacast.Relation)
   deriving BEq, Repr
 
 /-- A queue entry (§7.2): at most one chunk, its control (none, or a list of messages), and whether it answers an

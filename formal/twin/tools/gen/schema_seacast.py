@@ -38,17 +38,17 @@ from schema import TABLES, Scan, Table                    # noqa: E402
 # kinds of value of SEACAST's tables, as schema.py's VALUES (gen.py writes each kind's arms)
 VALUES_Seacast = {
     # an object type, by its id (`T_of[g]`): a plain dict, tested by `in`
-    "typeid":    dict(lean="V2.TypeId", read="option", param="ty", val="typeId"),
+    "typeid":    dict(lean="Seacast.TypeId", read="option", param="ty", val="typeId"),
     # a bitmap that can be complemented (`interest[g]`, `want_p[p][g]`), an integer in the signed form; a stored 0 is
     # a value (`interest`'s missing key asks `own_interest`, its stored 0 does not)
-    "ibits":     dict(lean="V2.IBits", read="option", param="ib", val="ibits"),
+    "ibits":     dict(lean="Seacast.IBits", read="option", param="ib", val="ibits"),
     # a JOIN (`join_recv[p][T]`, `join_sent[p][T]`): the inner level of `lazy_dict`, where a missing key raises
-    "join":      dict(lean="V2.Join", read="option", param="jn", val="join", parse="joinMsg"),
+    "join":      dict(lean="Seacast.Join", read="option", param="jn", val="join", parse="joinMsg"),
     # a set of colours (`push_out[p][T][fam]` and its three siblings), sorted; empty is no value
     "colours":   dict(lean="Std.HashSet Nat", read="default", default="{}", param="cs", val="colours",
                       empty="an empty set of colours"),
     # relation messages in order (`owed_relations[p]`); empty is no value
-    "relations": dict(lean="List V2.Relation", read="default", default="[]", param="rs", val="relations",
+    "relations": dict(lean="List Seacast.Relation", read="default", default="[]", param="rs", val="relations",
                       parse="relationList", empty="an empty list of relations"),
     # a set of peers whose stored empty value is a value, in a table that keeps no rows (`claims[g]`, iterated by
     # `claims.items()`; `standing[g][i]`, deleted by a pop)
@@ -65,10 +65,10 @@ VALUES_Seacast = {
                       empty="an empty list of groups and indices"),
 }
 # how a key of each of SEACAST's Lean types is read from a record's path (ReplayBase.lean)
-PARSE_Seacast = {"V2.TypeId": "typeId", "V2.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir"}
+PARSE_Seacast = {"Seacast.TypeId": "typeId", "Seacast.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir"}
 
 P, G, I = ("p", "Peer"), ("g", "Group"), ("i", "Nat")
-TY, FAM, B = ("T", "V2.TypeId"), ("fam", "V2.Fam"), ("b", "BlockId")
+TY, FAM, B = ("T", "Seacast.TypeId"), ("fam", "Seacast.Fam"), ("b", "BlockId")
 
 
 def whole(level, doc, used=False, note=None):
@@ -270,8 +270,8 @@ def python_tables_seacast(F, key, fbits, msg):
     seacast-lite.md's: how each key and each value is written in a record. `key` writes an ask key as seacast-lite.md's
     tables do (an ask by index `[group, index]`, a structured id its hex digits), `fbits` a float as its 64 bits,
     `msg` a JOIN, GRAFT or PRUNE as its tagged array (the tracer's, which knows the toy's messages)."""
-    keyenc = {"Key": key, "Peer": int, "Group": lambda g: g.hex(), "Nat": int, "V2.TypeId": type_id,
-              "V2.Fam": signed, "BlockId": lambda b: b.hex(), "ColourDir": colour_dir}
+    keyenc = {"Key": key, "Peer": int, "Group": lambda g: g.hex(), "Nat": int, "Seacast.TypeId": type_id,
+              "Seacast.Fam": signed, "BlockId": lambda b: b.hex(), "ColourDir": colour_dir}
 
     def finite(t):                      # `--prune-backoff` is not validated: a non-finite leaf is refused here
         if not math.isfinite(t):

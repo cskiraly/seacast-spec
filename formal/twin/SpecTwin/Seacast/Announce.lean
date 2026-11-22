@@ -8,12 +8,12 @@ The twin of the functions that offer, note pushes and send holdings: §4.4's `an
 `fills` and `note_push`; §4.1's `join_push`, which calls `announce`; §4.2's `suppression_scope`, `holding_of`
 and `send_have`; §4.7's `source_pool`, `unpush`, `candidates_for_source`, `origin_written`, `offer_at_publish`
 and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes after every function it calls
-(`V2/Relations.lean`'s rule).
+(`Seacast/Relations.lean`'s rule).
 
 - **`seacast-lite.md`'s functions that v2 calls unchanged** run through `v1`: `have_bits` (§4.2 there), `owe`
   (§5.2) and `N` (§1). SEACAST's functions of the same names as `seacast-lite.md`'s (`announce`, `note_push`, `unpush`,
   `send_have`, `origin_written`, `origin_acked`, `send_gossip`, `projected`) are this namespace's, and calls
-  among them name it (`V2.announce`).
+  among them name it (`Seacast.announce`).
 - **`suppression_scope(g)` is a set the tracer proxies**: the twin computes its members in
   the order `links(T)` gives them, and each caller asks the order it iterates them in, once per iteration, with
   the place named for the caller.
@@ -160,7 +160,7 @@ def joinPush (p : Peer) (T : TypeId) (fam : Fam) (c : Nat) : M2 m Unit := do
       continue
     -- `bitmap({i for i in chunks[g] if colour_of(g, i) == c})`
     let is ← (← chunkIndices g).filterM fun i => do return (← colourOf g i) == c
-    V2.announce p g (bitmapOf is)
+    Seacast.announce p g (bitmapOf is)
     branch "join_push: a group offered"
 
 /-- `source_pool(T, g, c)` (§4.7): whom a source pushes below `STRIPE_UPLINK`, and offers to: the relation
@@ -243,7 +243,7 @@ def offerAtPublish (g : Group) (d : Descriptor) : M2 m Unit := do
       offers := if offers.any (·.1 == q) then offers.map fun (x, b) => if x == q then (x, b.set i) else (x, b)
                 else offers ++ [(q, (0 : Bits).set i)]
   for (q, idx) in offers do
-    V2.announce q g idx
+    Seacast.announce q g idx
   branch "offer_at_publish: offered"
 
 /-- `origin_acked(g, i)` (§4.7) [c3, P4]: a chunk of a group we publish is acknowledged; it joins our holding,
@@ -271,7 +271,7 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
     | some ts => return !ts.contains q
     | none => return (← crash s!"KeyError: {i} (origin_acked: planned[g][i])")
   for p in ps do
-    V2.announce p g (1 <<< i)                                 -- a refused push is owed (v0.7)
+    Seacast.announce p g (1 <<< i)                                 -- a refused push is owed (v0.7)
   branch "origin_acked: the holding grows"
 
 /-- `send_gossip(q, ids)` (§4.8) [c7]: offers per group, for the types whose `ANNOUNCE_EXTRA` is `SAMPLE` -/
@@ -279,7 +279,7 @@ def sendGossip (q : Peer) (ids : List Key) : M2 m Unit := do
   enter "send_gossip"
   for (g, bits) in ← groupBits ids do                         -- `for g, bits in group_bits(ids):`
     if (← param (← NodeSeacast.typeOfGroup g) "ANNOUNCE_EXTRA" (·.ANNOUNCE_EXTRA)) == .sample then
-      V2.announce q g bits                                    -- [D5] ALL_JOINED offered at forward time already
+      Seacast.announce q g bits                                    -- [D5] ALL_JOINED offered at forward time already
       branch "send_gossip: offered"
     else
       branch "send_gossip: not SAMPLE"

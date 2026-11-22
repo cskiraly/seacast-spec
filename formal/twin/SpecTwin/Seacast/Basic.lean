@@ -14,7 +14,7 @@ is not negative; `IBits & ~Bits` and `IBits | Bits` are `IBits`. -/
 
 namespace SpecTwin.Seacast
 
-/-- A `Bits` as an `IBits` (`IBits` is in `V2/Types.lean`). -/
+/-- A `Bits` as an `IBits` (`IBits` is in `Seacast/Types.lean`). -/
 def IBits.ofBits (b : Bits) : IBits := Int.ofNat b
 
 /-- `~a` -/
@@ -246,7 +246,7 @@ class NodeSeacast (m : Type → Type) where
 
 /-- The functions of the 89 left out of this cycle that the 71 call. Until each is transcribed, its
 instance is a question on the tape. -/
-class V2Later (m : Type → Type) where
+class SeacastLater (m : Type → Type) where
   /-- `window_release(p, g, i)` (§4.11) -/
   windowRelease : Peer → Group → Nat → m Unit
 
@@ -319,10 +319,10 @@ instance {m : Type → Type} {ρ : Type} [Monad m] [NodeSeacast m] : NodeSeacast
 
 end NodeSeacast
 
-instance {m : Type → Type} {σ : Type} [Monad m] [V2Later m] : V2Later (StateT σ m) where
-  windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
-instance {m : Type → Type} {ρ : Type} [Monad m] [V2Later m] : V2Later (ReaderT ρ m) where
-  windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
+instance {m : Type → Type} {σ : Type} [Monad m] [SeacastLater m] : SeacastLater (StateT σ m) where
+  windowRelease p g i := monadLift (SeacastLater.windowRelease (m := m) p g i)
+instance {m : Type → Type} {ρ : Type} [Monad m] [SeacastLater m] : SeacastLater (ReaderT ρ m) where
+  windowRelease p g i := monadLift (SeacastLater.windowRelease (m := m) p g i)
 
 /-- SEACAST's node-wide constants this cycle reads that `seacast-lite.md`'s `Consts` lacks. Two of SEACAST's
 constants are `Consts`' own fields, read there, so that v2 and the kept functions it calls read one value:

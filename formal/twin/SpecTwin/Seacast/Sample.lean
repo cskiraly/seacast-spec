@@ -4,7 +4,7 @@ import SpecTwin.Sec72
 /-! # seacast.md's sampler, the writer's choice and the ask window: §4.10, §4.12, §4.13
 
 The twin of §4.13's `ask_scale`, §4.12's `own_chunk`, `pick` and `choose`, and §4.10's `ask_sample`, `resample`
-and `sample`. Each comes after every function it calls (`V2/Relations.lean`'s rule).
+and `sample`. Each comes after every function it calls (`Seacast/Relations.lean`'s rule).
 
 - **No recursion between `ask_sample` and `resample`:** `ask_sample` reaches `resample`, and itself again, only
   through timers (`afterSeacast`); `resample` calls `ask_sample` directly.
