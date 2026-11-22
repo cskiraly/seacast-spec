@@ -685,6 +685,11 @@ REWRAP = [True]         # the draws' re-wrap (rewrap_draws); off only in a plant
 # that holds the next layer, which ends the mode for the document's function (off: the mode runs on through it).
 # Each off only in a planted fault (observers_self_test).
 OBSERVE, HANDOVER = [True], [True]
+# HANDOVER_BOUND: a hand-over hands over only in the mode of the observer whose layer holds it (off: in any observer's
+# mode, so that an observer's own call of another observed name ends the caller's mode at that name's document
+# function). SIMGUARD: the simulator's own `after`, wrapped at the install (sim_guard), stops an observer's own code
+# that arms a timer through it (off: let through). Each off only in a planted fault or a control.
+HANDOVER_BOUND, SIMGUARD = [True], [True]
 
 
 class ObservedLayer:
@@ -718,15 +723,18 @@ def observed_chain(name, ls, lists=None):
     return ls
 
 
-def handover(rec, nxt, nxt_ob, doc_on, doc_off):
+def handover(rec, nxt, nxt_ob, own, doc_on, doc_off):
     """What an observer's cell holds in place of the layer `nxt` it calls: the hand-over from the observer's own code
     to `nxt`, at a boundary (footprint's `observer_boundary`). Into the next observer (`nxt_ob`) the mode goes on, with
     that layer named; into the document's function (`nxt_ob` None) it ends until the function returns (`doc_on` and
     `doc_off`: the record's questions, the mesh's and the gossip history's, around it). Outside the mode (the layer
-    called outside a record, or inside a question) it passes the call through."""
+    called outside a record, or inside a question) it passes the call through, and so it does in the mode of another
+    observer than `own`, the one whose layer holds the cell: that observer's own code called this name bare, and its
+    mode goes on through the name's layers and its document function. A limit: a name called again from its own
+    outermost observer's code meets its own observer here, and is handed over."""
     def h(*a, **k):
         prev = rec.observer
-        if prev is None:
+        if prev is None or (HANDOVER_BOUND[0] and prev is not own):
             return nxt(*a, **k)
         rec.observer_boundary()
         rec.observer, rec.obs_seen = nxt_ob, {}
@@ -768,6 +776,21 @@ def observe(rec, ob, fn, args, kw, doc_on, doc_off):
         rec.observer, rec.obs_seen = prev, {}
 
 
+def sim_guard(orig, observer_now):
+    """The simulator's own `after` (`orig`), wrapped at the install under v2: a timer armed while an observer's own
+    code runs (`observer_now()`: the open record's observer, else None) stops the tracer with that observer's words,
+    as iface_of stops one armed through the namespace's `after` or `start`; any other goes to the simulator. In the
+    document's function an observer hands over to, the mode is the document's, and its timers pass. arm_timer's hook,
+    set over it for one question's call, calls it in turn."""
+    def after(node, delay, fn, *args):
+        ob = observer_now() if SIMGUARD[0] else None
+        if ob is not None:
+            raise SystemExit(ob.words("arms a timer (sim.after)", "an observer changes nothing"))
+        return orig(node, delay, fn, *args)
+    after._trace3_guard = True
+    return after
+
+
 def rewrap_observers(rec, nid, name, ls, doc_on, doc_off, lists=None):
     """At the install: each cell of a handled chain's layers (observed_chain) that holds the next layer, re-wrapped as
     the hand-over to it; the outermost layer's ObservedLayer (the mode's entry, sec61's), and every layer's, or None
@@ -778,7 +801,7 @@ def rewrap_observers(rec, nid, name, ls, doc_on, doc_off, lists=None):
     if HANDOVER[0]:
         for i, (f, nxt) in enumerate(zip(ls, ls[1:])):
             cell = cell_holding(f, nxt)
-            cell.cell_contents = handover(rec, cell.cell_contents, obs[i + 1] if i + 1 < len(obs) else None,
+            cell.cell_contents = handover(rec, cell.cell_contents, obs[i + 1] if i + 1 < len(obs) else None, obs[i],
                                           doc_on, doc_off)
     return obs[0], obs
 
@@ -1988,7 +2011,10 @@ def observers_self_test():
     Planted faults: the handling off (the observer's read logged), the hand-over off (the document's reads missing,
     its write a stop), the stop off (writes let through), each failing its cases. Through iface_of's wrapper, a timer
     the observer arms stops, and a question it asks runs bare; the control hides the mode from the wrapper, and
-    fails both."""
+    fails both. Through the simulator's own `after` (sim_guard), a timer the observer arms stops, and one the document's
+    function arms after the hand-over reaches the simulator; the guard off and the hand-over off each fail theirs. An
+    observer's own call of a second observed name stays in the caller's mode through that name's layer and document
+    function: a read there unlogged, a write a stop in the caller's words; the hand-over unbound fails both."""
     sys.path.insert(0, str(HERE.parents[2] / "toy"))
     import bits as B                    # noqa: E402: the toy's, beside this repository's documents
     import wire as Wm                   # noqa: E402
@@ -2152,6 +2178,99 @@ def observers_self_test():
     bad += not all(failed)
     print(f"observers self-test, its control (the mode hidden from iface_of's wrapper): "
           f"{'fails its 2 cases, ok' if all(failed) else f'passes {failed.count(False)}  <-- FAIL'}")
+
+    def recorded(src, make_layers):
+        """A record over the two tables, with `src` compiled as protocol-v2.md's and `make_layers(ns, rec)` the top
+        layer of check_completion over its layers, entered by `observe`; after it, the record's reads and writes,
+        and `make_layers`' own report (its second value), or the stop."""
+        rec = F.Recorder()
+        ns = {"stop_pull": B.DefaultMap(False), "received": B.lazy(B.LazyBits)}
+        ns["received"][g].set(0)
+        F.install(rec, ns, [ts["stop_pull"], ts["received"]])
+        exec(compile(src, V2_FILE, "exec"), ns)
+        top, report = make_layers(ns, rec)
+        ls = layers_of(name, top)
+        ob, obs = rewrap_observers(rec, "stub", name, ls, lambda: None, lambda: None,
+                                   {layer_key(f): (name, OBSERVER) for f in ls[:-1]})
+        rec.clear()
+        rec.on, rec.tape = True, []
+        try:
+            observe(rec, ob, top, (g,), {}, lambda: None, lambda: None)
+        finally:
+            rec.on = False
+        reads, _, writes = rec.footprint()
+        return {"read": sorted({e[0] for e in reads}), "wrote": sorted({e[0] for e in writes}),
+                "calls": [o.calls for o in obs], "unlogged": [o.reads for o in obs], **report()}
+
+    def timed(where):
+        """The simulator's own `after` guarded (sim_guard, over a stub that counts the timers handed to it): `where`
+        "observer", the observer's own code arms a timer by it; "document", the document's function the observer
+        hands over to arms one by the namespace's binding of `after` (node.py's form, the simulator's own under it),
+        before its write, so that in the observer's mode the guard, not the write, is what stops it."""
+        armed = []
+        src = doc_src if where != "document" else doc_src.replace("(g):\n", "(g):\n    after(0.0, None)\n", 1)
+
+        def make(ns, rec):
+            sim_after = sim_guard(lambda node, delay, fn, *args: armed.append(delay), lambda: rec.observer)
+            ns["after"] = lambda delay, fn, *args: sim_after(None, delay, fn, *args)
+
+            def layer(doc):
+                def check_completion(g):
+                    if where == "observer":
+                        sim_after(None, 0.0, None)
+                    return doc(g)
+                return check_completion
+            return layer(ns[name]), lambda: {"armed": len(armed)}
+        return recorded(src, make)
+    sim_timer = ("an observer that arms a timer by the simulator's after: a stop, its words",
+                 lambda: timed("observer"),
+                 stops(" over check_completion arms a timer (sim.after): an observer changes nothing"))
+    doc_timer = ("an observer hands over to a document function that arms a timer by the namespace's after: no stop, "
+                 "the timer reaches the simulator",
+                 lambda: timed("document"),
+                 {"read": ["received"], "wrote": ["stop_pull"], "calls": [1], "unlogged": [0], "armed": 1})
+    for c in (sim_timer, doc_timer):
+        case(*c)
+    fault("the simulator's guard off: the observer's timer let through", SIMGUARD, [sim_timer])
+    fault("the hand-over off: the document's timer is armed in the observer's mode, and the guard stops it", HANDOVER,
+          [doc_timer])
+
+    def bound(write):
+        """An observer over check_completion whose own code calls a second observed name, fill, bare (as sec61's
+        wrapper runs a traced name in the mode): fill's one observer layer over its document function, which reads
+        stop_pull, and with `write` also sets a bit of received. Bound, the mode stays the caller's through fill's
+        layer and its document function: fill's read unlogged and counted as the caller's, its write a stop."""
+        src = doc_src + "def fill(g):\n    stop_pull[g]\n" + ("    received[g].set(7)\n" if write else "")
+
+        def make(ns, rec):
+            def fill_layer(doc):
+                def fill(g):
+                    return doc(g)
+                return fill
+            ftop = fill_layer(ns["fill"])
+            fls = layers_of("fill", ftop)
+            _, fobs = rewrap_observers(rec, "stub", "fill", fls, lambda: None, lambda: None,
+                                       {layer_key(f): ("fill", OBSERVER) for f in fls[:-1]})
+
+            def layer(doc):
+                def check_completion(g):
+                    ftop(g)
+                    return doc(g)
+                return check_completion
+            return layer(ns[name]), lambda: {"fill's calls": [o.calls for o in fobs]}
+        return recorded(src, make)
+    reads_bound = ("an observer's own call of another observed name: its document function's read in the caller's "
+                   "mode, unlogged",
+                   lambda: bound(False),
+                   {"read": ["received"], "wrote": ["stop_pull"], "calls": [1], "unlogged": [1], "fill's calls": [0]})
+    writes_bound = ("an observer's own call of another observed name whose document function writes: a stop, the "
+                    "caller's words",
+                    lambda: bound(True),
+                    stops(" over check_completion changed received[\"", ": an observer changes no table"))
+    for c in (reads_bound, writes_bound):
+        case(*c)
+    fault("the hand-over unbound: the other name's hand-over ends the caller's mode", HANDOVER_BOUND,
+          [reads_bound, writes_bound])
     return bad
 
 
@@ -2391,6 +2510,7 @@ class Tracer3(Tracer):
         # node and function, in a file beside the trace (OUT.bare.json), not in the trace. Under protocol.md each
         # node keeps its own state, as before
         self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0} if self.doc_v2 else None
+        self.rec_of = {}    # under v2, each node's recorder, by node: the open record's observer mode (sim_guard)
         self.bare = Counter()
         # under v2, every call of a traced name, by where it ran (count_call), the IWANTs that IW_NAMES' calls enqueue
         # (count_iwants), and how often one of IW_NAMES runs inside another: a file beside the trace (OUT.calls.json),
@@ -3910,6 +4030,12 @@ class Tracer3(Tracer):
         #                                                                         record's end checks they are still there
         st = self.vst if self.doc_v2 else {"depth": 0, "ext": 0, "cur": None}
         key, tr = self.key, self
+        if self.doc_v2:     # an observer's own code that arms a timer by the simulator itself stops as one that arms it
+            self.rec_of[int(nd.id)] = rec   # through the namespace: the simulator's `after` wrapped once (sim_guard);
+            sim = nd.sim                    # an observer runs only inside a record, at the open record's node
+            if not getattr(vars(sim).get("after"), "_trace3_guard", False):
+                sim.after = sim_guard(sim.after, lambda: getattr(tr.rec_of.get(st["node"]), "observer", None)
+                                      if st["depth"] else None)
         if self.doc_v2:     # protocol-v2.md's own tables are views over the toy's own objects (`hdr` is pointed at
             for name in OWN_V2:     # desc's by repoint_aliases); and interest's miss is the question own_interest
                 if not isinstance(ns.get(name), F.View) or ns[name]._o is not rec.roots[name][1]:

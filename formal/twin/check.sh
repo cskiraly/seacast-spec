@@ -69,8 +69,8 @@
 #   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
 #             line after the verdict, a line on stderr, exit code 2) refused, the plain one taken
-#   tracercontrols   a tracer whose views let an assignment through unlogged, and 30 faults planted in the tracer:
-#             each must stop it, with its own words; under v2, nine plants that must not (five, and four controls),
+#   tracercontrols   a tracer whose views let an assignment through unlogged, and 31 faults planted in the tracer:
+#             each must stop it, with its own words; under v2, ten plants that must not (five, and five controls),
 #             each as written (a plant that replaces a function at a node: the nodes line with its chains set
 #             aside, that node's chain the plant's), and the controls of the checks' own helpers; and a nodes
 #             line without a replaced name's chain, which the replay must refuse with its words; and the chain
@@ -1818,9 +1818,10 @@ s_tracercontrols() {
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
   local also
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2 param-after-install-v2; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2 param-after-install-v2 observer-timer-v2; do
     also=
     case $f in
+      observer-timer-v2) want="^trace3: node [0-9]*: the observer Node\._v2\.<locals>\.check_completion \(node\.py:[0-9]+\) over check_completion arms a timer \(sim\.after\): an observer changes nothing$" ;;
       param-after-install-v2) want="^trace3: node [0-9]*: type payload's EAGER changed after the tracer's install \(True there, False now\): the nodes line holds a type's parameters as the install read them" ;;
       # a slot bound again after the install: the next record's entry check stops it (bindings_check), and
       # final_check's words follow at the close, both stops shown
@@ -1866,8 +1867,8 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 30 ] || no "not 30 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 30 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 31 ] || no "not 31 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 31 planted faults stop the tracer with their own words"
   # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)
@@ -1877,8 +1878,8 @@ s_tracercontrols() {
   # the chain tells the truth about the code there: chain names it, and extra_records judges the nodes line with each
   # entry's chains set aside, that node's chain of on_iwant the plant's, every other the plain trace's
   : > "$OUT/c-tracerplants.txt"; bad=0
-  local plain line node k want why chain spec also_chain
-  for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2 bare-timer-v2-now hdr-read-v2 hdr-read-v2-raw; do
+  local plain line node k want why chain spec also_chain pl co
+  for f in bare-in-question-v2 bare-in-question-v2-per-node suppressed-entry-v2 suppressed-entry-v2-off bare-replaced-v2 bare-timer-v2 bare-timer-v2-now hdr-read-v2 hdr-read-v2-raw observer-timer-v2-off; do
     chain=
     case $f in      # the plant's own function at the planted node, its chain of on_iwant
       suppressed-entry-v2|suppressed-entry-v2-off) chain='["suppressed_entry_v2.<locals>.install.<locals>.on_iwant"]' ;;
@@ -1894,6 +1895,9 @@ s_tracercontrols() {
       bare-timer-v2-now) plain=v2/hand5; k=0; line=", planted 1 time; node a, node c: [0-9]+, [0-9]+; the timer scheduled at node c: 0; fired from the simulator, outside the question: 0$" ;;
       hdr-read-v2) plain=v2/hand5; k=-; line=", planted 1 time; node a: [0-9]+; desc read in its record: 1$" ;;
       hdr-read-v2-raw) plain=v2/hand5; k=0; line=", planted 1 time; node a: [0-9]+; desc read in its record: 0$" ;;
+      # the simulator's guard off (the control of the planted fault observer-timer-v2): a timer armed at each
+      # assignment of a node's completed, and the body v2/hand5's; one assignment for each group completed
+      observer-timer-v2-off) plain=v2/hand5; k=0; line=", planted [1-9][0-9]* times?; completions: [1-9][0-9]*$" ;;
     esac
     rm -f "$OUT/c-tp-$f.jsonl.gz" "$OUT/c-tp-$f.jsonl.gz.bare.json"    # nothing left from an earlier run counts
     if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$f" . "$OUT/c-tp-$f.jsonl.gz" > "$OUT/c-tp-$f.out" 2> "$OUT/c-tp-$f.err"); then
@@ -1901,6 +1905,13 @@ s_tracercontrols() {
     fi
     if ! has -E "^tracerfaults3: $f$line" "$OUT/c-tp-$f.err"; then
       echo "$f: its line is not as written  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
+    fi
+    if [ "$f" = observer-timer-v2-off ]; then       # one assignment of completed for each group completed
+      pl= co=
+      read -r pl co < <(sed -n -E 's/^tracerfaults3: [a-z0-9-]+, planted ([0-9]+) times?; completions: ([0-9]+)$/\1 \2/p' "$OUT/c-tp-$f.err")
+      if [ -z "$pl" ] || [ "$pl" != "$co" ]; then
+        echo "$f: planted ${pl:-?} times, and ${co:-?} completions: not one assignment for each  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
+      fi
     fi
     if ! gzip -t "$OUT/c-tp-$f.jsonl.gz" 2> /dev/null || ! gzip -t "$OUT/$plain.jsonl.gz" 2> /dev/null; then
       echo "$f: its trace or $plain's does not decompress whole  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; continue
@@ -2051,8 +2062,8 @@ EOF_ERC
     else echo "control: extra_records refuses the chain fixture $c for another reason: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
-  [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 9 ] || no "not 9 plants under v2 as written (c-tracerplants.txt)"
-  echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 9 plants under v2 as written (five, and four controls), and the checks' controls"
+  [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 10 ] || no "not 10 plants under v2 as written (c-tracerplants.txt)"
+  echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 10 plants under v2 as written (five, and five controls), and the checks' controls"
   # under v2, the nodes line's chains: hand5-own traced with its replaced names' chains left out (tracerfaults3's
   # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words, naming the
   # first it meets: a name that a node of the line replaces with no chain there (hand5-own, --rebuilt none: push_rebuilt

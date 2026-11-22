@@ -684,6 +684,43 @@ def draws_unrestored_v2():
     before_install_v2(plant)
 
 
+def observer_timer_v2(off):
+    """Under v2, the plant of an observer's own code that arms a timer by the simulator itself, not through the
+    namespace's `after` (which iface_of stops). At every node, `completed` (the toy's: by group, the time of its
+    completion) becomes a dict whose item assignment first arms a timer of a no-op by `node.sim.after`.
+    check_completion's observer assigns it in its own code (node.py's `_v2`), so the guard over the simulator's `after`
+    (sim_guard) must stop the tracer there, in that observer's words. With `off` (the control), the guard is off
+    (SIMGUARD): the run goes to its end, and its body is the plain run's, the no-op being no traced name. Counted once
+    for each assignment, before its timer (which may stop the run); "completions" is the number of groups completed
+    at every node at the run's end."""
+    if off:
+        T.SIMGUARD[0] = False
+    held, total = [], Count()
+
+    def noop():
+        pass
+
+    class Completed(dict):
+        def __setitem__(self, g, t):
+            PLANTED[0] += 1
+            self.node.sim.after(self.node, 0.0, noop)
+            super().__setitem__(g, t)
+            total.n = sum(len(c) for c in held)
+
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        c = Completed(nd.completed)
+        c.node = nd
+        held.append(c)
+        nd.completed = c
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+    SEEN["completions"] = total
+
+
 def owed_flipped_v2(kind):
     """Under v2, a plant of a layer's listing that changes only a return: at every node, a layer of this tool's own over
     `owed_missing`, bound before the install and holding the toy's (the member check's, which with the check on calls
@@ -1385,11 +1422,11 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
           "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2", "--raw-chunk-id-v2",
           "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2", "--rebound-scanned-v2",
           "--rebind-tape-v2", "--rebind-view-v2", "--stale-id-bare-v2", "--close-keyerror-v2",
-          "--param-after-install-v2")
+          "--param-after-install-v2", "--observer-timer-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
-          "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS + (
+          "--hdr-read-v2-raw", "--observer-timer-v2-off", "--chains-omit-v2") + CHAIN_PLANTS + (
           "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_V2 + (  # K13's two: the first must not
           "--layer-missing-v2",         # stop it, the second must; pieces D's and E's; H4's plant (n), on hand5-own;
           "--calls-nested-off-v2", "--calls-iwants-off-v2")     # piece (b)'s (u) and (v), on hand5
@@ -1442,6 +1479,8 @@ def main(argv):
             param_after_install_v2()
         elif fault.startswith("--hdr-read-v2"):
             hdr_read_v2(raw=fault.endswith("-raw"))
+        elif fault.startswith("--observer-timer-v2"):
+            observer_timer_v2(off=fault.endswith("-off"))
         elif fault == "--chains-omit-v2":
             chains_omit_v2()
         elif fault == "--chain-filter-observer-v2":
