@@ -486,6 +486,22 @@ def rebind_view_v2():
     after_install(wrap)
 
 
+def param_after_install_v2():
+    """Under v2: a type's parameter changed after the install (the payload type made pull-only, as the toy's
+    pull_source_known.py does after the sim is built). The nodes line holds the parameters the install read, so the
+    twin would run the type as it was; final_check, which reads them again, must stop it."""
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        r = _install(self, nd, ns)
+        nd._types["payload"].params.EAGER = not nd._types["payload"].params.EAGER
+        PLANTED[0] += 1
+        return r
+
+    T.Tracer3.install = install
+
+
 def close_keyerror_v2():
     """Under v2: a stop (a traced call at another node in an open record, as `--other-node-v2`), and an ordinary
     exception raised at the trace's close after it. The stop's reason must be the one raised; the close's is a note."""
@@ -872,7 +888,8 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
           "--late-rebind", "--stale-id-callee", "--rebind-after-records", "--limit-fraction",
           "--early-install-v2", "--raw-alias-v2", "--other-node-v2", "--unscanned-layer-v2", "--raw-chunk-id-v2",
           "--hdr-other-v2", "--alias-missing-v2", "--other-node-tape-v2", "--rebound-scanned-v2",
-          "--rebind-tape-v2", "--rebind-view-v2", "--stale-id-bare-v2", "--close-keyerror-v2")
+          "--rebind-tape-v2", "--rebind-view-v2", "--stale-id-bare-v2", "--close-keyerror-v2",
+          "--param-after-install-v2")
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
@@ -922,6 +939,8 @@ def main(argv):
             bare_in_question_v2(per_node=False, callee="stale-id")
         elif fault == "--close-keyerror-v2":
             close_keyerror_v2()
+        elif fault == "--param-after-install-v2":
+            param_after_install_v2()
         elif fault.startswith("--hdr-read-v2"):
             hdr_read_v2(raw=fault.endswith("-raw"))
         elif fault == "--chains-omit-v2":

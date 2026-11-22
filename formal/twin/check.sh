@@ -69,7 +69,7 @@
 #   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
 #             line after the verdict, a line on stderr, exit code 2) refused, the plain one taken
-#   tracercontrols   a tracer whose views let an assignment through unlogged, and 29 faults planted in the tracer:
+#   tracercontrols   a tracer whose views let an assignment through unlogged, and 30 faults planted in the tracer:
 #             each must stop it, with its own words; under v2, nine plants that must not (five, and four controls),
 #             each as written (a plant that replaces a function at a node: the nodes line with its chains set
 #             aside, that node's chain the plant's), and the controls of the checks' own helpers; and a nodes
@@ -439,14 +439,14 @@ EOF_SELF
      && head -n 1 "$lc/labcites.txt" | grep -q -F -e "$lc/README.md:$n: "; then
     echo "  control, a lab citation planted in README.md's copy: reported, as it must be"
   else no "the guard did not report a lab citation planted in README.md's copy ($lc/labcites.txt)"; fi
-  # the scan's lists beside trace3.py's hand-kept ones: exactly the one known difference, the observer the
-  # peer-promise mode binds over close_promises (not listed: that mode is refused under v2 today)
+  # the scan's lists beside trace3.py's hand-kept ones: no difference. The observer the peer-promise mode binds
+  # over close_promises, bound under v2 alone (_v2 calls _peer_promise), is held to LAYERS, which lists it
   $PY "$T/scan_bindings.py" "$TOY" --lists > "$OUT/scan-lists.txt" 2>&1; local lrc=$?
-  if [ "$lrc" = 1 ] && [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 1 ] \
-      && has -x "observer close_promises Node._peer_promise.<locals>.close_promises: NOT in WRAPPERS" "$OUT/scan-lists.txt" \
-      && has -x "1 differences from trace3.py's lists" "$OUT/scan-lists.txt"; then
-    echo "  the scan's lists: trace3.py's, but the one known observer (scan-lists.txt)"
-  else no "the scan's lists differ from trace3.py's otherwise than by the one known observer (scan-lists.txt)"; fi
+  if [ "$lrc" = 0 ] && [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 0 ] \
+      && has -x "observer close_promises Node._peer_promise.<locals>.close_promises: v2-only, an observer in LAYERS (the chain rule's)" "$OUT/scan-lists.txt" \
+      && has -x "the lists as trace3.py's" "$OUT/scan-lists.txt"; then
+    echo "  the scan's lists: trace3.py's (scan-lists.txt)"
+  else no "the scan's lists differ from trace3.py's (scan-lists.txt)"; fi
 }
 s_tables() {
   { $PY "$T/gen/gen.py" --check "$OUT/twin" && $PY "$T/gen/makers.py" --check "$OUT/twin"; } > "$OUT/tables.txt" 2>&1 \
@@ -878,9 +878,10 @@ s_tracercontrols() {
   # the tracer's own checks: each planted fault must stop it, with its own words
   : > "$OUT/c-tracerfaults.txt"; bad=0
   local also
-  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2; do
+  for f in made-rows-off alias alias-control installed-flip pending-twice alias-start alias-message defer-chain replaced false-wrapper stale-id level1-in-cell late-rebind stale-id-callee rebind-after-records limit-fraction early-install-v2 raw-alias-v2 other-node-v2 unscanned-layer-v2 raw-chunk-id-v2 hdr-other-v2 alias-missing-v2 other-node-tape-v2 rebound-scanned-v2 rebind-tape-v2 rebind-view-v2 stale-id-bare-v2 close-keyerror-v2 param-after-install-v2; do
     also=
     case $f in
+      param-after-install-v2) want="^trace3: node [0-9]*: type payload's EAGER changed after the tracer's install \(True there, False now\): the nodes line holds a type's parameters as the install read them" ;;
       rebind-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under v2 must be the namespace's last binding" ;;
       rebind-view-v2) want="^trace3: node [0-9]*: offers was bound again after the tracer was installed, which under v2 must be the namespace's last binding: a OfferMap" ;;
       close-keyerror-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs"
@@ -921,8 +922,8 @@ s_tracercontrols() {
     else echo "$f: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-tracerfaults.txt"; bad=1; fi
   done
   [ "$bad" = 0 ] || no "a planted fault of the tracer's (c-tracerfaults.txt)"
-  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 29 ] || no "not 29 planted faults stop the tracer as written (c-tracerfaults.txt)"
-  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 29 planted faults stop the tracer with their own words"
+  [ "$(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt")" = 30 ] || no "not 30 planted faults stop the tracer as written (c-tracerfaults.txt)"
+  echo "  $(grep -c 'the tracer stopped, as it must' "$OUT/c-tracerfaults.txt") of 30 planted faults stop the tracer with their own words"
   # under v2, the tracer-wide depth's plants, which must not stop it: a call at another node inside a question runs
   # bare and is counted, a replaced name entered outside any record makes no record inside and restores its state on
   # a raise; each plant's body is the plain v2 trace's (the run above), each control's another (a record inside)

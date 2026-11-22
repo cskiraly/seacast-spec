@@ -2028,6 +2028,8 @@ class Tracer3(Tracer):
         #                                   names' second check (final_check)
         self.type_slots = []            # under v2, (node, a type or its params, attribute, the tracer's question
         #                                   there), for final_check too
+        self.type_nodes = []            # under v2, (node, namespace, its types as the install read them), for
+        #                                   final_check: the nodes line holds the install's parameters
         self.doc_mid = {}               # and m2_check's reference function, a node's own
         self.cur_nid = None             # the node of the record being written (mid_of's reference)
         self.built_objs = {}            # the chunks the record's publish built (built, content_id_asked)
@@ -2347,6 +2349,18 @@ class Tracer3(Tracer):
             if getattr(obj, a, None) is not w:
                 raise SystemExit(f"trace3: node {nd.id}: an object type's {a} was bound again after the tracer was "
                                  f"installed: {layer_where(getattr(obj, a, None))}")
+        for nd, ns, types in self.type_nodes:   # the parameters as the install read them, which the nodes line holds
+            now = self.types_v2(nd, ns)
+            for tid in sorted(set(types) | set(now)):
+                was, is_ = types.get(tid), now.get(tid)
+                if was is None or is_ is None:
+                    raise SystemExit(f"trace3: node {nd.id}: the object type {tid} is "
+                                     f"{'new' if was is None else 'gone'} since the tracer's install")
+                for p in sorted(set(was) | set(is_)):
+                    if was.get(p, "missing") != is_.get(p, "missing"):
+                        raise SystemExit(f"trace3: node {nd.id}: type {tid}'s {p} changed after the tracer's install "
+                                         f"({was.get(p, 'missing')!r} there, {is_.get(p, 'missing')!r} now): the "
+                                         f"nodes line holds a type's parameters as the install read them")
         for nd, ns, bound in self.bound:
             if self.doc_v2:                     # both aliases there and still the installed objects
                 for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
@@ -3446,6 +3460,7 @@ class Tracer3(Tracer):
             if off:
                 raise SystemExit(f"trace3: node {nd.id}: the closure rule's lists and the node differ: " + "; ".join(off))
             types = self.types_v2(nd, ns)
+            self.type_nodes.append((nd, ns, types))     # read again by final_check
         # what each traced name is at this node, and the node's own line: under v2 by the chain rule over its layers
         replaced, chains = [], None
         if self.doc_v2:
