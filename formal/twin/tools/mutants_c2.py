@@ -1035,7 +1035,61 @@ PART7B = [
      "that can write: the tape (the wake); with no slot free, the line's read left unmade"),
 ]
 
-ROWS = PART0 + PART1 + PART2 + PART4 + PARTB + PARTC + PART5B + PART5C + PARTR + PART6 + PART7 + PART7B
+# §4.3's and §4.4's admitted (v0.10.12): a HAVE, and each id an IHAVE's entry expands to, of a group beyond the
+# peer's limit of unknown groups is ignored. The toy's admitted is always true, so hand5 and the cells answer true
+# everywhere; directed43 and directed44 refuse a share of the groups (their summaries count the kinds).
+SEC43, SEC44 = "SpecTwin/Sec43.lean", "SpecTwin/Sec44.lean"
+ADMIT_H = ("  if !(← admitted p (.bitmap g bits)) then                  -- a group beyond the peer's unknown groups "
+           "(§8.2): ignored\n    branch \"on_have: not admitted\"; return\n")
+VALID_H = ("  if !(← validHave g bits) then                             -- length, and indices within N once known "
+           "(§8.2)\n    penalise p\n    branch \"on_have: not a valid HAVE\"; return\n")
+ADMIT_I = ("      if !(← admitted p (.offer a)) then                    -- a group beyond the peer's unknown groups "
+           "(§8.2)\n        branch \"on_ihave: not admitted\"\n        continue\n")
+HELD_I = ('      if ← held a then\n        branch "on_ihave: held"\n        continue\n'
+          '      if ← expired a.group then\n        branch "on_ihave: expired"\n        continue\n')
+OFFER_I = "      addOffer a p                                          -- [c5] offer table (§6.1)\n"
+PARTG = [
+    ("have-admitted-not-asked", "on_have: admitted not asked", SEC43, ADMIT_H, "",
+     "yes", "yes", "yes",
+     "a HAVE of a group beyond the peer's limit of unknown groups is taken: its bits join peer_has and holders",
+     "directed43, an on_have record past valid_have: the tape (admitted logged and not asked); hand5, an on_frame "
+     "record with a HAVE: the tape"),
+    ("have-not-admitted-taken", "on_have: admitted asked, and a HAVE not admitted taken all the same", SEC43,
+     ADMIT_H, "  let _ ← admitted p (.bitmap g bits)\n",
+     "yes", "no", "no",
+     "as above, where the node asks: the toy's admitted is always true, so only a refusal tells",
+     "directed43, an on_have record whose tape answers admitted false: the writes (peer_has, holders)"),
+    ("have-admitted-before-valid", "on_have: admitted asked before valid_have", SEC43, VALID_H + ADMIT_H,
+     ADMIT_H + VALID_H,
+     "yes", "yes", "yes",
+     "a malformed HAVE of a refused group goes unpenalised, and every HAVE asks the two in the other order",
+     "directed43, an on_have record past expired: the tape (valid_have and admitted in the other order); of the "
+     "kind \"a refused group's HAVE, not valid\": the tape (penalise not asked)"),
+    ("ihave-admitted-not-asked", "on_ihave: admitted not asked", SEC44, ADMIT_I, "",
+     "yes", "yes", "yes",
+     "an offer of a group beyond the peer's limit of unknown groups is recorded and asked for",
+     "directed44, an on_ihave record with an id neither held nor expired: the tape (admitted logged and not asked); "
+     "hand5, an on_frame record with an IHAVE of a chunk not held: the tape"),
+    ("ihave-not-admitted-taken", "on_ihave: admitted asked, and an id not admitted taken all the same", SEC44,
+     ADMIT_I, "      let _ ← admitted p (.offer a)\n",
+     "yes", "no", "no",
+     "as above, where the node asks: the toy's admitted is always true, so only a refusal tells",
+     "directed44, an on_ihave record whose tape answers admitted false for an id: the writes (offers, by add_offer) "
+     "and the asks returned"),
+    ("ihave-admitted-before-held", "on_ihave: admitted asked before held and expired", SEC44, HELD_I + ADMIT_I,
+     ADMIT_I + HELD_I,
+     "yes", "no", "no",
+     "a held id, or one of an expired group, is asked of admitted: a question more, and its answer can decide first",
+     "directed44, an on_ihave record of the kind \"a held id of a refused group\" or with a held id at all: the tape "
+     "(admitted asked, not logged); a cell's IHAVE never brings a held chunk"),
+    ("ihave-offer-before-admitted", "on_ihave: the offer recorded before admitted is asked", SEC44, ADMIT_I + OFFER_I,
+     "      addOffer a p\n" + ADMIT_I,
+     "yes", "no", "no",
+     "an id of a refused group still enters the offer table, though it is never asked for",
+     "directed44, an on_ihave record whose tape answers admitted false for an id: the writes (offers)"),
+]
+
+ROWS = PART0 + PART1 + PART2 + PART4 + PARTB + PARTC + PART5B + PART5C + PARTR + PART6 + PART7 + PART7B + PARTG
 assert len({r[0] for r in ROWS}) == len(ROWS), "a name twice"
 CYCLE2 = {r[0]: (r[1], r[2], r[3], r[4]) for r in ROWS}
 PRED = {r[0]: {"D": r[5], "H": r[6], "C": r[7], "why": r[8], "witness": r[9]} for r in ROWS}
@@ -1049,6 +1103,72 @@ RESTATED_C = {"guard-more-than-r": "open", "guard-no-grace": "open", "guard-empt
               "guard-at-the-grace": "no", "choose-id-not-compared": "no"}
 for _k, _v in RESTATED_C.items():
     PRED[_k]["C"] = _v
+# PARTG's rows, in part restated after their mutants were run and the commit was read (the rows keep what was
+# predicted first):
+# - the H and C columns of two. As first written, only a held id, an expired group's entry or a refusal told them.
+#   Each asks out of the tape's order, though: admitted before expired, or listed (add_offer's read of the offer
+#   table) before admitted. So an IHAVE whose id reaches admitted tells the first: hand5's on_frame record with an
+#   IHAVE of a chunk not held among them, and a cell's, as for ihave-admitted-not-asked. An admitted id for which
+#   add_offer reads listed (the peer not yet in the id's list) tells the second, as hand5's does.
+# - the why of three, where it said more than the code does: on_have's two questions are in the other order only
+#   where both are asked, though every HAVE past expired differs at the first; add_offer sets the peer's offered bit
+#   always but appends to offers only within its limits, and an ask follows only past the guards after it.
+# - the witness of all seven.
+def _told(trace, record, diff):
+    return f"{trace}, the first record the replay told ({record}): its difference begins `{diff}`"
+
+
+_G2 = '"2222222222222222222222222222222222222222222222222222222222222222"'
+_G5 = '"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6"'
+_LISTED_H5 = _told("hand5", "node 2 at 3.096190, on_frame",
+                   "tape: listed(4) asked, SpecTwin.Replay.Entry.admitted   4   (SpecTwin.Admit.offer "
+                   f"(SpecTwin.Key.want {_G5} 0))")
+_LISTED_D44 = _told("directed44", "node 2 at 0.500000, on_ihave",
+                    "tape: listed(1) asked, SpecTwin.Replay.Entry.admitted   1   (SpecTwin.Admit.offer "
+                    "(SpecTwin.Key.want")
+RESTATED_G = {
+    "ihave-admitted-before-held": {
+        "H": "yes", "C": "yes",
+        "witness": "; ".join([
+            _told("directed44", "node 2 at 0.500000, on_ihave",
+                  "tape: admitted(1, SpecTwin.Admit.offer (SpecTwin.Key.want"),
+            _told("hand5", "node 2 at 3.096190, on_frame",
+                  f"tape: admitted(4, SpecTwin.Admit.offer (SpecTwin.Key.want {_G5} 0)) asked, "
+                  "SpecTwin.Replay.Entry.expired")])},
+    "ihave-offer-before-admitted": {
+        "H": "yes", "C": "yes",
+        "why": "an id of a refused group still enters the offer tables (offered always, offers within its limits), "
+               "though it is never asked for",
+        "witness": "; ".join([_LISTED_D44, _LISTED_H5])},
+    "have-admitted-not-asked": {
+        "witness": "; ".join([
+            _told("directed43", "node 2 at 1.000000, on_have",
+                  "tape: the toy asked more: [(SpecTwin.Replay.Entry.admitted     55     (SpecTwin.Admit.bitmap "
+                  f"{_G2} 39)     true,   none)]"),
+            _told("hand5", "node 5 at 3.008970, on_frame",
+                  "tape: the toy asked more: [(SpecTwin.Replay.Entry.admitted     1     (SpecTwin.Admit.bitmap "
+                  f"{_G5} 1)     true,")])},
+    "have-admitted-before-valid": {
+        "why": "a malformed HAVE of a refused group goes unpenalised, and every HAVE past expired asks admitted where "
+               "valid_have is asked first (the two in the other order where both are asked)",
+        "witness": "; ".join([
+            _told("directed43", "node 2 at 1.000000, on_have",
+                  f"tape: admitted(55, SpecTwin.Admit.bitmap {_G2} 39) asked, SpecTwin.Replay.Entry.validHave"),
+            _told("hand5", "node 5 at 3.008970, on_frame",
+                  f"tape: admitted(1, SpecTwin.Admit.bitmap {_G5} 1) asked, SpecTwin.Replay.Entry.validHave")])},
+    "have-not-admitted-taken": {
+        "witness": _told("directed43", "node 2 at 1.000000, on_have",
+                         "reached: the twin entered [on_have, window_release], the record has [on_have]")},
+    "ihave-admitted-not-asked": {
+        "why": "an offer of a group beyond the peer's limit of unknown groups is recorded (offered always, offers "
+               "within its limits), and asked for where the guards after add_offer let it through",
+        "witness": "; ".join([_LISTED_D44, _LISTED_H5])},
+    "ihave-not-admitted-taken": {
+        "witness": _told("directed44", "node 2 at 7.000000, on_ihave",
+                         f"tape: listed(5) asked, SpecTwin.Replay.Entry.expired {_G2} false logged")},
+}
+for _k, _v in RESTATED_G.items():
+    PRED[_k].update(_v)
 TABLE_OF = {"tables-origin-read-none": "origin", "tables-planned-row-read-false": "planned",
             "tables-pushed-read-none": "pushed", "tables-desc-read-none": "desc",
             "tables-pushed-write-not-made": "pushed",

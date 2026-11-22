@@ -1,7 +1,7 @@
-# SEACAST's next version (draft): its figures
+# SEACAST: its figures
 
-This file holds the figures behind [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next
-version, and behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).
+This file holds the figures behind SEACAST, [`protocol-v2.md`](protocol-v2.md), and
+behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).
 Both documents state the rules and their reasons in words, and they point here for the numbers, as
 `(protocol-v2-figures.md, §4.1)`, or as `(protocol-v2-figures.md, §4.6, "The probe")` for a part of
 an entry. The entries are grouped by the section that cites them, under that section's number and
@@ -36,11 +36,12 @@ transport, which takes every write at once (`--send-buffer 0`), unless they name
 
 **Each entry gives its own conditions:** the network and its size, the degree, the messages, the
 seeds, the operating point (the setting, the source's uplink, the faults), the transport, the
-baseline, and the rules it ran on. The rules are the draft's on the date of the run. An entry gives
-that date and the commit on this repository's main line that first wrote the figure into the text; a
-commit off the main line is named by its date. It names the later changes of the rules that its
-figures predate, where it can point to them; the versions of `protocol.md` carried since are listed
-in `protocol-v2-decisions.md` ("The versions of `protocol.md` carried"). A condition that the run's
+baseline, and the rules it ran on. The rules are those of `protocol-v2.md` on the date of the run;
+below, the draft of a date means `protocol-v2.md` as it was on that date. An entry gives that date
+and the commit on this repository's main line that first wrote the figure into the text; a commit
+off the main line is named by its date. It names the later changes of the rules that its figures
+predate, where it can point to them; the versions of `protocol.md` carried since are listed in
+`protocol-v2-decisions.md` ("The versions of `protocol.md` carried"). A condition that the run's
 record does not give is called unknown.
 
 ## §1.3 Links, joins and relations
@@ -166,6 +167,27 @@ they were not run again.
   from the two cells). Under variant C it reached 42 and 11.
 - Under the rows setting, the busiest peer reached 1 254 frames and 178 asks [857 to 1 254 frames
   and 78 to 178 asks over the three seeds].
+
+## §4.5 An ask arrives, and serving
+
+### Asks outside what a node serves
+
+**Conditions.** The count ran on 2026-11-21 on the spec of release v0.10.7 (`c67d0e5`), before the
+rule: an instrument around each node's `on_want` classed every honest ask as held, or as inside or
+outside what the receiving node serves. A run without the instrument, at seed 7 for each
+configuration, gave the same digest as the run with it, so the instrument changed nothing there.
+The runs have 60 nodes, degree 30 and three blocks, at seeds 7,
+8 and 9, with the toy's default transport (`--send-buffer 1`): custody alone and custody with a
+fifth of the nodes sampling (both with a 1 Gbps proposer, `--net bld`), the rows, and custody with
+samplers under `--upkeep on --churn 2`. The tier 4 setting's fifteen recorded cells cannot show such
+an ask: every node there declares interest `ALL`. In the strict reading the instrument used, a node
+that has not yet validated a group's header cannot derive its own interest in the group.
+- Custody alone and the rows had no ask the receiving node did not hold (12 912 to 13 286 and
+  50 963 to 52 438 asks a run).
+- Custody with samplers had 191 to 217 outside asks a run, 2.2 % to 3.0 % of the asks, with churn
+  and without. Every one was a sampler's standing WANT that reached a custodian before the
+  custodian had validated the header, for a column it custodies, and the asker believed it could
+  ask in every case. The examples the instrument kept arrived 6 to 9 ms after the block's publish.
 
 ## §4.6 Completion, the claims, decoding and repair
 
@@ -794,7 +816,7 @@ holding at the write"); and the line skip (2026-11-20) and the wake at the wait 
 - Under the liar fault (`--fault claim20`), over seeds 7 to 16, 108 (member, row) pairs never
   complete, against 80 without P4: more on seven seeds, as many on two, fewer on one (not traced).
   The earlier P4 batch of the same night recorded them.
-- With v0.5 merged (2026-10-21; the toy's README, "v0.5 in the next version"), 2 pairs stay short
+- With v0.5 merged (2026-10-21; the toy's README, now under "v0.5 in SEACAST"), 2 pairs stay short
   over seeds 7 to 16, and none on eight of the seeds.
 - The toy check of v0.5's last resort (2026-10-21) ran at seeds 9, 14 and 15. With the last resort
   off, 12, 24 and 18 pairs stay short, as before v0.5 (12, 22 and 20). With the candidates limited
@@ -1001,13 +1023,13 @@ digest only, and no other cell (§4.11).
 unless an entry gives another size. A cell is one configuration of the toy; the median and the tail
 are the 50th and the 99th percentile of a cell's completion times. Each entry names its seeds; a
 figure from fewer than ten seeds is a toy check of a mechanism, not a measurement. The baseline is
-v0.3's order, the toy's `--answers-first v03`, with v2's window in bytes. Every figure below was
-first written on 2026-10-07 (11:05), when the draft took the writer's order, and the toy's README of
-that commit records the checks. Spec `08fbc3d`, the v0.6 draft of 2026-10-21, took them into the
-main line. Like every figure from before 2026-11-15, they ran with the toy's earlier transport,
-which takes every write at once (`--send-buffer 0`). The rules they ran on are the draft's of
-2026-10-07. Which of them changed since is not traced here; §4.7's entry for the source's offers at
-publish (card 3), from the same runs, names the later rules it can point to.
+v0.3's order, the toy's `--answers-first v03`, with SEACAST's window in bytes. Every figure below
+was first written on 2026-10-07 (11:05), when the draft took the writer's order, and the toy's
+README of that commit records the checks. Spec `08fbc3d`, the v0.6 draft of 2026-10-21, took them
+into the main line. Like every figure from before 2026-11-15, they ran with the toy's earlier
+transport, which takes every write at once (`--send-buffer 0`). The rules they ran on are the
+draft's of 2026-10-07. Which of them changed since is not traced here; §4.7's entry for the source's
+offers at publish (card 3), from the same runs, names the later rules it can point to.
 
 **A source's own chunks first, against v0.3's order:**
 - With a 50 Mbps proposer, by the mean over seeds 7, 8 and 9 (paired by seed), the custody block
@@ -1129,7 +1151,12 @@ moved the digests of `rr-stripe` and `push-deep` only. Read from both recordings
 26 ms later at the median, 27 ms later at the tail and 0.05 copies lighter (p50 814 against 788 ms,
 p99 894 against 867 ms, 1.65 against 1.70 copies). `late-block` is 6 ms later at the median and
 11 ms later at the tail. `ihave-limits` is 1 ms sooner at the median and at the tail, with 0.01
-copies more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies).
+copies more (p50 510 against 511 ms, p99 593 against 594 ms, 2.07 against 2.06 copies). Since
+then, the window's room freed at a holding's repeated bit (`protocol-v2.md` §4.3, 2026-11-21) moved
+this document's `without-a` (p50 432 to 429 ms, p99 517 to 518 ms, copies 3.99 to 3.97). That cell
+runs without cancel (card 8), so copies reach peers that hold them already, and their holdings
+repeat the bit. It stays within the last bullet's distances of `protocol.md`'s (p50 429 against
+427 ms, p99 518 against 528 ms, 3.97 copies each).
 
 - **v0.3's window and the window in bytes** (2026-10-07). With v0.3's window (slots of one payload
   chunk), eleven of the twelve cells reproduced v0.3's completion times and bytes exactly, and
@@ -1183,7 +1210,7 @@ recording of 2026-10-27, with the earlier transport. It was first written on the
 ## §6.2 The five designs as settings
 
 **Conditions.** The cells have 60 nodes, degree 30, the 1 Gbps proposer and 6 row reconstructors
-where there are rows, in the custody and rows settings of `toy/README.md` ("The next version"). They
+where there are rows, in the custody and rows settings of `toy/README.md` ("SEACAST"). They
 ran at seeds 7 to 19, thirteen runs of each cell, unless an item names seed 7, the recorded seed.
 They ran on 2026-10-07 (the repair floor) and 2026-10-08 (three supernodes, `--supernodes`, on
 datacenter links); the figures were first written into the text on the main line in spec `08fbc3d`
@@ -1264,8 +1291,10 @@ configuration (100 samplers, two blocks, ten seeds). A time is the median over t
 ran on 2026-10-26 on the draft of 2026-10-23, and were recorded in the toy's README ("A sampler's
 reach"). The figures were first written into the text on the main line in spec `0d968d8`
 (2026-11-14). The transport took every write at once (`--send-buffer 0`). `SAMPLE_RETRY` was 2 s,
-`SAMPLE_RETRY2` 0.5 s and `SAMPLE_OUTSTANDING` 4. The runs predate ties (2026-10-26), the IHAVE
-limits (2026-10-27), v0.9's source at the acknowledgement (2026-11-11) and the transport
+`SAMPLE_RETRY2` 0.5 s and `SAMPLE_OUTSTANDING` 4. `SAMPLE_OUTSTANDING` was then a parameter of the
+column type. The samplers sampled only columns, so the 4 also capped a block's second-phase asks in
+flight across its types, as the node's setting does now. The runs predate ties (2026-10-26), the
+IHAVE limits (2026-10-27), v0.9's source at the acknowledgement (2026-11-11) and the transport
 (2026-11-15); they were not run again.
 
 - **`SAMPLE_RETRY`:** the custodians' 99th percentile was 0.67 to 0.70 s, honest [666 to 678 ms at
@@ -1355,7 +1384,7 @@ groups, at seeds 7 to 16, and the figures are warm medians. A figure is the medi
 the change, paired by seed: P4 against no P4, and P4 with merging (`--merge-holdings on`) against
 P4. The baselines differ by transport: writes that complete at once (`--send-buffer 0`), and one
 write per connection at a time (`--send-buffer 1`), each with its own P4 baseline. The cells ran on
-2026-10-21, the day v0.4's P4 came in, and were recorded in the toy's README ("The next version",
+2026-10-21, the day v0.4's P4 came in, and were recorded in the toy's README (now under "SEACAST",
 P4's and `--merge-holdings`'s tables). The figures were first written on the main line in
 `08fbc3d`. The runs predate v0.5 (2026-10-21), ties (2026-10-26), v0.9's source at the
 acknowledgement (2026-11-11) and the transport of 2026-11-15.

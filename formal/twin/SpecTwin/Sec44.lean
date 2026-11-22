@@ -22,7 +22,11 @@ purpose:
 The functions reach the block's tables through `Tables` and in no other way.
 
 An id of any length is an entry since v0.10, which settles what §4.4 did not say before: one that is not a
-chunk's structured id is ignored (`valid_id`), and so is a bitmap beyond a HAVE's limits, with a penalty. -/
+chunk's structured id is ignored (`valid_id`), and so is a bitmap beyond a HAVE's limits, with a penalty.
+
+Since v0.10.12 each id an entry expands to, neither held nor of an expired group, is asked of `admitted(p, a)`
+before it is an offer: an id of a group beyond the peer's limit of unknown groups is ignored, with no offer
+recorded, and the next id is taken. -/
 
 namespace SpecTwin
 
@@ -113,6 +117,9 @@ def onIhave (p : Peer) (ids : List IhaveEntry) : M m (List Key) := do
         continue
       if ← expired a.group then
         branch "on_ihave: expired"
+        continue
+      if !(← admitted p (.offer a)) then                    -- a group beyond the peer's unknown groups (§8.2)
+        branch "on_ihave: not admitted"
         continue
       addOffer a p                                          -- [c5] offer table (§6.1)
       -- `if gated(a) or not authenticable(group(a)): continue`: [c6] stop-pull; the block first (§3)

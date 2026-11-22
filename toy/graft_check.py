@@ -57,6 +57,7 @@ trip, and answered (this document's way).
 """
 import argparse
 import ast
+import math
 import sys
 from collections import defaultdict, deque
 from dataclasses import dataclass, replace
@@ -70,7 +71,7 @@ from extract import blocks  # noqa: E402
 
 DOC2 = HERE.parent / "protocol-v2.md"
 NAMES = ("maintain_relations", "graft", "prune", "on_graft", "on_prune", "join_push", "send_relation",
-         "queue_owed_relations", "on_join", "send_join", "yes", "no")
+         "queue_owed_relations", "on_join", "send_join", "yes", "no", "joined", "relation_room")
 IN, OUT, BOTH, FORWARD, NONE, FAST, HOME = "IN", "OUT", "BOTH", "FORWARD", "NONE", "FAST", "HOME"
 QUEUE = 1                           # entries a per-peer queue admits
 FILLERS = 2                         # times other traffic may take a node's queue room
@@ -113,7 +114,7 @@ class Type:
 
     def __init__(self, symmetric=False):
         self.params = SimpleNamespace(M=1, F_LO=0, F_HI=1, D_OUT=0, D_OUT_FAST=0, D_OUT_MAX=1,
-                                      SYMMETRIC=symmetric, PRUNE_BACKOFF=0.0)
+                                      SYMMETRIC=symmetric, PRUNE_BACKOFF=0.0, MAX_RELATIONS=math.inf)
 
     def family(self, g):
         return FAM
@@ -178,7 +179,8 @@ class Node:
             in_pushers=lambda T_, fam, c: [peer] if c in ns["push_in"][peer][T][fam] else [],
             out_pushees=lambda T_, fam, c: [peer] if c in ns["push_out"][peer][T][fam] else [],
             wants_family=lambda T_, fam: ns["accept"], uplink_class=lambda: HOME,
-            has_room=lambda p: len(ns["queue"]) < QUEUE, wake=lambda p: None, our_join=lambda T_: JOIN)
+            has_room=lambda p: len(ns["queue"]) < QUEUE, wake=lambda p: None, our_join=lambda T_: JOIN,
+            runs_type=lambda tid: True, links=lambda T_: [peer] if linked() else [])
         self.linked = linked
         exec(compile(code, "protocol-v2.md (§4.1's functions)", "exec"), ns)
         self.load((False,) * 4 + ((), ()) + (False,) * 4)

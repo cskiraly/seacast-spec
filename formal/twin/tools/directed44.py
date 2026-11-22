@@ -17,6 +17,14 @@ index 8191 or below 3); a group's descriptor known (counts 1 to 3, so that an in
 falls on both sides of it) or not; and so bitmaps the toy's `valid_have` refuses, whose sender is penalised.
 valid_id is also called alone, now and then with a bitmap, of which the Python's `len` raises.
 
+`admitted(p, a)`, which the toy answers true always, is the scenario's: false for an id of a group beyond the
+peer's limit of unknown groups (no offer recorded, the next id taken), each group refused on a sample with
+probability 0.15, drawn from a stream of its own so that every other draw is as without it. The order shows: an
+id of a refused group that reached `expired` and is expired asks no `admitted` (counted from `expired`'s calls,
+which are the scenario's), nor does an id entry of a refused group drawn held, and one call can be refused by
+`admitted` twice or more (an id drawn twice, refused each time, counts twice). The counts of these kinds, per call,
+are printed.
+
 As directed61.py's, the states are drawn without the document's invariants (its docstring lists what that
 allows for §6.1's tables). For the other tables: held_back may hold an ask for a chunk whose group is not
 authenticable, or one that is held; a count of asks may exceed the count of frames' asks.
@@ -52,6 +60,8 @@ LIMIT_RPCS, LIMIT_ASKS = 2, 3
 
 class Scenario:
     held, expired, tied, peers, listed, admit, rank, block, order = set(), set(), set(), [], {}, True, {}, set(), {}
+    refused, asked = set(), []          # the groups beyond p's limit of unknown groups; admitted's calls
+    expired_asked = []                  # expired's calls, by group
 
 
 def main(argv):
@@ -85,7 +95,7 @@ def main(argv):
 
     if not a.no_limits:
         ns["MAX_IHAVE_MESSAGES"], ns["MAX_IHAVE_LENGTH"] = LIMIT_RPCS, LIMIT_ASKS
-    ns["expired"] = lambda g: g in sc.expired
+    ns["expired"] = lambda g: sc.expired_asked.append(g) or g in sc.expired    # its calls kept, for the order
     ns["authenticable"] = lambda g: g in sc.block
     ns["connected_topic_peers"] = lambda: list(sc.peers)
     ns["own_order"] = lambda xs, x: sorted(xs, key=lambda q: sc.rank[q])
@@ -93,11 +103,18 @@ def main(argv):
     #   sample's draw; an id of index 8191 is drawn last
     ns["listed"] = lambda p: sc.listed.get(p, 0)
     ns["enqueue"] = lambda p, x, urgent=False: sc.admit
+
+    def group_of(x):                    # the group an offered id names: a WantIndex's, or a full id's first 32 bytes
+        return x.group if isinstance(x, Wm.WantIndex) else x[:32]
+
+    ns["admitted"] = lambda p, x: sc.asked.append(x) or group_of(x) not in sc.refused
     ns["after"] = lambda delay, fn, *args: None
     tr.install(nd, ns)
 
     rng = random.Random(a.seed)
     rng2 = random.Random(a.seed + 1000003)      # the draws of `tied`'s decoys: apart from the main stream
+    rng4 = random.Random(a.seed + 3000017)      # the refused groups: apart from the main stream too
+    order = Counter()
     roots = [bytes([0xa1 + j]) * 32 for j in range(4)]      # the ties' root; the decoys' three
     held_apart = []                     # records whose drawn held disagreed with mine
     groups = [bytes([0x11 * (j + 1)]) * 32 for j in range(2)]
@@ -177,6 +194,7 @@ def main(argv):
         sc.rank = {q: rng.random() for q in peers}
         sc.order = {(c, full): rng.random() for c in chunks for full in (False, True)}
         sc.admit = rng.random() < 0.85
+        sc.refused = {gg for gg in groups if rng4.random() < 0.15}     # a draw for each group, every sample
 
         def an_id(gg):                  # an id: a chunk's structured id, or not one (§4.4's valid_id)
             r = rng.random()
@@ -236,14 +254,29 @@ def main(argv):
             args = (an_id(gg) if rng.random() < 0.95 else Wm.HaveBitmap(gg, B.Bits(rng.randrange(1, 8))),)
         else:
             args = (rng.choice(keys),)
+        sc.asked, sc.expired_asked = [], []
         try:
             ns[fn](*args)
         except Exception as e:              # noqa: BLE001: the tracer wrote it, with `raises`
             raised[type(e).__name__] += 1
+        if fn == "on_ihave":                # the order of on_ihave's checks of an id, as the call went: each kind
+            ids, refusals = args[1].ids, [x for x in sc.asked if group_of(x) in sc.refused]   # counted per call
+            if refusals:
+                order["admitted false for an id"] += 1
+            if len(refusals) >= 2:
+                order["admitted false twice or more (an id drawn twice counts twice)"] += 1
+            # (a full id is expanded only where valid_id holds: this counts the entries drawn so, not the ids that
+            # reached held)
+            if any(isinstance(e, bytes) and len(e) == 56 and e[:32] in sc.refused and e not in sc.asked
+                   and (e[:32], int.from_bytes(e[32:36], "little")) in sc.held for e in ids):
+                order["an id entry of a refused group, drawn held: admitted not asked of it"] += 1
+            # expired is the scenario's: each of its calls here was made for an id that reached it
+            if any(gg in sc.refused and gg in sc.expired for gg in sc.expired_asked):
+                order["an id of a refused group that reached expired, expired: admitted not asked of it"] += 1
     tr.close()
     Path(a.out + ".moved.json").write_text(json.dumps({"held_apart": held_apart}) + "\n")
     print(f"directed44: {sum(tr.counts.values())} records, raised {dict(raised)}, {dict(sorted(tr.counts.items()))}; "
-          f"{len(held_apart)} with held drawn apart from mine", file=sys.stderr)
+          f"{len(held_apart)} with held drawn apart from mine; admitted: {dict(sorted(order.items()))}", file=sys.stderr)
 
 
 if __name__ == "__main__":

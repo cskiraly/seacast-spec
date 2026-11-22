@@ -1,4 +1,4 @@
-# SEACAST in Veil: properties at any size
+# SEACAST on gossipsub in Veil: properties at any size
 
 Models of the spec, `protocol.md`, whose properties are proved for **any number of nodes, groups and
 chunk indices** and every interleaving. In each Veil model the safety property is an inductive

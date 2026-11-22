@@ -194,7 +194,7 @@ def tie (p : Peer) (f : ChunkF) : M m Unit := do
   if !(← live f.slot) then
     branch "tie: not live"
     return
-  if !(← admitted p f) then                                 -- `if not admitted(p, f) or not tie_room(p, f): return`
+  if !(← admitted p (.chunk f)) then                        -- `if not admitted(p, f) or not tie_room(p, f): return`
     branch "tie: not admitted"
     return
   if !(← tieRoom p f) then
@@ -284,7 +284,7 @@ def defer (fuel : Nat) (p : Peer) (f : ChunkF) : M m Unit := do
       branch (if fuel == 0 then "defer: installed in the meantime, at the last level B1 allows"
               else "defer: installed in the meantime")
       return
-  if !(← admitted p f) then                                 -- a group beyond the peer's unknown groups (§8.2):
+  if !(← admitted p (.chunk f)) then                        -- a group beyond the peer's unknown groups (§8.2):
     branch "defer: not admitted"                            --   ignored, neither kept nor tied
     return
   tie p f                                                   -- kept or refused, its sender is tied to the root
