@@ -1031,7 +1031,8 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
   done
   # (h), (i): owed_missing's answer flipped on das-samplers by a layer of tracerfaults3's own, which calls the member
   # check's (so the document's) and returns the opposite. (h), listed an observer: the replay must refuse each record
-  # whose call it flipped, with rule 2's words (the twin returns where the toy went on), and nothing else. (i), listed
+  # whose call it flipped, with rule 2's words (the twin returns where the toy went on), and nothing else (a mismatch
+  # line holds the function and its error's first two parts by ":", so not the rest of the tape). (i), listed
   # as changing, its control: the call a question with the flipped answer on the tape, the replay clean. The two run
   # the same toy, the listing alone differing: the same digest, records and flipped calls, or the listing reached it
   local flip="the flipped answer:" kf ni="" ki="" di="" chain="owed_flipped_v2.<locals>.plant.<locals>.owed_missing,Node._member_check.<locals>.owed_missing,doc"
@@ -1051,8 +1052,8 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
            echo "(h) the flipped answer, listed an observer: not (i)'s run (records $ni, flipped $ki, digest $di): its listing reached the toy, or (i) failed  <-- NOT" >> "$OUT/c-chains.txt"
          elif has -E "^replay: [0-9]+ records, [0-9]+ ok, $kf mismatched\$" "$OUT/chains/plant-h.replay" \
              && has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-h.replay" \
-             && [ "$(grep '^mismatch ' "$OUT/chains/plant-h.replay" | grep -c -v '^mismatch reconsider: tape: the toy asked more: ')" = 0 ] \
-             && [ "$(sed -n -E 's/^mismatch reconsider: tape: the toy asked more: .*: ([0-9]+)$/\1/p' "$OUT/chains/plant-h.replay" | awk '{s += $1} END {print s + 0}')" = "$kf" ]; then
+             && [ "$(grep '^mismatch ' "$OUT/chains/plant-h.replay" | grep -c -v -E '^mismatch reconsider: tape: the toy asked more: [0-9]+$')" = 0 ] \
+             && [ "$(sed -n -E 's/^mismatch reconsider: tape: the toy asked more: ([0-9]+)$/\1/p' "$OUT/chains/plant-h.replay")" = "$kf" ]; then
            echo "(h) the flipped answer, listed an observer: refused at its $kf record$([ "$kf" = 1 ] || echo s), on (i)'s run: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-h.replay" | cut -c1-120)" >> "$OUT/c-chains.txt"
            flip="$flip refused as an observer at its $kf record$([ "$kf" = 1 ] || echo s) of the same run"
          else echo "(h) the flipped answer, listed an observer: not refused at its $kf flipped record(s) alone, by rule 2's words: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-chains.txt"; fi ;;

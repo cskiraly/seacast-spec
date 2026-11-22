@@ -16,7 +16,8 @@ without a nodes line or a case it cannot read.
 in every entry whose chains hold NAME; nothing else changed. It says how many entries; exit 2 where none.
 
 `--rows`: the rows of the question NAME on the records' tapes, by the answer they hold (a row is [NAME, its
-arguments, its answer]); with FN, on the tapes of the records whose `reached` holds FN alone.
+arguments, its answer], and a fourth member, the question's log, where it touched the node's tables); with FN, on
+the tapes of the records whose `reached` holds FN alone.
 """
 import gzip
 import json
@@ -136,7 +137,7 @@ def rows(name, trace, fn=None):
             recs += 1
             for row in d.get("tape") or ():
                 if row and row[0] == name:
-                    answers[json.dumps(row[-1])] += 1
+                    answers[json.dumps(row[2])] += 1
     on = "the tapes" if fn is None else f"the tapes of the {recs} records that reach {fn}"
     print(f"chaincases: {name} on {on}: {sum(answers.values())} rows"
           + ("" if not answers else " (" + ", ".join(f"{a}: {k}" for a, k in sorted(answers.items())[:4])
