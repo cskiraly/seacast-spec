@@ -240,24 +240,34 @@ def inserted(line):
     return isinstance(r, dict) and r.get("fn") == fn and int(r.get("n", -1)) == node
 
 
+def canon(x):           # a value as JSON writes it, keys sorted: false and 0, or 1 and 1.0, are not the same here
+    return json.dumps(x, sort_keys=True)
+
+
 def nodes_rule(la, lb):
     """The nodes line. Without a spec, the first's byte for byte. With one, each entry's `chains` set aside and
-    nothing else: the rest equal; every entry's chains the first's, but the planted node's chain of the name, which is
-    the spec's (a plant's own function there: the chain tells the truth about the code at that node)."""
+    nothing else: the rest equal as JSON values (a Boolean is no number); every entry's chains the first's, but the
+    planted node's chain of the name, which is the spec's (a plant's own function there: the chain tells the truth
+    about the code at that node). The spec's node is in exactly one entry of each line."""
     if not spec:
         return None if la == lb else "the nodes line differs from the first's"
     cnode, cname, cwant = int(spec[0]), spec[1], json.loads(spec[2])
     ea, eb = json.loads(la)["nodes"], json.loads(lb)["nodes"]
+    for es in (ea, eb):
+        k = sum(cnode in e["n"] for e in es)
+        if k != 1:
+            return (f"the spec's node {cnode} is in no entry of the nodes line" if k == 0 else
+                    f"the spec's node {cnode} is in {k} entries of the nodes line")
     ca, cb = [e.pop("chains", None) for e in ea], [e.pop("chains", None) for e in eb]
-    if ea != eb:
+    if canon(ea) != canon(eb):
         return "the nodes line differs outside its chains"
     for e, x, y in zip(ea, ca, cb):
         if cnode in e["n"]:
             got = (y or {}).get(cname)
-            if got != cwant:
+            if canon(got) != canon(cwant):
                 return f"the planted node's chain of {cname} is {json.dumps(got)}, not {json.dumps(cwant)}"
             x, y = {n: c for n, c in (x or {}).items() if n != cname}, {n: c for n, c in (y or {}).items() if n != cname}
-        if x != y:
+        if canon(x) != canon(y):
             return "a chain other than the planted node's differs from the first's"
     return None
 
@@ -993,6 +1003,8 @@ nodes = json.loads(lines[NL])["nodes"]
 at = next(j for j, e in enumerate(nodes) if "on_iwant" in e["replaced"])
 node, chain = nodes[at]["n"][0], nodes[at]["chains"]["on_iwant"]
 rec = next(j for j, x in enumerate(lines) if x.startswith('{"n"') and json.loads(x)["fn"] != "N")
+bk = next(c for c, v in nodes[0]["consts"].items() if isinstance(v, bool))     # the first Boolean constant
+absent = max(n for e in nodes for n in e["n"]) + 1000                          # a node in no entry
 
 
 def with_nodes(change):
@@ -1008,6 +1020,7 @@ cases = {
     "replaced": with_nodes(lambda ns: ns[at].update(replaced=[])),
     "const": with_nodes(lambda ns: ns[0]["consts"].update(IWANT_WINDOW=ns[0]["consts"]["IWANT_WINDOW"] + 1)),
     "type": with_nodes(lambda ns: ns[0]["types"]["payload"].update(M=ns[0]["types"]["payload"]["M"] + 1)),
+    "const-bool": with_nodes(lambda ns: ns[0]["consts"].update({bk: int(ns[0]["consts"][bk])})),
     "other-chain": with_nodes(lambda ns: ns[0]["chains"].update(may_ask=["planted"])),
     "planted-chain": with_nodes(lambda ns: ns[at]["chains"].update(on_iwant=chain + ["planted"])),
 }
@@ -1016,20 +1029,29 @@ for name, ls in cases.items():
     with gzip.open(f"{out}-{name}.jsonl.gz", "wt") as f:
         f.write("\n".join(ls) + "\n")
 with open(f"{out}.spec", "w") as f:
-    f.write(f"{node}\n{json.dumps(chain)}\n")
+    f.write(f"{node}\n{json.dumps(chain)}\n{absent}\n")
 EOF_ERC
   then
     echo "control: extra_records' chain fixtures were not made  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
   fi
-  local cnode cchain
+  local cnode cchain cabsent
   cnode=$(sed -n 1p "$OUT/c-erc.spec" 2> /dev/null); cchain=$(sed -n 2p "$OUT/c-erc.spec" 2> /dev/null)
+  cabsent=$(sed -n 3p "$OUT/c-erc.spec" 2> /dev/null)
   if [ -n "$cnode" ] && extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/v2/hand5-own.jsonl.gz" "$cnode" N 0 "$cnode" on_iwant "$cchain" > /dev/null; then
     echo "control: extra_records with node $cnode's chain of on_iwant passes v2/hand5-own against itself, as it must" >> "$OUT/c-tracerplants.txt"
   else echo "control: extra_records with node ${cnode:-?}'s chain of on_iwant refuses v2/hand5-own against itself  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
-  for c in record replaced const type other-chain planted-chain; do
+  # the spec of a node in no entry (the largest plus 1000), the trace against itself: refused, for that reason
+  if [ -z "$cabsent" ]; then
+    echo "control: no node in no entry for the chain spec  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
+  elif why=$(extra_records "$OUT/v2/hand5-own.jsonl.gz" "$OUT/v2/hand5-own.jsonl.gz" "$cnode" N 0 "$cabsent" on_iwant "$cchain" 2> /dev/null); then
+    echo "control: extra_records passes the spec of node $cabsent, in no entry  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1
+  elif [[ $why == *"the spec's node $cabsent is in no entry of the nodes line"* ]]; then
+    echo "control: extra_records refuses the spec of node $cabsent, in no entry, as it must: $why" >> "$OUT/c-tracerplants.txt"
+  else echo "control: extra_records refuses the spec of node $cabsent, in no entry, for another reason: $why  <-- NOT" >> "$OUT/c-tracerplants.txt"; bad=1; fi
+  for c in record replaced const type const-bool other-chain planted-chain; do
     case $c in
       record) want="is neither the first trace's next line" ;;
-      replaced|const|type) want="the nodes line differs outside its chains" ;;
+      replaced|const|type|const-bool) want="the nodes line differs outside its chains" ;;
       other-chain) want="a chain other than the planted node's differs from the first's" ;;
       planted-chain) want="the planted node's chain of on_iwant is" ;;
     esac
