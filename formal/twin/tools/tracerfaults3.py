@@ -813,7 +813,9 @@ def per_node_depth_v2():
     planted fault), and the plant makes no call of its own. On a cell where a question at node a reaches node c's
     traced code (custody-floor-churn1: node a's `keep_floor` opens a link, and node c's `on_open` sends its JOIN and a
     relation inside a's `open_link` question), those calls at c are then records of c's own, which start inside a's
-    question: the replay must refuse them. Counted once for each install."""
+    question: the bare counts then hold none of them, and the body has them inserted. The replay accepts them, for it
+    checks each record on the Python's own reads: R7 is the tracer's rule (check.sh's carried cases). Counted once
+    for each install."""
     tracer_instance()
     _install = T.Tracer3.install
 
@@ -824,6 +826,31 @@ def per_node_depth_v2():
         return _install(self, nd, ns)
 
     T.Tracer3.install = install
+
+
+SILENT_FORWARD = ("node.py", "Node._faults.<locals>.forward", 1103)    # LAYERS' key of the silent node's forward
+
+
+def layer_missing_v2(toy):
+    """Under v2, H4's plant (n): trace3.py's LAYERS without the silent node's layer of `forward` (node.py's
+    `Node._faults.<locals>.forward`), which hand5-own's arguments bind at the silent node alone. First the scan's
+    lists against the lists so changed (scan_bindings.py's `--lists`): each of its lines that names a difference, and
+    its last line, on stderr, each after "tracerfaults3: scan: ". Then the run, whose install at the silent node must
+    stop the tracer, with its words."""
+    if SILENT_FORWARD not in T.LAYERS:
+        raise SystemExit(f"tracerfaults3: {SILENT_FORWARD} is not in trace3.py's LAYERS")
+    del T.LAYERS[SILENT_FORWARD]
+    PLANTED[0] += 1
+    import scan_bindings as S           # noqa: E402: this directory's; it imports the same trace3 module
+    Tn, _ = S.load_names(toy)
+    if Tn is not T:
+        raise SystemExit("tracerfaults3: scan_bindings.py loaded another trace3 module than this tool's")
+    out, other = S.lists(S.scan(Path(toy).resolve()), Tn)
+    for ln in out:
+        if "NOT" in ln:
+            print(f"tracerfaults3: scan: {ln}", file=sys.stderr)
+    print(f"tracerfaults3: scan: {other} differences from trace3.py's lists" if other else
+          "tracerfaults3: scan: the lists as trace3.py's", file=sys.stderr)
 
 
 def suppressed_filter_v2(toy, off):
@@ -1257,8 +1284,8 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
           "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS + (
-          "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_V2   # K13's two: the first must not stop
-#                                                                              it, the second must; piece D's three
+          "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_V2 + (  # K13's two: the first must not
+          "--layer-missing-v2",)        # stop it, the second must; pieces D's and E's; H4's plant (n), on hand5-own
 HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -1334,6 +1361,8 @@ def main(argv):
             per_node_depth_v2()
         elif fault.startswith("--suppressed-filter-v2"):
             suppressed_filter_v2(rest[0], off=fault.endswith("-off"))
+        elif fault == "--layer-missing-v2":
+            layer_missing_v2(rest[0])
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":
@@ -1347,7 +1376,8 @@ def main(argv):
                 return 2
         else:
             args = (HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault in ("--bare-replaced-v2",
-                                                                                         "--chains-omit-v2")
+                                                                                         "--chains-omit-v2",
+                                                                                         "--layer-missing-v2")
                     else HAND5) + ["--doc", "v2"]
         try:                            # the arguments as check.sh's v2/hand5 and v2/hand5-own have them
             T.main([rest[0], rest[1], *args, "--digest"])
