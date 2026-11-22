@@ -893,7 +893,8 @@ it, and the proposer counts where it already is a link and is never added (propo
 `--route on|off` (on) lets a sample that no link serves go as a routed request to a link with duty
 `FORWARD`, which passes it one step on (§4.5), `--route-hops` (1) steps at most; `--sample-retry2`
 (0.5 s), `--sample-outstanding` (4) and `--forward-limit` (none) are the second phase's wait per
-peer, its asks in flight per block and the forwarders' limit. A sampler asks a peer for at most one
+peer, its asks in flight per block and the forwarders' limit. The asks in flight are the node's cap,
+counted per block across the block's sampled types, and at least 1. A sampler asks a peer for at most one
 sample of a block, and a peer of high custody only in the second phase. The `reach` line gives the
 floor's links per sampler, by which ask each sample first arrived, the asks per sample, the routed
 requests passed on per node, the most samples of a block one peer was asked for by one sampler,

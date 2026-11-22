@@ -26,7 +26,7 @@ states.
 | `[D9]` one document or a sibling (decided: a sibling) | `protocol-v2.md`; §6.1 is the merge path |
 | `[D10]` colours (decided: a parameter, with no default) | `TypeParams.M`, `F_LO`, `F_HI`, `D_OUT`, `SYMMETRIC`, §1.4, §4.1 |
 | `[D11]` join = (interest, duty); topics as rendezvous (decided: the join as written; the rendezvous gossipsub topics per family, with the ENR beside them) | §2 `Join`, §1.2, `protocol-v2-bindings.md` §0's rendezvous row |
-| `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_OUTSTANDING`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
+| `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; the node's `SAMPLE_OUTSTANDING`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
 | the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | `protocol.md` §6.1's `PROMISE`; §6.3's `PROMISE` row |
 | a source's links in a family it does not custody (decided: it never waits for links; three layers on top of its fanout; a refused push to a fallback link owed) | §4.7 `source_pool`, `candidates_for_source`, `origin_acked`, `unpush`; §6.3's `SOURCE_FLOOR` row |
 | the probe of a claim (R5) (decided: the claimant judged by its own copy; the probe marked and answered whatever the asker holds, once per asker and group; the asker's queue keeps it; its cell drawn at random) | §2 `Want.probe`; §4.2 `on_chunk`, `fill`; §4.5 `on_want`; §4.6 `reconsider`, `defer_on_claim`, `settle_probe`, `probe_answer`, `probe_promise`, `probe_waits`, `probe_of_claim`, `serve_probe`, `filter_entry`; `protocol-v2-bindings.md` §0's WANT row |
@@ -230,7 +230,10 @@ built for diversity. Its size is `SAMPLE_COVER`, a parameter of the object type 
 least 1, set at two links per family; `COVER_HIGH` is set at 1 (§6.3). Routed sample requests
 take what the floor misses, with one forwarding step by default (§4.10, `ROUTE_HOPS` 1). Both run on
 LiteDAS's two phases: one sample per peer, with peers of high custody as the second phase's
-fallback. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT` and
+fallback. Since 2026-11-22 the second phase's asks in flight have one cap per block, counted across
+the block's sampled types: `SAMPLE_OUTSTANDING`, a setting of the node, with a bound of at least 1.
+Before, it was a parameter of each object type. The cap bounds one block's hunt, and a cap per type
+on a shared count could keep the refill loop of §4.10 from ending. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT` and
 `SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
 60-node cells and its 500-node cells at ten seeds (protocol-v2-figures.md, §6.3). These are kept as
 options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours

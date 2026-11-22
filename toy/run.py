@@ -349,7 +349,7 @@ def main(argv):
                     "§4.1): after a PRUNE received, its relation is not grafted again before then (0: none)")
     ap.add_argument("--route-hops", type=int, default=1, help="custody: ROUTE_HOPS, the forwarding steps of a routed request (1: two hops)")
     ap.add_argument("--sample-retry2", type=float, default=0.5, help="custody: SAMPLE_RETRY2, the second phase's wait per peer (§4.10)")
-    ap.add_argument("--sample-outstanding", type=int, default=4, help="custody: SAMPLE_OUTSTANDING, second-phase asks in flight per block (§4.10)")
+    ap.add_argument("--sample-outstanding", type=int, default=4, help="custody: SAMPLE_OUTSTANDING, the node's second-phase sample asks in flight per block, across types, at least 1 (§4.10)")
     ap.add_argument("--forward-limit", type=float, default=math.inf, help="custody: FORWARD_LIMIT, routed requests a node passes on per peer and block")
     ap.add_argument("--no-invariants", action="store_true", help="--doc v2: skip the invariants report (invariants.py)")
     ap.add_argument("--answers-first", default="off",
@@ -416,6 +416,8 @@ def main(argv):
                ALARM_WAIT=a.alarm_wait, ALARM_JITTER=a.alarm_jitter, ALARM_NEXT=a.alarm_next, ALARM_MAX=a.alarm_max)
     if a.fault.startswith("hoardcol") and a.rebuilt_seen != "on":
         ap.error("--fault hoardcol is meant strict: with --rebuilt-seen on")
+    if a.sample_outstanding < 1:
+        ap.error("--sample-outstanding: SAMPLE_OUTSTANDING's bound is at least 1 (protocol-v2.md §6.3)")
     if a.payload:
         cfg["payload"], cfg["COMPRESSED"] = a.payload, round(a.payload / CFG["COMPRESSION"])
     for k in filter(None, a.without.split(",")):

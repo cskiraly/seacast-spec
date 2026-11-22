@@ -175,7 +175,6 @@ class TypeParams:                                    # per object type; values i
     SERVE_LIMIT: int                                 # chunks served per peer and group         (R6)
     SAMPLE_RETRY: float                              # a sampler's first wait, before asking another peer (§4.10)
     SAMPLE_RETRY2: float                             # its wait on each later peer (§4.10)          [D12]
-    SAMPLE_OUTSTANDING: int                          # its later asks in flight per block (§4.10)   [D12]
     SAMPLE_COVER: int                                # links serving each family, for a node that samples (§1.3) [D12]
     COVER_HIGH: int                                  # families a peer of high custody counts for in it (§1.3) [D12]
     ROUTE_HOPS: int                                  # forwarding steps a sampler's routed request may take (§4.10) [D12]
@@ -498,8 +497,8 @@ park: Dict[PeerId, Dict[GroupId, float]]
 standing: Dict[GroupId, Dict[int, Set[PeerId]]]       # new: WANTs for chunks we do not hold yet (§4.10)
 routed_standing: Dict[GroupId, Dict[int, Set[PeerId]]]   # new: those a routed request made (§4.5's exemption)
 sampled_from: Dict[BlockId, Set[PeerId]]              # new: the peers asked for a sample of a block, one each (I6) [D12]
-samples_in_flight: Dict[BlockId, int]                 # new: our second-phase sample asks in flight
-held_samples: Dict[BlockId, List[Tuple[GroupId, int]]]   # new: second-phase asks waiting for room
+samples_in_flight: Dict[BlockId, int]                 # new: our second-phase sample asks in flight, across types
+held_samples: Dict[BlockId, List[Tuple[GroupId, int]]]   # new: second-phase asks waiting for room, across types
 forwarded: Dict[PeerId, Dict[ObjectType, int]]        # new: routed requests from p passed on, per type and slot (X6)
 claims: Dict[GroupId, Set[PeerId]]                    # new: peers whose claim_all arrived (R5, §4.6)
 reconsider_at: Dict[GroupId, float]                   # new: when our later decode duty fires, if armed (§4.6)
@@ -2887,7 +2886,7 @@ def ask_sample(g, i, first=False):                     # one sample to one peer,
     T, b = type_of_group(g), block_of(g)               #   sample of the block (I6): a link that serves it, else
                                                        #   a routed request through another (§4.5, route_want)
     if mine[g].has(i) or expired(g): return
-    if not first and samples_in_flight[b] >= T.params.SAMPLE_OUTSTANDING:
+    if not first and samples_in_flight[b] >= SAMPLE_OUTSTANDING:   # the node's cap, per block across its types
         return held_samples[b].append((g, i))          # LiteDAS's cap: asked when a second-phase ask ends
     fresh = [q for q in links(T) if q not in sampled_from[b] and not parked(q, Ask(g, i))]
     direct = [q for q in fresh if serves(q, g, i) and not high_custody(q, T)]
@@ -2906,14 +2905,13 @@ def ask_sample(g, i, first=False):                     # one sample to one peer,
     after(T.params.SAMPLE_RETRY if first else T.params.SAMPLE_RETRY2, resample, g, i, q, first)
 
 def resample(g, i, q, first):                          # the wait ran out
-    T, b = type_of_group(g), block_of(g)
+    b = block_of(g)
     if not first: samples_in_flight[b] -= 1
-    if expired(g): return                              # past its lifetime: no state is made again for it
-    if not mine[g].has(i):
+    if not expired(g) and not mine[g].has(i):          # past its lifetime: no state is made again for g
         park[q][g] = now + PARK_TTL                    # it held or should have held it (a first hop may have had no route)
         ask_sample(g, i)                               # the second phase: another peer, a short wait
-    while held_samples[b] and samples_in_flight[b] < T.params.SAMPLE_OUTSTANDING:
-        ask_sample(*held_samples[b].pop(0))
+    while held_samples[b] and samples_in_flight[b] < SAMPLE_OUTSTANDING:   # the block's held samples take the room,
+        ask_sample(*held_samples[b].pop(0))            #   g expired or not; each pass takes one off the list
 ```
 
 **A sampler's interest is `DECLARED` and its duty `NONE`** (§1.2). It learns the group ids from the
@@ -2950,12 +2948,14 @@ sample arrives once, one hop after the cell reached the custodian. A sample stil
 to the second phase: the peer asked is parked for the group, and the sample is declared to another
 peer that has not been asked for one, a link of ordinary custody that serves it while one is left, a
 routed request through another link after, a peer of high custody last, each with a short wait
-`SAMPLE_RETRY2`, and at most `SAMPLE_OUTSTANDING` such asks in flight per block; a slot frees when
-its wait ends. A sample with no peer to declare it to in the first phase (no link of ordinary
-custody not yet asked serves it, and none routes it) is not declared then, and goes to the second
-phase after the same wait. The hunt ends when no link is left to ask (each has been asked for a
-sample, is parked for the group, or neither serves the sample nor forwards) or the group expires, so
-an unavailable block costs a bounded number of asks. Where the binding offers a fetch from a node
+`SAMPLE_RETRY2`. At most `SAMPLE_OUTSTANDING` such asks are in flight per block, counted across the
+block's sampled types; `SAMPLE_OUTSTANDING` is a setting of the node, not of a type. A slot frees
+when its wait ends, and it goes to the block's held samples in their order, even when the group of
+the sample whose wait ended has expired. A sample with no peer to declare it to in the first phase
+(no link of ordinary custody not yet asked serves it, and none routes it) is not declared then, and
+goes to the second phase after the same wait. The hunt ends when no link is left to ask (each has
+been asked for a sample, is parked for the group, or neither serves the sample nor forwards) or the
+group expires, so an unavailable block costs a bounded number of asks. Where the binding offers a fetch from a node
 that is not a link (§7), the second phase may use it before a routed request, under the same rule:
 one sample per node.
 
@@ -3586,7 +3586,8 @@ nobody withheld.
 | `SERVE_BUDGET` | node, per peer | answers given one peer in a heartbeat, across groups, counted in the heartbeat the node decides each (a standing request's when its chunk arrives); the answers to asks on the node's own offers, recorded as they are written, and to a claim's probe not counted; an ask over it is refused, and a standing request's answer dropped and not retried, without penalty (§4.5) | stated by its bound (`protocol.md` §8.3's kinds): at least what honest peers ask through one peer in a heartbeat other than on the node's offers: per block, a sampler's one cell, and the routed requests a forwarder passes on for the samplers it serves (`FORWARD_LIMIT` for each), with the standing answers that a block's cells release in one heartbeat; the cells of a row member's repair sample with its re-asks (`REPAIR_REASK`), and a custodian's alarm asks (§4.6); and a peer's asks by derived interest at a block's arrival. No limit in the measurements |
 | `PROMISE` | node | how long an offer's promise runs before a broken one parks the peer for the group (`protocol.md` §6.1: 400 ms), one value for every object type in the code (`filter_entry`) | the payload's promise stays at 400 ms (§4.13); a promise per peer that follows its answer times is permitted as local policy, with 400 ms the default (§8, decided); a longer promise for cells, so one per object type, is open (below) |
 | `SAMPLE_RETRY` | object type | seconds a sampler waits for its first-phase standing request before the second phase asks another peer (§4.10) | `[D12]`, stated by its bound: longer than the honest path's latest sample, the custodians' tail plus a hop; 2 s in every measurement, LiteDAS suggests 4 s; a shorter wait is open (below) |
-| `SAMPLE_RETRY2`, `SAMPLE_OUTSTANDING` | object type | the second phase's wait per peer, and its asks in flight per block (§4.10, LiteDAS) | `[D12]`, stated by their bounds: the wait at least a routed request's round trip (two hops out and back), the asks in flight at least 1; 0.5 s and 4 in every measurement, no other value tried |
+| `SAMPLE_RETRY2` | object type | the second phase's wait per peer (§4.10, LiteDAS) | `[D12]`, stated by its bound: at least a routed request's round trip (two hops out and back); 0.5 s in every measurement, no other value tried |
+| `SAMPLE_OUTSTANDING` | node | the second phase's asks in flight per block, counted across the block's sampled types (§4.10, LiteDAS) | `[D12]`, stated by its bound: at least 1; 4 in every measurement, no other value tried |
 | `SAMPLE_COVER` | object type | links serving each family that a node keeps for a type it samples, sampling-only links closing what its other links leave short (§1.3, §4.1) | `[D12]`; 2, decided, built for diversity (`COVER_HIGH`), and at least 1 (§1.3). One cover is an option |
 | `COVER_HIGH` | object type | families a peer of high custody counts for in the coverage floor (§1.3, §4.1) | `[D12]`; 1, decided, as in the measurements |
 | `ROUTE_FLOOR` | object type | links a node with duty `FORWARD` keeps to custodians at the routing neighbours' distances (§1.3) | `[D12]`; an option, off |

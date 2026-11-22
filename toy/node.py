@@ -1288,7 +1288,7 @@ class Node:
             cprm.MAX_INDICES = c["blobs"]                # §6.3: a column has a cell per blob
             cprm.ANNOUNCE_EXTRA, cprm.START_DELAY, cprm.SERVE_LIMIT, cprm.EVIDENCE = c.get("COL_ANNOUNCE", "ALL_JOINED"), 0.0, math.inf, None   # [D5]
             cprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
-            cprm.SAMPLE_RETRY2, cprm.SAMPLE_OUTSTANDING = c.get("SAMPLE_RETRY2", 0.5), c.get("SAMPLE_OUTSTANDING", 4)   # [D12]
+            cprm.SAMPLE_RETRY2 = c.get("SAMPLE_RETRY2", 0.5)   # [D12]
             cprm.SAMPLE_COVER, cprm.FORWARD_LIMIT = c.get("SAMPLE_COVER", 0), c.get("FORWARD_LIMIT", math.inf)   # [D12]
             cprm.COVER_HIGH = c.get("COVER_HIGH", 1)     # [D12] families a peer of high custody counts for in the floor
             cprm.ROUTE_HOPS = c.get("ROUTE_HOPS", 1)     # [D12] forwarding steps of a routed sample request
@@ -1376,7 +1376,8 @@ class Node:
                   probe_answers=lazy2(LazyBits), probe_waiting=lazy(lazy_dict), rsample=lazy(LazyList), rsample_step=DefaultMap(0),
                   rsample_asked=lazy2(LazySet), rsample_final=DefaultMap(False),
                   sampled_from=lazy(LazySet), samples_in_flight=DefaultMap(0),
-                  held_samples=lazy(LazyList), forwarded=lazy2(zero))   # [D12] §4.10's and §4.5's
+                  held_samples=lazy(LazyList), forwarded=lazy2(zero),   # [D12] §4.10's and §4.5's
+                  SAMPLE_OUTSTANDING=c.get("SAMPLE_OUTSTANDING", 4))    # [D12] the node's cap per block, across types
         Ask = Wm.WantIndex
         chunk_id = ns["message_id"]
         spec_open_group = ns["open_group"]
