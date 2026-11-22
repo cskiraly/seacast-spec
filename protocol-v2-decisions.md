@@ -1,10 +1,10 @@
-# SEACAST's next version: its decisions
+# SEACAST: its decisions
 
-This is the decision record of [`protocol-v2.md`](protocol-v2.md), SEACAST's next version (v2). It
-lists the design decisions `[D1]` to `[D12]` and the others that v2 took: when each was decided,
-what was not taken and why, and the runs behind it. It also lists the versions of
-[`protocol.md`](protocol.md) that v2 has carried. `protocol-v2.md` states the
-rules and gives their reasons; the comments in its code cite these labels where each decision bites.
+This is the decision record of SEACAST, [`protocol-v2.md`](protocol-v2.md). It lists the design
+decisions `[D1]` to `[D12]` and the others that SEACAST took: when each was decided, what was not
+taken and why, and the runs behind it. It also lists the versions of [`protocol.md`](protocol.md)
+that SEACAST has carried. `protocol-v2.md` states the rules and gives their reasons; the comments in
+its code cite these labels where each decision bites.
 
 In this file, a section number (§) without the name of a document refers to `protocol-v2.md`'s
 sections, and "this document" and "this draft" mean `protocol-v2.md`. The figures behind this record
@@ -33,7 +33,7 @@ states.
 
 **Decided on 2026-11-13.** Six of the decisions above were chosen on that day, and each entry below
 says what was not taken:
-- **`[D1]` identity and bindings.** v2 is a protocol of its own: it is defined on its own messages
+- **`[D1]` identity and bindings.** SEACAST is its own protocol: it is defined on its own messages
   and carried by three bindings, which are defined in their own document (`protocol-v2-bindings.md`,
   since 2026-11-17). The three were the standalone binding, the binding onto the Partial Messages
   Extension of gossipsub, and the gossipsub binding. Since 2026-11-21 they are named by their
@@ -303,8 +303,8 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
 - **The bindings by carrier.** The bindings document defines SEACAST's message encoding once (§1
   there), then one binding per carrier: the libp2p stream binding, the Waggle binding, the gossipsub
   binding and the partial-messages binding (§2 to §5 there), and the native QUIC binding as a draft
-  (§7 there). The gossipsub binding is v2's path on gossipsub alone; the partial-messages binding is
-  kept beside it.
+  (§7 there). The gossipsub binding uses gossipsub's wire alone, as `protocol.md` does; the
+  partial-messages binding is kept beside it.
 - **The gossipsub binding to the byte.** Its extra fields, a holding's `claim_all` and `complete`
   and a WANT's `standing`, `hops` and `probe`, travel in version 4 of the id strings, and a WANT's
   index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). On that binding,

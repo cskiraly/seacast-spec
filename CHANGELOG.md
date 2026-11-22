@@ -13,6 +13,23 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
+## After v0.10.12 — not yet released
+
+The two protocols get their names: `protocol-v2.md` is SEACAST, and `protocol.md` is SEACAST on
+gossipsub. Names and text only; no rule changes since v0.10.12.
+
+### Changed
+- `protocol-v2.md`, `protocol.md`: their titles and openings name SEACAST and SEACAST on gossipsub;
+  `protocol.md`'s new opening paragraph says which protocol was measured and proved, and how SEACAST
+  contains it; the files keep their names, and the toy's `--doc v2` stays.
+- `protocol.md`: §5.1 cites `protocol-v2.md` by its file name where it said "the next version's
+  draft", and names SEACAST's proposer where it said "the draft's"; §9 cites the announcement post
+  by its current title.
+- `protocol-v2-bindings.md`, `protocol-v2-decisions.md`, `protocol-v2-figures.md`: titled "SEACAST:
+  its bindings", "its decisions" and "its figures"; in them, `toy/README.md` and `formal/README.md`,
+  "the next version" and "v2" as names become "SEACAST"; `formal/veil/README.md`'s title names
+  SEACAST on gossipsub.
+
 ## v0.10.12 — 2026-11-22
 
 The next version bounds more of what a peer can make a node keep or serve: asks outside what it

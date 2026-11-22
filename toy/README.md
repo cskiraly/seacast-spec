@@ -122,7 +122,8 @@ and where one has a control that must come out the other way, it is named:
   `unwanted[p]` with no penalty; a bitmap beside it must still be read as a HAVE, and not be kept in
   `unwanted[p]`. The toy tells a bitmap by its type, not by the string's first bytes and length.
   With `--doc v2`, the same on the gossipsub binding (`protocol-v2-bindings.md` §4): the toy reads
-  the frame as v2's messages and keeps the stock id in `unwanted[p]`, which v2's `on_want` reads.
+  the frame as SEACAST's messages and keeps the stock id in `unwanted[p]`, which SEACAST's `on_want`
+  reads.
 - `want_promise_known.py`: `protocol-v2.md` §4.5 and §4.10, an ask sent as a `Want` starts no
   promise at its write: such an ask sent through the gossipsub binding and written by
   `filter_entry` gets none, and the control, an ask on an offer written the same way, gets v0.5's;
@@ -421,7 +422,7 @@ digest; with the key, the cells moved at seed 7 by −10 to +69 ms at the median
 namings: 486 ms for the descriptor's group id, the naming until then; 491 and 493 ms for the same
 construction under two other domain bytes; 498 ms for the key and 489 to 497 ms for three other
 keys. The key and another key differ by +1.1 ± 3.5 ms (mean ± standard error over the 20 seeds,
-each seed's four cells averaged). The next version's column and row groups keep their names, and
+each seed's four cells averaged). SEACAST's column and row groups keep their names, and
 its custody and row settings their digests at seed 7, with and without supernodes, samplers and
 withheld columns.
 
@@ -444,7 +445,7 @@ and degree 30 the asks the publisher receives fall to about a third and its uplo
 payload. One cost appears with it: the publisher's HAVE names a chunk about a round trip later than
 before, and a mesh peer that got the chunk from a forwarder meanwhile may push it back to the
 publisher (a few chunks a payload at that size; cancel drops the pushes still queued when the HAVE
-arrives). `golden-v2.txt` was unchanged by it: the next version kept its own source until it took
+arrives). `golden-v2.txt` was unchanged by it: SEACAST kept its own source until it took
 the rule for every object type (2026-11-11) and was recorded again.
 
 ## How it maps onto the document
@@ -634,37 +635,37 @@ fixed in `protocol.md` since the window is v0.3's:
     way, copies rose by 0.03 to 0.12 (`cap-wait` 1.64 → 1.66, `dcb20` 3.20 → 3.32, `push` 2.35 →
     2.41), since chunks that had waited in the line, and were pulled meanwhile, now go out.
 
-## The next version (`--doc v2`)
+## SEACAST (`--doc v2`)
 
-*The next version is checked in this toy only (its banner). Figures below from fewer than ten
+*SEACAST is checked in this toy only (its banner). Figures below from fewer than ten
 seeds, a single seed unless stated, are toy checks of a mechanism, not measurements. Those of runs
 with a payload (tier 4, variant C) were recorded before 2026-10-23, under the descriptor's group id
 as the payload's name; under the group's key their exact values move as any renaming's do
 ("Checking a change"). Column and row groups are named as before.*
 
 [`protocol-v2.md`](../protocol-v2.md) is run on top of `protocol.md`: `extract.py` pulls both
-documents' blocks, v0.3's are executed first and the next version's after them in the same namespace, so
-the next version redefines what it changes (`on_frame`, `on_chunk`, `forward`, `announce`, the holding and
+documents' blocks, v0.3's are executed first and SEACAST's after them in the same namespace, so
+SEACAST redefines what it changes (`on_frame`, `on_chunk`, `forward`, `announce`, the holding and
 offer handlers, `on_want`, completion and repair, `publish`, the heartbeat) and keeps what it says
 carries over (the ask discipline, `choose_push`; the window and the writer as its §4.11 and §4.12 adapt them). `node.py` supplies what
-the next version leaves to the environment under its tier 4 setting (its §6.1): the payload object type
+SEACAST leaves to the environment under its tier 4 setting (its §6.1): the payload object type
 with its parameters, the join tables, the push relation behind the mesh, and the gossipsub
 binding of its messages (`protocol-v2-bindings.md` §4): a holding is an IDONTWANT bitmap, an offer
 an IHAVE bitmap, an ask a `WantIndex`. Relations are static, as the mesh is for v0.3.
 
-`check.py --doc v2` runs the fifteen cells against the next version's own recording,
+`check.py --doc v2` runs the fifteen cells against SEACAST's own recording,
 `golden-v2.txt` (`--update` records it, as for v0.3). `check.py --doc v2 --golden golden.txt`
-compares the next version against `protocol.md`'s cells instead (v0.3's until 2026-10-13, v0.4's
+compares SEACAST against `protocol.md`'s cells instead (v0.3's until 2026-10-13, v0.4's
 until 2026-10-21, v0.5's until 2026-10-25, v0.7's until 2026-10-26, v0.8's until 2026-11-12, v0.9's
 since); there a cell whose digest moved but whose numbers did not is reported as such and does not
-count, since the next version iterates the relation in peer order where v0.3 iterates the mesh set,
+count, since SEACAST iterates the relation in peer order where v0.3 iterates the mesh set,
 which reorders same-instant sends. On 2026-10-07, with v0.3's slot window, eleven cells reproduced
 v0.3's numbers exactly and `rr-stripe` differed by 3 ms at the median; with the window in bytes
 (`protocol-v2.md` §4.11) the cells differ from v0.3's by at most 7 ms at the median, 15 ms at the
 tail and 0.04 copies either way, which is the writer choosing the entry before taking room and
 control taking none, not the unit.
 
-**v0.4's P4 in the next version** (2026-10-21, `protocol-v2.md` §4.7): the source's holding names only the
+**v0.4's P4 in SEACAST** (2026-10-21, `protocol-v2.md` §4.7): the source's holding names only the
 chunks it has sent. Against v0.4's recording the twelve cells now sit within 3 ms at the median,
 16 ms at the tail and 0.03 copies, `loss-thin` aside (§4.13's ask window, at 20 Mbps); without P4
 the medians had been up to 102 ms behind. On the settings it costs a slow proposer of columns
@@ -719,9 +720,9 @@ against 80, more on seven seeds, as many on two, fewer on one (not traced). Its 
 as before, on every seed but 13, where two custodians stay short either way. Tables further down
 that predate 2026-10-21 were recorded without P4.
 
-**v0.5 in the next version** (2026-10-21, `protocol-v2.md` §5 and the functions it names in its header):
+**v0.5 in SEACAST** (2026-10-21, `protocol-v2.md` §5 and the functions it names in its header):
 a refused push or offer is offered with the next write, parked announcers are asked once more, the
-gate per object type, the promise from the write (a WANT starts none). Against the next version just
+gate per object type, the promise from the write (a WANT starts none). Against SEACAST just
 before the merge, with P4 (60 nodes, warm medians; over several seeds the median and the range):
 
 | cell | seeds | p50 | p99 | copies | (node, group) pairs short |
@@ -1463,7 +1464,7 @@ and 2.0 without, and then completes 10 ms later at the median. A rule keyed on t
 uplink, as striping's is, could save the home builder's bytes where they are scarce. It is not in
 the document; v0.9's timing of the source's offers, below, saves most of them instead.
 
-**v0.9 in the next version** (2026-11-11, `protocol-v2.md` §4.7, §4.11). What the next version
+**v0.9 in SEACAST** (2026-11-11, `protocol-v2.md` §4.7, §4.11). What SEACAST
 takes from v0.9, as written:
 - the source's holding grows at a chunk's acknowledgement, not at its write;
 - its offers wait for the acknowledgement, for every object type;

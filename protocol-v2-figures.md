@@ -1,6 +1,6 @@
-# SEACAST's next version: its figures
+# SEACAST: its figures
 
-This file holds the figures behind [`protocol-v2.md`](protocol-v2.md), SEACAST's next version, and
+This file holds the figures behind SEACAST, [`protocol-v2.md`](protocol-v2.md), and
 behind its decision record, [`protocol-v2-decisions.md`](protocol-v2-decisions.md).
 Both documents state the rules and their reasons in words, and they point here for the numbers, as
 `(protocol-v2-figures.md, §4.1)`, or as `(protocol-v2-figures.md, §4.6, "The probe")` for a part of
@@ -816,7 +816,7 @@ holding at the write"); and the line skip (2026-11-20) and the wake at the wait 
 - Under the liar fault (`--fault claim20`), over seeds 7 to 16, 108 (member, row) pairs never
   complete, against 80 without P4: more on seven seeds, as many on two, fewer on one (not traced).
   The earlier P4 batch of the same night recorded them.
-- With v0.5 merged (2026-10-21; the toy's README, "v0.5 in the next version"), 2 pairs stay short
+- With v0.5 merged (2026-10-21; the toy's README, now under "v0.5 in SEACAST"), 2 pairs stay short
   over seeds 7 to 16, and none on eight of the seeds.
 - The toy check of v0.5's last resort (2026-10-21) ran at seeds 9, 14 and 15. With the last resort
   off, 12, 24 and 18 pairs stay short, as before v0.5 (12, 22 and 20). With the candidates limited
@@ -1023,13 +1023,13 @@ digest only, and no other cell (§4.11).
 unless an entry gives another size. A cell is one configuration of the toy; the median and the tail
 are the 50th and the 99th percentile of a cell's completion times. Each entry names its seeds; a
 figure from fewer than ten seeds is a toy check of a mechanism, not a measurement. The baseline is
-v0.3's order, the toy's `--answers-first v03`, with v2's window in bytes. Every figure below was
-first written on 2026-10-07 (11:05), when the draft took the writer's order, and the toy's README of
-that commit records the checks. Spec `08fbc3d`, the v0.6 draft of 2026-10-21, took them into the
-main line. Like every figure from before 2026-11-15, they ran with the toy's earlier transport,
-which takes every write at once (`--send-buffer 0`). The rules they ran on are the draft's of
-2026-10-07. Which of them changed since is not traced here; §4.7's entry for the source's offers at
-publish (card 3), from the same runs, names the later rules it can point to.
+v0.3's order, the toy's `--answers-first v03`, with SEACAST's window in bytes. Every figure below
+was first written on 2026-10-07 (11:05), when the draft took the writer's order, and the toy's
+README of that commit records the checks. Spec `08fbc3d`, the v0.6 draft of 2026-10-21, took them
+into the main line. Like every figure from before 2026-11-15, they ran with the toy's earlier
+transport, which takes every write at once (`--send-buffer 0`). The rules they ran on are the
+draft's of 2026-10-07. Which of them changed since is not traced here; §4.7's entry for the source's
+offers at publish (card 3), from the same runs, names the later rules it can point to.
 
 **A source's own chunks first, against v0.3's order:**
 - With a 50 Mbps proposer, by the mean over seeds 7, 8 and 9 (paired by seed), the custody block
@@ -1210,7 +1210,7 @@ recording of 2026-10-27, with the earlier transport. It was first written on the
 ## §6.2 The five designs as settings
 
 **Conditions.** The cells have 60 nodes, degree 30, the 1 Gbps proposer and 6 row reconstructors
-where there are rows, in the custody and rows settings of `toy/README.md` ("The next version"). They
+where there are rows, in the custody and rows settings of `toy/README.md` ("SEACAST"). They
 ran at seeds 7 to 19, thirteen runs of each cell, unless an item names seed 7, the recorded seed.
 They ran on 2026-10-07 (the repair floor) and 2026-10-08 (three supernodes, `--supernodes`, on
 datacenter links); the figures were first written into the text on the main line in spec `08fbc3d`
@@ -1382,7 +1382,7 @@ groups, at seeds 7 to 16, and the figures are warm medians. A figure is the medi
 the change, paired by seed: P4 against no P4, and P4 with merging (`--merge-holdings on`) against
 P4. The baselines differ by transport: writes that complete at once (`--send-buffer 0`), and one
 write per connection at a time (`--send-buffer 1`), each with its own P4 baseline. The cells ran on
-2026-10-21, the day v0.4's P4 came in, and were recorded in the toy's README ("The next version",
+2026-10-21, the day v0.4's P4 came in, and were recorded in the toy's README (now under "SEACAST",
 P4's and `--merge-holdings`'s tables). The figures were first written on the main line in
 `08fbc3d`. The runs predate v0.5 (2026-10-21), ties (2026-10-26), v0.9's source at the
 acknowledgement (2026-11-11) and the transport of 2026-11-15.

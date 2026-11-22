@@ -1,4 +1,4 @@
-# SEACAST's next version: its bindings
+# SEACAST: its bindings
 
 > This document is a companion of [`protocol-v2.md`](protocol-v2.md), released with it.
 > SEACAST's message encoding and the libp2p stream and Waggle bindings are defined to the byte

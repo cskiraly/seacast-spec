@@ -35,7 +35,7 @@ time, node, function and arguments, so that a change in what a node does moves a
 change of state that alters no event does not), and known answers (`toy/*_known.py`: scenarios
 whose outcome is stated beforehand, for what a digest cannot show). This is testing: it shows what
 the code does in those runs, not that the rules are right, and the toy's numbers are not
-measurements. The next version's draft, `protocol-v2.md`, runs in the toy too, with recorded cells
+measurements. SEACAST, `protocol-v2.md`, runs in the toy too, with recorded cells
 of its own (`toy/golden-v2.txt`), known answers on its own functions, and the invariants its §6.2
 names: `toy/invariants.py` checks three on every run and two under its row setting, and
 `toy/check.py --doc v2 --golden golden.txt` holds its tier 4 setting to `protocol.md`'s cells.

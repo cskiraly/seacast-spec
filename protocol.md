@@ -1,9 +1,15 @@
-# SEACAST: the protocol in pseudocode
+# SEACAST on gossipsub: the protocol in pseudocode
 
 > **DRAFT v0.10.12, 2026-11-22.** Companion to the post [*Informed Diffusion: making home builders
 > publish fast*](https://ethresear.ch/t/informed-diffusion-making-home-builders-publish-fast/26151). Field level on the wire; byte-exact layouts follow in a second phase. Written from
 > the research implementation (Prysm and a go-libp2p-pubsub fork) and revised after a review
 > against it; section 9 lists where the measured runs differ from what is written here.
+
+*This is SEACAST on gossipsub, the protocol that was measured and proved: the measurements ran a
+research implementation of it (§9), and the proofs are of models of its rules at v0.8 with four
+later changes ([`formal/`](formal/README.md)). SEACAST itself is defined in
+[`protocol-v2.md`](protocol-v2.md), which is checked in the toy only. SEACAST contains this
+protocol as its tier 4 setting, with the differences that `protocol-v2.md` §6.1 lists.*
 
 ## 0. How to read this
 
@@ -1149,15 +1155,15 @@ the setting trades is the source's own:
   §7.3's rule and the queue admits them, they wait behind the pushes queued before them to the same
   peer (an offer a full queue refuses is owed, and rides with the next write, §7.2); where the
   transport takes a writer's entries at once, they can leave while pushes still wait. In the toy at
-  60 nodes (degree 30, three payloads, the median of ten seeds), measured on the next version's
-  draft when it took this rule as written (`toy/README.md`, 2026-11-11), with writes that complete
+  60 nodes (degree 30, three payloads, the median of ten seeds), measured on `protocol-v2.md`
+  when it took this rule as written (`toy/README.md`, 2026-11-11), with writes that complete
   at once: against announcing at publish, a 50 Mbps builder announcing at the acknowledgement was
   asked 61 % less and uploaded 2.07 copies of the payload instead of 2.50, and a 1 Gbps builder 5.9
   instead of 10.0; the payload's median completion moved by −8 to 0 ms over four cells, and by −19
   to +6 ms over their seeds. At 500 nodes, at one seed, the source was asked 22 % less and uploaded
   3.06 copies instead of 3.24. With §7.3's rule kept, the timing changed nothing measurable at 60
   nodes (40 asks against 45, the medians within 4 ms). A fast source can gain where its peers pull
-  chunks from it while its uplink has room: the draft's 1 Gbps proposer of many column groups
+  chunks from it while its uplink has room: SEACAST's 1 Gbps proposer of many column groups
   completes 44 ms sooner at 60 nodes and 9 ms sooner at 500 when it offers at publish, and its
   50 Mbps proposer 26 ms later at 500 (`protocol-v2-figures.md`, §4.7).
 - *Its privacy.* Every chunk announced at once, by the one node that holds them all, names the
@@ -2281,7 +2287,7 @@ scored peers by this promise would make it a bound.
 The measurements in the posts this document accompanies come from a research harness. This section
 lists where the harness does something this document does not specify, and what that means for the
 numbers. Figures 4 and 5 of
-[*SEACAST: fast, lean broadcast for Ethereum, with an executable spec and a formal model*](https://ethresear.ch/t/seacast-fast-lean-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)
+[*SEACAST: fast, lean, sampled broadcast for Ethereum, with an executable spec and a formal model*](https://ethresear.ch/t/seacast-fast-lean-sampled-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)
 (2026) were rerun on an implementation with v0.5's rules and the source's paced HAVE; that
 post's other figures, and the earlier posts', come from the implementation before them. Where the
 rerun does as this document does, the entry says so.
