@@ -69,7 +69,8 @@
 #             line after the verdict, a line on stderr, exit code 2) refused, the plain one taken
 #   tracercontrols   a tracer whose views let an assignment through unlogged, and 29 faults planted in the tracer:
 #             each must stop it, with its own words; under v2, nine plants that must not (five, and four controls),
-#             each as written, and the controls of the checks' own helpers
+#             each as written, and the controls of the checks' own helpers; and a nodes line without a replaced
+#             name's chain, which the replay must refuse with its words
 #   seeds     the same bytes whatever Python's hash seed, which is random in every process of an isolated Python:
 #             every directed set made again twice, two cells once (46 traces)
 #   sizes     sizes.txt: each of the record's traces as the tracer wrote it: bytes, lines, the longest line; and
@@ -925,6 +926,18 @@ EOF_ER
   [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
   [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 9 ] || no "not 9 plants under v2 as written (c-tracerplants.txt)"
   echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 9 plants under v2 as written (five, and four controls), and the checks' controls"
+  # under v2, the nodes line's chains: hand5-own traced with its replaced name's chain left out (tracerfaults3's
+  # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words
+  rm -f "$OUT/c-chains-omit.jsonl.gz" "$OUT/c-chains-omit.jsonl.gz.bare.json" "$OUT/c-chains-omit.replay"
+  if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --chains-omit-v2 . "$OUT/c-chains-omit.jsonl.gz" > "$OUT/c-chains-omit.out" 2> "$OUT/c-chains-omit.err"); then
+    no "the trace of a nodes line without a replaced name's chain did not end with 0 (c-chains-omit.err)"
+  elif ! has -E '^tracerfaults3: chains-omit-v2, planted [1-9][0-9]* times?$' "$OUT/c-chains-omit.err"; then
+    no "no replaced name's chain was left out (c-chains-omit.err)"
+  elif replay_of c-chains-omit; then
+    no "the replay passed a nodes line without a replaced name's chain (c-chains-omit.replay)"
+  elif has -x "nodes: chains: a replaced name with no chain: on_iwant" "$OUT/c-chains-omit.replay"; then
+    echo "  a nodes line without on_iwant's chain at its replacing node: refused by the replay, with its words"
+  else no "the replay refused a nodes line without a replaced name's chain otherwise than by its words (c-chains-omit.replay)"; fi
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
