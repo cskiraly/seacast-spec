@@ -104,7 +104,7 @@ class Sim:
         self.churn_rng = random.Random(cfg["seed"] * 7919 + 3301)
         self.epoch, self.entry_epoch = {}, {}
         self.churn_log, self.churn_dropped = [], 0
-        # --keep-floor on (with --upkeep on, custody): protocol-v2.md §4.1's keep_floor for the columns, the
+        # --keep-floor on (with --upkeep on, custody): seacast.md §4.1's keep_floor for the columns, the
         # custodian floor per column the graph is built with (scenario.family_topology) kept at runtime: at
         # its heartbeat a custodian short of F_LO custodian links in a column opens links to custodians it has
         # none with, drawn from the floor's own generator, so the other draws stay the same (node.py's
@@ -180,7 +180,7 @@ class Sim:
         classes = c["classes"](n, self.rng)                    # node id -> {"up", "down"}
         if c.get("fault"):                                     # wh<pct>, sil<pct> (the harness's set), claim<pct>, hoard<pct>
             kind, pct = re.fullmatch(r"(wh|sil|claim|hoardcol|hoardm|hoard)(\d+)", c["fault"]).groups()   # or hoardm<pct>,
-            c["faulty"] = scenario_fail_select(c["seed"], n, int(pct))                           #   hoardcol<pct> (v2)
+            c["faulty"] = scenario_fail_select(c["seed"], n, int(pct))                           #   hoardcol<pct> (SEACAST)
             c["silent"] = kind == "sil"
             c["claim"] = kind == "claim"
             c["hoard"] = kind in ("hoard", "hoardm", "hoardcol")
@@ -189,7 +189,7 @@ class Sim:
         if c.get("late_block"):                                # pct % of the non-publishers, by another seeded draw
             pubs = {c.get("publishers", {}).get(m, 1) for m in range(1, c["msgs"] + 1)}    # as publish() picks them
             c["late_nodes"] = scenario.late_select(c["seed"], n, c["late_block"][0], pubs)
-        das = c.get("doc") == "v2" and c.get("setting") in ("custody", "rows")
+        das = c.get("doc") == "seacast" and c.get("setting") in ("custody", "rows")
         dump = c.get("das_dump") if das else None              # a harness dump's network (run.py --topology,
         if das and c.get("samplers"):                          #   xcheck.apply_das): no draw below runs
             k = max(1, (c["samplers"] * (n - 1) + 50) // 100)         # samplers: interest without duty (§4.10)
@@ -220,7 +220,7 @@ class Sim:
         self.nodes = {i: Node(self, i, classes[i], c) for i in range(1, n + 1)}
         self.links = {i: Link(classes[i]["up"], classes[i]["down"]) for i in self.nodes}
         self.lat = c["latency"](n, self.rng)                   # (i, j) -> one-way seconds
-        setting = c.get("setting") if c.get("doc") == "v2" else None
+        setting = c.get("setting") if c.get("doc") == "seacast" else None
         if setting in ("custody", "rows") and dump is not None:   # the dump's custody, row subnets and graph; the
             self.custody.update(dump["custody"])               #   derived interest of the protocol reads them too
             for i in self.nodes:
@@ -275,7 +275,7 @@ class Sim:
             conns, mesh = c["topology"](n, c["degree"], c["D"], self.rng)
             colour_meshes = None
             if setting == "c":                                 # variant C: a mesh per index on the same connections
-                n_colours = 2 * math.ceil(c["payload"] / (16 * 1024))      # N at this payload (protocol.md §1)
+                n_colours = 2 * math.ceil(c["payload"] / (16 * 1024))      # N at this payload (seacast-lite.md §1)
                 colour_meshes = [scenario.gossip_mesh(conns, c["D"], 6, 12, self.rng) for _ in range(n_colours)]
             for i, nd in self.nodes.items():
                 nd.peers = sorted(conns[i])
@@ -300,7 +300,7 @@ class Sim:
         self.churn_log.append((self.now, a, b, c))
 
     def close_link(self, a, b):
-        """protocol-v2.md §3's lifetimes at a close: per-peer entries, relations, our unanswered GRAFTs
+        """seacast.md §3's lifetimes at a close: per-peer entries, relations, our unanswered GRAFTs
         and anything owed end at both ends; entries not yet sent go, and those on the wire are dropped."""
         key = (min(a, b), max(a, b))
         self.epoch[key] = self.epoch.get(key, 0) + 1
@@ -329,7 +329,7 @@ class Sim:
 
     def header_key(self, node, p, e):
         """--wire standalone: the key under which entry e's chunk would carry its block's header, or None: a cell,
-        pushed (not an answer), the first of its group to p on this connection (protocol-v2-bindings.md §2.3)."""
+        pushed (not an answer), the first of its group to p on this connection (seacast-bindings.md §2.3)."""
         f = e.chunk
         if f is None or e.solicited or not self.is_cell(f):
             return None
@@ -337,7 +337,7 @@ class Sim:
         return None if key in self.headers_sent else key
 
     def chunk_bytes(self, node, p, e):
-        """The bytes entry e's chunk will take on the wire to p, as the links charge them (protocol-v2.md §4.11's
+        """The bytes entry e's chunk will take on the wire to p, as the links charge them (seacast.md §4.11's
         wire_size): on the libp2p stream binding with the header a first push carries."""
         f = e.chunk
         if self.wire != "standalone":
@@ -345,8 +345,8 @@ class Sim:
         return Wm.standalone_chunk(f, self.is_cell(f), self.cfg["blobs"] if self.header_key(node, p, e) else None)
 
     def standalone_wire(self, node, p, e):
-        """(data, control) bytes of entry e on protocol-v2-bindings.md §2's stream, each message a frame of its own.
-        A cell carries the block's header with the first eager push of its group on the link (§1.2, §2.3; protocol-v2.md
+        """(data, control) bytes of entry e on seacast-bindings.md §2's stream, each message a frame of its own.
+        A cell carries the block's header with the first eager push of its group on the link (§1.2, §2.3; seacast.md
         §2, P2): an unsolicited cell, once per group and connection, with every blob's commitment."""
         data = 0
         f = e.chunk
@@ -515,14 +515,14 @@ class Sim:
         for i in sorted(self.cfg.get("late_nodes", ())):       # --late-block: these install it later (§4.2)
             self.nodes[i].blocks_waiting.add(root)
             self.after(self.nodes[i], self.cfg["late_block"][1], self.nodes[i].install_block, root)
-        g = ns["group_key"](gid, m)                            # the group's name in diffusion (protocol.md §1)
+        g = ns["group_key"](gid, m)                            # the group's name in diffusion (seacast-lite.md §1)
         self.msgs.append((self.now, [g]))
         self.pubs.append(pub)
         ns["publish"](self.blocks[root], d, shards)
         self.canonical[g] = dict(ns["chunks"][g])
 
     def publish_block(self, m):
-        """A block of `blobs` blobs as COLUMNS column groups (protocol-v2.md §1.1's table): each
+        """A block of `blobs` blobs as COLUMNS column groups (seacast.md §1.1's table): each
         group's header is a descriptor-shaped object whose count is the blob count, so that v0.3's
         N and K read it (K = N: no code within a column), its root names the block and the column,
         and its id is group_id(header), computable by everyone from the block root."""
@@ -645,7 +645,7 @@ class Sim:
         """Per message: the receivers' completion (custodians, or every node on a payload), and the
         samplers' apart, since a sample is a different interest. A sampler confirms availability only
         once every cell it declared arrived: one with a sample given up (`unreachable`, which drops it
-        from the interest, before protocol-v2.md's [D12]) or never delivered never does; the time over
+        from the interest, before seacast.md's [D12]) or never delivered never does; the time over
         the samples that arrived is kept beside."""
         out = []
         for k, ((t0, groups), pub) in enumerate(zip(self.msgs, self.pubs)):

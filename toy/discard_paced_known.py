@@ -2,7 +2,7 @@
 """A known answer for `discard_paced`, which `drop_group` calls (§4.6, §6.4, §8.1): a dropped group is announced no
 more by paced gossip either.
 
-    python3 discard_paced_known.py      # protocol.md, then protocol-v2.md on top of it
+    python3 discard_paced_known.py      # seacast-lite.md, then seacast.md on top of it
 
 §4.6: the node "announces the group no more, at the heartbeat or paced". `drop_group` calls
 `gossip_history.remove_group` and `discard_paced`, which §8.1's list defines: they "drop a group from the gossip
@@ -34,7 +34,7 @@ def check(doc):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     nd = got["sim"].nodes[NODE]
     ns = nd.ns
     bad = 0
@@ -74,7 +74,7 @@ def check(doc):
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         print(f"--doc {doc}:")
         bad += check(doc)
     print("ok" if not bad else "FAIL")

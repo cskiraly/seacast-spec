@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """sampler_graph.py PART [--seeds 7-16]: how a sampler reaches custodians, on the toy's graphs.
 
-The figures of protocol-v2.md's [D12] (§1.3, §4.10, §6.3's SAMPLE_COVER and ROUTE_FLOOR rows, §8's
+The figures of seacast.md's [D12] (§1.3, §4.10, §6.3's SAMPLE_COVER and ROUTE_FLOOR rows, §8's
 "A sampler's reach"): three ways for a sampler to reach a custodian of each column, graph-only
 (no events): each network is built by the toy (custody from node ids, das-core's
 get_custody_groups; the random regular graph plus the custodian floor), 500 nodes, a fifth of them
@@ -50,7 +50,7 @@ def build(args, seed):
         _built.append(simmod.Sim(cfg))
     run.run = capture
     with contextlib.redirect_stdout(io.StringIO()):
-        run.main(f"{args} --doc v2 --msgs 1 --net bld --seed {seed}".split())
+        run.main(f"{args} --doc seacast --msgs 1 --net bld --seed {seed}".split())
     s = _built.pop()
     cust = {i: set(s.custody.get(i) or ()) for i in s.nodes}
     mask = {i: sum(1 << c for c in cols) for i, cols in cust.items()}

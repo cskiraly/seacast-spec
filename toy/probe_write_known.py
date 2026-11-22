@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""Known answers for protocol-v2.md §4.6's probe and its write (R5): the probe's promise and the verdict's wait
+"""Known answers for seacast.md §4.6's probe and its write (R5): the probe's promise and the verdict's wait
 start when its WANT is written, and a probe not written gets no verdict.
 
     python3 probe_write_known.py
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), for a row it holds, three of whose
+On one node of a small rows run (seacast.md, one block, run to its end), for a row it holds, three of whose
 cells it is made to lack, with one claimant, the deferral is made by hand (`defer_on_claim`) three times:
 - **A probe a full queue refuses** (`send` returns False): no verdict, and the member's own repair is
   reconsidered at once; the duty, fired, penalises nobody.
@@ -26,7 +26,7 @@ def main():
     import sim as S
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

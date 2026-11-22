@@ -1,19 +1,48 @@
 # Changelog
 
-Each release is a tag, and `protocol.md` names its version at the top. A release's heading below
+Each release is a tag, and `seacast-lite.md` names its version at the top. A release's heading below
 names the tag's commit from the next release on, since a commit cannot name itself. Changes after
 the latest tag are on `main`; when there are any, this file's first entry names them. A release
 changes the text and its checks, not earlier measurements: each measurement says which code it ran
-(`protocol.md` §9 for the SEACAST post's figures).
+(`seacast-lite.md` §9 for the SEACAST post's figures).
 
 Each entry opens with a one-line summary and lists its changes by kind. **Rules** come first: they
-change what a node does, under `protocol.md`, `protocol-v2.md` or its bindings. **Added**,
+change what a node does, under `seacast-lite.md`, `seacast.md` or its bindings. **Added**,
 **Changed**, **Fixed** and **Removed** follow. Each line says what changed and where. The reasons
 are in the documents, most of them in their Rationales, and the full story is in the commit
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## v0.11.1 — 2026-11-22
+## v0.12.0 — 2026-11-22
+
+This release changes names only: the files take their protocols' names, and SEACAST on gossipsub
+is now SEACAST Lite. No rule changed, and every digest of `toy/check.py` is as it was, under either
+document. The entries below this one keep the names of their time.
+
+### Changed
+- These files are renamed, and their contents change only by the new names that this entry lists:
+  - `protocol.md` is now `seacast-lite.md`, and `protocol-v2.md` is now `seacast.md`;
+  - `protocol-v2-bindings.md`, `protocol-v2-decisions.md` and `protocol-v2-figures.md` are now
+    `seacast-bindings.md`, `seacast-decisions.md` and `seacast-figures.md`;
+  - `toy/golden-v2.txt` is now `toy/golden-seacast.txt`, and `toy/v2_carried_known.py` is now
+    `toy/seacast_carried_known.py`.
+- `seacast-lite.md`'s protocol is SEACAST Lite, in its title and wherever the documents, the
+  READMEs and the tools name it.
+- The toy's `--doc` takes `lite` (the default) and `seacast`, in place of `v03` and `v2`, in
+  `run.py`, `check.py` and every known answer that runs under either document. `--wire v03` (the
+  gossipsub binding) and `--answers-first v03` (v0.3's order of the queue) keep their values.
+- The toy's and the twin's names for SEACAST follow: `v2` is `seacast` in identifiers and file
+  names (`doc_seacast`, `seacast_kept`, `Node._seacast`) and `SEACAST` in prose and printed lines
+  ("SEACAST's kept"). The twin's `check.sh` writes SEACAST's traces under `seacast/`, with
+  `cells-seacast.txt` and the step `seacastcells`, and `trace3.py`'s self-test of the kept names
+  is `--self-test-seacast`.
+- `formal/twin/tools/trace3.py`'s `doc_of` reads a header written before this release, whose
+  arguments say `--doc v2` or `--doc v03`, as `seacast` or `lite`.
+- The twin's record, `formal/twin/record/`, is v0.11.1's run (`1370aa0`), carried under these names
+  with no new run. Its files keep their names (`replays/v2/`, `controls/cells-v2.txt`), and
+  `RECORD.md` says which commit its sentences about the release's tree describe.
+
+## v0.11.1 — 2026-11-22 (`1370aa0`)
 
 SEACAST's second sampling phase has one cap per block on its asks in flight, a setting of the
 node, and the toy's cross-check (`--xcheck`) counts the window in bytes under `protocol-v2.md`.

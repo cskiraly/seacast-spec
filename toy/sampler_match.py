@@ -2,7 +2,7 @@
 """sampler_match.py POPULATION DEGREE [--seeds 7-16] [--draws 400]: can a sampler send each sample
 to a different linked custodian? Graph-only, on the toy's networks (no events).
 
-The figures of protocol-v2.md's diversity floor ([D12]: §1.3, §6.3's SAMPLE_COVER row, §8's "The
+The figures of seacast.md's diversity floor ([D12]: §1.3, §6.3's SAMPLE_COVER row, §8's "The
 floor's size"), one sample per peer. For each sampler, links = its own links plus a floor of
 sampling-only links, chosen by computed custody (greedy multi-cover, t covers of every column):
   (i)   own links only;
@@ -48,7 +48,7 @@ def build(args, seed):
         _built.append(simmod.Sim(cfg))
     run.run = capture
     with contextlib.redirect_stdout(io.StringIO()):
-        run.main(f"{args} --doc v2 --msgs 1 --net bld --seed {seed}".split())
+        run.main(f"{args} --doc seacast --msgs 1 --net bld --seed {seed}".split())
     s = _built.pop()
     return s, {i: sorted(s.custody.get(i) or ()) for i in s.nodes}
 

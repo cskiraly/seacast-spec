@@ -962,7 +962,7 @@ def main():
     ok &= case("W5 a failed acquisition (the window full, the peer in line): reads, no write",
                run("x = in_flight < W and (not waiters or waiters[0] == 7)\ny = 7 not in waiters"),
                reads=[CNT + [2], LN + [[5, 7]]], make=lambda: fresh_window(count=2))
-    ok &= case("W6 the count in a sum (v2's `in_flight + need <= W`): one read", run("x = in_flight + 1 <= W"),
+    ok &= case("W6 the count in a sum (SEACAST's `in_flight + need <= W`): one read", run("x = in_flight + 1 <= W"),
                reads=[CNT + [1]], make=fresh_window)
     ok &= case("W7 the line: `if waiters`, `waiters[0]`, `p in waiters`: one read",
                run("x = bool(waiters) and waiters[0] == 5 and 7 in waiters"), reads=[LN + [[5, 7]]], make=fresh_window)

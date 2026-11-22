@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §2's rule on object types a link has not joined, in §4.1's code (`runs_type`,
+"""A known answer for seacast.md §2's rule on object types a link has not joined, in §4.1's code (`runs_type`,
 `joined`): a JOIN for an object type the node does not run, and a GRAFT or a PRUNE for one the link has not joined,
 leave no state, draw no answer and no penalty.
 
@@ -72,7 +72,7 @@ def build(args):
 
 
 def main():
-    sim = build(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7",
+    sim = build(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7",
                  "--upkeep", "on"])
     S = sim.nodes[2]
     ns = S.ns

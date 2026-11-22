@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.5's ask outside what a node serves (`outside`, `drop_outside`): once a
+"""A known answer for seacast.md §4.5's ask outside what a node serves (`outside`, `drop_outside`): once a
 group's gate is open, a node ignores an ask for an index it does not hold, that is outside its interest as it declared
 it to the asker, for a group it has not claimed whole, unless it is a routed request to a forwarding node. It answers
 nothing, keeps no standing request and no WANT bit for it, and does not penalise the asker. An ask that comes before
@@ -76,7 +76,7 @@ def kept(ns, g, i, p):
 
 def custody_cases():
     import wire as Wm
-    sim = build(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    sim = build(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     S = sim.nodes[2]
     ns = S.ns
     p = min(q for q in S.peers if q != 1)
@@ -117,7 +117,7 @@ def custody_cases():
 
 def sampler_cases():
     import wire as Wm
-    sim = build(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7",
+    sim = build(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7",
                  "--samplers", "50"])
     smp = set(sim.cfg["sampler_ids"])
     S = next(sim.nodes[q] for q in sorted(sim.nodes) if q not in smp and q != 1
@@ -177,9 +177,9 @@ def honest_runs():
     import run as R
     import sim as SM
     for label, args in (("custody, 25 % samplers, two blocks",
-                         ["--doc", "v2", "--setting", "custody", "--nodes", "12", "--degree", "8", "--msgs", "2",
+                         ["--doc", "seacast", "--setting", "custody", "--nodes", "12", "--degree", "8", "--msgs", "2",
                           "--seed", "7", "--samplers", "25"]),
-                        ("rows, one block", ["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6",
+                        ("rows, one block", ["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6",
                                              "--msgs", "1", "--seed", "7"])):
         got, spec_run = {}, R.run
         R.run = lambda cfg, out=None: got.setdefault("sim", SM.Sim(cfg))

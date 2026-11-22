@@ -35,7 +35,7 @@ tool changed between the two runs) and are counted, not judged.
 
 --bodies: the bodies alone, both ways, for a record made before the manifest named its twin and its mutants, or
 a run of another base. Each trace with another body, or in one manifest alone, is named; then a line a
-directory (`traces/`, `directed/`, `v2/`): how many of its traces have the record's body. The head lines both
+directory (`traces/`, `directed/`, `seacast/`): how many of its traces have the record's body. The head lines both
 manifests have are reported where they differ (the replay's above all), and decide nothing. Exit code 0: every
 trace of each in the other, with its body; 1: not so; 2: a manifest that cannot be read.
 """
@@ -173,8 +173,8 @@ def self_test():
     base = (f"content {H('a')}\npython 3.12.3 x86_64 linux\nreplay {H('b')}\ntwin {H('c')} (32 files: twin-sources.txt)\n"
             f"mutants 554 {H('d')} (their names, in the tool's order)\n{H('1')}  {H('2')}  traces/none.jsonl.gz\n"
             f"{H('3')}  {H('4')}  directed/directed.jsonl.gz\n")
-    c1 = content.line({"content": {"version": 1, "files": {"protocol.md": H("1"), "toy/node.py": H("2")}}})
-    c2 = content.line({"content": {"version": 1, "files": {"protocol.md": H("9"), "toy/node.py": H("2")}}})
+    c1 = content.line({"content": {"version": 1, "files": {"seacast-lite.md": H("1"), "toy/node.py": H("2")}}})
+    c2 = content.line({"content": {"version": 1, "files": {"seacast-lite.md": H("9"), "toy/node.py": H("2")}}})
     other = base.replace(f"content {H('a')}", f"content {H('e')}").replace(f"{H('1')}  {H('2')}", f"{H('5')}  {H('2')}") \
                 .replace(f"{H('3')}  {H('4')}", f"{H('6')}  {H('4')}")
     cases = [
@@ -188,7 +188,7 @@ def self_test():
         ("the same content and bodies, one whole hash another", base.replace(f"{H('1')}  {H('2')}", f"{H('5')}  {H('2')}"), 1,
          "another whole hash"),
         ("a trace missing", base.replace(f"{H('3')}  {H('4')}  directed/directed.jsonl.gz\n", ""), 1, "in the record, not in the run"),
-        ("a trace more", base + f"{H('3')}  {H('4')}  v2/none.jsonl.gz\n", 1, "in the run, not in the record"),
+        ("a trace more", base + f"{H('3')}  {H('4')}  seacast/none.jsonl.gz\n", 1, "in the run, not in the record"),
         ("another twin", base.replace(f"twin {H('c')}", f"twin {H('f')}"), 1, "twin: the record's"),
         ("another replay", base.replace(f"replay {H('b')}", f"replay {H('f')}"), 1, "replay: the record's"),
         ("one mutant more", base.replace("mutants 554", "mutants 555"), 1, "mutants: the record's"),
@@ -202,23 +202,23 @@ def self_test():
         print(f"against self-test, {name}: exit code {rc}, must be {want}; "
               f"{'says' if any(words in l for l in out) else 'does NOT say'}: {words}{'' if ok else '  <-- FAIL'}")
     rc, out = compare(manifest(base), manifest(other), c1, c2)
-    ok = "content: protocol.md: other bytes" in out
+    ok = "content: seacast-lite.md: other bytes" in out
     bad += not ok
     print(f"against self-test, another content names the file that differs: {'so' if ok else 'NOT so  <-- FAIL'}")
-    c3 = content.line({"content": {"version": 2, "files": {"protocol.md": H("9"), "toy/node.py": H("2")}}})
+    c3 = content.line({"content": {"version": 2, "files": {"seacast-lite.md": H("9"), "toy/node.py": H("2")}}})
     rc, out = compare(manifest(base), manifest(other), c1, c3)
     ok = rc == 3 and "content: the version of the content's form differs" in out
     bad += not ok
     print(f"against self-test, a record of content version 1 against a run of version 2: exit code {rc}, the version "
           f"named: {'so' if ok else 'NOT so  <-- FAIL'}")
-    docs = f"documents protocol.md {H('7')} protocol-v2.md {H('8')} (each file's sha256: reported, it decides nothing)\n"
+    docs = f"documents seacast-lite.md {H('7')} seacast.md {H('8')} (each file's sha256: reported, it decides nothing)\n"
     for name, rec, run, want, words in (
             ("a documents line in both, the same", base + docs, base + docs, 0, "as recorded: "),
             ("a documents line in both, another document's bytes", base + docs, base + docs.replace(H("8"), H("9")), 0,
              "(documents: the record's"),
             ("a documents line in the run alone (a record of an earlier kit)", base, base + docs, 0, "(documents: the record's none"),
             ("a documents line in both, the second document's hash another in its last digit", base + docs,
-             base + docs.replace(H("8"), H("8")[:-1] + "9"), 0, f"the run's protocol.md {H('7')} protocol-v2.md {H('8')[:-1]}9")):
+             base + docs.replace(H("8"), H("8")[:-1] + "9"), 0, f"the run's seacast-lite.md {H('7')} seacast.md {H('8')[:-1]}9")):
         try:
             rc, out = compare(manifest(rec), manifest(run), c1, c1)
             ok = rc == want and any(words in l for l in out)
@@ -258,15 +258,15 @@ def self_test():
         bad += not ok
         print(f"against self-test, --bodies-in, {name}: exit code {rc}, must be {want}{'' if ok else '  <-- FAIL'}")
     early = "\n".join(l for l in base.splitlines() if not l.startswith(("twin ", "mutants "))) + "\n"   # an earlier kit's
-    v2 = f"{H('7')}  {H('8')}  v2/none.jsonl.gz\n"
+    seacast = f"{H('7')}  {H('8')}  seacast/none.jsonl.gz\n"
     for name, r_text, u_text, want, words in (
-            ("an earlier kit's record, the same bodies, another content", early + v2, other + v2, 0,
+            ("an earlier kit's record, the same bodies, another content", early + seacast, other + seacast, 0,
              "every trace's body the record's: 3 of 3, both ways"),
-            ("the same, by directory", early + v2, other + v2, 0, "v2/: 1 of 1 traces with the record's body"),
-            ("a v2 body another: named, and counted in its directory", early + v2, other + v2.replace(H('8'), H('9')), 1,
-             "v2/: 0 of 1 traces with the record's body"),
-            ("a trace in the record alone", early + v2, other, 1, "v2/none.jsonl.gz: in the record, not in the run"),
-            ("a trace in the run alone", early, other + v2, 1, "v2/none.jsonl.gz: in the run, not in the record"),
+            ("the same, by directory", early + seacast, other + seacast, 0, "seacast/: 1 of 1 traces with the record's body"),
+            ("a SEACAST body another: named, and counted in its directory", early + seacast, other + seacast.replace(H('8'), H('9')), 1,
+             "seacast/: 0 of 1 traces with the record's body"),
+            ("a trace in the record alone", early + seacast, other, 1, "seacast/none.jsonl.gz: in the record, not in the run"),
+            ("a trace in the run alone", early, other + seacast, 1, "seacast/none.jsonl.gz: in the run, not in the record"),
             ("another replay: reported, deciding nothing", early, base.replace(f"replay {H('b')}", f"replay {H('f')}"), 0,
              "(replay: the record's")):
         rc, out = bodies_against(manifest(r_text, whole=False), manifest(u_text, whole=False))

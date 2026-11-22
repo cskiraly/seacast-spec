@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """A known answer for `accepted(mid)` (§8.1: "`accepted`: the id was stored"): it asks after the id, not the index.
 
-    python3 accepted_id_known.py        # protocol.md, then protocol-v2.md on top of it
+    python3 accepted_id_known.py        # seacast-lite.md, then seacast.md on top of it
 
-§4.2's duplicate path acknowledges a copy of a chunk it has seen if `accepted(mid)`, and protocol-v2.md's also
+§4.2's duplicate path acknowledges a copy of a chunk it has seen if `accepted(mid)`, and seacast.md's also
 answers the copy's probe there. Two ids can name one index: a copy whose content differs has its own content id,
 and so its own id (§2: the group, the index and the content id). Only the id that was stored is accepted. So:
 - a copy that level 1 rejected (here: naming a slot that is not its block's) is seen and never stored; a later copy
@@ -11,7 +11,7 @@ and so its own id (§2: the group, the index and the content id). Only the id th
 - a copy with its own id that passes level 1 after the index was received is acknowledged by `on_validated` as a
   second copy (§4.2: "a second copy of a chunk we received: acknowledge") and is not stored; a later copy of it is
   seen, and is not acknowledged, since its id was not stored. (The toy's level 1 does not check proofs, so such a
-  copy passes it. That a first copy is acknowledged and a later one is not is the text's. Under protocol-v2.md the
+  copy passes it. That a first copy is acknowledged and a later one is not is the text's. Under seacast.md the
   first copy's acknowledgement is `fill`'s.)
 - a rebuilt chunk is stored and never seen, and is accepted: `accepted` does not ask whether the id was seen.
 The controls: a copy of the stored chunk is acknowledged; `accepted` answers yes for the stored id.
@@ -35,7 +35,7 @@ def check(doc):
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "65536", "--seed", str(SEED)]
-             + (["--doc", "v2"] if doc == "v2" else []))
+             + (["--doc", "seacast"] if doc == "seacast" else []))
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"])
     sim.publish(1)                                          # the block installs, its chunks exist; nothing delivered
@@ -108,7 +108,7 @@ def check(doc):
 
 def main():
     bad = 0
-    for doc in ("v03", "v2"):
+    for doc in ("lite", "seacast"):
         print(f"--doc {doc}:")
         bad += check(doc)
     print("ok" if not bad else "FAIL")

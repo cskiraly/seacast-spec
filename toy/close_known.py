@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Known answers for a connection's close under protocol-v2.md (`Node.drop_peer`, which `--churn` runs): what
-goes, by §3's lifetimes, which are `protocol.md` §8.1's, and what the probe does when its claimant leaves (R5,
+"""Known answers for a connection's close under seacast.md (`Node.drop_peer`, which `--churn` runs): what
+goes, by §3's lifetimes, which are `seacast-lite.md` §8.1's, and what the probe does when its claimant leaves (R5,
 `claims_close`).
 
     python3 close_known.py
 
-On one node of a small network (protocol-v2.md, one payload, run to its end), with states made by hand:
+On one node of a small network (seacast.md, one payload, run to its end), with states made by hand:
 
 - **What an announcer leaves goes with its connection.** Peer 1 is made to hold what an announcer holds:
   - an offer of three chunks, so a place in three ordered lists (`listed` 3) and three bits in `offered`;
@@ -28,7 +28,7 @@ On one node of a small network (protocol-v2.md, one payload, run to its end), wi
   peer 3.
 - **A closed peer leaves the window** (since 2026-11-17). Peer 1 is first in the writers' line with peer 3
   behind it, and a chunk to peer 1 holds room in flight. After the close, peer 1 is out of the line and peer 3
-  is woken, and the room is released, as `WINDOW_TIMEOUT` releases it (`protocol.md` §8.1: window slots end
+  is woken, and the room is released, as `WINDOW_TIMEOUT` releases it (`seacast-lite.md` §8.1: window slots end
   "when the peer's queue closes"). Before, a closed peer at the head of the line stalled every writer behind it.
 """
 import copy as C
@@ -48,7 +48,7 @@ def main():
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
     run.main(["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7",
-              "--late-block", "0,400,2", "--doc", "v2"])          # a store of two copies per peer
+              "--late-block", "0,400,2", "--doc", "seacast"])          # a store of two copies per peer
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]
@@ -96,13 +96,13 @@ def main():
     ns["claims"][g] |= {P, Q}
     ns["state"][g] = "COMPLETE"
     ns["deferred"][g], ns["probed"][g], ns["probe"][g] = True, P, 0
-    if "probe_sent" in ns:                                  # its WANT written (protocol-v2.md §4.6, since 2026-11-16)
+    if "probe_sent" in ns:                                  # its WANT written (seacast.md §4.6, since 2026-11-16)
         ns["probe_sent"].add(g)
     ns["probe_ok"].pop(g, None)
     later = ns["now"] + 1
     ns["reconsider_at"][g] = later                          # the duty armed for later, as defer_on_claim arms it
     if "duty_at" in ns:                                     # the duty's own time: due at the deferral, as when
-        ns["duty_at"][g] = ns["now"]                        #   reconsider defers it (protocol-v2.md §4.6)
+        ns["duty_at"][g] = ns["now"]                        #   reconsider defers it (seacast.md §4.6)
 
     # the window: peer 1 first in the writers' line, peer 3 behind it, and room in flight with a chunk to peer 1
     ns["waiters"].clear(); ns["waiters"].extend([P, Q])

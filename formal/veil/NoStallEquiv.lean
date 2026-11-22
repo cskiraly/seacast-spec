@@ -26,7 +26,7 @@ macro "fv_step" : tactic => `(tactic| (
 
 /-! # No stall under equivocation, the asking part (F6), for any number of nodes
 
-SEACAST, `protocol.md` v0.7 (§3, §4.1, §4.2, §4.4, §4.5, §6.1, §6.4, §7.2), with the two rules
+SEACAST, `seacast-lite.md` v0.7 (§3, §4.1, §4.2, §4.4, §4.5, §6.1, §6.4, §7.2), with the two rules
 for F6 that v0.8 adds (`../README.md`, F6): **when the asking machinery has nothing left to do, a node
 that has installed the builder's block holds every chunk an honest peer offered it, or has stopped
 pulling the group, also when it installed the proposer's other block first.** The chunk is any one
@@ -74,7 +74,7 @@ that copy waits for good, and its sender, which counted it, sends nothing more f
 v0.8's §4.6 has a rebuilt chunk name the block the chunks it was rebuilt from name, where they all
 name one: the source publishes under one block, and forwarding and the rule keep it, so among
 honest nodes every copy names it, while no node relabels a chunk under the other block's root
-(`protocol.md` §4.6, open: honest nodes forward such a copy and rebuild from it). That argument is
+(`seacast-lite.md` §4.6, open: honest nodes forward such a copy and rebuild from it). That argument is
 by inspection, not in this model.
 
 Not modelled here: how offers come about (the transport), lifetimes, adversaries (so every tie is

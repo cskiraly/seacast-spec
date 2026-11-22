@@ -1048,7 +1048,7 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
       exec (withOwed (← nat p) (← qentry e f)) fun v => do
         return v == (← if r.ret == .null then pure none else some <$> qentry r.ret f)
     | "projected", #[p, .str g'] => do exec (projected (← nat p) (← group g')) fun v => return v == (← r.ret.getBool?)
-    | "rarest", #[p] => do exec (rarestOf (← nat p)) fun v => return v == (← retNat r.ret)   -- v2's choose calls it
+    | "rarest", #[p] => do exec (rarestOf (← nat p)) fun v => return v == (← retNat r.ret)   -- SEACAST's choose calls it
     -- §1's seven. K and N take what the caller read of `desc`: a descriptor, or null
     | "message_id", #[f] => do exec (messageId (← chunkIn form f)) fun v => return v == (← mid r.ret)   -- §2
     -- §6.4's paced gossip

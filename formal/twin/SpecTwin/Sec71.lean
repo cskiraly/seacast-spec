@@ -1,7 +1,7 @@
 import SpecTwin.Readers
 import SpecTwin.Sec51
 
-/-! # The twin of protocol.md §7.1, the window [c14] (v0.10.9): `front`, `wake_front`, `write_waits`,
+/-! # The twin of seacast-lite.md §7.1, the window [c14] (v0.10.9): `front`, `wake_front`, `write_waits`,
 `acquire_slot`, `release_unused_slot`, `track_in_flight`, `window_release`, `window_timeout` and `free_slot`
 
 - **The window's three tables are the twin's own:** `in_flight`, a signed count in one entry (free_slot at 0

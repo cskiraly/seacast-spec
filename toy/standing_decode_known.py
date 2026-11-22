@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2.md §4.5's standing WANTs, answered when a decode stores the cell.
+"""A known answer for seacast.md §4.5's standing WANTs, answered when a decode stores the cell.
 
     python3 standing_decode_known.py
 
@@ -8,7 +8,7 @@ A WANT for a chunk the node does not hold yet stands: a `DECLARED` peer's always
 from `fill` and `decode_group`). A rebuilt chunk fills its other groups through `fill`, which answers their
 standing WANTs; the group being decoded stores its own rebuilt chunks itself, and answers them there.
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), for a row the node holds whole:
+On one node of a small rows run (seacast.md, one block, run to its end), for a row the node holds whole:
 three of its cells are taken out of its store, as if it were still decoding, its claim on them kept. Then:
 - peer 1, a `DECLARED` link, sends a plain WANT of the first cell (it stands: a declared peer's WANT does);
 - peer 3, a `DERIVED` link, sends a WANT of the second cell that says `standing`;
@@ -31,7 +31,7 @@ def main():
     import wire as Wm
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])
     nd = sim.nodes[NODE]

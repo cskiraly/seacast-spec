@@ -1,6 +1,6 @@
 import SpecTwin.Sec1
 
-/-! # The twin of protocol.md §2, "The wire" [c1, c7] (v0.10.4, spec 34f60f8): `message_id`
+/-! # The twin of seacast-lite.md §2, "The wire" [c1, c7] (v0.10.4, spec 34f60f8): `message_id`
 
 - **The document's line:** `f.group + uint32_le(f.index) + content_id(f)`. The twin computes the layout and asks
   `content_id`, at every call.

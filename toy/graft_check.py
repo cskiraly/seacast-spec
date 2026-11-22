@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""graft_check.py [--bound N] [--doc FILE] [--model]: protocol-v2.md §4.1's JOIN and GRAFT
+"""graft_check.py [--bound N] [--doc FILE] [--model]: seacast.md §4.1's JOIN and GRAFT
 exchanges, every interleaving, for one link and one push relation between two nodes.
 
 The document's own functions run as written: the last definition of each of NAMES in its code
@@ -69,7 +69,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from extract import blocks  # noqa: E402
 
-DOC2 = HERE.parent / "protocol-v2.md"
+DOC2 = HERE.parent / "seacast.md"
 NAMES = ("maintain_relations", "graft", "prune", "on_graft", "on_prune", "join_push", "send_relation",
          "queue_owed_relations", "on_join", "send_join", "yes", "no", "joined", "relation_room")
 IN, OUT, BOTH, FORWARD, NONE, FAST, HOME = "IN", "OUT", "BOTH", "FORWARD", "NONE", "FAST", "HOME"
@@ -182,7 +182,7 @@ class Node:
             has_room=lambda p: len(ns["queue"]) < QUEUE, wake=lambda p: None, our_join=lambda T_: JOIN,
             runs_type=lambda tid: True, links=lambda T_: [peer] if linked() else [])
         self.linked = linked
-        exec(compile(code, "protocol-v2.md (§4.1's functions)", "exec"), ns)
+        exec(compile(code, "seacast.md (§4.1's functions)", "exec"), ns)
         self.load((False,) * 4 + ((), ()) + (False,) * 4)
 
     def load(self, s):
@@ -541,7 +541,7 @@ WAYS = ("at the GRAFT, no backoff", "at the GRAFT, with a backoff", "answered")
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--bound", type=int, default=3, help="upkeep steps per node (default 3)")
-    ap.add_argument("--doc", default=str(DOC2), help="the document whose §4.1 runs (default protocol-v2.md)")
+    ap.add_argument("--doc", default=str(DOC2), help="the document whose §4.1 runs (default seacast.md)")
     ap.add_argument("--model", action="store_true", help="the abstract comparison of the three ways")
     ap.add_argument("--both", action="store_true", help="a SYMMETRIC type's relation, grafted and pruned BOTH")
     ap.add_argument("--diverged", action="store_true", help="start from linked ends that disagree at rest")

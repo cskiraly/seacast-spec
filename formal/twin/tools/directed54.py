@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Directed records for forward (protocol.md §5.2), candidates_for_source (§5.1) and on_mesh_join
+"""Directed records for forward (seacast-lite.md §5.2), candidates_for_source (§5.1) and on_mesh_join
 (§5.4). The toy's own functions are called in a toy node's namespace on generated states, and trace3.py's
 tracer logs each call with the node's whole state.
 

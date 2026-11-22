@@ -10,7 +10,7 @@
     python3 content.py --self-test
 
 The line is `{"content":{"files":{NAME:SHA256,...},"version":2}}`. It names:
-- the two documents, as `protocol.md` and `protocol-v2.md`, each by the sha256 of its code: the text that the
+- the two documents, as `seacast-lite.md` and `seacast.md`, each by the sha256 of its code: the text that the
   toy's own `extract.py` makes of it (`generate(doc)`), which is what the toy compiles. That text holds every
   python block of the document in order, each under a comment with the heading it stands under, comments inside
   the blocks included. So an edit of a document's prose, its version line among it, leaves the line as it was;
@@ -28,7 +28,7 @@ knows it, a bytecode file outside `__pycache__` too. Version 1 named each docume
 The line's form, exactly: one object with the one member `content`, which has `files` and `version` in that
 order; `files` has its names in the order of their bytes; no blank anywhere; ASCII; one line end after it. The
 names' characters need no escape, so the line has one way to be written, and two lines are compared as bytes.
-The documents are the ones the toy reads: `protocol.md` and `protocol-v2.md` beside the toy's directory.
+The documents are the ones the toy reads: `seacast-lite.md` and `seacast.md` beside the toy's directory.
 
 It names no commit, no path of this machine (the toy's place is read, and written as `toy/`), no host, time,
 Python version or hash seed. The tracer writes this line first in every trace; the replay is given the same line,
@@ -84,7 +84,7 @@ def walk(top, prefix):
     return out
 
 
-DOCS = ("protocol.md", "protocol-v2.md")
+DOCS = ("seacast-lite.md", "seacast.md")
 
 
 def code_of(extract_py, doc):
@@ -253,8 +253,8 @@ def self_test():
             r = d / name
             (r / "toy").mkdir(parents=True)
             (r / "tools" / "gen").mkdir(parents=True)
-            (r / "protocol.md").write_text(DOC1)
-            (r / "protocol-v2.md").write_text(DOC2)
+            (r / "seacast-lite.md").write_text(DOC1)
+            (r / "seacast.md").write_text(DOC2)
             (r / "toy" / "extract.py").write_text(EXTRACT)
             (r / "toy" / "README.md").write_text("about the toy\n")
             (r / "toy" / "node.py").write_text("x = 1\n")
@@ -280,14 +280,14 @@ def self_test():
             else:
                 p.parent.mkdir(parents=True, exist_ok=True); p.write_text(new)
             cases.append((what, c(t) == base, expect))
-        changed("a document's prose changed", "protocol.md", DOC1.replace("Prose of one.", "Prose of one, edited."), True)
-        changed("a document's version line changed", "protocol.md", DOC1.replace("Version 1.", "Version 2."), True)
-        changed("a heading with no code under it changed", "protocol.md", DOC1.replace("## Notes", "## Remarks"), True)
-        changed("the other document's prose changed", "protocol-v2.md", DOC2.replace("Prose of two.", "More prose."), True)
-        changed("a document's code changed", "protocol.md", DOC1.replace("x = 1", "x = 2"))
-        changed("a comment inside a document's code block changed", "protocol.md", DOC1.replace("# set x", "# set x first"))
-        changed("a heading over a code block relabelled", "protocol.md", DOC1.replace("## 1. One", "## 1. Uno"))
-        changed("the other document's code changed", "protocol-v2.md", DOC2.replace("y = 2", "y = 3"))
+        changed("a document's prose changed", "seacast-lite.md", DOC1.replace("Prose of one.", "Prose of one, edited."), True)
+        changed("a document's version line changed", "seacast-lite.md", DOC1.replace("Version 1.", "Version 2."), True)
+        changed("a heading with no code under it changed", "seacast-lite.md", DOC1.replace("## Notes", "## Remarks"), True)
+        changed("the other document's prose changed", "seacast.md", DOC2.replace("Prose of two.", "More prose."), True)
+        changed("a document's code changed", "seacast-lite.md", DOC1.replace("x = 1", "x = 2"))
+        changed("a comment inside a document's code block changed", "seacast-lite.md", DOC1.replace("# set x", "# set x first"))
+        changed("a heading over a code block relabelled", "seacast-lite.md", DOC1.replace("## 1. One", "## 1. Uno"))
+        changed("the other document's code changed", "seacast.md", DOC2.replace("y = 2", "y = 3"))
         changed("the toy's README changed", "toy/README.md", "about the toy, edited\n", True)
         changed("a README added to the tools", "tools/README.md", "about the tools\n", True)
         changed("a Markdown file added below the tools", "tools/gen/notes.md", "notes\n", True)
@@ -347,31 +347,31 @@ def self_test():
                          ("--rev: the commit's extract.py, not the working tree's, makes the documents' code",
                           r1 == base and c(t) != base)):
             print(f"{what}: {'so' if ok else 'NOT so  <-- it must be'}"); bad += not ok
-        # --rev with the working protocol.md a link to protocol-v2.md: the commit's protocol.md all the same
+        # --rev with the working seacast-lite.md a link to seacast.md: the commit's seacast-lite.md all the same
         t = tree("git-link")
         subprocess.run(["git", "-C", str(t), "init", "-q"], check=True)
         subprocess.run(["git", "-C", str(t), "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
                         "add", "-A"], check=True)
         subprocess.run(["git", "-C", str(t), "-c", "user.name=t", "-c", "user.email=t@t", "-c", "commit.gpgsign=false",
                         "commit", "-q", "-m", "t"], check=True)
-        (t / "protocol.md").unlink(); (t / "protocol.md").symlink_to(t / "protocol-v2.md")
+        (t / "seacast-lite.md").unlink(); (t / "seacast-lite.md").symlink_to(t / "seacast.md")
         try:
             ok = line(of_rev(t / "toy", "HEAD", tools=t / "tools")) == base
         except Refused:
             ok = False
-        print(f"--rev with the working protocol.md a link to protocol-v2.md: the commit's protocol.md: "
+        print(f"--rev with the working seacast-lite.md a link to seacast.md: the commit's seacast-lite.md: "
               f"{'so' if ok else 'NOT so  <-- it must be'}"); bad += not ok
-        # --rev with the working protocol.md a link to a directory of another repository: the commit's protocol.md
+        # --rev with the working seacast-lite.md a link to a directory of another repository: the commit's seacast-lite.md
         other = d / "another-repo"
         (other / "dir").mkdir(parents=True)
         subprocess.run(["git", "-C", str(other), "init", "-q"], check=True)
-        (t / "protocol.md").unlink(); (t / "protocol.md").symlink_to(other / "dir")
+        (t / "seacast-lite.md").unlink(); (t / "seacast-lite.md").symlink_to(other / "dir")
         try:
             ok = line(of_rev(t / "toy", "HEAD", tools=t / "tools")) == base
         except (Refused, ValueError, subprocess.CalledProcessError):
             ok = False
-        print(f"--rev with the working protocol.md a link to a directory of another repository: the commit's "
-              f"protocol.md: {'so' if ok else 'NOT so  <-- it must be'}"); bad += not ok
+        print(f"--rev with the working seacast-lite.md a link to a directory of another repository: the commit's "
+              f"seacast-lite.md: {'so' if ok else 'NOT so  <-- it must be'}"); bad += not ok
         # --rev and the walk on caches: a link tracked under a __pycache__ directory, and a file named __pycache__
         t = tree("git-cache")
         (t / "toy" / "__pycache__").mkdir(); (t / "toy" / "__pycache__" / "l.pyc").symlink_to(t / "toy" / "node.py")
@@ -416,20 +416,20 @@ def self_test():
             c(t); print("an extract.py that fails: taken  <-- it must be refused"); bad += 1
         except Refused as e:
             print(f"an extract.py that fails: refused ({e})")
-        t = tree("nodoc"); (t / "protocol-v2.md").unlink()
+        t = tree("nodoc"); (t / "seacast.md").unlink()
         try:
             c(t); print("a document missing: taken  <-- it must be refused"); bad += 1
         except Refused as e:
             print(f"a document missing: refused ({e})")
         v2a = json.loads(base)
-        v2b = json.loads(base); v2b["content"]["files"]["protocol.md"] = "0" * 64; v2b["content"]["files"]["toy/node.py"] = "0" * 64
+        v2b = json.loads(base); v2b["content"]["files"]["seacast-lite.md"] = "0" * 64; v2b["content"]["files"]["toy/node.py"] = "0" * 64
         v1a, v1b = json.loads(base), json.loads(json.dumps(v2b))
         v1a["content"]["version"] = v1b["content"]["version"] = 1
-        for what, got, want in (("diff of two v2 lines: a document's code", diff(v2a, v2b), "protocol.md: other code"),
+        for what, got, want in (("diff of two v2 lines: a document's code", diff(v2a, v2b), "seacast-lite.md: other code"),
                                 ("diff of two v2 lines: a file of the toy", diff(v2a, v2b), "toy/node.py: other bytes"),
-                                ("diff of two v1 lines: a document's bytes", diff(v1a, v1b), "protocol.md: other bytes"),
+                                ("diff of two v1 lines: a document's bytes", diff(v1a, v1b), "seacast-lite.md: other bytes"),
                                 ("diff of a v1 line and a v2 line: a document's two hashes not compared", diff(v1b, v2a),
-                                 "protocol.md: named by its bytes in one line and by its code in the other")):
+                                 "seacast-lite.md: named by its bytes in one line and by its code in the other")):
             ok = want in got
             print(f"{what}: {'says' if ok else 'does NOT say'} {want!r}{'' if ok else '  <-- it must'}"); bad += not ok
         obj = json.loads(base)

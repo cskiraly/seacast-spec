@@ -388,7 +388,7 @@ def self_test():
         ("next_to_send's owed answer queued, on enqueue's tape entry", 0,
          {"fn": "next_to_send", "args": [4], "ret": None,
           "tape": [["enqueue", [4, ["entry", [chunk, None, True]], False], True]]}),
-        ("with_owed's entry in its args (v2's choose calls it)", 0,
+        ("with_owed's entry in its args (SEACAST's choose calls it)", 0,
          {"fn": "with_owed", "args": [4, [chunk, None, False]], "tape": [], "ret": None}),
         ("with_owed's returned entry", 0,
          {"fn": "with_owed", "args": [4, [None, None, False]], "tape": [], "ret": [chunk, None, False]}),

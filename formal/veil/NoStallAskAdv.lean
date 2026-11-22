@@ -11,7 +11,7 @@ set_option veil.smt.timeout 300
 
 /-! # No stall, the asking part, with malicious peers, for any number of nodes
 
-`NoStallAsk.lean` with adversaries: SEACAST, `protocol.md` v0.5 (§4.1,
+`NoStallAsk.lean` with adversaries: SEACAST, `seacast-lite.md` v0.5 (§4.1,
 §4.4, §4.5, §6.1, §7.2), with v0.7's IHAVE limits (§4.4, §6.4) and connections that close (§8.1).
 **When no honest node's asking machinery has anything left to do, an honest node that has the block
 holds every chunk an honest peer offered it, or has stopped pulling the group, whatever the other

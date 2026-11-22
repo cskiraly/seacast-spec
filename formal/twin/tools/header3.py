@@ -9,12 +9,12 @@ and the reason names the first name whose hash differs (a document's code, any o
 this one is made against the tree itself. cells3.py asks it of each trace it has just made.
 
 What the replay does not check of the header, the second line: the tracer's name, and that the functions traced
-(`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc v2,
-the block's names that are protocol.md's all the way down (trace3.v2_kept), computed here from TOYDIR's documents,
+(`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc seacast,
+the block's names that are seacast-lite.md's all the way down (trace3.seacast_kept), computed here from TOYDIR's documents,
 or §6.1's twelve; and that it claims the whole state exactly where it is a directed set's. Its tables (`own`,
-`foreign`) are trace3.py's, or for a trace run with --doc v2 protocol-v2.md's manifest's (`want`). Its envelope
+`foreign`) are trace3.py's, or for a trace run with --doc seacast seacast.md's manifest's (`want`). Its envelope
 is the one both readers hold it to: no member twice, nothing beside the header, no member trace3.py does not write,
-the arguments a list of words, and a document word the toy takes (`v03` or `v2`). A trace that passes is printed
+the arguments a list of words, and a document word the toy takes (`v03` or `SEACAST`). A trace that passes is printed
 with its kind.
 
 Exit code 0 when every trace passes; otherwise each trace's reasons are printed.
@@ -28,15 +28,15 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import content                          # noqa: E402
 import trace3                           # noqa: E402
-import manifest_v2                      # noqa: E402: gen/manifest_v2.py (trace3.py puts gen/ on the path)
+import manifest_seacast                      # noqa: E402: gen/manifest_seacast.py (trace3.py puts gen/ on the path)
 
 
-def want(v2):
-    """The header's fields every trace of these tools has, as trace3.py writes them: under --doc v2 the tables are
-    protocol-v2.md's manifest's (its own, protocol.md's and v2's, and its foreign), otherwise trace3.py's own."""
-    if v2:
-        return {"format": 7, "tracer": "trace3.py", "own": list(manifest_v2.OWN),
-                "foreign": list(manifest_v2.FOREIGN)}
+def want(SEACAST):
+    """The header's fields every trace of these tools has, as trace3.py writes them: under --doc seacast the tables are
+    seacast.md's manifest's (its own, seacast-lite.md's and SEACAST's, and its foreign), otherwise trace3.py's own."""
+    if SEACAST:
+        return {"format": 7, "tracer": "trace3.py", "own": list(manifest_seacast.OWN),
+                "foreign": list(manifest_seacast.FOREIGN)}
     return {"format": 7, "tracer": "trace3.py", "own": list(trace3.OWN), "foreign": list(trace3.FOREIGN)}
 
 
@@ -44,30 +44,30 @@ KINDS = {tuple(sorted(trace3.BLOCK)): f"the block's {len(trace3.BLOCK)} function
          tuple(sorted(trace3.SEC61)): f"§6.1's {len(trace3.SEC61)} alone"}
 
 
-def v2_kind(toy):
-    """v2's kept names, sorted, from TOYDIR's documents: the toy's node.py makes their extracted code."""
+def seacast_kind(toy):
+    """SEACAST's kept names, sorted, from TOYDIR's documents: the toy's node.py makes their extracted code."""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node                         # noqa: E402: the pinned toy, from TOYDIR
-    return tuple(sorted(n for n in trace3.v2_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
-                        if n not in trace3.SEC71))      # the window's six are not traced under v2
+    return tuple(sorted(n for n in trace3.seacast_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
+                        if n not in trace3.SEC71))      # the window's six are not traced under SEACAST
 
 
 def kind_of(toy, traced, args):
-    """The name of a traced list's kind, or None. A trace run with --doc v2 has two kinds, v2's kept and §6.1's
+    """The name of a traced list's kind, or None. A trace run with --doc seacast has two kinds, SEACAST's kept and §6.1's
     twelve (TRACE3_ONLY=sec61, whose traced names trace3.py does not hold to the manifest's KEPT), and a trace run
-    without it never has v2's kept: the block's list under --doc v2 does not pass."""
+    without it never has SEACAST's kept: the block's list under --doc seacast does not pass."""
     t = tuple(traced) if isinstance(traced, list) else None
-    if trace3.doc_of(args or []) == "v2":           # the words of the trace's arguments: see trace3.doc_of
+    if trace3.doc_of(args or []) == "seacast":           # the words of the trace's arguments: see trace3.doc_of
         if t is not None and t == tuple(sorted(trace3.SEC61)):
-            return f"§6.1's {len(trace3.SEC61)} alone, under --doc v2"
-        return f"v2's kept, {len(t)} functions" if t is not None and t == v2_kind(toy) else None
+            return f"§6.1's {len(trace3.SEC61)} alone, under --doc seacast"
+        return f"SEACAST's kept, {len(t)} functions" if t is not None and t == seacast_kind(toy) else None
     return KINDS.get(t)
 
 
-# the header's members, as trace3.py writes them (row_reads under --doc v2 alone), and the document words the toy's
+# the header's members, as trace3.py writes them (row_reads under --doc seacast alone), and the document words the toy's
 # parser takes (run.py's --doc)
 MEMBERS = ("format", "whole", "own", "foreign", "row_reads", "traced", "tracer", "args")
-DOCS = ("v03", "v2")
+DOCS = ("v03", "seacast")
 
 
 def head_lines(trace):
@@ -137,10 +137,10 @@ def check(toy, trace):
         why.append(f"args: a document trace3.py does not write: {doc}")
     traced = h.get("traced")
     if kind_of(toy, traced, args) is None:
-        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept or "
+        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc seacast SEACAST's kept or "
                    "§6.1's alone, sorted")
-    v2 = doc == "v2"
-    for name, v in want(v2).items():
+    SEACAST = doc == "seacast"
+    for name, v in want(SEACAST).items():
         got = h.get(name)
         if got == v:
             continue
@@ -152,11 +152,11 @@ def check(toy, trace):
     #                                              drop_offer's (directed6o.py), §6.4's (directed64.py, directed64h.py), §4.6's (directed46.py), §4.3's (directed43.py), §4.1's (directed41.py), §4.6's decode's (directed46d.py), §3's (directed3v.py)
     if h.get("whole") is not whole:
         why.append(f"whole: {h.get('whole')!r}, must be {whole!r} for this kind of trace")
-    # the rows the views read on the way down: under --doc v2 exactly trace3.ROW_READS_V2, and in no other trace
-    if v2 and h.get("row_reads") != list(trace3.ROW_READS_V2):
-        why.append(f"row_reads: {h.get('row_reads')!r}, must be {list(trace3.ROW_READS_V2)!r} under --doc v2")
-    if not v2 and "row_reads" in h:
-        why.append(f"row_reads: {h['row_reads']!r} in a trace not run with --doc v2")
+    # the rows the views read on the way down: under --doc seacast exactly trace3.ROW_READS_Seacast, and in no other trace
+    if SEACAST and h.get("row_reads") != list(trace3.ROW_READS_Seacast):
+        why.append(f"row_reads: {h.get('row_reads')!r}, must be {list(trace3.ROW_READS_Seacast)!r} under --doc seacast")
+    if not SEACAST and "row_reads" in h:
+        why.append(f"row_reads: {h['row_reads']!r} in a trace not run with --doc seacast")
     return why
 
 

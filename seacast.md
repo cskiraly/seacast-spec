@@ -6,30 +6,31 @@
 > defined in §2) were checked exhaustively for one link and one relation in small bounds.
 
 *SEACAST stands for Segmented, Encoded, Availability-sampled broadCAST (the E could also read
-Elastic). The name dates from 2026-10-19; `protocol.md`'s protocol, now SEACAST on gossipsub, was
+Elastic). The name dates from 2026-10-19; `seacast-lite.md`'s protocol, now SEACAST Lite, was
 published at v0.4 as Informed Diffusion, which now names SEACAST's diffusion part (§0, "The
-parts"). This file keeps its earlier name, `protocol-v2.md`, and the toy runs it with `--doc v2`.*
+parts"). Up to v0.11.1 this file was `protocol-v2.md` and `seacast-lite.md` was `protocol.md`. The
+toy runs this document with `--doc seacast`.*
 
-*This document began as draft 1, of 2026-10-07. It is a sibling of [`protocol.md`](protocol.md),
-which defines SEACAST on gossipsub; SEACAST contains that protocol as its tier 4 setting, with the
+*This document began as draft 1, of 2026-10-07. It is a sibling of [`seacast-lite.md`](seacast-lite.md),
+which defines SEACAST Lite; SEACAST contains that protocol as its tier 4 setting, with the
 differences that §6.1 lists. That document was draft v0.3 when this was written and has been
-v0.11.1 since 2026-11-22, with the same section numbers. Below, `protocol.md` means that document
+v0.12.0 since 2026-11-22, with the same section numbers. Below, `seacast-lite.md` means that document
 as it is now, and "v0.3" means draft v0.3 itself, for its own rules.*
 
-*Each later version of `protocol.md` is carried into this document in the same way; §5 maps what
-carries over, and [`protocol-v2-decisions.md`](protocol-v2-decisions.md) lists the versions
+*Each later version of `seacast-lite.md` is carried into this document in the same way; §5 maps what
+carries over, and [`seacast-decisions.md`](seacast-decisions.md) lists the versions
 carried.*
 
 *This document defines the notions, the messages, the state and the event handlers; the scheduling
 that tier 4 (§6.2) measured carries over unchanged where §5 says so. Every design decision is
-marked `[D1]` … `[D12]`, and [`protocol-v2-decisions.md`](protocol-v2-decisions.md) records where
-each bites and what was decided (§8). The toy runs this document on top of `protocol.md`'s
-(`toy/run.py --doc v2`): `protocol.md`'s blocks are loaded first, this document's after them, and
+marked `[D1]` … `[D12]`, and [`seacast-decisions.md`](seacast-decisions.md) records where
+each bites and what was decided (§8). The toy runs this document on top of `seacast-lite.md`'s
+(`toy/run.py --doc seacast`): `seacast-lite.md`'s blocks are loaded first, this document's after them, and
 the tier 4 setting is checked against its own recorded cells, which §6.1 compares with
-`protocol.md`'s. Draft 0 (2026-10-06) was written without running; draft 1 is what executing it
+`seacast-lite.md`'s. Draft 0 (2026-10-06) was written without running; draft 1 is what executing it
 changed.*
 
-*[`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind this document's
+*[`seacast-figures.md`](seacast-figures.md) gives the figures behind this document's
 reasons, each with its conditions.*
 
 ## 0. How to read this
@@ -38,53 +39,53 @@ reasons, each with its conditions.*
 - §1 to §3 define the notions (§1), the messages (§2) and the state a node keeps (§3).
 - §4 defines what a node does at each event: joining and keeping its relations, the arrival of each
   message, forwarding, completion and repair, publishing, the heartbeat, sampling and sending.
-- §5 maps what carries over from `protocol.md` unchanged.
-- §6 gives the settings: `protocol.md` as one, the five designs, and the parameters, limits and
+- §5 maps what carries over from `seacast-lite.md` unchanged.
+- §6 gives the settings: `seacast-lite.md` as one, the five designs, and the parameters, limits and
   constants.
 - §7 says what every binding provides, and what the bindings differ in.
 - §8 points to the record of the decisions.
 - The glossary, after §8, defines the document's terms and its labels.
 
 **Three companion documents** go with this one:
-- [`protocol-v2-bindings.md`](protocol-v2-bindings.md) defines the bindings: how each carries the
+- [`seacast-bindings.md`](seacast-bindings.md) defines the bindings: how each carries the
   messages, SEACAST's message encoding, and the bytes of the libp2p stream and Waggle bindings.
-- [`protocol-v2-decisions.md`](protocol-v2-decisions.md) records each decision: when it was taken,
+- [`seacast-decisions.md`](seacast-decisions.md) records each decision: when it was taken,
   what was not taken and why, and the runs behind it.
-- [`protocol-v2-figures.md`](protocol-v2-figures.md) gives the figures behind the reasons, the toy's
+- [`seacast-figures.md`](seacast-figures.md) gives the figures behind the reasons, the toy's
   and a few of the research harness's, each with its conditions.
 
 Gossipsub bundles its notions: a *topic* is the namespace, the unit of subscription, the unit of
 the mesh, the scope of scoring and the rendezvous; a *subscription* means "everything here", is
 announced to every peer and invites GRAFTs; the *mesh* is one symmetric pusher set per topic and the
 scope of IDONTWANT; *gossip* is message ids sent to a few random non-mesh peers per heartbeat.
-`protocol.md` runs inside those notions and loosens them from within: it uses chunks as messages,
+`seacast-lite.md` runs inside those notions and loosens them from within: it uses chunks as messages,
 carries HAVE bitmaps inside IDONTWANT and IHAVE and asks by index inside IWANT, and its source
 stripes over every connection. This document unbundles them. What a node receives (*interest*), what
 it does for others (*duty*), whom it pushes to and for which indices (the *push relation*, per
 family and colour: §1.1, §1.4), whom it tells what it holds (the *announce relation*), and where it
 finds peers (*rendezvous*) are five separate things, each with its own parameter. Variant C of the
-posts, one topic per index with everyone subscribed, and `protocol.md`, one topic with one mesh, are
+posts, one topic per index with everyone subscribed, and `seacast-lite.md`, one topic with one mesh, are
 two settings of the same protocol (§6).
 
 **What is assumed and not restated.** The consensus-side objects and their verification are
 assumed: the payload's descriptor committed in the bid and its Merkle tree over Reed–Solomon chunks
-(`protocol.md` §1), the `DataColumnSidecar` header and the KZG cell proofs (Fulu `das-core`, the
+(`seacast-lite.md` §1), the `DataColumnSidecar` header and the KZG cell proofs (Fulu `das-core`, the
 partial-columns spec), and RowDAS's rows (EIP-8371). Rendezvous and discovery are assumed: how a
 node finds peers that share an object type and a family (gossipsub topics where they exist, the
 ENR's `cgc` and node ids); this document assumes a set of connected peers per object type and
 defines what happens on those connections. On the bindings that run on libp2p, the libp2p
 connection and its framing are assumed. The native QUIC binding, a draft, runs on a QUIC connection
-of its own, with framing of its own (`protocol-v2-bindings.md` §7). Gossipsub itself is *not*
+of its own, with framing of its own (`seacast-bindings.md` §7). Gossipsub itself is *not*
 assumed: what it provided, the pusher set, suppression, announcements and pulls, is defined here,
-and the bindings (§7, `protocol-v2-bindings.md`) say how the result is carried on gossipsub's wire
-where that is the deployed path. `protocol.md`'s code is assumed where §5 says a function carries
+and the bindings (§7, `seacast-bindings.md`) say how the result is carried on gossipsub's wire
+where that is the deployed path. `seacast-lite.md`'s code is assumed where §5 says a function carries
 over: this document redefines what changes and names what it keeps.
 
 **What is normative.** Sections 1 to 3, the notions, the messages and the state, are what both ends
 of a link must agree on. Section 4 combines each node's local scheduling with the meaning of the
 messages: what a holding, an offer, an ask, a claim and an acknowledgement promise. A client may
 schedule differently without breaking interoperability, provided those meanings hold. Section 5
-names `protocol.md`'s scheduling that carries over, section 6 the settings, section 7 the
+names `seacast-lite.md`'s scheduling that carries over, section 6 the settings, section 7 the
 bindings and section 8 the decisions, with what was not taken.
 
 **The parts.** SEACAST has six parts, named for what they do. Three carry message semantics that
@@ -98,7 +99,7 @@ last says how the messages travel. Named mechanisms inside a part keep their own
 | completion and repair | the claims, completion per interest, decoding at K, rebuilt chunks, deferral, the probe, evidence | §1.5, §4.6 | |
 | informed scheduling *(local)* | what a node sends next and when: the window in bytes, the projection, the next entry, pacing, the ask window | §4.9, §4.11–4.13 | the byte window |
 | source distribution *(local)* | how a source releases a group: batch order, striping, its paced holding; any node holding chunks first is a source (§1.6) | §4.7 | striped publishing |
-| wire bindings | how the messages travel: the libp2p stream, Waggle, gossipsub and partial-messages bindings (`protocol-v2-bindings.md` §2 to §5), and the native QUIC binding as a draft (§7 there) | §7; `protocol-v2-bindings.md` | |
+| wire bindings | how the messages travel: the libp2p stream, Waggle, gossipsub and partial-messages bindings (`seacast-bindings.md` §2 to §5), and the native QUIC binding as a draft (§7 there) | §7; `seacast-bindings.md` | |
 
 The heartbeat (§4.8) drives three of them: relation upkeep, announcement gossip and pacing.
 Outside the parts, and assumed above, are the object type's interface (§1.1: indices,
@@ -108,17 +109,17 @@ repair's floor and sampling's coverage floor ask of it (§4.6, `REPAIR_FLOOR`; �
 a relation, not necessarily a custody group.
 
 **Conventions.** The code is Python-like pseudocode in the style of the consensus specs, as in
-`protocol.md`. A comment `# [c8]` marks a card of the posts (`protocol.md`'s introduction lists the
+`seacast-lite.md`. A comment `# [c8]` marks a card of the posts (`seacast-lite.md`'s introduction lists the
 cards and the posts), and `# [D5]` marks one of §8's decisions, where it bites. State and helpers
-keep `protocol.md`'s names wherever the object is the same (`peer_has`, `pushed`, `holders`,
-`mine`, `received`); the header of a group is `protocol.md`'s `desc`, read here as `hdr`. New
+keep `seacast-lite.md`'s names wherever the object is the same (`peer_has`, `pushed`, `holders`,
+`mine`, `received`); the header of a group is `seacast-lite.md`'s `desc`, read here as `hdr`. New
 helpers are listed in §3.
 
 **Requirement labels.** The requirement labels the text cites, such as I3 or R5, and the tag [P4]
 are defined in the glossary.
 
 **Numbers.** The figures measured for this draft, each with its conditions, are in
-[`protocol-v2-figures.md`](protocol-v2-figures.md), grouped by the section that cites them.
+[`seacast-figures.md`](seacast-figures.md), grouped by the section that cites them.
 
 ## 1. Notions
 
@@ -164,7 +165,7 @@ class TypeParams:                                    # per object type; values i
     DECODE_LATER: Callable[[GroupId], Optional[float]]   # repair: who decodes later if the group is still short, and when (from known_at) [D4]
     REPAIR_TO: Callable[[GroupId], List[PeerId]]     # repair: whom rebuilt chunks of a group go to  [D4]
     REPAIR_BUDGET: bool                              # repair: each rebuilt chunk to R_NODE of them lacking it, offered
-                                                     #   to the rest (§1.6: its rebuilder is its source); False: protocol.md's,
+                                                     #   to the rest (§1.6: its rebuilder is its source); False: seacast-lite.md's,
                                                      #   every peer short of K up to its shortfall   [D4]
     DEFER_WINDOW: float                              # repair: how long a peer's claim defers our own decode (R5) [D4]
     REPAIR_SAMPLE: Optional[List[Tuple[int, int]]]   # repair: the sample's steps [(S1, L1), (S2, L2), ...] after a
@@ -182,22 +183,22 @@ class TypeParams:                                    # per object type; values i
     EVIDENCE: Optional[ObjectType]                   # the fraud-proof object, if any           [D6]
 ```
 
-| | payload (`protocol.md`) | column (PeerDAS) | row (RowDAS) |
+| | payload (`seacast-lite.md`) | column (PeerDAS) | row (RowDAS) |
 |---|---|---|---|
 | a group | one descriptor's chunks, at one slot | one column of one block | one row of one block |
-| group id | `group_key(group_id(descriptor), slot)`, the key of `protocol.md` §1 | `(block_root, column)` | `(block_root, row)` |
+| group id | `group_key(group_id(descriptor), slot)`, the key of `seacast-lite.md` §1 | `(block_root, column)` | `(block_root, row)` |
 | N | `descriptor.count` | the blob count | `NUMBER_OF_COLUMNS` = 128 |
 | K | `ceil(total_length / segment_size)` | N: no code across blobs | 64 |
-| `verify` | `protocol.md`'s `validate_chunk`: the Merkle path to the committed root, and since v0.10 the copy's slot its block's; DEFER before the block | `verify_cell_kzg_proof_batch`, one cell index, many commitments, and the copy's slot its header's (REJECT otherwise, as v0.10's `validate_chunk`); DEFER before the header | the same, one commitment, many cell indices, and the same slot check |
-| `decode` | `protocol.md`'s `decode_and_reencode`: any K chunks to all N, or None if the root differs; a coded group's root commits the bytes its builder's compressor produced from the body, and whether a canonical compressor should fix those bytes is open (`protocol.md` §1, "Open: the compressed bytes") | the cells present, if all are; nothing is rebuilt within a column (§4.6) | `recover_cells_and_kzg_proofs` from 64 |
-| `header_of` | the descriptor: carried by the chunk and checked against the bid's group id (design A, which the toy runs), or carried by the bid itself (design B), so none before the block is installed (the gate, §4.2); `protocol.md` §1 leaves the choice open ("Open: getting the descriptor"), and the installed block confirms it either way | `PartialDataColumnHeader`, validated once per block on any group | the same header |
+| `verify` | `seacast-lite.md`'s `validate_chunk`: the Merkle path to the committed root, and since v0.10 the copy's slot its block's; DEFER before the block | `verify_cell_kzg_proof_batch`, one cell index, many commitments, and the copy's slot its header's (REJECT otherwise, as v0.10's `validate_chunk`); DEFER before the header | the same, one commitment, many cell indices, and the same slot check |
+| `decode` | `seacast-lite.md`'s `decode_and_reencode`: any K chunks to all N, or None if the root differs; a coded group's root commits the bytes its builder's compressor produced from the body, and whether a canonical compressor should fix those bytes is open (`seacast-lite.md` §1, "Open: the compressed bytes") | the cells present, if all are; nothing is rebuilt within a column (§4.6) | `recover_cells_and_kzg_proofs` from 64 |
+| `header_of` | the descriptor: carried by the chunk and checked against the bid's group id (design A, which the toy runs), or carried by the bid itself (design B), so none before the block is installed (the gate, §4.2); `seacast-lite.md` §1 leaves the choice open ("Open: getting the descriptor"), and the installed block confirms it either way | `PartialDataColumnHeader`, validated once per block on any group | the same header |
 | `project` | `[(g, i)]` | `[((root, c), b), ((root, row b), c)]` | the same two |
 | `cross` | none | index b of column c: `((root, row b), c)` | index c of row b: `((root, c), b)` |
 | `family` | one family | the column index | the row's subnet (EIP-8371: `ROW_SUBNET_COUNT` subnets, a node's one from its id, rows mapped to subnets per slot) |
 | `derived_interest` | all | all of the column if `c ∈ get_custody_groups(node_id, cgc)`, else none | all of the row if it is the node's row subnet, else none |
 
 A **group** `g` is one instance of an object type: its id is computable before any chunk of it
-exists (`protocol.md` §1; partial columns; the RowDAS design §4), so a receiver can hold state for
+exists (`seacast-lite.md` §1; partial columns; the RowDAS design §4), so a receiver can hold state for
 it, exchange bitmaps about it and ask for it before it holds anything. Its **header** arrives
 through the object type's gate and is what the verifier needs. A **chunk** is one index of a group
 with the proof that verifies it alone; `project` says which (group, index) pairs it fills, one for
@@ -248,9 +249,9 @@ node keeps, per object type and family, two **relations**:
   peer it pushes to, which it offers what it chose not to push; beyond that its width is a
   parameter `[D5]`.
 
-The **suppression scope** of a group is the set of peers that may push it to us. `protocol.md`'s
+The **suppression scope** of a group is the set of peers that may push it to us. `seacast-lite.md`'s
 mesh is the case where both relations are the same symmetric set of eight and the scope is the mesh.
-A type whose relation is symmetric (`SYMMETRIC`, as `protocol.md`'s mesh, §6.1) keeps it as one
+A type whose relation is symmetric (`SYMMETRIC`, as `seacast-lite.md`'s mesh, §6.1) keeps it as one
 relation both ways, grafted and pruned with direction `BOTH` (§4.1).
 
 **Sampling links and the coverage floor** `[D12]`. A sample is served by a peer whose interest holds
@@ -305,17 +306,17 @@ every column of its own block only, and proposers rotate. Two covers were decide
 node's links custodies is never served. In the toy's 500-node graphs, some samplers of eight cells
 have such a sample at 70 links, and nearly all do at 16. With the floor, on the same graphs, one
 cover by the fewest links adds a few sampling-only links at 70 links and many more at 16 (§6.3);
-the diversity floor of two covers adds more again (§6.3, §8; protocol-v2-figures.md, §1.3).
+the diversity floor of two covers adds more again (§6.3, §8; seacast-figures.md, §1.3).
 
 **One forwarding step usually reaches the family.** A custodian's floor per column (§1.4) makes it
 likely that one of a forwarding link's own links custodies the sample's family: in the toy's graphs
-the floor gives a custodian many more links than a degree of 16 (protocol-v2-figures.md, §1.3).
+the floor gives a custodian many more links than a degree of 16 (seacast-figures.md, §1.3).
 
 ### 1.4 Colours and the floor
 
 Each index of a group has a **colour**, `colour_of(g, i)`, one of `M[T]` `[D10]`. A chunk is pushed
 eagerly only on links whose push relation for its family holds its colour. With `M = 1` every link
-carries every index: this is `protocol.md`'s mesh. With `M = N` each index has its own pusher set:
+carries every index: this is `seacast-lite.md`'s mesh. With `M = N` each index has its own pusher set:
 these are variant C's independent meshes, on one neighbourhood. In between, each link carries a
 share of the indices and a node's pushers for a given index are a subset of its links, which is
 where path diversity comes from without multiplying topics.
@@ -335,16 +336,16 @@ family, and opens more where churn leaves it short (`keep_floor`, §4.1).
 
 A node says two different things about what it holds, and they are not interchangeable. A
 **holding** ("I hold these, verified") goes to whoever may push to us: it suppresses pushes, it
-acknowledges the chunk just received (the window, `protocol.md` §7.1), and it counts the sender as a
+acknowledges the chunk just received (the window, `seacast-lite.md` §7.1), and it counts the sender as a
 holder for rarest-first and cancel. An **offer** ("you may ask me for these") goes to a peer we
 chose not to push a chunk to, or to a peer outside the relation: it feeds that peer's offer table
 and nothing else. A pusher's holding is not an offer, since it may be pushing that very chunk; an
-offer is not a holding count, since what the pull discipline needs is who can serve. `protocol.md`
+offer is not a holding count, since what the pull discipline needs is who can serve. `seacast-lite.md`
 carries the two in IDONTWANT and IHAVE; here they are one message with a flag (§2) and two handlers
 (§4.3).
 
 A holding carries two **claims** besides its bitmap `[D3]`: `claim_all`, the sender holds or can
-produce every index (it has reached K and will decode: `protocol.md`'s decode claim, made at K,
+produce every index (it has reached K and will decode: `seacast-lite.md`'s decode claim, made at K,
 before the decode, because a group whose chunks do not form a codeword fails at every node), and
 `complete`, the sender's interest in this group is satisfied, so nothing more need be pushed or
 announced to it. Both are unverified; the window and serving treat them as such, and a claim not
@@ -363,21 +364,21 @@ defines one in this version (§8).
 
 A **source** is any node that holds chunks of a group before its peers do: the builder with the
 whole payload, or a node that built columns from its mempool at block arrival (I8, X8). The source
-rules of `protocol.md` §5.1 (batch order, striping and the window) apply to what such a node pushes
+rules of `seacast-lite.md` §5.1 (batch order, striping and the window) apply to what such a node pushes
 first; whether a node is a source is read from its holdings and its peers' holdings, not announced.
 A **forwarding node** is any node with duty `FORWARD`. A **reconstructor** is a node whose repair
 rule (§4.6) says it decodes a group or a block it does not need whole for itself.
 
 ## 2. Messages
 
-The messages are abstract; the bindings carry them on wires (§7, `protocol-v2-bindings.md`). Every
+The messages are abstract; the bindings carry them on wires (§7, `seacast-bindings.md`). Every
 message names its object type or group, and a receiver ignores, without penalty, a JOIN for an
 object type it does not run, and a GRAFT, PRUNE, offer or WANT for one it has not joined on that
 link; a JOIN for a type the node runs is how a link joins it (§4.1). Chunks and holdings are
 taken on any link: a cell is in groups of two types, so an answer or an acknowledgement can name
 the group of either (a cell stored from its column and asked for in its row comes back naming its
 column); a chunk is verified against its group's header; and holdings of groups the node does not
-know are bounded (`protocol.md` §8.2). A fetch outside the links (§7) has no JOIN: its WANT is
+know are bounded (`seacast-lite.md` §8.2). A fetch outside the links (§7) has no JOIN: its WANT is
 answered without one.
 
 ```python
@@ -427,13 +428,13 @@ class Evidence(Container):               # [D6]
     body: bytes
 ```
 
-- **One message, two kinds.** `offer = False` is a holding (`protocol.md`'s IDONTWANT with a
-  bitmap, on the urgent lane); `offer = True` is an offer (`protocol.md`'s IHAVE with a bitmap,
+- **One message, two kinds.** `offer = False` is a holding (`seacast-lite.md`'s IDONTWANT with a
+  bitmap, on the urgent lane); `offer = True` is an offer (`seacast-lite.md`'s IHAVE with a bitmap,
   paced). §4.3 handles them differently and §1.5 says why.
 - **WANT is per recipient** (the RowDAS design's reading of `requests`): what the sender asks *this*
   peer for, not what it lacks, and the peer sends it what it holds of that now and, for a standing
   WANT (below), the rest when it arrives, within the group's lifetime (§4.10). The ask discipline of
-  `protocol.md` §6.1 sends one index per peer at a time and carries over for pulls against offers; a
+  `seacast-lite.md` §6.1 sends one index per peer at a time and carries over for pulls against offers; a
   bitmap lets a client batch, and a sampler declares its indices in one. There is no third bitmap
   for need `[D2]`: a peer with `DERIVED` or `ALL` interest needs no WANT to declare what both ends
   can compute (its pulls on offers are asks, §4.3), and a declared interest is only ever told to the
@@ -444,13 +445,13 @@ class Evidence(Container):               # [D6]
   fewer (§4.10). A pull against an offer, the probe and the repair sample (§4.6) set neither. A
   third field, `probe`, marks the one ask that verifies a peer's claim (§4.6): the claimant answers
   it whatever the asker's holdings say, once per asker and group. SEACAST's message encoding carries
-  `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
+  `standing` and `probe` in one flags byte (`seacast-bindings.md` §1.2).
 - **A cell group's header travels in one of three forms**, which the object type's definition fixes
-  (`protocol-v2-bindings.md` §1.6, and §7): from the block, in every cell message, or in a header
+  (`seacast-bindings.md` §1.6, and §7): from the block, in every cell message, or in a header
   message of its own. On the libp2p stream binding, the second form carries the header once per
   group and link, so cells can be verified before the block (P2). The payload's header is the
   descriptor, which every chunk carries under design A and the bid under design B, a choice
-  `protocol.md` §1 leaves open; the installed block confirms it, as in `protocol.md`.
+  `seacast-lite.md` §1 leaves open; the installed block confirms it, as in `seacast-lite.md`.
 
 ## 3. State
 
@@ -466,9 +467,9 @@ owed_relations: Dict[PeerId, List[Container]]                    # per link: JOI
 backoff: Dict[PeerId, Dict[TypeId, Dict[FamilyId, Dict[Tuple[int, Direction], float]]]]   # until when we do not graft p
                                                                  #   again for a relation its PRUNE named (§4.1)
 
-# per group (protocol.md §8.1's, plus three)
+# per group (seacast-lite.md §8.1's, plus three)
 T_of: Dict[GroupId, ObjectType]                       # new: the group's type, from its id
-hdr: Dict[GroupId, Header]                            # protocol.md's desc, once the gate opened
+hdr: Dict[GroupId, Header]                            # seacast-lite.md's desc, once the gate opened
 state: Dict[GroupId, GroupState]                      # COLLECTING | DECODING | COMPLETE | INVALID
 received: Dict[GroupId, Bitmap]                       # chunks from the network
 rebuilt: Dict[GroupId, Bitmap]                        # new: chunks from a decode
@@ -480,7 +481,7 @@ origin: Dict[GroupId, Bitmap]                         # v0.4's: for a group we p
 planned: Dict[GroupId, Dict[int, Set[PeerId]]]        # v0.9's: for a group we publish, each chunk's push targets [c3]
 known_at: Dict[GroupId, float]                        # new: when the group id became known; START_DELAY runs from here [D8]
 
-# per peer and group (protocol.md's, plus flags and one counter)
+# per peer and group (seacast-lite.md's, plus flags and one counter)
 peer_has: Dict[PeerId, Dict[GroupId, HaveEntry]]      # bits, ttl; and claim_all, complete (§1.5)
 holders: Dict[GroupId, Dict[int, Set[PeerId]]]        # [c9] distinct live holders, from holdings only
 pushed: Dict[PeerId, Dict[GroupId, PushEntry]]        # bits, first_push, ttl               [c16]
@@ -489,7 +490,7 @@ served: Dict[PeerId, Dict[GroupId, int]]              # new: chunks answered (R6
 served_hb: Dict[PeerId, int]                          # new: answers to p this heartbeat that SERVE_BUDGET counts (§4.5)
 offered_to: Dict[PeerId, Dict[GroupId, Bitmap]]       # new: what we offered p, whose asks the budget does not count
 want_p: Dict[PeerId, Dict[GroupId, Bitmap]]           # new: a DECLARED peer's interest, from its WANTs (§1.2, §4.5)
-promises: Dict[Tuple[Ask, PeerId], float]             # protocol.md §6.1, unchanged
+promises: Dict[Tuple[Ask, PeerId], float]             # seacast-lite.md §6.1, unchanged
 offers: Dict[Ask, List[PeerId]]
 tried: Dict[Ask, Dict[PeerId, float]]
 asked_at: Dict[Ask, float]
@@ -522,8 +523,8 @@ rsample_asked: Dict[GroupId, Dict[int, Set[PeerId]]]  # new: the custodians each
 rsample_final: Dict[GroupId, bool]                    # new: the last step's re-asks were waited for
 ```
 
-Lifetimes are `protocol.md` §8.1's. Per-group state lives `GROUP_TTL` past the last chunk or the
-completion, or until its slot leaves the node's live window (`protocol.md` §8.1) if that comes
+Lifetimes are `seacast-lite.md` §8.1's. Per-group state lives `GROUP_TTL` past the last chunk or the
+completion, or until its slot leaves the node's live window (`seacast-lite.md` §8.1) if that comes
 first, and leaves a tombstone until the window has passed the slot. The probe's tables
 (`probe_ok`, and `probe_served`, `probe_answers` and `probe_waiting` for every peer) go with the
 group's state, and a peer's entries in them also go with its connection (a bit of `probe_answers`
@@ -539,15 +540,15 @@ until it runs out or the connection closes. A writer's place in the window's lin
 (`acquire_room`). It also leaves when it has nothing to send and when the connection closes:
 `leave_line` takes it out, and the first writer in line that can write then tries again if room is
 free (`wake_front`). `forwarded` starts again at each slot. An expired group is not taken up again.
-The receive and publish paths check it as `protocol.md`'s do, `fill` checks it on every axis a
+The receive and publish paths check it as `seacast-lite.md`'s do, `fill` checks it on every axis a
 chunk projects onto, and the paths that act on a projected group (`forward`, `push_rebuilt`, the
 repair sample's `ask_custodian`) skip an expired axis; `check_completion` finds no state to act on.
 A dropped group's later chunks are not stored, forwarded, offered or kept for heartbeat gossip on
-that axis (`fill`, `forward`, `push_rebuilt`), as `protocol.md`'s `on_validated` returns for one.
+that axis (`fill`, `forward`, `push_rebuilt`), as `seacast-lite.md`'s `on_validated` returns for one.
 Offered, such a chunk would draw asks that the node does not answer, and an asker's promise could
 break against an honest node. The sampler's `sample`, `resample` and `ask_sample` check it (§4.10),
 so a draw or a retry after the expiry makes no park, interest or WANT again. Reading a missing entry
-allocates nothing; the admission checks of `protocol.md` §8.2 and the limits of §6.3 come first. A
+allocates nothing; the admission checks of `seacast-lite.md` §8.2 and the limits of §6.3 come first. A
 group with no entry in `interest` reads as the node's own interest in it, from what it declared:
 every index under `ALL`, its derived interest under `DERIVED` (every index of a column it
 custodies, or of its own subnet's row, and none of another), the cells it drew to sample under
@@ -557,7 +558,7 @@ node may hold state for a group it has no interest in, when it holds chunks of i
 interest names it (a reconstructor's non-custodied columns, R4); the number of such groups per slot
 is bounded (§6.3).
 
-**Helpers not written out**, beyond `protocol.md` §8.1's, are these: `type_of_group(g)` (the object
+**Helpers not written out**, beyond `seacast-lite.md` §8.1's, are these: `type_of_group(g)` (the object
 type a group id names), `links(T)` (the peers with a JOIN for `T` both ways: theirs received, ours
 queued rather than owed, §4.1; none for a type the node does not run), `our_join(T)` (the JOIN
 the node sends for `T`: its interest, custody count, duty and `M`, §1.2), `joined_types()`,
@@ -569,14 +570,14 @@ own id),
 colour `c` and direction `d`, with `BOTH` in neither; with no GRAFT of ours for it unanswered; and
 out of its backoff, with `BOTH` for both directions; §4.1), `least_used_colour(T, fam)`,
 `families_with_duty(T)`, `wants_family(T, fam)`, `duty_for(g)`, `uplink_class()` (card 17),
-`send(p, msg, urgent)` (a message into the bounded per-peer queue of `protocol.md` §7; the binding's
+`send(p, msg, urgent)` (a message into the bounded per-peer queue of `seacast-lite.md` §7; the binding's
 job; true if the queue admitted it, as v0.5's `enqueue`; the asks of a `Want` sent through it are
 marked `want`, a local mark that goes on no wire, where those the pull discipline queues on an
 offer, `respond`, `retry_offer` and `ask_parked`'s, are not; the two kinds go in separate ask
-messages of an entry), `Ask(g, i)` (an ask's key, `protocol.md`'s `WantIndex`), `chunk_id(f)`
-(`protocol.md`'s `message_id`), `open_group(g, f)` (as `protocol.md`'s, and records `T_of`,
+messages of an entry), `Ask(g, i)` (an ask's key, `seacast-lite.md`'s `WantIndex`), `chunk_id(f)`
+(`seacast-lite.md`'s `message_id`), `open_group(g, f)` (as `seacast-lite.md`'s, and records `T_of`,
 `interest`, `known_at`), `open_group_source(g, h)`, `group_of(block, h)` (the group a source
-publishes, by §1.1's table: for the payload the key of `protocol.md` §1, for a column or a row its
+publishes, by §1.1's table: for the payload the key of `seacast-lite.md` §1, for a column or a row its
 id), `interest_satisfied(g)` (§1.5), `deferred_offers(p, h)` (§4.3), `publish_evidence(g, body)`,
 `sampled_types()` (the object types the node samples), `families(T)` (every family of the type: the
 128 columns), `link_cover(q, T)` (§4.1: the families whose every index `q`'s interest holds, from
@@ -605,9 +606,9 @@ bitmap, whichever path queued them).
 
 ## 4. Events
 
-Validation runs off the receive path as in `protocol.md` §4.1. The order of handling one frame (a
-binding's unit on the wire, which may carry several messages; `protocol-v2-bindings.md` §0) is
-`protocol.md`'s: chunks, then offers (which produce asks), then asks (which produce answers), then
+Validation runs off the receive path as in `seacast-lite.md` §4.1. The order of handling one frame (a
+binding's unit on the wire, which may carry several messages; `seacast-bindings.md` §0) is
+`seacast-lite.md`'s: chunks, then offers (which produce asks), then asks (which produce answers), then
 GRAFT and PRUNE, then holdings, then the response.
 
 ```python
@@ -623,7 +624,7 @@ def on_frame(p, frame):
     for pr in frame.prunes: on_prune(p, pr)
     for h in frame.haves:
         if not h.offer: on_holding(p, h)                              # §4.3
-    respond(p, asks, answers, [])                                     # protocol.md §4.1; a GRAFT's answer goes on its own
+    respond(p, asks, answers, [])                                     # seacast-lite.md §4.1; a GRAFT's answer goes on its own
 ```
 
 ### 4.1 Joining, and keeping the relations
@@ -632,7 +633,7 @@ def on_frame(p, frame):
 def on_join(p, j: Join):
     if not runs_type(j.object_type): return            # §2: a type the node does not run: no state, no penalty
     T = type_of(j.object_type)
-    if j.colours != T.params.M: return                 # no v2 for T on this link; the stock path remains
+    if j.colours != T.params.M: return                 # no SEACAST for T on this link; the stock path remains
     join_recv[p][T] = j
     if T not in join_sent[p]: send_join(p, our_join(T))   # the answer, unless ours went first
 
@@ -748,7 +749,7 @@ def relation_room(p, T, fam, c) -> bool:               # §6.3, X6: the link has
     return (fam, c) in held or len(held) < T.params.MAX_RELATIONS
 
 def join_push(p, T, fam, c):                           # p joins our push relation for colour c: what we hold of
-    if c in push_out[p][T][fam]: return                #   it is announced (protocol.md §5.4's on_mesh_join);
+    if c in push_out[p][T][fam]: return                #   it is announced (seacast-lite.md §5.4's on_mesh_join);
     push_out[p][T][fam].add(c)                         #   a GRAFT that adds nothing runs nothing
     for g in list(chunks):
         if expired(g) or state[g] == INVALID or type_of_group(g) != T or T.family(g) != fam: continue
@@ -845,7 +846,7 @@ below).
   For as long as the yes takes to arrive, one end is in a relation the other has left; the yes then
   reaches an end with nothing of the relation and is decided as a new GRAFT.
 - **On gossipsub's wires** (§7) no answer comes, since a stock peer accepts in silence. There a
-  GRAFT's sender is in the relation from its GRAFT and runs `join_push` at once, as `protocol.md`
+  GRAFT's sender is in the relation from its GRAFT and runs `join_push` at once, as `seacast-lite.md`
   §5.4 does, and the two ends' agreement rests on gossipsub's backoff after a PRUNE.
 
 **A GRAFT for a relation already held is answered yes again.** A node that holds a relation and
@@ -902,7 +903,7 @@ peer's (`on_join`).
   type.
 - **On gossipsub's wires** a JOIN is a subscription (§7): both ends send theirs when the
   connection opens, and one made later goes to every peer, so none is an answer. A sampler's
-  `(DECLARED, NONE)` writes nothing there, so it is never owed (`protocol-v2-bindings.md` §6).
+  `(DECLARED, NONE)` writes nothing there, so it is never owed (`seacast-bindings.md` §6).
 
 **A JOIN for a type the node does not run, and a GRAFT or PRUNE for a type not joined, leave no
 state,** as §2 says. A JOIN for an object type the node does not run is ignored
@@ -936,8 +937,8 @@ exchange's order, is left to a later version.
   or dropped group.
 - **When.** It runs where a relation in which the node pushes comes into being at its end: at a
   GRAFT it accepts, and at the yes to its own (`on_graft` either way), a round trip after
-  `protocol.md`, which runs it at the node's own GRAFT at once. On gossipsub's wires it runs there
-  too, as in `protocol.md`. A GRAFT that adds nothing runs nothing. Relations end with the
+  `seacast-lite.md`, which runs it at the node's own GRAFT at once. On gossipsub's wires it runs there
+  too, as in `seacast-lite.md`. A GRAFT that adds nothing runs nothing. Relations end with the
   connection, so a reconnection is announced again once it is grafted again.
 
 **`keep_coverage` reads custody, never a sample:** it runs before the node knows what it will
@@ -977,12 +978,12 @@ echoed the GRAFT's direction, which undid the opposite relation at the grafter.
   (`toy/controls/graft-unanswered.md`), where the GRAFT's sender recorded nothing (the ends disagree
   in nearly half of such states at two upkeep steps), and on this rule without the owing, with an
   owed message overtaken, without the yes, or with a PRUNE that leaves the receiver's GRAFT standing
-  (protocol-v2-figures.md, §4.1). The toy's recorded cells keep their relations static and do not
+  (seacast-figures.md, §4.1). The toy's recorded cells keep their relations static and do not
   run this; under `--upkeep on` it runs this section on the wire.
 - **Compared** (`toy/graft_check.py --model`: one relation in the abstract, without queues, four
   upkeep steps per end): with the relation counted at the GRAFT, many states at rest disagree
   without a backoff, and none do with a backoff longer than the round trip; with the GRAFT answered,
-  none do (protocol-v2-figures.md, §4.1).
+  none do (seacast-figures.md, §4.1).
 
 **A GRAFT for a relation already held is answered yes again** (decided 2026-11-09).
 - **Why.** From ends that agree, the rules keep them agreed (Checked, above). Where they diverge,
@@ -995,7 +996,7 @@ echoed the GRAFT's direction, which undid the opposite relation at the grafter.
   one counts a pusher that does not push, or pushes a peer that does not count it; with `--both`,
   the two ends hold the relation in any way but whole at both or at neither. At three upkeep steps,
   every state at rest once an upkeep has acted agrees, with no GRAFT unanswered, and every exchange
-  ends (protocol-v2-figures.md, §4.1). The text before (`toy/controls/held-graft-unanswered.md`)
+  ends (seacast-figures.md, §4.1). The text before (`toy/controls/held-graft-unanswered.md`)
   fails: a GRAFT for a relation the receiver holds goes unanswered in some states at rest, at two
   steps. Without the mark, the check finds an exchange that never ends, at two steps. One end's
   PRUNE crosses the other's later GRAFT, the first end accepts that GRAFT, the second decides its
@@ -1009,7 +1010,7 @@ echoed the GRAFT's direction, which undid the opposite relation at the grafter.
   bytes wherever every relation is pushed (tier 1). In the toy (the payload at 60 nodes, under
   `--upkeep on` with links replaced, one seed), with a prune only above `F_HI` no node was ever
   pruned, and nodes ended at the cap, `F_HI`. With the prune at `F_HI`, no node ended at the cap,
-  and the relations per node averaged fewer (protocol-v2-figures.md, §4.1).
+  and the relations per node averaged fewer (seacast-figures.md, §4.1).
 - **Why at random.** A capped relation is first come, first served: a full node refuses later
   GRAFTs, and near peers' GRAFTs arrive first, so the relations lean on near peers. Gossipsub's
   prune keeps `D_score` peers by score and the rest at random; scoring is the client's, and the draw
@@ -1021,7 +1022,7 @@ echoed the GRAFT's direction, which undid the opposite relation at the grafter.
   acts on it with its count between its floor and its cap. The text without that step fails there:
   in some states at rest, at three steps, an end holds the relation one way and neither end's
   upkeep acts. In the first such state that the check records, one end counts the other as a pusher
-  and the other holds nothing (protocol-v2-figures.md, §4.1).
+  and the other holds nothing (seacast-figures.md, §4.1).
 
 **A candidate's interest holds the family** (decided 2026-11-09).
 - **Why.** Before, `candidates` took any joined peer with duty, so a column's relations could form
@@ -1046,11 +1047,11 @@ echoed the GRAFT's direction, which undid the opposite relation at the grafter.
   JOIN, both ends hold each other's, and no GRAFT or PRUNE ever reaches a node that has no link for
   it. The check fails on the text before (`toy/controls/join-lost.md`), where a JOIN a full queue
   refused was lost (in some states at rest, at two upkeep steps, a JOIN was sent and the link did
-  not form; protocol-v2-figures.md, §4.1), and where `send_join` records its JOIN but does not owe
+  not form; seacast-figures.md, §4.1), and where `send_join` records its JOIN but does not owe
   it (a GRAFT then reaches a node that has no link for it).
 
 **A peer that joins a push relation is announced what the node holds** (2026-10-26, from
-`protocol.md` §5.4's `on_mesh_join`).
+`seacast-lite.md` §5.4's `on_mesh_join`).
 - **Why.** Offers come from `forward`, at a chunk's arrival, to the relation for its colour (§4.4).
   Nothing else offers the chunk to a peer that joins the relation after the chunk was forwarded.
   Nothing else offers a peer whose connection closed what the old connection lost, either.
@@ -1074,7 +1075,7 @@ the samples it may serve.
   draft assumes it: the rendezvous is per family (§1.1), and §8's route leans on custodians keeping
   a floor per column.
 - **Measured** in the toy, in its custody setting at 500 nodes with links replaced during the run
-  (protocol-v2-figures.md, §4.1): without the rule, at every seed, some of the nodes at the ends of
+  (seacast-figures.md, §4.1): without the rule, at every seed, some of the nodes at the ends of
   a closed link had not, by the run's end, come back to the number of their (family, colour) pairs
   below `F_LO` that they had before the close; with the rule, far fewer fell short. Against the
   same cells without churn, it also removed most of churn's excess in the share of (node, family,
@@ -1082,7 +1083,7 @@ the samples it may serve.
   the more so the more links were replaced. Every node completed, and the warm block's 99th
   percentile moved within the toy's noise. These runs predate 2026-11-16. Since then, the toy's
   close also drops the closed peer's offers, tries, promises and ties, and keeps its park (§3's
-  lifetimes, `protocol.md` §8.1). They were not run again.
+  lifetimes, `seacast-lite.md` §8.1). They were not run again.
 
 ### 4.2 A chunk arrives
 
@@ -1095,29 +1096,29 @@ def on_chunk(p, f):
             send_have(p, f.group)                      # [c14] duplicates are acknowledged too
         elif mid in pending_ids: tie(p, f)             # another copy of one that waits: its sender too
         return
-    if expired(f.group) or not live(f.slot): return    # past its lifetime or live window (protocol.md §8.1)
+    if expired(f.group) or not live(f.slot): return    # past its lifetime or live window (seacast-lite.md §8.1)
     T = type_of_group(f.group)
     on_validated(p, f, T.verify(f, T.header_of(f)))   # level 1; DEFER while the gate is closed
 
 def on_validated(p, f, result):
-    if expired(f.group) or not live(f.slot): return    # expired or out of the window meanwhile (protocol.md §8.1)
-    if result == DEFER: return defer(p, f)             # protocol.md §4.2: the bounded per-peer store
+    if expired(f.group) or not live(f.slot): return    # expired or out of the window meanwhile (seacast-lite.md §8.1)
+    if result == DEFER: return defer(p, f)             # seacast-lite.md §4.2: the bounded per-peer store
     mark_seen(chunk_id(f))                             # accepted or rejected: never validated again
     if result == REJECT: return penalise(p)            # level 1 failures are the sender's
     T = type_of_group(f.group)
-    new = [(g, i) for (g, i) in T.project(f) if not received[g].has(i)]   # a second id for a received index: only acknowledged (fill), as protocol.md
+    new = [(g, i) for (g, i) in T.project(f) if not received[g].has(i)]   # a second id for a received index: only acknowledged (fill), as seacast-lite.md
     for (g, i) in T.project(f): fill(g, i, f, p)       # (R4) one arrival fills every group it belongs to
     acting = [(g, i) for (g, i) in new if not expired(g) and state[g] != INVALID]   # a dropped group is not acted on (§4.6)
     if any(duty_for(g) == FORWARD for (g, i) in acting): forward(f, p, acting)   # §4.4: on any axis we serve; never waits for level 2
     for (g, i) in T.project(f): check_completion(g)    # §4.6
 
 def fill(g, i, f, p):
-    if expired(g): return                              # an expired group is not taken up again (protocol.md §8.1)
+    if expired(g): return                              # an expired group is not taken up again (seacast-lite.md §8.1)
     if g not in T_of:
         release_wanted_groups()                        # §4.5: a place that ran out goes before its group opens
         open_group(g, f)                               # hdr[g], T_of[g], interest[g], known_at[g]
         drop_wants_beyond(g)                           # §4.5: its count is known now
-        drop_beyond(g)                                 # what named an index it has not goes (protocol.md §4.2, §8.2)
+        drop_beyond(g)                                 # what named an index it has not goes (seacast-lite.md §4.2, §8.2)
     if state[g] == INVALID: return                     # a dropped group (§4.6)
     if received[g].has(i) or rebuilt[g].has(i):        # a copy of a chunk we hold: acknowledge it
         probe_answer(g, i, p)                          # (R5) a duplicate from the claimant passes its probe too
@@ -1163,7 +1164,7 @@ names its own bits and `h`'s, with `h`'s claims, and the call returns True.
 seen is acknowledged if that id was stored (`on_chunk`). One under an id it has not seen goes
 through level 1; where it passes, on an axis whose index the node has already received it is
 acknowledged there (`fill`, which also answers a waiting probe) and not forwarded there, as
-`protocol.md` §4.2 does with "a second copy of an index under another id". `on_validated` forwards
+`seacast-lite.md` §4.2 does with "a second copy of an index under another id". `on_validated` forwards
 only on the live axes, with duty `FORWARD`, whose index it had not received before the copy, and the
 copy is kept for heartbeat gossip only if it is forwarded on some axis. An index held only as
 rebuilt, or one the node published, is not received, so a copy of it is forwarded. A network arrival
@@ -1174,27 +1175,27 @@ that arrival, which `on_validated` does not act on.
 
 The gate is the object type's. For the payload, it is the installed block (its descriptor comes
 from the bid; `validate_chunk` returns DEFER before it); for cells, it is a validated header, which
-may precede the block. A deferred chunk is held in the bounded per-peer store of `protocol.md` §4.2
+may precede the block. A deferred chunk is held in the bounded per-peer store of `seacast-lite.md` §4.2
 and §8.2 and resumes when the gate opens. `authenticable(g)` is the gate of `g`'s type: nothing of
 `g` is asked for before it opens, and what was offered meanwhile is asked for when it does. For the
 payload, that is at v0.5's `on_block_installed` (its §3, §4.4); for cells, it is when the binding
 first validates a block's header:
 
 ```python
-def defer(p, f):                                      # protocol.md §4.2's, at the gate of f's type: the block for
+def defer(p, f):                                      # seacast-lite.md §4.2's, at the gate of f's type: the block for
     T = type_of_group(f.group)                        #   the payload, the cell header for cells
     result = T.verify(f, T.header_of(f))
     if result != DEFER: return on_validated(p, f, result)   # the gate opened in the meantime
-    if not admitted(p, f): return                     # a group beyond the peer's unknown groups (protocol.md §8.2):
+    if not admitted(p, f): return                     # a group beyond the peer's unknown groups (seacast-lite.md §8.2):
                                                       #   ignored, neither kept nor tied
     tie(p, f)                                         # kept or refused, its sender is tied to the root it names
-    if reserve(p, f):                                 # a per-peer reservation in the bounded store (protocol.md §8.2)
+    if reserve(p, f):                                 # a per-peer reservation in the bounded store (seacast-lite.md §8.2)
         pending[f.beacon_block_root].append((p, f))
         pending_ids.add(chunk_id(f))
     # refused: the copy is not kept, so a later copy is evaluated afresh; its sender stays tied
 
 def on_header_validated(root):                       # (P2) a block's cell header, validated once: the cells'
-    groups = set(cell_groups(root))                   #   gate, as installation is the payload's (protocol.md §4.2)
+    groups = set(cell_groups(root))                   #   gate, as installation is the payload's (seacast-lite.md §4.2)
     cells = [(p, f) for p, f in pending[root] if f.group in groups]
     pending[root] = [(p, f) for p, f in pending[root] if f.group not in groups]   # the payload waits for the block
     for p, f in cells:                                # the cells that waited resume level 1
@@ -1210,7 +1211,7 @@ def on_header_validated(root):                       # (P2) a block's cell heade
             for i in bits:                            #   which is the one a WANT for it may go to
                 asked_parked[(g, i)].discard(p)
                 if g in hdr and i >= type_of_group(g).index_count(hdr[g]):   # an index the group, known now,
-                    continue                          #   has not is dropped (protocol.md §8.2), the others kept
+                    continue                          #   has not is dropped (seacast-lite.md §8.2), the others kept
                 if offers and not mine[g].has(i): add_offer(Ask(g, i), p)
     for p in [p for p, held in tied[root].items() if not held]:   # a sender with nothing left tied under
         del tied[root][p]; tie_slot.pop((root, p), None)          #   the root: its tie's slot goes too (§8.1)
@@ -1220,14 +1221,14 @@ def on_header_validated(root):                       # (P2) a block's cell heade
         for a in ledger(g): retry_offer(a)            # offered meanwhile, or released, asked for now (v0.5 §4.4)
 ```
 
-**A copy that waits ties its sender,** as in `protocol.md` §4.2 and §6.1.
+**A copy that waits ties its sender,** as in `seacast-lite.md` §4.2 and §6.1.
 - **The tie.** A deferred copy, kept or refused, ties its sender to the root it names, for its group
-  and index (`tie`); so does another copy of one that waits (`on_chunk`, as in `protocol.md`). The
-  sender is not asked for that index while it waits: not by `on_offer`, nor by `protocol.md`'s
+  and index (`tie`); so does another copy of one that waits (`on_chunk`, as in `seacast-lite.md`). The
+  sender is not asked for that index while it waits: not by `on_offer`, nor by `seacast-lite.md`'s
   `retry_offer`, `last_resort` or `ask_parked`, which this document takes as they are, nor by
   `filter_entry` (§4.6).
 - **The release.** The gate's opening releases the ties: each sender's park for the group lifts,
-  the count of the last resort (`protocol.md` §6.1) for its indices clears, and each index is its
+  the count of the last resort (`seacast-lite.md` §6.1) for its indices clears, and each index is its
   offer again; an index the group does not have, once its count is known, is dropped instead. A
   cell's copy can tie a sender whose link has not joined the group's type (a cell answered in its
   row while naming its column, §2): its park lifts and its count clears, but its indices are not
@@ -1235,52 +1236,52 @@ def on_header_validated(root):                       # (P2) a block's cell heade
   sender with nothing left tied under the root loses the slot its ties recorded (`tie_slot`). For
   the payload this is at the block's installation (`on_block_installed`); for cells it is at the
   header (`on_header_validated`, above).
-- **What waits is bounded** as in `protocol.md` §4.2 and §8.1, since v0.10, for both object types.
+- **What waits is bounded** as in `seacast-lite.md` §4.2 and §8.1, since v0.10, for both object types.
   A copy of a group beyond its sender's limit of unknown groups is ignored, neither kept nor tied
   (`defer`). When a group opens, at its first valid chunk, what named an index beyond its count
   goes: offers, asks, promises, tries and ties (`drop_beyond`, from `fill`). And at each heartbeat,
   what waits for a gate that never opens goes once its slot leaves the live window or its group
   expires (`drop_stale_waits`, from `on_heartbeat`).
 - **Tables by group and index** (a note, not a rule). The pseudocode finds what names one chunk by
-  scanning whole tables: `drop_beyond` when a group opens, and `protocol.md`'s `close_promises` at
+  scanning whole tables: `drop_beyond` when a group opens, and `seacast-lite.md`'s `close_promises` at
   every arrival, over every promise, offer, try and ask the node holds. That keeps it short, and the
   result is the same either way. An implementation is expected to index these tables by group and
   index, so that an arrival costs a lookup, not a pass over everything the node tracks.
-- **Ordering.** `defer` here waits for the gate of the chunk's own type; `protocol.md`'s waited
+- **Ordering.** `defer` here waits for the gate of the chunk's own type; `seacast-lite.md`'s waited
   for the block alone. Cells leave the store and their ties at the header, so a binding validates
   a block's cell header no later than it installs the block.
 - **The second-ask rule.** A node makes no second ask of a peer for a chunk while an earlier one is
-  outstanding, queued or promised (`outstanding`, `protocol.md` §6.1): `on_offer` passes over such a
+  outstanding, queued or promised (`outstanding`, `seacast-lite.md` §6.1): `on_offer` passes over such a
   peer.
-- **An ask goes with its announcer's offers** (`protocol.md` §6.1). Where a peer's offers of a chunk
+- **An ask goes with its announcer's offers** (`seacast-lite.md` §6.1). Where a peer's offers of a chunk
   are dropped, with its tie (`drop_tie`) or 30 s after its last offer of the group, an ask of the
   chunk still queued to it is removed and its promise for the chunk closes (`drop_offer`). This
-  document drops offers only on `protocol.md`'s paths, so the rule applies to both object types as
+  document drops offers only on `seacast-lite.md`'s paths, so the rule applies to both object types as
   written.
 
 #### Rationale
 
-**A copy that waits ties its sender** (2026-10-26, from `protocol.md` v0.8). With it, v0.5's offer
+**A copy that waits ties its sender** (2026-10-26, from `seacast-lite.md` v0.8). With it, v0.5's offer
 of a refused copy is gone.
 
 **A block's cell header before the block** (decided 2026-11-01). The installation would otherwise
 resume the cells with the payload's check and drop their ties as forgeries.
 
-**An ask goes with its announcer's offers** (from `protocol.md` v0.8, 2026-10-28). If the node
+**An ask goes with its announcer's offers** (from `seacast-lite.md` v0.8, 2026-10-28). If the node
 kept the ask, the ask would leave the peer outstanding. `on_offer` would pass over the peer's next
 offer. While this peer is unparked, a parked announcer's offer would draw no last resort. Once the
 peer's promise fell due, nothing would ask either peer again, and the pull would stall.
 
 **In the toy** cells carry their header, so their gate is open from the first cell and neither
-`defer` nor `on_header_validated` runs there; `toy/v2_carried_known.py` calls the latter by hand.
+`defer` nor `on_header_validated` runs there; `toy/seacast_carried_known.py` calls the latter by hand.
 
 ### 4.3 A holding or an offer arrives
 
 ```python
-def on_holding(p, h: Have):                            # protocol.md §4.3's on_have
+def on_holding(p, h: Have):                            # seacast-lite.md §4.3's on_have
     if expired(h.group): return                        # past its active lifetime: ignored
     if not valid_have(h): return penalise(p)           # length, and indices within N once known
-    if not admitted(p, h): return                      # a group beyond p's unknown groups (protocol.md §8.2): ignored
+    if not admitted(p, h): return                      # a group beyond p's unknown groups (seacast-lite.md §8.2): ignored
     e = peer_has[p][h.group]                           # created at p's first holding for the group
     newly = h.bits & ~e.bits
     e.bits |= h.bits
@@ -1296,12 +1297,12 @@ def on_holding(p, h: Have):                            # protocol.md §4.3's on_
     for i in h.bits & ~newly:                          # [c14] a bit p held already: a copy written to it since (a
         window_release(p, h.group, i)                  #   probe's answer, §4.6, or any without cancel) frees its slot
 
-def on_offer(p, h: Have):                              # protocol.md §4.4's on_ihave over one group's bitmap; returns asks
+def on_offer(p, h: Have):                              # seacast-lite.md §4.4's on_ihave over one group's bitmap; returns asks
     g = h.group
     if expired(g): return []
-    if not valid_have(h):                              # held to a holding's limits, as protocol.md §4.4 holds an
+    if not valid_have(h):                              # held to a holding's limits, as seacast-lite.md §4.4 holds an
         penalise(p); return []                         #   IHAVE's bitmap: ignored, and counted (§8.2)
-    if not admitted(p, h): return []                   # a group beyond p's unknown groups (protocol.md §8.2): ignored
+    if not admitted(p, h): return []                   # a group beyond p's unknown groups (seacast-lite.md §8.2): ignored
     if now - known_at[g] < type_of_group(g).params.START_DELAY:   # [D8] (R7) a secondary axis waits
         return deferred_offers(p, h)                   # recorded as offers; asked when the delay has run
     candidates = []
@@ -1309,12 +1310,12 @@ def on_offer(p, h: Have):                              # protocol.md §4.4's on_
         a = Ask(g, i)
         add_offer(a, p)                                # [c5] the offer table (v0.5 §6.1)
         if gated(a) or not authenticable(g): continue  # [c6] stop-pull; the gate first (v0.5 §3, §4.2 here)
-        if tied_to_root(p, a): continue                # its copy waits for its gate (protocol.md §4.2)
+        if tied_to_root(p, a): continue                # its copy waits for its gate (seacast-lite.md §4.2)
         if parked(p, a): last_resort(a); continue      # [c5] park; every announcer parked: v0.5 §6.1
-        if outstanding(p, a): continue                 # an ask of it to p is open (protocol.md §6.1)
+        if outstanding(p, a): continue                 # an ask of it to p is open (seacast-lite.md §6.1)
         candidates.append(a)
     asks = []
-    for a in shuffled(candidates):                     # protocol.md §6.1: one ask per index at a time
+    for a in shuffled(candidates):                     # seacast-lite.md §6.1: one ask per index at a time
         if over_ihave_limits(p): held_back[(group(a), index(a))] = a   # retried at the next heartbeat (§4.8)
         elif may_ask(a, p):
             asks.append(a)
@@ -1322,11 +1323,11 @@ def on_offer(p, h: Have):                              # protocol.md §4.4's on_
     return asks
 ```
 
-**A holding** (`on_holding`) plays the role of `protocol.md` §4.3's HAVE. A holding of an expired
+**A holding** (`on_holding`) plays the role of `seacast-lite.md` §4.3's HAVE. A holding of an expired
 group is ignored, and a malformed one is ignored and counts against its sender: one beyond a
 holding's length, or naming an index at or beyond the group's count once the count is known
-(`protocol.md` §8.2). A holding of a group beyond the peer's limit of unknown groups
-(`MAX_PENDING_GROUPS`, `protocol.md` §8.2) is ignored, without penalty. Otherwise the node adds its
+(`seacast-lite.md` §8.2). A holding of a group beyond the peer's limit of unknown groups
+(`MAX_PENDING_GROUPS`, `seacast-lite.md` §8.2) is ignored, without penalty. Otherwise the node adds its
 bits to what it knows the peer holds (`peer_has`), whose lifetime each holding from the peer for the
 group refreshes (`HAVE_TTL`), and keeps the peer's two claims once set (§1.5): it holds or can
 produce every index (`claim_all`, card 10), and its interest in the group is satisfied, so nothing
@@ -1346,41 +1347,41 @@ chunk's acknowledgement (`origin_acked`, §4.7), which acts once per chunk and d
 be written to a peer that holds it (a probe's answer whatever the peer holds, §4.6, and any copy
 without cancel, card 8), and its acknowledgement repeats the bit.
 
-**An offer** (`on_offer`) plays the role of `protocol.md` §4.4's IHAVE over one group's bitmap. An
+**An offer** (`on_offer`) plays the role of `seacast-lite.md` §4.4's IHAVE over one group's bitmap. An
 offer of an expired group is ignored, and one beyond a holding's limits is ignored and counts
-against its sender, as `protocol.md` holds an IHAVE's bitmap (§8.2). An offer of a group beyond the
+against its sender, as `seacast-lite.md` holds an IHAVE's bitmap (§8.2). An offer of a group beyond the
 peer's limit of unknown groups is ignored, without penalty, as its holdings are. Within the type's
 start delay after the group became known (`START_DELAY`, a secondary axis's `[D8]`), each index the
 peer offers, the node wants and does not hold is recorded as an offer, and asked once the delay has
-run, under the checks of `protocol.md` §6.1's retry (`deferred_offers`). Otherwise each such index
+run, under the checks of `seacast-lite.md` §6.1's retry (`deferred_offers`). Otherwise each such index
 is recorded as an offer (card 5), whatever follows, and becomes a candidate unless stop-pull holds
 it back (card 6), the group's gate has not opened (`authenticable`, §4.2), the peer's copy of it
-waits for its gate (`protocol.md` §4.2), the peer is parked for the group (then the last resort,
-`protocol.md` §6.1, which acts once every untied announcer of the index is parked: it asks the
+waits for its gate (`seacast-lite.md` §4.2), the peer is parked for the group (then the last resort,
+`seacast-lite.md` §6.1, which acts once every untied announcer of the index is parked: it asks the
 parked announcers once more each, one at a time, each after a wait of `PROMISE` × 2ⁿ, where n is the
 number of parked announcers it has already queued such an ask to for the chunk), or an ask of it to
 the peer is open. The candidates are taken in random order. While the peer is over an IHAVE limit,
-each is held back (below); otherwise it is asked of the peer if `may_ask` allows (`protocol.md`
+each is held back (below); otherwise it is asked of the peer if `may_ask` allows (`seacast-lite.md`
 §6.1: one ask per index at a time).
 
 - **An offer from any link is an offer.** The announce relation decides who learns what a node
-  holds; `protocol.md` §6.1's pull decides whom the node asks, when it moves on and whom it parks.
+  holds; `seacast-lite.md` §6.1's pull decides whom the node asks, when it moves on and whom it parks.
   Offers never touch `peer_has`, `holders`, cancel or the window, and holdings never feed the offer
   table except in one case: a claim of a whole group that defers a decode duty is taken as an offer
   of the index its probe asks for, from that claimant (`defer_on_claim`, §4.6).
-- **Gossipsub's two IHAVE limits apply to offers** (`protocol.md` §4.4). They delay asks and lose no
+- **Gossipsub's two IHAVE limits apply to offers** (`seacast-lite.md` §4.4). They delay asks and lose no
   offer.
   - `MAX_IHAVE_MESSAGES` counts the offer-bearing frames from a peer within a heartbeat
     (`on_frame`, §4), and `MAX_IHAVE_LENGTH` counts the asks made of the peer in reply to its
     offers. Both count per peer over every object type, as one connection carries them all.
   - Over either limit, the peer's offers are still recorded. What the node would ask of it is held
-    back to the next heartbeat (§4.8), which runs `protocol.md`'s retry for it, with the retry's
+    back to the next heartbeat (§4.8), which runs `seacast-lite.md`'s retry for it, with the retry's
     checks.
   - Only asks in reply to offers count against the limits: the retry, the last resort, the asks at a
     gate's release and those after the start delay `[D8]` do not.
-- **The limits' values are the client's** (`protocol.md` §8.2). `protocol.md` §8.3 gives reference
+- **The limits' values are the client's** (`seacast-lite.md` §8.2). `seacast-lite.md` §8.3 gives reference
   values for gossipsub's: 4096 offer-bearing frames and 5000 ids asked, per peer and heartbeat. What
-  the values mean depends on the binding (§7, `protocol-v2-bindings.md` §4, §5):
+  the values mean depends on the binding (§7, `seacast-bindings.md` §4, §5):
   - on the gossipsub binding, offers are IHAVEs, so a stock gossipsub client applies its own limits;
   - on the libp2p stream binding, the values are the client's alone (§6.3 says which to avoid);
   - on the partial-messages binding, offers travel as `partsMetadata`, not as IHAVEs.
@@ -1394,7 +1395,7 @@ here.
 cells hold back no ask, under this draft's tier 4 setting, variant C (`c`) and custody, with and
 without samplers, nor under the rows setting, with and without half the columns withheld. The
 busiest peer stayed well below both values in a heartbeat, in every setting
-(protocol-v2-figures.md, §4.3).
+(seacast-figures.md, §4.3).
 
 ### 4.4 A node forwards
 
@@ -1402,7 +1403,7 @@ busiest peer stayed well below both values in a heartbeat, in every setting
 def forward(f, from_peer, axes=None):                                      # axes: those on_validated acts on
     for (g, i) in (type_of_group(f.group).project(f) if axes is None else axes):   # (R4) each axis with its own type
         T = type_of_group(g)
-        if expired(g) or state[g] == INVALID: continue                     # an expired or dropped axis is not acted on (protocol.md §8.1, §4.6)
+        if expired(g) or state[g] == INVALID: continue                     # an expired or dropped axis is not acted on (seacast-lite.md §8.1, §4.6)
         if duty_for(g) != FORWARD: continue                                # no duty on this axis: we only serve asks
         fam, c = T.family(g), colour_of(g, i)
         pushers = [q for q in links(T) if c in push_out[q][T][fam]]        # the relation for this colour
@@ -1410,7 +1411,7 @@ def forward(f, from_peer, axes=None):                                      # axe
         cands = [q for q in pushers if q not in holding and q != from_peer
                  and interest_of_peer(q, g).has(i) and not peer_has[q][g].complete]   # [I3] into interest only
         budget = max(0, R_NODE - len(holding)) if T.params.EAGER else 0    # [c3, c4, c11, c17]; rows: offers only
-        targets = choose_push(f, cands, budget, at_source=False)           # protocol.md §5.3 unchanged
+        targets = choose_push(f, cands, budget, at_source=False)           # seacast-lite.md §5.3 unchanged
         for q in targets:
             if enqueue(q, f, urgent=False): note_push(q, g, i)             # [c7, c16]
             else: owe(q, g, bitmap({i}))                                   # [c3] refused: offered instead (v0.5)
@@ -1434,23 +1435,23 @@ def announce_extra(g, i) -> List[PeerId]:                                  # [D5
 def fills(g, i) -> List[Tuple[GroupId, int]]:         # (R4) every (group, index) the chunk at index i of g fills,
     return [(g, i)] + type_of_group(g).cross(g, i)     #   from the ids alone: the chunk need not be stored
 
-def note_push(p, g, i):                                # protocol.md §5.2's, under every group the chunk fills (R4):
+def note_push(p, g, i):                                # seacast-lite.md §5.2's, under every group the chunk fills (R4):
     for (g2, i2) in fills(g, i):                       #   a chunk noted through one group is not offered or
         e = pushed[p][g2]                              #   repaired to that peer again through another
         if e.empty(): e.first_push = now               # the guard's clock (§5.3 there), per group
         e.set(i2); e.ttl = PUSH_TTL
 ```
 
-**A forwarding node's rules are `protocol.md` §5.2 and §5.3** with two changes: the candidates
+**A forwarding node's rules are `seacast-lite.md` §5.2 and §5.3** with two changes: the candidates
 are the push relation for the chunk's colour instead of the mesh, filtered by the peer's interest;
 and the offer's width beyond the relation is a parameter: `ALL_JOINED` for columns and rows, `NONE`
 permitted for columns (`[D5]`, §8). With `M = 1`, interest `ALL` everywhere and
-`ANNOUNCE_EXTRA = SAMPLE`, the two functions are `protocol.md`'s `forward` and `announce`.
+`ANNOUNCE_EXTRA = SAMPLE`, the two functions are `seacast-lite.md`'s `forward` and `announce`.
 
 ### 4.5 An ask arrives, and serving
 
 ```python
-def on_want(p, asks):                                  # protocol.md §4.5's on_iwant, plus the serving limit (R6)
+def on_want(p, asks):                                  # seacast-lite.md §4.5's on_iwant, plus the serving limit (R6)
     answers = {}                                       # by id: one answer per id per frame
     probes = {(gi.group, gi.index): gi for gi in map(group_index, asks) if gi and gi.probe}   # (R5) the frame's probes
     taken = set()                                      # §4.5: the indices answered in this frame
@@ -1503,7 +1504,7 @@ def on_want(p, asks):                                  # protocol.md §4.5's on_
         if flagged: serve_probe(p, gi.group, chunk_of(mid))  # (R5) answered: the probe's one exemption, taken
         answers[mid] = chunk_of(mid)
         if gi: taken.add((gi.group, gi.index))
-    return list(answers.values())                      # [c14] one chunk per queue entry (protocol.md §4.1)
+    return list(answers.values())                      # [c14] one chunk per queue entry (seacast-lite.md §4.1)
 
 def serve_standing(g, i):                              # §4.10: the chunk a WANT waited for is here
     routed_standing[g].pop(i, None)                    # §4.5: the route marks go with the requests
@@ -1583,7 +1584,7 @@ per peer and group `[R6]`, whatever the asker's duty. An ask may go to a peer th
 or whose derived interest includes it (a custodian can be asked without offering, PeerDAS's "knows
 exactly what a peer should be able to respond to"); an ask outside both is ignored (below), unless
 it is a routed request and goes to a peer with duty `FORWARD`. A promise is made by an offer, and a
-broken one parks the peer for the group (`protocol.md` §6.1). A `DECLARED` peer's WANT is also its
+broken one parks the peer for the group (`seacast-lite.md` §6.1). A `DECLARED` peer's WANT is also its
 interest: `want_p[p][g]` is set from it before the asks are answered, and what the peer does not
 hold yet is kept as a standing request (§4.10). An ask by derived interest makes no promise with a
 timer either: an ask marked `want` (§3), one sent in a WANT and not on an offer, starts none,
@@ -1610,12 +1611,12 @@ An ask for an index the asker itself claimed is penalised as before.
 - *Why no penalty.* The asker's view can lag the node's honestly: a header the asker holds first, a
   JOIN or an offer in flight. In the toy's custody runs with samplers, the asks a strict test would
   call outside were all such races: a sampler's standing WANT reaching a custodian before the
-  custodian had validated the header, for a column it custodies (protocol-v2-figures.md, §4.5). The
+  custodian had validated the header, for a column it custodies (seacast-figures.md, §4.5). The
   rule therefore ignores without penalty, and tests what came before the gate once the gate opens.
   Without the rule, such an ask kept a standing request, or a bit of a `DECLARED` peer's interest,
   that the node could never answer until `GROUP_TTL`: a table any peer could grow.
 
-**A WANT is held to two bounds** before it can leave any state, as `protocol.md` §8.2 holds HAVEs
+**A WANT is held to two bounds** before it can leave any state, as `seacast-lite.md` §8.2 holds HAVEs
 and offers.
 - *Its index.* An index at or past the group's count, once the node knows it (`hdr`), is ignored;
   before the count is known, an index at or past the most a group of the type has
@@ -1625,7 +1626,7 @@ and offers.
 - *Its group.* A group the node has not opened (at its first valid chunk, `hdr`) counts against
   the asker's limit of unknown groups named in WANTs (`admitted_group`), whatever else the node
   keeps for it, another peer's standing request included: `MAX_PENDING_GROUPS` of them, counted
-  apart from the unknown groups of the asker's HAVEs and offers (`protocol.md` §8.2). An ask takes a
+  apart from the unknown groups of the asker's HAVEs and offers (`seacast-lite.md` §8.2). An ask takes a
   place only once it has passed the test of what the node serves. A group frees its place when it
   resolves, when the connection closes, or when its lifetime would have passed (`GROUP_TTL` after it
   was first named), and then the asker's standing requests and interest bits for it go too. The node frees
@@ -1747,7 +1748,7 @@ def repair_verdict(g):                                 # (R5, option) Incrementa
 def ask_custodian(g, i) -> bool:                       # (R5, option) cell i of g, of a custodian of its column not
     T = type_of_group(g); (g2, i2) = T.cross(g, i)[0]  #   yet asked for it and not a claimant (REPAIR_FLOOR keeps
     if expired(g2): return False                       #   the node a link to one per column); an expired column
-    qs = [q for q in links(type_of_group(g2))          #   is not asked for (protocol.md §8.1)
+    qs = [q for q in links(type_of_group(g2))          #   is not asked for (seacast-lite.md §8.1)
           if interest_of_peer(q, g2).has(i2) and q not in claims[g] and q not in rsample_asked[g][i]]
     if not qs: return False
     q = choice(qs); rsample_asked[g][i].add(q)
@@ -1805,7 +1806,7 @@ def defer_on_claim(g):                                 # (R5) verify the claim b
     probe[g] = i
     q = probed[g] = choice(list(claims[g]))
     a = Ask(g, i)
-    add_offer(a, q); tried[a][q] = now                 # a claim is an offer of every index (protocol.md §6.1's tables)
+    add_offer(a, q); tried[a][q] = now                 # a claim is an offer of every index (seacast-lite.md §6.1's tables)
     probe_asks.add(a)                                  # past stop-pull and the ask window: gated exempts it
     if not send(q, Want(group=g, bits=bitmap({i}), probe=True), urgent=False):   # marked: answered whatever we hold
         settle_probe(g, None)                          # refused by a full queue, never written: no verdict, and our
@@ -1813,7 +1814,7 @@ def defer_on_claim(g):                                 # (R5) verify the claim b
     arm(g, max(reconsider_at.get(g, now), now + T.params.DEFER_WINDOW))   # its promise starts at its write
                                                        #   (filter_entry); not written by then: no verdict either
 
-def gated(a): return stop_pull[group(a)] and a not in probe_asks    # [c6] protocol.md §6.2, with the probe exempt
+def gated(a): return stop_pull[group(a)] and a not in probe_asks    # [c6] seacast-lite.md §6.2, with the probe exempt
 
 def settle_probe(g, verdict):                          # (R5) the verdict, once (True passed, False failed, None no
     probe_ok[g] = verdict                              #   verdict); settled, the probe's ask is gated again, so the
@@ -1847,7 +1848,7 @@ def serve_probe(p, g, f):                              # (R5) f answers p's prob
     probe_served[p][g] = True                          #   lets that answer through once, whatever p holds
     probe_answers[p][f.group].set(f.index)
 
-def filter_entry(p, entry):                            # protocol.md §7.2's, but for the lines marked (R5) and want's
+def filter_entry(p, entry):                            # seacast-lite.md §7.2's, but for the lines marked (R5) and want's
     f = entry.chunk
     if f:
         exempt = entry.solicited and probe_answers[p][f.group].has(f.index)   # (R5) our answer to p's probe
@@ -1896,13 +1897,13 @@ def decode_group(g):                                   # level 2, off the chunk 
     for g2 in filled: check_completion(g2)             # (R4) as on_chunk does: a filled group may be complete
     deliver(g, payload_of(whole))                      # level 3: the application's checks
 
-def push_rebuilt(g, new):                              # [c10] protocol.md §4.6 over each group a rebuilt chunk fills
+def push_rebuilt(g, new):                              # [c10] seacast-lite.md §4.6 over each group a rebuilt chunk fills
     T = type_of_group(g)
     by_group = {}
     for i in new:
         for (g2, i2) in T.project(chunks[g][i]): by_group.setdefault(g2, []).append((i2, chunks[g][i]))
     for g2, items in by_group.items():
-        if expired(g2) or state[g2] == INVALID: continue   # an expired or dropped axis is not acted on (protocol.md §8.1, §4.6)
+        if expired(g2) or state[g2] == INVALID: continue   # an expired or dropped axis is not acted on (seacast-lite.md §8.1, §4.6)
         T2 = type_of_group(g2); k = T2.threshold(hdr[g2])
         if T2.params.REPAIR_BUDGET and T2.params.EAGER:
             push_rebuilt_as_source(g2, items); continue
@@ -1954,12 +1955,12 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   the window has run; a node that keeps the row on no link goes by the cells it holds (below). The
   claimant passes only on its own copy, an answer or a push: if none has come when the deferred
   duty fires, with its probe written and the claimant still connected (below), the claimant is
-  penalised, once, and another peer's copy leaves its promise open, so that `protocol.md`'s pull
+  penalised, once, and another peer's copy leaves its promise open, so that `seacast-lite.md`'s pull
   discipline parks it when the promise breaks. That holds only while the probe waits: once it is
   judged or given no verdict, a promise under its key is a plain ask's, which any copy closes
   (`probe_promise`), and the probe's ask is no longer exempt from stop-pull (`settle_probe`), so the
   member pulls the probed cell from nobody after the verdict, as it pulls no other cell of the row
-  once complete. The probe's promise is the deferral window itself, not `protocol.md`'s `PROMISE`
+  once complete. The probe's promise is the deferral window itself, not `seacast-lite.md`'s `PROMISE`
   of 400 ms. A claim counts for nothing in the subnet's view of the row (`known_in_scope`),
   verified or not; a verified claim ends a member's duty through the deferral instead. A claim that
   came on a link that has not joined the row type makes no claimant: it counts as a plain holding,
@@ -1978,19 +1979,19 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   - *The mark.* The probe's WANT sets `probe` (§2). The claimant answers the first such ask per
     asker and group, of an index it claims, whatever the asker's holdings say: neither the claim
     rule (§4.5) nor a receipt of the asker's refuses it, and card 8 lets the answer through once
-    (`filter_entry`, `protocol.md` §7.2's with the probe's lines). The exemption is the answer's
+    (`filter_entry`, `seacast-lite.md` §7.2's with the probe's lines). The exemption is the answer's
     alone: it is taken when the claimant answers, only for an index it claims, and spent when that
     answer is written, so a push of the same cell neither uses it nor passes card 8. A second marked
     ask of the group, after one was answered, is a plain ask. The mark costs no byte: it is one more
     bit beside `standing` in version 4 of the strings on the gossipsub binding
-    (`protocol-v2-bindings.md` §4) and in Partial Messages, and SEACAST's message encoding carries
-    `standing` and `probe` in one flags byte (`protocol-v2-bindings.md` §1.2).
+    (`seacast-bindings.md` §4) and in Partial Messages, and SEACAST's message encoding carries
+    `standing` and `probe` in one flags byte (`seacast-bindings.md` §1.2).
   - *The asker's queue keeps the probe.* While the probe waits, the asker's queue writes its marked
     WANT even when another peer's copy came first and the asker holds the cell (`probe_waits`). The
     writer's other checks on an ask still apply: it drops an ask past the group's lifetime, and one
     to a claimant whose copy of the index waits for its gate (`filter_entry`).
   - *The cell at random.* The probed index is drawn uniformly among those the member lacks.
-  - *The probe's wait starts at its write*, as every promise does (`protocol.md` §6.1). The probe's
+  - *The probe's wait starts at its write*, as every promise does (`seacast-lite.md` §6.1). The probe's
     promise starts when its WANT is first written (`filter_entry`) and lasts `DEFER_WINDOW`; once
     that promise is gone, a write of it again while it waits starts v0.5's plain one, as any ask on
     an offer does; the wait for the verdict lasts until the later of the end of that first promise
@@ -2026,7 +2027,7 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   - *A claimant that leaves is not judged.* A peer's claims go with its connection (`claims_close`),
     so the probed claimant is drawn among connected ones. A probe of a claimant whose connection
     closes before the verdict gets none, neither a pass nor a penalty: its answer can no longer
-    come, and its promise went with the connection (`protocol.md` §8.1). The deferral then ends, and
+    come, and its promise went with the connection (`seacast-lite.md` §8.1). The deferral then ends, and
     the member's own repair is reconsidered at the duty's own time, at once if that has passed
     (`reconsider`, which rebuilds unless the group is whole in the subnet's view or the repair
     reached it): the claim, unverified, returns the duty to its own time, or to the close if that
@@ -2104,7 +2105,7 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   the column groups of their columns, to the custodians `REPAIR_TO` names that lack them, which is
   "the push into non-custodied columns is the whole of the relief" (the RowDAS design); the row's
   own members, complete at 64, are not pushed what they do not want. For the payload, `project` is
-  the identity and this is `protocol.md`'s `push_rebuilt`. PeerDAS's reconstruction is the second
+  the identity and this is `seacast-lite.md`'s `push_rebuilt`. PeerDAS's reconstruction is the second
   phase without row subnets (below). A push, and an answer to a standing WANT or a kept probe, is
   noted under every group the chunk fills (`note_push`, §4.4; `unpush` clears it for a source's push
   its queue refuses and for a push the writer skips by projection), so a chunk noted through one of
@@ -2112,14 +2113,14 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   source (`wants_from_me`). The note does not keep a forwarding node from pushing the chunk to that
   peer (`choose_push` only ranks by it), and an answer from `on_want`, a probe's included, is not
   noted.
-- **A rebuilt chunk names the block its sources name** (`protocol.md` §4.6, v0.8). Otherwise,
+- **A rebuilt chunk names the block its sources name** (`seacast-lite.md` §4.6, v0.8). Otherwise,
   under two blocks of a slot, a rebuilt copy naming the other block would wait for good at a
   neighbour that installed only the first.
-  - A rebuilt payload chunk does so by `decode_and_reencode`, as `protocol.md` defines it.
+  - A rebuilt payload chunk does so by `decode_and_reencode`, as `seacast-lite.md` defines it.
   - A rebuilt cell does so by construction. Its group id carries the root (§1.1), and `project`
     keeps it, so a rebuilt cell of row b fills the column groups of the same block.
   - The rule keeps honest copies on the source's block only as long as no node relabels a chunk
-    (`protocol.md` §4.6, "Open: relabelled copies", with its options; 2026-10-28). The payload is
+    (`seacast-lite.md` §4.6, "Open: relabelled copies", with its options; 2026-10-28). The payload is
     exposed as there. A cell relabelled under the other block is a cell of that block's groups,
     which its id carries. It cannot stand in for the source's copy or tie its sender for this
     block's groups: for cells this is that list's option of a group per block root. The cells'
@@ -2176,8 +2177,8 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
 - *The probe's promise* is the window, not `PROMISE`: a reconstructor that has just decoded is
   pushing a row's worth of rebuilt cells through its window. In the toy its answer to a probe left
   later than `PROMISE` after the probe was decided, so with the shorter promise honest claimants
-  were parked and penalised (protocol-v2-figures.md, §4.6, "The deferral").
-- *A claim outside the subnet's view.* Executing the toy's liar fault (protocol-v2-figures.md,
+  were parked and penalised (seacast-figures.md, §4.6, "The deferral").
+- *A claim outside the subnet's view.* Executing the toy's liar fault (seacast-figures.md,
   §4.6, "The probe") showed that a false claim counted there made the row look whole to every
   member of its subnet and suppressed the third phase, the suppression the RowDAS design warned of.
 - *The probe exempt.* Without the exemptions, the one-ask-per-index window dropped the probe in the
@@ -2203,9 +2204,9 @@ write, a claimant still decoding and a claimant that leaves since 2026-11-16; `p
   whose decode outlasts the probe's round trip would be penalised. An honest member sends one probe
   per group; before, a faulty asker's second marked ask, of a stored cell, took the exemption, and
   the kept one went unanswered.
-- *Measured* results come from five cells (protocol-v2-figures.md,
+- *Measured* results come from five cells (seacast-figures.md,
   "A cell, the median and the tail") of the toy's rows, honest and under liars or hoarders, run on
-  this section's rules as they stood on 2026-11-18 (protocol-v2-figures.md, §4.6, "The probe"). No
+  this section's rules as they stood on 2026-11-18 (seacast-figures.md, §4.6, "The probe"). No
   verdict on an honest or hoarding claimant failed. Every probe got a verdict and was written: none
   was still unwritten when its window ran out, and no probe reached a claimant still decoding (the
   toy's queues refuse nothing, and these cells close no connection). Liars almost never passed their
@@ -2222,27 +2223,27 @@ write, a claimant still decoding and a claimant that leaves since 2026-11-16; `p
   almost never passed in two of the liar cells, and passed more often in the one with supernodes;
   the mark cost a few duplicate cells; one probe, in the supernodes' cell, passed before it was
   written, on the claimant's own copy; the run that delivers no block decided a few probes; and the
-  longest wait from decision to write was a small part of the window (protocol-v2-figures.md, §4.6,
+  longest wait from decision to write was a small part of the window (seacast-figures.md, §4.6,
   "The probe").
 - *Measured before 2026-11-16*, and before v0.10's order of the announcers beyond the list
-  (`protocol.md` §6.1), these runs used the same five cells. That order moves a run of the
+  (`seacast-lite.md` §6.1), these runs used the same five cells. That order moves a run of the
   supernodes' cell and, bracketed but not run at that change, another. Judged by the claimant's own
   copy without the mark and the kept WANT, a few verdicts on honest claimants failed, all in the
   hoarders' cell; with them, none did. When any peer's copy passed the claimant, liars passed far
   more often in every liar cell, by a count that is a lower bound. Against the earlier rule's runs
   (the lowest index, any peer's copy passing), the copies stayed close in most runs and were lighter
   in one run of the hoarders' cell and in two of the supernodes' cell. Almost all of the difference
-  was data, and it was not traced further (protocol-v2-figures.md, §4.6, "The probe").
+  was data, and it was not traced further (seacast-figures.md, §4.6, "The probe").
 - *The random index's cost, and what is not measured.* In the runs measured before 2026-11-16,
   liars passed a little more often with the random index than with the lowest. In the traced runs,
   which hold all such passes, the liar had by then already sent the member the lowest lacked cell
-  in most of them and held it unsent in the rest; in none had it neither (protocol-v2-figures.md,
+  in most of them and held it unsent in the rest; in none had it neither (seacast-figures.md,
   §4.6, "The probe"). The excess fits the draw choosing a cell already on its way, but that is not
   proven. The toy's liars do not aim at the cell they expect to be asked, so these runs measure the
   draw's side effects, not its purpose; nor does any fault send marked asks, which the cap bounds to
   one exempt answer per asker and group.
 - The figures file gives the rules and the transport that each figure in this section ran with
-  (protocol-v2-figures.md, §4.6).
+  (seacast-figures.md, §4.6).
 
 **The verdict, by what the node can see** (decided 2026-10-10). Draft 1 ended a row member's duty on
 a verified claim; the rule above keeps that, subject to the member check.
@@ -2253,13 +2254,13 @@ a verified claim; the rule above keeps that, subject to the member check.
   supernodes (honest, and half the columns withheld with 16 and with 32 subnets) and the withheld
   custody cell with a fifth of the nodes hoarding run as under draft 1, event for event on every
   seed, and so do almost all seed-cells of the row cells with supernodes and a fifth or half
-  hoarding (protocol-v2-figures.md, §4.6, "The verdict").
+  hoarding (seacast-figures.md, §4.6, "The verdict").
 - *Draft 1, and a first version.* Draft 1 ended the duty of both, a row member and a node that
   keeps the row on no link, on the probed cell; when the toy's rebuilders stopped pushing to
   supernodes (an exploration), supernodes deferred on a claim that came in an acknowledgement,
   received the probed cell, and ended one cell short of a column. A first version of this rule
   counted a verified claim only from a peer in the node's view, and row members decoded several
-  times as many rows for no change in time or bytes (protocol-v2-figures.md, §4.6, "The verdict"):
+  times as many rows for no change in time or bytes (seacast-figures.md, §4.6, "The verdict"):
   their claimants were mostly supernodes rebuilding the row in the second phase, which have no
   relation on it, so their claims reach a member in the acknowledgement of a column chunk (§4.2,
   `fill`).
@@ -2271,11 +2272,11 @@ a verified claim; the rule above keeps that, subject to the member check.
   supernode sent, which a hoarder sends while still short. Where none does, the row is lost: without
   supernodes, a fifth of the nodes hoarding left custodians short in every run of the toy's withheld
   row cell, each time a subnet whose honest members had deferred to a hoarding reconstructor
-  (protocol-v2-figures.md, §4.6, "The verdict"); the member check (above) closed this in those runs
+  (seacast-figures.md, §4.6, "The verdict"); the member check (above) closed this in those runs
   wherever the subnet had an honest member, against a claimant that repairs nothing.
 
 **The member check** (decided 2026-10-09). It was measured in the toy's withheld row cell
-(protocol-v2-figures.md, §4.6, "The member check"):
+(seacast-figures.md, §4.6, "The member check"):
 - *What it addresses: a claimant that rebuilds, passes the probe and repairs nothing* (the toy's
   `--fault hoard`). Without supernodes, with a fifth or half of the nodes hoarding, custodians were
   left short on every seed without the check, and with it they were left short on a few seeds at a
@@ -2287,7 +2288,7 @@ a verified claim; the rule above keeps that, subject to the member check.
   some seeds, and each time the member check sent the member to rebuild instead of trusting the liar
   (traced on some of those seeds; measured when that cell also passed the claimant). In the traces,
   the few (node, row) pairs left short, with and without the check, are the liars' own rows, which
-  the toy's liars never rebuild: the check moved their count only slightly (protocol-v2-figures.md,
+  the toy's liars never rebuild: the check moved their count only slightly (seacast-figures.md,
   §4.6, "The member check").
 - *What it does not address.* It does not address a subnet whose members all misbehave: nobody
   honest is there to check. A member whose custody columns are all among the published ones holds
@@ -2297,7 +2298,7 @@ a verified claim; the rule above keeps that, subject to the member check.
   passes the check (the toy's `--fault hoardm`: without supernodes, a fifth of the nodes doing so
   left custodians short on every seed); sampling the repair samples for it. Where an honest
   supernode keeps the row, its second phase already repairs what a hoarder withholds, and the check
-  never fired there (protocol-v2-figures.md, §4.6, "The member check").
+  never fired there (seacast-figures.md, §4.6, "The member check").
 - *What it costs.* Where nobody misbehaves, it costs nothing: in each cell run without a fault
   (rows honest with and without supernodes, withheld with 16 subnets with and without, withheld
   with 32 with supernodes) it never fired and every event is the same. A rescued block completes
@@ -2305,13 +2306,13 @@ a verified claim; the rule above keeps that, subject to the member check.
   deferral; its bytes are not higher, since hoarders push nothing. In the traced runs with hoarders
   or liars every firing was on a misbehaving claimant's claim: a needless rebuild, an honest
   claimant's repair still on its way when the window ends, was not seen at 60 nodes. It is the case
-  to watch at larger scale, where repair travels further (protocol-v2-figures.md, §4.6,
+  to watch at larger scale, where repair travels further (seacast-figures.md, §4.6,
   "The member check").
 
 **Sampling the repair.** The sample is extended, never redrawn, since the larger sample could have
 been drawn at once ("toss a coin until you like the result" is the alternative the post rules
 out); allowing losses is LossyDAS's answer to a custodian that has not yet received a repaired cell
-when asked. It was measured in the toy's withheld row cell (protocol-v2-figures.md, §4.6,
+when asked. It was measured in the toy's withheld row cell (seacast-figures.md, §4.6,
 "Sampling the repair"):
 - *Against a claimant that repairs only the members' cells* (a fifth of the nodes, without
   supernodes): the member check alone left custodians short on every seed. The lenient form,
@@ -2321,23 +2322,23 @@ when asked. It was measured in the toy's withheld row cell (protocol-v2-figures.
   own pushes had filled some columns, and most of the sampled cells came. A rescued block completes
   later than a block without the fault, with the rebuild waiting out the deferral and two sample
   steps, and later than a block the member check alone rescues from a claimant that repairs nothing
-  (protocol-v2-figures.md, §4.6, "Sampling the repair").
+  (seacast-figures.md, §4.6, "Sampling the repair").
 - *Where nobody misbehaves* no sample failed in any form, with or without supernodes, and the times
   and bytes are within the seeds' spread; the cost is the sampled cells, a few per node and block
-  (protocol-v2-figures.md, §4.6, "Sampling the repair"). With supernodes every cell completed in
+  (seacast-figures.md, §4.6, "Sampling the repair"). With supernodes every cell completed in
   every form.
 - *Where custodians do not answer.* The toy's liars answer no ask, so a sample cell asked of one is
   lost: with a fifth of the nodes lying, `(4, 0), (8, 1)` failed on honest claimants in many
   verdicts, and in almost all of them in a run with supernodes, where a liar is a supernode and so a
   custodian of every column. The strict forms had members rebuild more rows per run, without
-  changing completion (protocol-v2-figures.md, §4.6, "Sampling the repair").
+  changing completion (seacast-figures.md, §4.6, "Sampling the repair").
 - *Re-asking a lost cell* (`REPAIR_REASK`) was measured over the same seeds. Among liars the strict
   forms' failed samples fell to none at the median, though not in every run, and members rebuilt
   about as many rows as with the member check alone. Where no cell was lost (no fault, and a
   claimant that repairs nothing) the runs are the same event for event. Against a claimant that
   repairs only the members' cells, `(4, 0), (8, 1)` and `(6, 0), (12, 1)` still leave short only the
   seeds without an honest member, and a rescued block completes later, by about the one more wait;
-  `(3, 1), (6, 2)` stays lenient (protocol-v2-figures.md, §4.6, "Sampling the repair").
+  `(3, 1), (6, 2)` stays lenient (seacast-figures.md, §4.6, "Sampling the repair").
 - *At 500 nodes* (`(4, 0), (8, 1)` with re-ask against the member check alone): where nobody
   misbehaves, with and without supernodes, the member check never fired, no sample failed, and times
   and bytes are similar. The sample asked a few cells per node and block without supernodes, and far
@@ -2349,14 +2350,14 @@ when asked. It was measured in the toy's withheld row cell (protocol-v2-figures.
   the run with the member check alone, where an honest node had rebuilt that row earlier (the runs
   diverge from the first block, and which node it was is not traced). The rescue path's length,
   `DEFER_WINDOW` plus two `SAMPLE_WAIT` and the re-ask's, is the cost to cut; a shorter wait was not
-  measured (protocol-v2-figures.md, §4.6, "Sampling the repair").
+  measured (seacast-figures.md, §4.6, "Sampling the repair").
 
 **Rebuilt cells marked seen** (kept as an option, 2026-11-01).
 - *It needs the sample.* The forwarded copies also repair by accident: two hoarding reconstructors
   that forward each other's rebuilt cells fill columns that neither repairs on purpose. With the
   cells marked seen, such hoarders leave more columns unrepaired: in one network of the toy's
   500-node rows, a network model gives several times as many, and the runs matched the model
-  (protocol-v2-figures.md, §4.6, "Rebuilt cells marked seen"). The member check, which looks only
+  (seacast-figures.md, §4.6, "Rebuilt cells marked seen"). The member check, which looks only
   at the member's own columns, misses them, and the sample catches them. With the member check
   alone, the option left more custodians short in the runs that measured it, so it is never on
   without the sample.
@@ -2364,14 +2365,14 @@ when asked. It was measured in the toy's withheld row cell (protocol-v2-figures.
   nodes repairing only the members' cells: the member check alone left blocks short, the sample
   left fewer short, and the sample with rebuilt cells marked seen left none short. In honest cells
   the two together cost slightly more copies and control, against neither, with no direction in
-  time (protocol-v2-figures.md, §4.6, "Rebuilt cells marked seen").
+  time (seacast-figures.md, §4.6, "Rebuilt cells marked seen").
 
 **A custodian's alarm** (kept on 2026-11-01 for networks without an honest supernode).
 - *Its wait, in the toy.* The measurements set the wait above the latest custodian's completion in
-  the toy's 500-node rows without a fault (protocol-v2-figures.md, §4.6, "A custodian's alarm", with
+  the toy's 500-node rows without a fault (seacast-figures.md, §4.6, "A custodian's alarm", with
   the settings and the rules each run had).
 - *Measured again on the rules as they stood* (2026-11-18), these figures come from the 500-node
-  cells of the one-column hoarder (protocol-v2-figures.md, §4.6, "A custodian's alarm"). Without
+  cells of the one-column hoarder (seacast-figures.md, §4.6, "A custodian's alarm"). Without
   the alarm some blocks were short: the same blocks as before but one, which now completes. With it
   none was, for as many alarms and rebuilds as before. In honest cells and under false claims
   (rebuilt cells not marked seen) no alarm fired. The figures of the ten-seed runs below were not
@@ -2383,7 +2384,7 @@ when asked. It was measured in the toy's withheld row cell (protocol-v2-figures.
   supernode's second phase rebuilds the row: the alarm is for networks without one. In honest
   cells, with the builder at 1 Gbps or at home, no alarm fired, and the latest custodian completed
   before the alarm's wait. Under false claims by a fifth of the nodes, a few alarms fired and no
-  rebuild followed (protocol-v2-figures.md, §4.6, "A custodian's alarm").
+  rebuild followed (seacast-figures.md, §4.6, "A custodian's alarm").
 - *Not measured:* the wait on thinner links, where the honest tail is longer, is not measured, and
   neither is the alarm since the probed cell is drawn at random. These runs probed the lowest index
   a member lacked, which was never the hidden column; drawn at random, the probe can ask for it, and
@@ -2393,7 +2394,7 @@ when asked. It was measured in the toy's withheld row cell (protocol-v2-figures.
 
 **A rebuilt chunk completes the groups it fills.** Draft 1 filled the column without the check, so
 the member never completed it: it neither stopped pulling it nor told its peers, and the toy counted
-it short (in a run of the repair floor's measurement below, before the fix; protocol-v2-figures.md,
+it short (in a run of the repair floor's measurement below, before the fix; seacast-figures.md,
 §4.6, "The repair floor").
 
 **Every member keeps a link to each column.** In the toy's withheld row cell, without the floor
@@ -2404,14 +2405,14 @@ single rebuilder common. In the other, a subnet had two members, linked only to 
 members, and each gathered its rows from the columns' custodians one cell short: neither was linked
 to the only custodian of one published column, so neither row was ever rebuilt. With
 `REPAIR_FLOOR = 1` every run completed, and the links it added left completion times and bytes
-within the seeds' spread (§6.2; protocol-v2-figures.md, §4.6, "The repair floor").
+within the seeds' spread (§6.2; seacast-figures.md, §4.6, "The repair floor").
 
 **A supernode keeps every row.** In the toy, a few supernodes on datacenter links complete every
 custodian on every seed of the custody cell whose proposer withholds half the columns, which nothing
 else recovers. They complete the withheld row cell with 32 subnets, which its subnets without
 members left short, and they complete the cell with 16 subnets much sooner. The cost is bytes, most
 of it duplicate pushes of the fast class: with a budget of `R` for cells the copies are fewer and
-the tails are shorter (§6.2; §6.3, `R_NODE`, for later study; protocol-v2-figures.md, §4.6,
+the tails are shorter (§6.2; §6.3, `R_NODE`, for later study; seacast-figures.md, §4.6,
 "Supernodes").
 
 **A row held on the columns is on its way.** Without the wait, on home links, supernodes in the
@@ -2419,7 +2420,7 @@ toy's honest row cell rebuilt many rows that nobody had withheld, and the cell's
 wait, no supernode rebuilt a row in any honest custody or row run. In the withheld cells the
 supernodes still rebuild most rows more than once; a jitter longer than a rebuilt row's trip to the
 other supernodes would cancel more of them; such a longer jitter was not measured. For a member it
-changed no event of the row cells without supernodes that were checked (protocol-v2-figures.md,
+changed no event of the row cells without supernodes that were checked (seacast-figures.md,
 §4.6, "Supernodes").
 
 **A rebuilder pushes as a source.** Without supernodes, in the withheld 16-subnet row cell, where
@@ -2428,7 +2429,7 @@ shorter tail, at the median over the seeds and at the worst seed. With supernode
 links, whose budget is the fast class's six, it saves copies and costs time at the tail, and in the
 custody cell both the saving and the cost are small. With the fast class's budget off for cells
 (§6.3, `R_NODE`) it saves more copies in the 16-subnet cell, for a later median and tail
-(protocol-v2-figures.md, §4.6, "A rebuilder pushes as a source").
+(seacast-figures.md, §4.6, "A rebuilder pushes as a source").
 
 **Whom rebuilt cells go to.** A supernode keeps every row, so a rebuilder's push into a column
 reaches it too, and where several nodes rebuild a row their pushes cross in flight: at 500 nodes
@@ -2438,22 +2439,22 @@ push it, so no estimate of the network's size is needed to bound them. In the to
 offering the cells to the nodes that keep every row instead of pushing them saves copies at no cost
 in time; offering every rebuilt cell, as a row's are, saves more and costs time at the median;
 leaving the keepers out saves as much as offering to them, but lengthens the custody cell's tail,
-since a supernode left out has only its own rebuild, after a deferral (protocol-v2-figures.md, §4.6,
+since a supernode left out has only its own rebuild, after a deferral (seacast-figures.md, §4.6,
 "Whom rebuilt cells go to").
 
 ### 4.7 The source
 
 ```python
-def publish(block, d, shards):                         # the payload's builder; protocol.md §5.1 over the relation
+def publish(block, d, shards):                         # the payload's builder; seacast-lite.md §5.1 over the relation
     g = group_of(block, d)                             # §1.1's table: the payload's key, a column's id
-    if expired(g) or not live(block.slot): return      # too late: past its live window (protocol.md §8.1)
+    if expired(g) or not live(block.slot): return      # too late: past its live window (seacast-lite.md §8.1)
     release_wanted_groups()                            # §4.5: a place that ran out goes before its group opens
     open_group_source(g, d)                            # hdr[g] = d; T_of, interest, known_at
     drop_wants_beyond(g)                               # §4.5: its count is known now
     T = type_of_group(g)
     for s in shards:                                   # the source holds every chunk from the start
         f = Chunk(slot=block.slot, beacon_block_root=block_root(block), group=g,
-                  descriptor=d, index=s.index, proof=s.proof, data=s.data)    # descriptor: design A (B open, protocol.md §1)
+                  descriptor=d, index=s.index, proof=s.proof, data=s.data)    # descriptor: design A (B open, seacast-lite.md §1)
         store(g, s.index, f); mark_seen(chunk_id(f))
         gossip_history.put(f)                          # heartbeat gossip may offer it (§4.8)
     mine[g] = all_bits(N(d)); state[g] = COMPLETE; stop_pull[g] = True
@@ -2463,7 +2464,7 @@ def publish(block, d, shards):                         # the payload's builder; 
     plan = []
     for i in range(N(d)):                              # index order; each chunk's targets see earlier plans
         f = chunks[g][i]
-        targets = choose_push(f, candidates_for_source(f), budget=R, at_source=True)   # protocol.md §5.3
+        targets = choose_push(f, candidates_for_source(f), budget=R, at_source=True)   # seacast-lite.md §5.3
         for p in targets: note_push(p, g, i)
         plan.append((f, targets))
     led = set()
@@ -2524,8 +2525,8 @@ def unpush(p, g, i):                                   # [c3] a chosen push that
         owe(p, g, bitmap({i}))                         #   now (v0.5 §5.2's, with the fallback links)
 ```
 
-**What carries over.** Batch order (card 2) and striping (card 13) are `protocol.md` §5.1
-unchanged, and the window (card 14) is `protocol.md`'s counted in bytes (§4.11). So is v0.7's
+**What carries over.** Batch order (card 2) and striping (card 13) are `seacast-lite.md` §5.1
+unchanged, and the window (card 14) is `seacast-lite.md`'s counted in bytes (§4.11). So is v0.7's
 single offer: the source offers a chunk only to the peers of its pool (the relation for the chunk's
 colour, or the fallback links, below) not chosen to be pushed it, and a peer whose push its queue
 refuses is owed the chunk instead, so these two paths never offer a peer the same chunk twice; a
@@ -2534,7 +2535,7 @@ the candidates are the links that want the chunk, which for a pre-seeded peer (a
 blobs from its mempool, I8) is decided by the holding it sent before any data, so a source holding
 *part* of a group pushes only what its peers lack.
 
-**A refused push to a fallback link is owed.** `protocol.md`'s `unpush` (v0.5 §5.2) owes a push the
+**A refused push to a fallback link is owed.** `seacast-lite.md`'s `unpush` (v0.5 §5.2) owes a push the
 queue refuses to a mesh peer; there the mesh is the set the source pushes and offers to. With no
 relation in the family for the chunk's colour that set is the fallback links (`source_pool`), so
 `unpush` here owes a peer of the source's pool too, the pool as it stands when the push is refused.
@@ -2543,14 +2544,14 @@ source an asker that waits past the promise parks it for the group.
 
 **When the source offers** [c3] (v0.9 §5.1). A chunk is *acknowledged* at the first holding naming
 it, from any peer (§4.3), or, if none comes, at the first window timeout of any copy of it (§4.11; a
-closed connection drops the room of its copy, `protocol.md` §8.1), as `protocol.md`'s glossary has
+closed connection drops the room of its copy, `seacast-lite.md` §8.1), as `seacast-lite.md`'s glossary has
 it.
 - **A source offers a chunk at its acknowledgement** by default (`SOURCE_OFFERS = ACK`), for every
   object type a source pushes, the rule v0.9 had for every source. The offers trail the pushes by
   about a round trip.
 - **Offering at publish is the source's choice** (`SOURCE_OFFERS = PUBLISH`). No rule at another
   node needs either setting: a receiver takes an offer whenever it comes. The setting changes how a
-  group spreads, as any default does (`protocol.md` §8.3): what other nodes are asked and pushed,
+  group spreads, as any default does (`seacast-lite.md` §8.3): what other nodes are asked and pushed,
   and when they complete. A source whose offers draw asks it cannot answer in time is parked by its
   askers for the group, a cost it bears itself. At `PUBLISH` the source offers each chunk at
   publish, by the rule it would use at the acknowledgement, to its pool as it stands then, and its
@@ -2567,15 +2568,15 @@ it.
   have nothing to race. They name the source to those peers, which [P4]'s paced holding does not
   hide. No setting publishes a pull-only type: rows come from cross-fill or a rebuild.
 
-**Open: a chunk that is never acknowledged,** as `protocol.md` §5.1 names it. At
+**Open: a chunk that is never acknowledged,** as `seacast-lite.md` §5.1 names it. At
 `SOURCE_OFFERS = ACK` the source offers a chunk to the rest of its pool only at the chunk's
 acknowledgement, and a chunk has none while no holding naming it reaches the source and no copy of
 it times out in the window (§4.11). That happens when each of its chosen pushes was refused or
 skipped by projection, stays queued to a peer that does not read, or went with its connection
-before a holding or the timeout (`protocol.md` §8.1). A refused or skipped push to a relation peer,
+before a holding or the timeout (`seacast-lite.md` §8.1). A refused or skipped push to a relation peer,
 or to a fallback link where the chunk's colour has no relation, is offered to that peer instead
 (above); one to any other link, which only a striping source pushes, is forgotten (`unpush`, as
-`protocol.md` §5.2). A holding naming the chunk comes once a peer that holds a copy claims it to
+`seacast-lite.md` §5.2). A holding naming the chunk comes once a peer that holds a copy claims it to
 the source: a copy delivered before its connection closed and forwarded, a rebuilt copy, or a
 decode claim, which names every chunk of a coded group (§4.2, §4.6). Until then the source offers
 the chunk only once a peer has asked for it and the source's answer is acknowledged: a peer
@@ -2592,7 +2593,7 @@ layers keep its chunks moving:
   the chunk's family. With no relation in the family for the chunk's colour, it uses the links whose
   interest holds the chunk (`source_pool`), as gossipsub's fanout reaches a topic its publisher has
   not joined. A push to one of them that a full queue refuses is owed, as to a relation peer
-  (`unpush`). The fallback holds for the payload too, where `protocol.md`'s source with no
+  (`unpush`). The fallback holds for the payload too, where `seacast-lite.md`'s source with no
   mesh peer sends nothing (§6.1).
 - **1. Links kept for the families it will publish** (`SOURCE_FLOOR`, a parameter). A node keeps at
   least `SOURCE_FLOOR` links to custodians of each family it will publish, opened through the
@@ -2635,9 +2636,9 @@ fewer of the scope's peers, which v0.4 does not provide for, is for later study.
 
 **v0.7's single offer** (since 2026-11-04). Among the toy's recorded cells then, only the thin lossy
 one (`loss-thin`), whose queues refuse some chunks at admission, met the second offer. There the
-single offer sends fewer offers, and the warm medians (protocol-v2-figures.md,
+single offer sends fewer offers, and the warm medians (seacast-figures.md,
 "A cell, the median and the tail"), of completion and of copies, stay as they were
-(protocol-v2-figures.md, §4.7).
+(seacast-figures.md, §4.7).
 
 **A refused push to a fallback link is owed** (decided 2026-11-14). Without it, a fallback target
 whose push was refused would be neither pushed the chunk nor offered it at the acknowledgement,
@@ -2661,7 +2662,7 @@ acknowledgement is the one event the source sees whatever the transport holds (�
   the acknowledgement, on the toy's 60-node graph and on the research harness's 100-node one, with
   writes completing at once and with one write at a time. It also answers several times as many
   asks. A 50 Mbps proposer that offers at publish completes its block later, at 60 nodes and at 500
-  (below; protocol-v2-figures.md, §4.7).
+  (below; seacast-figures.md, §4.7).
 - *Its privacy.* Every chunk offered at once, by the one node that holds them all, names the source
   to those peers, and the paced holding [P4] then hides nothing from them. Toward the peers outside
   its pool (the relation for the chunk's colour, or with none the fallback links, `source_pool`) the
@@ -2672,7 +2673,7 @@ acknowledgement is the one event the source sees whatever the transport holds (�
 
 Copies do not decide it: offering at publish adds a little to the copies of the block received per
 node, data and control, on the toy's 60-node graph, and saves a little on the research harness's
-100-node one (protocol-v2-figures.md, §4.7). A client may key the choice on its uplink, as striping
+100-node one (seacast-figures.md, §4.7). A client may key the choice on its uplink, as striping
 is (`STRIPE_UPLINK`); this document does not, since a fast source may still want P4.
 
 **A pull-only type's source** (decided 2026-11-18).
@@ -2682,7 +2683,7 @@ cell bounds it only where every copy of one chunk is lost with its connection; n
 source's links in the middle of a message.
 
 **The acknowledgement against the document before, in the toy.** These are the results at 60
-nodes (protocol-v2-figures.md, §4.7):
+nodes (seacast-figures.md, §4.7):
 - **The payload** completes as soon or a little sooner, and its source saves bytes where the
   transport takes the batch at once (below, "The source's offers, card 3 at the source").
 - **A 50 Mbps proposer's custody block** completes sooner at the median, on most seeds.
@@ -2694,7 +2695,7 @@ nodes (protocol-v2-figures.md, §4.7):
   it pushed, the cells it did not push them. Offered each cell only at its acknowledgement, they
   completed much later. The other nodes moved little.
 
-These are the results at 500 nodes (protocol-v2-figures.md, §4.7):
+These are the results at 500 nodes (seacast-figures.md, §4.7):
 - **Against the document before,** at one seed: the payload (tier 4 in the all-home network), the
   rows and a 50 Mbps proposer's custody block complete sooner at the median, and the custody block
   of a 1 Gbps proposer completes a little later (a fifth of the nodes sampling).
@@ -2714,10 +2715,10 @@ These are the results at 500 nodes (protocol-v2-figures.md, §4.7):
 type had the payload's source offer at the acknowledgement and a column's at publish.
 - **What it kept:** it kept the rows' early completion at 60 nodes, against offers at the
   acknowledgement for every type, with and without §4.11's rule; and a 1 Gbps proposer's earlier
-  block, at 60 nodes and at 500 (protocol-v2-figures.md, §4.7).
+  block, at 60 nodes and at 500 (seacast-figures.md, §4.7).
 - **What it gave up:** at 500 nodes it gave up the saving in upload of a column's source and a
   50 Mbps proposer's earlier block, for the rows' small gain there, with and without §4.11's rule
-  (protocol-v2-figures.md, §4.7).
+  (seacast-figures.md, §4.7).
 
 One rule for every type, as v0.9 has it, was taken instead; since 2026-11-18 any source may offer at
 publish (`SOURCE_OFFERS`, above).
@@ -2727,17 +2728,17 @@ publish (`SOURCE_OFFERS`, above).
 - *In the toy.* Its setup gives the proposer a relation with every custodian it links to, which are
   the fallback's peers. Its custody and row settings use a `SOURCE_FLOOR` of 2, at setup
   (`--source-floor`). The hunt is not measured. At 500 nodes, with half the columns withheld, every
-  custodian completed through the rows (protocol-v2-figures.md, §4.7).
+  custodian completed through the rows (seacast-figures.md, §4.7).
 - *Not taken:* the alternative of holding the publish until the links are there would delay every
   family for one that the code can recover. No layer reaches a column that no node but the source
-  custodies, and the toy's 60-node cells have such columns (protocol-v2-figures.md, §4.7); routed
+  custodies, and the toy's 60-node cells have such columns (seacast-figures.md, §4.7); routed
   sample requests do (§4.10).
 
 **The source's holding is paced** [P4].
 - **Why not at the write.** Until v0.9 a chunk joined at its first write, as it still does at
   `PUBLISH`. Where the transport takes a batch at once, that named chunks which had not left (v0.9
   §5.1).
-- **The signs that remain.** These remain here too, from v0.4's list and `protocol.md` §5.1's:
+- **The signs that remain.** These remain here too, from v0.4's list and `seacast-lite.md` §5.1's:
   - the source offers every chunk, at `ACK` about a round trip after its first copy;
   - its holding tends to grow faster than anyone's;
   - it offers the chunks of the group that have the relation's colour at once to a peer that joins
@@ -2748,14 +2749,14 @@ publish (`SOURCE_OFFERS`, above).
     next three heartbeats, less what `announce` leaves out, since `publish` puts every chunk in the
     gossip history (§4.8), at `ACK` without waiting for any chunk's acknowledgement. Keeping a
     source's chunks out of the gossip history until they are acknowledged is left, as in
-    `protocol.md` §5.4, to the work on the source's privacy.
+    `seacast-lite.md` §5.4, to the work on the source's privacy.
 - **The cost of the later holding.** It names a chunk about a round trip later than at the write.
   A relation peer that got the chunk from a forwarder may push it back to the source until the
   holding arrives; cancel drops what is still queued. In the toy's all-home payload cells at 60
   nodes, with writes that complete at once, a few of a payload's chunks come back a message at the
   median of the seeds, and many more at one seed. With §4.11's rule fewer come back at the median.
   The 1 Gbps builder's cell has more come back either way, and no column's cells come back
-  (protocol-v2-figures.md, §4.7).
+  (seacast-figures.md, §4.7).
 
 What P4 costs here depends on how many groups a source publishes. For the payload, one group, it
 costs nothing (§6.1). A proposer of 128 column groups sends a holding per cell to each peer in that
@@ -2767,12 +2768,12 @@ traced). With v0.5 merged (2026-10-21) few pairs stay short, and on most seeds n
 last resort (its §6.1): when every announcer of a cell is parked, each is asked once more, at waits
 that double. In a toy check at three seeds, without it the members stay short as before v0.5, while
 asking announcers beyond the first sixteen changes nothing; the doubling waits are why those rows
-complete late. The other cells move little (protocol-v2-figures.md, §4.7).
+complete late. The other cells move little (seacast-figures.md, §4.7).
 
 The costs above were measured with the holding at the write. At the acknowledgement P4 sends as many
 holdings, a round trip later. Moved there alone, with a column's offers still at publish, the
 holding moves the toy's column cells little at the median: the rows, the rows with liars, and the
-custody block with a 50 Mbps and with a 1 Gbps proposer (protocol-v2-figures.md, §4.7).
+custody block with a 50 Mbps and with a 1 Gbps proposer (seacast-figures.md, §4.7).
 
 The offers at the acknowledgement then move them as above.
 
@@ -2787,10 +2788,10 @@ liar fault merging leaves slightly fewer pairs short than P4 alone (both before 
 Most holdings would leave alone anyway: at one seed, most find no earlier holding of their group
 still waiting, in the queue or in the transport. Taking back more needs fewer holdings, which v0.4
 does not provide for: holding them back for a set time, or sending them to fewer of the scope's
-peers; both are for later study (protocol-v2-figures.md, §4.7).
+peers; both are for later study (seacast-figures.md, §4.7).
 
 **The source's offers, card 3 at the source,** cost a home builder bytes.
-- **At publish**, in the toy's tier 4 cells (protocol-v2-figures.md, §4.7):
+- **At publish**, in the toy's tier 4 cells (seacast-figures.md, §4.7):
   - they drew asks that the builder answered after its first copies, and most of those answers
     arrived as duplicates;
   - without the offers a 50 Mbps builder uploads fewer copies of the message, and its cells' medians
@@ -2798,21 +2799,21 @@ peers; both are for later study (protocol-v2-figures.md, §4.7).
   - a 1 Gbps builder uploads far fewer copies, but completes a little later;
   - a 1 Gbps proposer of columns completes later, since its offers let peers pull from it while its
     uplink has room.
-- **At the acknowledgement**, with writes that complete at once (protocol-v2-figures.md, §4.7):
+- **At the acknowledgement**, with writes that complete at once (seacast-figures.md, §4.7):
   - the payload's offers draw fewer asks;
   - a 50 Mbps builder uploads fewer copies of the message, and so does a 1 Gbps builder;
   - the medians move little, and none is later.
 
   So most of those bytes are saved where the transport takes the batch at once, and none need saving
   where it keeps §4.11's rule: there the offers wait behind the pushes either way, and they draw
-  about as many asks (protocol-v2-figures.md, §4.7).
+  about as many asks (seacast-figures.md, §4.7).
 - **A column's offers wait for the acknowledgement too** (above). A fast proposer pays for it: its
   block completes later at 60 nodes, and a little later at 500, than with its offers at publish
-  (protocol-v2-figures.md, §4.7).
+  (seacast-figures.md, §4.7).
   - A fast proposer can take it back by offering at publish (`SOURCE_OFFERS`, above). With the
     offers keyed on the configured uplink, as striping is, its block completed a little sooner at
     60 nodes than in the document before; at 500 nodes the cost is the small one above
-    (protocol-v2-figures.md, §4.7). The order of a source's queue is §4.12's.
+    (seacast-figures.md, §4.7). The order of a source's queue is §4.12's.
 
 ### 4.8 The heartbeat
 
@@ -2823,7 +2824,7 @@ def on_heartbeat():
     held_back.clear()                                         #   which they do not count
     served_hb.clear()                                         # §4.5's serving budget starts again
     release_wanted_groups()                                   # §4.5: the places of unknown groups named in WANTs
-    drop_stale_waits()                                        # protocol.md §4.2: copies and ties past their window
+    drop_stale_waits()                                        # seacast-lite.md §4.2: copies and ties past their window
     ids = gossip_history.gossip_ids()                         # stock: ids of the last 3 heartbeats
     for T in joined_types(): keep_floor(T)                    # §4.1, links for the floor per family
     for T in joined_types(): maintain_relations(T)            # §4.1
@@ -2840,7 +2841,7 @@ def send_gossip(q, ids):                                       # [c7] offers, pe
             announce(q, g, bits)                               # minus pushed[q], minus peer_has[q] (§4.4)
 ```
 
-At each heartbeat, as in `protocol.md` §6.4, §4.3's IHAVE limits start again and what they held
+At each heartbeat, as in `seacast-lite.md` §6.4, §4.3's IHAVE limits start again and what they held
 back is retried, TTLs expire, the links for the floor per family, the relations and a sampler's
 coverage floor are maintained, and heartbeat gossip goes out. The gossip offers the last three
 heartbeats' chunks, less what each peer holds, was pushed or lies outside its interest
@@ -2848,13 +2849,13 @@ heartbeats' chunks, less what each peer holds, was pushed or lies outside its in
 admits: one peer per pace tick with card 15 (`on_pace_tick` unchanged), and all at once without
 it. It offers only groups of a type whose `ANNOUNCE_EXTRA` is `SAMPLE` (`send_gossip`): a type at
 `ALL_JOINED` is offered at forward time instead, and one at `NONE` is not offered beyond its
-relations `[D5]`. The window of `protocol.md` §7.1 is per node across every group of every object
+relations `[D5]`. The window of `seacast-lite.md` §7.1 is per node across every group of every object
 type (X3).
 
 ### 4.9 The window's projection, per object type
 
 ```python
-def projected(p, g):                                           # [c12] protocol.md §7.2, read per object type
+def projected(p, g):                                           # [c12] seacast-lite.md §7.2, read per object type
     T, h = type_of_group(g), hdr[g]
     if T.threshold(h) == T.index_count(h): return False         # no code: every index is needed, nothing is projected
     has, sent = peer_has[p][g].bits, sent_to[p][g]
@@ -2870,7 +2871,7 @@ false: every index is needed, and nothing is projected.
 
 **Why only with a code.** A column has no code across its cells (K = N), so the premise fails: a
 dropped cell is a cell the peer still needs, and in a thin family nobody else may be pushing it.
-Executing the custody setting (§6.2) found this: with `protocol.md`'s `projected` a custodian ended
+Executing the custody setting (§6.2) found this: with `seacast-lite.md`'s `projected` a custodian ended
 short of exactly the cells its pushers had projected away, and nobody offered them, since a planned
 push is not announced.
 
@@ -2879,7 +2880,7 @@ push is not announced.
 ```python
 def sample(g, bits):                                   # at block arrival: the application's draw, never narrowed to
     if expired(g): return                              #   what our links serve; ours from now on (§1.5), unless
-    interest[g] |= bits                                #   the group is past its lifetime (protocol.md §8.1)
+    interest[g] |= bits                                #   the group is past its lifetime (seacast-lite.md §8.1)
     for i in bits: ask_sample(g, i, first=True)        # the first phase: every sample at once, one peer each
 
 def ask_sample(g, i, first=False):                     # one sample to one peer, never one asked for another
@@ -3004,7 +3005,7 @@ column left few pairs unreached at 16 links where custodians keep their floor pe
 more without that floor; the second phase meets such a miss through another first hop, and the
 routing rules meet it by construction (§6.3, `ROUTE_FLOOR`). Beyond one step: without the floor, the
 Kademlia-style rule reached most pairs within two hops and the rest in three. A first hop drawn at
-random, as here without the rules, was not measured (protocol-v2-figures.md, §4.10).
+random, as here without the rules, was not measured (seacast-figures.md, §4.10).
 
 **Not taken: narrowing the draw** to the columns the node's links serve was not taken. A sample
 drawn among what a neighbourhood offers is a sample that neighbourhood steers, which breaks the
@@ -3015,24 +3016,24 @@ someone").
 ### 4.11 The window, in bytes
 
 ```python
-W_BYTES = W * CHUNK_BYTES             # protocol.md's W slots of CHUNK_BYTES: the payload's capacity is unchanged  [c14, X3]
+W_BYTES = W * CHUNK_BYTES             # seacast-lite.md's W slots of CHUNK_BYTES: the payload's capacity is unchanged  [c14, X3]
 in_flight = 0                         # bytes taken: held by a writer for the chunk it is about to send, or travelling
 waiters = deque()                     # peer writers waiting for room, first come first served
 sent = {}                             # (peer, group, index) -> (send time, bytes)
 
-def wake_front():                     # protocol.md §7.1's, over the window in bytes: room is free, so the first
+def wake_front():                     # seacast-lite.md §7.1's, over the window in bytes: room is free, so the first
     if in_flight >= W_BYTES: return   #   in line that can write tries again (§7.2 there)
     q = front()
     if q is not None: wake(q)
 
-def write_waits(p):                   # protocol.md §7.1's: p's write has not completed, so the line skips p
+def write_waits(p):                   # seacast-lite.md §7.1's: p's write has not completed, so the line skips p
     if p in waiters: wake_front()     #   and the first writer in line that can write tries again, if room is free
 
 def acquire_room(p, need) -> bool:    # True: p's writer may send `need` bytes now; False: it waits in line
     global in_flight
     fits = in_flight + need <= W_BYTES or in_flight == 0          # an empty window always takes one chunk
     if fits and front() in (None, p):                            # no writer that can write is ahead of p
-        if p in waiters: waiters.remove(p)                       #   (protocol.md §7.1's front, writing)
+        if p in waiters: waiters.remove(p)                       #   (seacast-lite.md §7.1's front, writing)
         in_flight += need
         wake_front()                                             # room remains: the next in line tries too
         return True
@@ -3071,7 +3072,7 @@ def free_room(need):
     in_flight -= need
     wake_front()                                  # the first writer in line that can write tries again
 
-def next_to_send(p):                  # protocol.md §7.2, with the chunk chosen before the room is taken
+def next_to_send(p):                  # seacast-lite.md §7.2, with the chunk chosen before the room is taken
     q = queue[p]
     while True:
         queue_owed_relations(p)                                # JOINs, GRAFTs and PRUNEs a full queue refused, in order (§4.1)
@@ -3097,27 +3098,27 @@ def next_to_send(p):                  # protocol.md §7.2, with the chunk chosen
 ```
 
 **The window keeps about one round trip of the uplink in flight,** whatever the chunks' sizes: a
-payload chunk of 12 KB takes six times the room of a cell, and `W_BYTES` is `protocol.md`'s `W`
+payload chunk of 12 KB takes six times the room of a cell, and `W_BYTES` is `seacast-lite.md`'s `W`
 slots of `CHUNK_BYTES`, so the payload's cells see the same capacity as before. Two things change
 besides the unit. The writer chooses the entry before taking room, since the room depends on the
 chunk, and control takes no room. And an empty window always admits one chunk, so a chunk larger
 than the window is not stuck. `rarest` and `projected` (§4.9) are as before, and `filter_entry` is
 §4.6's; `wire_size(p, entry)` (§3) is the binding's: the bytes the entry's chunk takes on the wire
 to `p`, with the header that a first push of a cell's group carries on the libp2p stream binding in
-form (b) (`protocol-v2-bindings.md` §1.6, §2.3).
+form (b) (`seacast-bindings.md` §1.6, §2.3).
 
-**The line skips a writer mid-write,** as `protocol.md` §7.1's does. Writers wait for room first
+**The line skips a writer mid-write,** as `seacast-lite.md` §7.1's does. Writers wait for room first
 come, first served over peers, and keep their place while they wait. A writer whose write has not
-completed (`writing`, as `protocol.md` §7.3 and its helpers define it) keeps its place but not the
+completed (`writing`, as `seacast-lite.md` §7.3 and its helpers define it) keeps its place but not the
 front: `acquire_room` admits the first waiter whose writer can write (`front`), and every window
 wake goes to that one (`wake_front`, here over the window in bytes: only while room is free).
 Without this, a peer that stops reading while its writer heads the line holds all free room, and the
 node sends no chunk to any other peer.
 
-**A writer in line whose control write waits wakes the next,** as `protocol.md` §7.1's does. A
+**A writer in line whose control write waits wakes the next,** as `seacast-lite.md` §7.1's does. A
 writer in line may write control, which takes no room: an urgent entry, owed offers on their own, or
 a control-only entry of the normal lane. It keeps its place in line. When the transport does not
-take that write at once (`protocol.md` §7.3), the writer calls `write_waits` as it starts to wait,
+take that write at once (`seacast-lite.md` §7.3), the writer calls `write_waits` as it starts to wait,
 and the window wake lets the first writer in line that can write try again, if room is free. A write
 that completes at once does not call `write_waits`. A client that cannot tell when a write starts
 to wait, as with a blocking write call, may call `write_waits` before a control write from the line,
@@ -3148,20 +3149,20 @@ cancel, projection and §4.12's order act on it.
 
 #### Rationale
 
-**The window's unit (X3, decided 2026-11-13, §8).** `protocol.md` §7.1 counts the window in slots
+**The window's unit (X3, decided 2026-11-13, §8).** `seacast-lite.md` §7.1 counts the window in slots
 of `CHUNK_BYTES` (12 000 bytes, the payload's chunk),
 `W = ceil(uplink_bytes_per_s · (RTT_REF + TARGET) / CHUNK_BYTES)`. A cell is 2 096 bytes, so the
 same slot count carries a sixth of the bytes per round trip. In the toy, a proposer of 128 column
 groups was held by its own window to a small share of its uplink, at 50 Mbps and at 1 Gbps, and a
 reconstructor's answer to a probe left late behind its burst of rebuilt cells
-(protocol-v2-figures.md, §4.11). One window over every object type (X3) is therefore counted in
+(seacast-figures.md, §4.11). One window over every object type (X3) is therefore counted in
 bytes here, and a chunk takes its own length of it; slots per object type would be the alternative,
 with the same capacity question at every boundary between types.
 
-**The entry before the room.** `protocol.md` takes a slot first and chooses after, which also
+**The entry before the room.** `seacast-lite.md` takes a slot first and chooses after, which also
 makes a control-only entry at the head of the queue wait for a chunk's slot.
 
-**What the unit changes, in the toy** (protocol-v2-figures.md, §4.11). At 60 nodes, the custody
+**What the unit changes, in the toy** (seacast-figures.md, §4.11). At 60 nodes, the custody
 setting's block completes sooner, at the median and at the tail, with a 1 Gbps proposer. With a
 50 Mbps proposer it completes at about the uplink's own bound, where the slot window took several
 times as long, and a little sooner with §4.12's source rule. The sampling cell's samples arrive
@@ -3174,8 +3175,8 @@ and at the tail. Tier 4 moves little (§6.1).
 
 **Below the writer, in the toy.** The toy runs the rule as one write per connection at a time
 (`--send-buffer 1`). Read in bytes instead, as less than one payload chunk unsent, the rule moves
-the column cells little at the median, at one seed (protocol-v2-figures.md, §4.11).
-- **Its effect,** with §4.7's rules, in the toy at 60 nodes (protocol-v2-figures.md, §4.11):
+the column cells little at the median, at one seed (seacast-figures.md, §4.11).
+- **Its effect,** with §4.7's rules, in the toy at 60 nodes (seacast-figures.md, §4.11):
   - the 50 Mbps payload cells complete sooner, on nearly every seed, with fewer copies;
   - the rows complete a little sooner at the median, on more than half the seeds, and the rows with
     liars complete sooner at the median, on more than half the seeds. With a column's offers at
@@ -3185,44 +3186,44 @@ the column cells little at the median, at one seed (protocol-v2-figures.md, §4.
   - at 500 nodes, the payload completes sooner with fewer copies, at one seed, and the rows complete
     a little sooner, on every seed.
 
-**The line skips a writer mid-write** (2026-11-20, from `protocol.md` v0.10.7's §7.1).
+**The line skips a writer mid-write** (2026-11-20, from `seacast-lite.md` v0.10.7's §7.1).
 - *The case.* The line admitted only its first writer, and every freed room woke only it. A writer
   whose write has not completed cannot take room, so a peer that stops reading while its writer
-  heads the line held every free byte. On 2026-11-20 `toy/line_stall_known.py --doc v2` showed it on
+  heads the line held every free byte. On 2026-11-20 `toy/line_stall_known.py --doc seacast` showed it on
   the `push` cell's network: with the source's line head stalled, the other peers' chunks waited in
   an empty window, and none was sent to them from 600 ms after the stall to the end of the check
-  (protocol-v2-figures.md, §4.11). With the rule none was held up. The check counts the sends to the
+  (seacast-figures.md, §4.11). With the rule none was held up. The check counts the sends to the
   other peers from 600 ms after the stall on (past `WINDOW_TIMEOUT`), and accepts queues left empty.
-- *The wake when a control write waits* (since `protocol.md` v0.10.9's §7.1). A burst of urgent
+- *The wake when a control write waits* (since `seacast-lite.md` v0.10.9's §7.1). A burst of urgent
   entries woke writers in line that each blocked on its write, and free room went to nobody.
-  `protocol.md`'s monitor (its W2) found this in `loss-thin`. So a writer in line whose control
+  `seacast-lite.md`'s monitor (its W2) found this in `loss-thin`. So a writer in line whose control
   write does not complete at once wakes the first writer in line that can write, as it starts to
-  wait (`write_waits`), as `protocol.md`'s does. Here control has a third path, a control-only entry
+  wait (`write_waits`), as `seacast-lite.md`'s does. Here control has a third path, a control-only entry
   of the normal lane, which takes no room and reaches the lane's head when a writer's queued chunks
   are discarded (a dropped or expired group). The wake acts at the write, whatever the entry, so it
   covers that path with the other two. A client whose write call blocks may call `write_waits`
   before a control write from the line instead, once it has marked the write pending. The early call
   can queue an extra run even for a write that completes at once. Admission is unchanged: a writer
   takes room only while room is free, and never ahead of a writer in line that can write.
-  `toy/write_wait_known.py --doc v2` checks five cases on each of the three paths, with p the writer
+  `toy/write_wait_known.py --doc seacast` checks five cases on each of the three paths, with p the writer
   that writes control and q the other writer in line: q has no run queued when `next_to_send`
   returns p's control; q has one after p's write starts to wait, and only after the control reached
   the transport and `write_waits(p)` was called with the write pending; q has none when p is not in
   line or when no room is free, the window full or above its cap; and a write that completes at once
   calls no `write_waits`. In the first, the second and the fourth, p keeps its place at the head of
-  the line. `protocol.md` has no such third path: its control-only entry goes through
+  the line. `seacast-lite.md` has no such third path: its control-only entry goes through
   `release_unused_slot`, which gives back the writer's slot and also takes the writer out of the
   line when it holds none, so there a control-only entry is never written from the line.
   `wake_front` is this document's own, since its room is counted in bytes (`W_BYTES`), where
-  `protocol.md`'s counts slots.
+  `seacast-lite.md`'s counts slots.
 - *Replaced: the wake before the write* (v0.10.7's). It woke the next writer in line before every
   control write of a writer in line, whether or not the write then waited. A write that completes at
   once leaves its writer able to write, and waking another then would change the schedule of the
   node's writers where nothing else changes.
-- *The recorded cells* (`golden-v2.txt`, against v0.10.6's). Twelve move in their digest only:
+- *The recorded cells* (`golden-seacast.txt`, against v0.10.6's). Twelve move in their digest only:
   `push`, `hold`, `announce`, `none`, `withholders`, `silent`, `cap-wait`, `dcb20`, `rr-stripe`,
   `without-a`, `ihave-limits` and `push-deep`. Two move in their numbers too: `loss-thin` and
-  `late-block` (protocol-v2-figures.md, §4.11). `without-b` is the same. The figures in this
+  `late-block` (seacast-figures.md, §4.11). `without-b` is the same. The figures in this
   document measured before 2026-11-20 ran without the rule. With the wake at the wait (v0.10.9),
   `rr-stripe` and `push-deep` move in their digest only, back to their values before v0.10.7. Every
   other cell kept its recorded digest, `loss-thin` and `late-block` among them: there the wake moved
@@ -3275,13 +3276,13 @@ the proposer's window from its first copies. Taking the source's own chunks firs
 queue, keeps them ahead. The rule was chosen with one window, counted in bytes over every group
 (§4.11): the window part of X3. Its clearest gain in the toy was in custody with a 50 Mbps proposer.
 The single-group cells checked ran exactly as under v0.3's order, and elsewhere the rule changed
-nothing that the seeds could tell apart (protocol-v2-figures.md, §4.12).
+nothing that the seeds could tell apart (seacast-figures.md, §4.12).
 
 **Not taken: v0.3's order, and two other cures for the same cause.** v0.3's order is not taken for
 the reason above. Dropping the source's offers, or queueing them after all of the block's pushes,
 gains about as much with a 50 Mbps proposer. With a fast proposer, both delay completion at the
 median, since its offers let custodians pull from it while its uplink has room
-(protocol-v2-figures.md, §4.12).
+(seacast-figures.md, §4.12).
 
 **Answers first, as an option.** An answer is a chunk its receiver asked for, so it is never a
 guess, and the asker is timing it. For a pull on an offer, the asker may ask another holder after
@@ -3291,10 +3292,10 @@ no such clock. Under v0.3's order an asked chunk is rarely the rarest, since a p
 answering node holds it, so its answer waits behind fresh pushes. In the toy, the option moved
 median completion little in most tier 4 cells, and shortened the asks' round trip at the 99th
 percentile in most cells. With cards 8, 9, 12 and 15 off, answers waited behind long runs of
-pushes, and the option cut their wait at the 99th percentile (protocol-v2-figures.md, §4.12).
+pushes, and the option cut their wait at the 99th percentile (seacast-figures.md, §4.12).
 
 **Not taken: three other forms of answers first.** Each cost time in some cells of the toy
-(protocol-v2-figures.md, §4.12). The first sends the oldest answer first, ahead of a source's own
+(seacast-figures.md, §4.12). The first sends the oldest answer first, ahead of a source's own
 chunks too: it takes a slow proposer's uplink from its first copies. The second does that, and also
 puts the answer's writer ahead of the window's line of writers (§4.11): it starves the other writers
 at thin links. The third puts an answer first only once it has waited 100 ms.
@@ -3310,26 +3311,26 @@ def ask_scale() -> float:
 IWANT_WINDOW = IWANT_WINDOW * ask_scale()      # 200 ms at 50 Mbps and above, 1 s at 10 Mbps
 ```
 
-**The ask window stretches as the uplink falls.** `protocol.md` puts two clocks on an ask (§6.1
+**The ask window stretches as the uplink falls.** `seacast-lite.md` puts two clocks on an ask (§6.1
 there). At `IWANT_WINDOW` (200 ms) plus `RETRY_SLACK` after the ask, its retry asks an announcer,
 an untried one first, if the chunk is still missing, under the retry's checks (`retry_offer`). The
 ask's promise, from its write, parks the asked peer for the group if it is still open after
 `PROMISE` (400 ms). Here the ask window stretches in proportion as the node's own uplink falls
-below `ASK_UPLINK`, and stays as `protocol.md` set it above it. The promise does not change.
+below `ASK_UPLINK`, and stays as `seacast-lite.md` set it above it. The promise does not change.
 - **Whose uplink:** it is the asker's own, the one figure a node is configured with (card 14 sizes
   its window from it, card 17 its push degree). The asked peer's link is not known; a home node
   asking a datacenter peer waits longer than it needs to before moving on, which costs time only
   when that peer does not answer.
-- **The floor** is `protocol.md`'s value: at 50 Mbps and above the ask window is `protocol.md`'s.
+- **The floor** is `seacast-lite.md`'s value: at 50 Mbps and above the ask window is `seacast-lite.md`'s.
 - **The promise stays at 400 ms**, so a peer that does not answer is still parked as soon as in
-  `protocol.md`, and the asker moves on from it later only by the window. A slow honest peer can
+  `seacast-lite.md`, and the asker moves on from it later only by the window. A slow honest peer can
   now be parked before the asker has moved on from it (the promise is shorter than the window below
   25 Mbps). A promise per peer that follows its observed answer times is permitted as local policy
   (§8).
 
 #### Rationale
 
-**Why the window follows the uplink.** `protocol.md`'s two clocks are fixed. Both were set where
+**Why the window follows the uplink.** `seacast-lite.md`'s two clocks are fixed. Both were set where
 answers come back within a round trip or two, at 50 Mbps. On a thinner link an answer waits longer
 behind the answerer's queue, the window runs out before it arrives, the second ask's answer
 competes with the first for the same thin uplinks, and both arrive: the bytes stop falling with the
@@ -3339,20 +3340,20 @@ bandwidth and the tail grows.
 checked and rejected: with 30 % withholders at 10 Mbps it lengthened the tail at the median of
 paired seeds in the research harness, since withholders then went unparked for the whole payload.
 Under the rule as it stands (the window stretched, the promise at 400 ms), the toy's count of
-parked pairs stayed below `protocol.md`'s on clean, withholding and mixed networks, since fewer
+parked pairs stayed below `seacast-lite.md`'s on clean, withholding and mixed networks, since fewer
 asks go out, but rose with 10 % of chunks lost (lost answers break promises)
-(protocol-v2-figures.md, §4.13).
+(seacast-figures.md, §4.13).
 
-**Evidence** (the research harness of the posts) comes from runs against `protocol.md`'s fixed
-window on the same seed (protocol-v2-figures.md, §4.13). At 10 Mbps per node every seed was faster
+**Evidence** (the research harness of the posts) comes from runs against `seacast-lite.md`'s fixed
+window on the same seed (seacast-figures.md, §4.13). At 10 Mbps per node every seed was faster
 and leaner, and the tail was shorter at the median and the copies were fewer. At 25 Mbps every
 seed had fewer copies, but only slightly fewer, and the tail was unchanged within the seeds'
 spread. With 30 % withholders at 10 Mbps the tail was shorter and the copies were fewer. The toy's
 checks (mixed network, silent peers, loss) are in §6.3, `ASK_UPLINK`.
 
-## 5. What carries over from `protocol.md` unchanged
+## 5. What carries over from `seacast-lite.md` unchanged
 
-| `protocol.md` | here | note |
+| `seacast-lite.md` | here | note |
 |---|---|---|
 | §1 the payload, the code, the commitment | the payload object type's `verify`, `decode`, `header_of` | the leaf rule unchanged in this version; a fraud proof would change it (`[D6]`, §8) |
 | §3 the three levels | level 1 = `T.verify`, level 2 = `T.decode`, level 3 = the application | per object type (I7) |
@@ -3370,19 +3371,19 @@ checks (mixed network, silent peers, loss) are in §6.3, `ASK_UPLINK`.
 | §6.2 `gated` | `on_offer`, `filter_entry` | per interest |
 | §6.4 `on_pace_tick` | §4.8 | |
 | §7.2 `filter_entry`, `rarest` | `send`, `enqueue`; §4.12 | `rarest` unchanged; the writer takes a source's own chunks first (§4.12); `filter_entry` is this document's (§4.6): v0.5's promise starts when an ask on an offer is written; an ask sent as a `Want` (`want`, §3), a sampler's, a routed request's or the repair sample's, starts none (§4.10), but a claim's probe starts one (§4.6), and under the alarm option the member's ask of the claimant too |
-| §7.1 the window, §7.2 `next_to_send` | §4.11 | one window per node over every object type, counted in bytes; the entry is chosen before the room is taken; JOINs, GRAFTs and PRUNEs a full queue refused are queued first, in order (§4.1); the line skips a writer mid-write, and a writer in line whose control write does not complete at once wakes the first writer in line that can write as it starts to wait, if room is free, as `protocol.md`'s do (`front`, `write_waits`; `wake_front` this document's own, in bytes; since 2026-11-20, the wake at the wait since v0.10.9) |
+| §7.1 the window, §7.2 `next_to_send` | §4.11 | one window per node over every object type, counted in bytes; the entry is chosen before the room is taken; JOINs, GRAFTs and PRUNEs a full queue refused are queued first, in order (§4.1); the line skips a writer mid-write, and a writer in line whose control write does not complete at once wakes the first writer in line that can write as it starts to wait, if room is free, as `seacast-lite.md`'s do (`front`, `write_waits`; `wake_front` this document's own, in bytes; since 2026-11-20, the wake at the wait since v0.10.9) |
 | §7.2 `projected` | §4.9 | reads the type's K; off for a type without a code |
 | §8.2 limits | §6.3 | plus relations and groups per slot |
 
-**The versions carried.** Each later version of `protocol.md` is carried into this document; the
+**The versions carried.** Each later version of `seacast-lite.md` is carried into this document; the
 list of versions, with what each brought and when it was carried, is in
-[`protocol-v2-decisions.md`](protocol-v2-decisions.md) ("The versions of `protocol.md` carried").
+[`seacast-decisions.md`](seacast-decisions.md) ("The versions of `seacast-lite.md` carried").
 
 ## 6. Settings
 
-### 6.1 `protocol.md` as a setting
+### 6.1 `seacast-lite.md` as a setting
 
-| notion here | in `protocol.md` |
+| notion here | in `seacast-lite.md` |
 |---|---|
 | object type | the payload only; one family |
 | JOIN | subscription to the payload's topic: interest `ALL`, duty `FORWARD`, `M = 1` |
@@ -3395,30 +3396,30 @@ list of versions, with what each brought and when it was carried, is in
 | repair | `(everyone, at once, the mesh peers)` |
 | `START_DELAY`, `SERVE_LIMIT` | 0, unbounded (the stock per-id limit remains) |
 | evidence | none |
-| wire | `protocol.md` §2's magic strings (`protocol-v2-bindings.md` §4) |
+| wire | `seacast-lite.md` §2's magic strings (`seacast-bindings.md` §4) |
 
 **Five differences in the rules, which no recorded cell exercises.**
 - *A source with an empty mesh.* A source with no mesh peer for the payload offers its chunks to its
   links whose interest holds them, and owes them a refused push (§4.7, `source_pool`); below
   `STRIPE_UPLINK` it also pushes to them, as a column's source does with no relation in the family.
-  `protocol.md`'s source offers to its mesh only and, below `STRIPE_UPLINK`, pushes to it only: with
+  `seacast-lite.md`'s source offers to its mesh only and, below `STRIPE_UPLINK`, pushes to it only: with
   an empty mesh it offers nothing at publish, a slower one makes no push, and its chunks enter its
   heartbeat gossip. This document keeps the fallback for every object type, since a source never
   waits for links (§4.7). No recorded cell has a source with an empty mesh.
 - *More ids for a rebuilt index.* At an index held only as rebuilt, both documents forward the first
-  copy that arrives under an id the node has not seen. `protocol.md` stores it, so a copy under yet
+  copy that arrives under an id the node has not seen. `seacast-lite.md` stores it, so a copy under yet
   another id is a second copy of a received index, only acknowledged; here `fill` stores none of
   them, so each such copy enters forwarding (`forward`, where the choice of peers still applies).
   A repeat of a seen id at such an index is acknowledged where that id was stored (`accepted`):
-  there, that is the id of the first network copy, which `protocol.md` stores over the rebuilt one;
+  there, that is the id of the first network copy, which `seacast-lite.md` stores over the rebuilt one;
   here, it is the rebuilt chunk's own id, since `fill` stores none. Where the two ids are the same,
   both acknowledge it; where they differ, each acknowledges its own and ignores the other. No
   recorded cell has two ids for one index.
 - *An IHAVE entry by id.* On the gossipsub binding this document takes offers as bitmaps only
-  (`protocol-v2-bindings.md` §4), where `protocol.md` records a valid structured id in an IHAVE as
+  (`seacast-bindings.md` §4), where `seacast-lite.md` records a valid structured id in an IHAVE as
   an offer, which can draw an ask under its §4.4's checks. No recorded cell names an id in an IHAVE.
 - *An id asked twice in one frame.* Here it is answered once and charged once against the stock
-  limit of three answers per id (§4.5); `protocol.md`'s `on_iwant` charges each repeat. The recorded
+  limit of three answers per id (§4.5); `seacast-lite.md`'s `on_iwant` charges each repeat. The recorded
   cells did not move with it.
 - *A link that has not joined the type.* Here an offer, a WANT, a GRAFT or a PRUNE for an object
   type the link has not joined is ignored (§2). In this setting every link has joined the payload's
@@ -3426,27 +3427,27 @@ list of versions, with what each brought and when it was carried, is in
 
 **One difference in the rules, which a recorded cell shows.** A holding that reports an index the
 peer had reported already frees the window's room of a copy written to it since (§4.3,
-`on_holding`); `protocol.md`'s `on_have` frees it for new bits only, so that room waits for
+`on_holding`); `seacast-lite.md`'s `on_have` frees it for new bits only, so that room waits for
 `WINDOW_TIMEOUT`. Only a run without cancel (card 8) writes such copies, and of the recorded cells
 `without-a` moves with it: p50 432 to 429 ms, p99 517 to 518 ms, copies 3.99 to 3.97
-(protocol-v2-figures.md, §6.1).
+(seacast-figures.md, §6.1).
 
 The other differences the recorded cells show are in the scheduling (§4.11 to §4.13), which moves
-times and copies by measured amounts (protocol-v2-figures.md, §6.1).
+times and copies by measured amounts (seacast-figures.md, §6.1).
 
 **The regression.** The toy's fifteen cells are the regression for this setting, recorded for this
-document in `toy/golden-v2.txt` (`toy/check.py --doc v2`) and compared against `protocol.md`'s own
-recording with `toy/check.py --doc v2 --golden golden.txt`. Since 2026-10-27 a thirteenth cell,
+document in `toy/golden-seacast.txt` (`toy/check.py --doc seacast`) and compared against `seacast-lite.md`'s own
+recording with `toy/check.py --doc seacast --golden golden.txt`. Since 2026-10-27 a thirteenth cell,
 `ihave-limits`, sets stock gossipsub's two IHAVE limits (10 offer-bearing frames and 5000 asks;
 §4.3). The other cells set none. Since 2026-11-15 there are two more: `late-block`, where 18 of the
-60 nodes install each block 400 ms after its publish (`protocol.md` §4.2's deferral and ties; this
+60 nodes install each block 400 ms after its publish (`seacast-lite.md` §4.2's deferral and ties; this
 document runs its own `defer`), and `push-deep`, the `push` cell with the earlier transport
 (`--send-buffer 0`), whose line is the `push` cell's before the transport changed.
 
 #### Rationale
 
 **The distance to the recordings, by date.** The figures file gives the amounts
-(protocol-v2-figures.md, §6.1).
+(seacast-figures.md, §6.1).
 - Checked on 2026-10-07: with v0.3's window (slots of one payload chunk) every cell but `rr-stripe`
   reproduced v0.3's completion times and bytes exactly, and `rr-stripe` differed by a few ms at the
   median; the residue was the order of same-instant sends (this document iterates the relation in
@@ -3463,37 +3464,37 @@ document runs its own `defer`), and `push-deep`, the `push` cell with the earlie
 - With v0.5 merged (2026-10-21; every cell of both recordings moves) the comparison is with v0.5's:
   eleven cells stay close to it, and `loss-thin` is a little later at the median and lighter in
   copies, as before the merge.
-- With the group's key (2026-10-23, `protocol.md` §1; both recordings move again, as under any
+- With the group's key (2026-10-23, `seacast-lite.md` §1; both recordings move again, as under any
   renaming: `toy/README.md`) eleven cells stay close, and `loss-thin` is later at the median and
   lighter in copies.
-- Since `protocol.md` §5.1 announces only to the mesh peers it did not choose for a chunk
+- Since `seacast-lite.md` §5.1 announces only to the mesh peers it did not choose for a chunk
   (2026-10-25), its `loss-thin` runs differently with the same medians and copies, so these
   distances stand.
-- With ties and no second ask of a peer at once (2026-10-26, `protocol.md` §4.2, §6.1; both
+- With ties and no second ask of a peer at once (2026-10-26, `seacast-lite.md` §4.2, §6.1; both
   recordings move) eleven cells stay close, and `loss-thin` is a little later at the median and
   lighter in copies.
-- Asks that go with their announcer's dropped offers (2026-10-28, `protocol.md` §6.1) change no
+- Asks that go with their announcer's dropped offers (2026-10-28, `seacast-lite.md` §6.1) change no
   event in any cell of either recording: nothing was tied in the toy then, and its offers expire
   only after their group has completed.
 - With v0.9's rules (2026-11-10, §4.7: the source's holding and its offers at the acknowledgement;
   every cell of both recordings moves), eleven cells stay close to v0.9's own recording, and
   `loss-thin` is a little later at the median and lighter in copies.
-- With the toy's transport keeping `protocol.md` §7.3's rule (2026-11-15, one entry at a time per
+- With the toy's transport keeping `seacast-lite.md` §7.3's rule (2026-11-15, one entry at a time per
   connection; every cell of both recordings moves but `rr-stripe`, whose uplink has no send buffer),
-  eleven cells stay close to `protocol.md`'s recording, and `loss-thin` is later at the median and
+  eleven cells stay close to `seacast-lite.md`'s recording, and `loss-thin` is later at the median and
   lighter in copies.
 
-**`ihave-limits` against `protocol.md`.**
+**`ihave-limits` against `seacast-lite.md`.**
 - Under v0.9's rules and the toy's transport since 2026-11-15, in that day's recordings, this
-  document held back slightly fewer asks to the next heartbeat than `protocol.md` did. It was a
+  document held back slightly fewer asks to the next heartbeat than `seacast-lite.md` did. It was a
   little sooner at the median and a little later at the tail, with a few hundredths of a copy more.
   With the earlier transport (`--send-buffer 0`) it held back slightly fewer too, and it was a
-  little sooner at the median and at the tail (protocol-v2-figures.md, §6.1).
+  little sooner at the median and at the tail (seacast-figures.md, §6.1).
 - Before §4.3 carried the limits, it held back none and ran as without them.
 
 **Draft 0** did not reproduce the cells at all: it filtered a forwarding node's push candidates by
-what it had already pushed, which `protocol.md` does not, and it shuffled the relation peers for
-repair in a different order than `protocol.md`'s mesh set, so its random draws diverged; draft 1
+what it had already pushed, which `seacast-lite.md` does not, and it shuffled the relation peers for
+repair in a different order than `seacast-lite.md`'s mesh set, so its random draws diverged; draft 1
 fixed both.
 
 ### 6.2 The five designs as settings
@@ -3506,13 +3507,13 @@ fixed both.
 | RowDAS | column, row | 1 | DERIVED (columns: `cgc`; rows: the node's subnet) | FORWARD | ALL_JOINED | rows not pushed (`EAGER` off); at K: row reconstructors (64 columns or more) on their subnet's row; later: supernodes on every other row at the second phase's delay, any member on its subnet's row at the third's, each with jitter; a row held on the columns waits once; rebuilt cells to the custodians lacking them; one claim defers once, verified by a probe | rows: 1 s (`[D8]`; RowDAS: a slot fraction) | cross-fill, the two claims, deferral on a claim, a proposer withholding half the columns, subnets without members |
 | FullDAS sampling | column | 1 | DECLARED | NONE | none | none | 0 | interest without duty: a standing WANT per sample, retried at another link (§4.10); the custodians' serving load |
 
-**All five run in the toy** (`toy/run.py --doc v2 --setting t4|c|custody|rows`, custody with
+**All five run in the toy** (`toy/run.py --doc seacast --setting t4|c|custody|rows`, custody with
 `--samplers` for the sampling row). Each setting is a settings file for the toy, and the invariants
 the toy checks for every setting (`toy/invariants.py`) are these: every node completes its interest
 given a source; nothing is pushed outside interest; upload stays within the duty bounds; a claim
 whose probe goes unanswered is detected; one cell fills both groups; the tier 4 setting reproduces
 its own recorded cells (§6.1). All six are checked: the first three on every run, the claim and
-cross-fill ones under the row setting, the last by `check.py --doc v2`.
+cross-fill ones under the row setting, the last by `check.py --doc seacast`.
 
 #### Rationale
 
@@ -3524,11 +3525,11 @@ more bytes than the tier 4 setting, the direction the harness measured, with the
 custodians of 8 columns each, with a mesh per column on the custodians' subgraph; every custodian
 completes, nothing is pushed outside interest and no node pushes a chunk above its budget, and
 executing it found two things in the carried-over code: the window's line of writers stalled while
-slots were free (`protocol.md` §7.1, fixed there, since it is `protocol.md`'s window) and card 12's
+slots were free (`seacast-lite.md` §7.1, fixed there, since it is `seacast-lite.md`'s window) and card 12's
 projection assumes a code (§4.9). With supernodes (`--supernodes`), custodians of every column that
 keep the rows and rebuild a row still short at the second phase's delay, the custody cell whose
 proposer withholds half the columns completes on every seed run, where without them nearly every
-custodian stays short; this is PeerDAS's reconstruction, delayed (§4.6; protocol-v2-figures.md,
+custodian stays short; this is PeerDAS's reconstruction, delayed (§4.6; seacast-figures.md,
 §6.2).
 
 **The sampling setting** runs on top of custody (`--samplers`): a share of the nodes declare eight
@@ -3544,7 +3545,7 @@ decodes later, and a proposer withholds half the columns, so that only the rows 
 the recorded seed every custodian completes through the rows, and on every seed run with a
 custodian link per column for every member (§4.6's repair floor; without it some runs left
 custodians short, each for a missing link), every cell sits in both of its groups (R4), and a liar
-fault shows a false claim detected by the probe (R5; protocol-v2-figures.md, §6.2). Executing it
+fault shows a false claim detected by the probe (R5; seacast-figures.md, §6.2). Executing it
 changed the document in eight places: a chunk a node rebuilt is filled into its other groups as
 rebuilt and acknowledged to nobody, and completes them (`decode_group` checks them as `on_chunk`
 does); repair respects `EAGER`, so rebuilt row cells are offered to row members and pushed only
@@ -3556,7 +3557,7 @@ in that view, or every member short of 128 rebuilds a row the network already ha
 member keeps a link to each column (`REPAIR_FLOOR`), or a row is neither gathered nor repaired
 where no member has one. With three supernodes the second phase completes the 32-subnet withheld
 cell on every seed run, a cell some of whose subnets have no member (short without them at the
-recorded seed), and much shortens the withheld cells' time (protocol-v2-figures.md, §6.2); it
+recorded seed), and much shortens the withheld cells' time (seacast-figures.md, §6.2); it
 changed the document in two more places: a supernode keeps every row with interest declared on no
 link (§1.2), and a row whole on its columns' bitmaps but not in the node's holdings waits once
 before it is rebuilt (`known_across`), or a supernode still receiving its columns rebuilds rows
@@ -3566,17 +3567,17 @@ nobody withheld.
 
 | name | per | meaning | status |
 |---|---|---|---|
-| `M` | object type | colours of the push relation; 1 … N | `[D10]`: a parameter with no default (decided). Measured at 1 (tier 4, `protocol.md`) and at N (variant C); 1 < M < N is open (below) |
-| `F_LO`, `F_HI` | object type | in-pushers per family and colour: floor and cap (`protocol.md`: 6, 12) | `[D10]` |
-| `D_OUT`, `D_OUT_FAST`, `D_OUT_MAX` | object type | out-pushees per family and colour by uplink class (`protocol.md`: 8; card 17's classes) | `[D10]` |
-| `SYMMETRIC` | object type | one relation both ways per family and colour, grafted and pruned with `BOTH`: below `F_LO` grafted up to `D_OUT`, at `F_HI` pruned down to `D_OUT` at random (§4.1); False: in- and out-relations apart | `protocol.md`'s mesh: True (§6.1), with `F_LO ≤ D_OUT < F_HI`, since at `D_OUT = F_HI` the prune makes no room; one-way relations are an option `[D10]` |
+| `M` | object type | colours of the push relation; 1 … N | `[D10]`: a parameter with no default (decided). Measured at 1 (tier 4, `seacast-lite.md`) and at N (variant C); 1 < M < N is open (below) |
+| `F_LO`, `F_HI` | object type | in-pushers per family and colour: floor and cap (`seacast-lite.md`: 6, 12) | `[D10]` |
+| `D_OUT`, `D_OUT_FAST`, `D_OUT_MAX` | object type | out-pushees per family and colour by uplink class (`seacast-lite.md`: 8; card 17's classes) | `[D10]` |
+| `SYMMETRIC` | object type | one relation both ways per family and colour, grafted and pruned with `BOTH`: below `F_LO` grafted up to `D_OUT`, at `F_HI` pruned down to `D_OUT` at random (§4.1); False: in- and out-relations apart | `seacast-lite.md`'s mesh: True (§6.1), with `F_LO ≤ D_OUT < F_HI`, since at `D_OUT = F_HI` the prune makes no room; one-way relations are an option `[D10]` |
 | `PRUNE_BACKOFF` | object type | how long after a PRUNE that a node receives it does not graft that peer again for the relation the PRUNE named (§4.1) | stated by its bounds: at least a round trip, at most how long a node may stay below its floor once its candidates have refused; on gossipsub's wires gossipsub's backoff (§7) |
-| `R_NODE`, `R` | node | the per-chunk push budget (`protocol.md`: 2, 6 fast; the source's plan) | `protocol.md` §8.3's open item on size; for cells, open (below) |
-| `ANNOUNCE_EXTRA` | object type | ALL_JOINED, SAMPLE or NONE beyond the relations | `[D5]`, decided: `ALL_JOINED` for columns and rows, as in every measurement; `NONE` permitted for columns, never for rows (§8); the payload `SAMPLE`, `protocol.md`'s heartbeat gossip (§6.1) |
+| `R_NODE`, `R` | node | the per-chunk push budget (`seacast-lite.md`: 2, 6 fast; the source's plan) | `seacast-lite.md` §8.3's open item on size; for cells, open (below) |
+| `ANNOUNCE_EXTRA` | object type | ALL_JOINED, SAMPLE or NONE beyond the relations | `[D5]`, decided: `ALL_JOINED` for columns and rows, as in every measurement; `NONE` permitted for columns, never for rows (§8); the payload `SAMPLE`, `seacast-lite.md`'s heartbeat gossip (§6.1) |
 | `EAGER` | object type | chunks of the type are pushed eagerly; False: holdings and offers only (rows), at the source too, which offers every chunk at publish (§4.7) | – |
 | `DECODE_AT_K`, `DECODE_LATER` | object type | who decodes at K; who decodes later and when (from `known_at`), e.g. EIP-8371's phases | `[D4]`, decided: EIP-8371's phases (§4.6), the second phase's delay shorter than the third's; the second at 1 s and the third at 2 s, each with up to 0.2 s of jitter, in the toy and in the research harness |
-| `REPAIR_TO` | object type | whom rebuilt chunks of a group go to (`protocol.md`: the mesh; columns: custodians lacking them) | `[D4]`, decided: pushed to the custodians lacking them, as measured. Options measured (§4.6, "Whom rebuilt cells go to"): the cells offered, not pushed, to the nodes that keep every row, or every rebuilt cell offered |
-| `REPAIR_BUDGET` | object type | each rebuilt chunk to `R_NODE` of those lacking it and offered to the rest, as its source pushes a chunk (§1.6); off: to every peer short of K, `protocol.md`'s | `[D4]`: an option, off (decided) |
+| `REPAIR_TO` | object type | whom rebuilt chunks of a group go to (`seacast-lite.md`: the mesh; columns: custodians lacking them) | `[D4]`, decided: pushed to the custodians lacking them, as measured. Options measured (§4.6, "Whom rebuilt cells go to"): the cells offered, not pushed, to the nodes that keep every row, or every rebuilt cell offered |
+| `REPAIR_BUDGET` | object type | each rebuilt chunk to `R_NODE` of those lacking it and offered to the rest, as its source pushes a chunk (§1.6); off: to every peer short of K, `seacast-lite.md`'s | `[D4]`: an option, off (decided) |
 | `REPAIR_FLOOR` | object type | links the rendezvous keeps, for a node that may rebuild, to custodians of each family it does not hold (the rebuilders' fanout, §4.6) | `[D4]`; decided, stated by its bound: at least 1; 1 in every measurement of the rows |
 | `SOURCE_FLOOR` | object type | links a node keeps to custodians of each family it will publish, opened through the rendezvous (§4.7, the first of the source's three layers) | a parameter with no default (decided): 0 leaves the source to the hunt and the code; the toy's custody and row settings use 2, at setup |
 | `DEFER_WINDOW` | object type | how long a peer's claim defers our own decode while one ask verifies it, and that ask's promise (R5) | `[D4]`, decided: 1 s, in the toy and in the research harness |
@@ -3585,8 +3586,8 @@ nobody withheld.
 | `ALARM_WAIT`, `ALARM_NEXT`, `ALARM_MAX` | object type | a custodian's alarm: how long after `known_at` a custodian lacking a cell of its custody asks a member of the row's subnet; how long before it asks another; and how many it asks (§4.6) | option, off; for networks without an honest supernode. The wait is stated by its bound: above the honest custodians' tail on the network. The measurements use 3.5 s, 1.5 s and 3 |
 | `START_DELAY` | object type | seconds from the group id being known to the first ask | `[D8]`, decided: 1 s for rows, as in every measurement of the toy and the research harness; 0 for the payload and columns. Shorter for rows at a cost: with liars, row members are left short (§8) |
 | `SERVE_LIMIT` | object type | chunks served per peer and group (R6) | stated by its bound: at least what an honest peer's interest may need from the node in the group, K for a row member (it completes at K) and the index count for a column's custodian; a sampler asks one cell per peer and block. Rows: 64 (K) in the toy and the research harness; columns: no limit in the measurements |
-| `SERVE_BUDGET` | node, per peer | answers given one peer in a heartbeat, across groups, counted in the heartbeat the node decides each (a standing request's when its chunk arrives); the answers to asks on the node's own offers, recorded as they are written, and to a claim's probe not counted; an ask over it is refused, and a standing request's answer dropped and not retried, without penalty (§4.5) | stated by its bound (`protocol.md` §8.3's kinds): at least what honest peers ask through one peer in a heartbeat other than on the node's offers: per block, a sampler's one cell, and the routed requests a forwarder passes on for the samplers it serves (`FORWARD_LIMIT` for each), with the standing answers that a block's cells release in one heartbeat; the cells of a row member's repair sample with its re-asks (`REPAIR_REASK`), and a custodian's alarm asks (§4.6); and a peer's asks by derived interest at a block's arrival. No limit in the measurements |
-| `PROMISE` | node | how long an offer's promise runs before a broken one parks the peer for the group (`protocol.md` §6.1: 400 ms), one value for every object type in the code (`filter_entry`) | the payload's promise stays at 400 ms (§4.13); a promise per peer that follows its answer times is permitted as local policy, with 400 ms the default (§8, decided); a longer promise for cells, so one per object type, is open (below) |
+| `SERVE_BUDGET` | node, per peer | answers given one peer in a heartbeat, across groups, counted in the heartbeat the node decides each (a standing request's when its chunk arrives); the answers to asks on the node's own offers, recorded as they are written, and to a claim's probe not counted; an ask over it is refused, and a standing request's answer dropped and not retried, without penalty (§4.5) | stated by its bound (`seacast-lite.md` §8.3's kinds): at least what honest peers ask through one peer in a heartbeat other than on the node's offers: per block, a sampler's one cell, and the routed requests a forwarder passes on for the samplers it serves (`FORWARD_LIMIT` for each), with the standing answers that a block's cells release in one heartbeat; the cells of a row member's repair sample with its re-asks (`REPAIR_REASK`), and a custodian's alarm asks (§4.6); and a peer's asks by derived interest at a block's arrival. No limit in the measurements |
+| `PROMISE` | node | how long an offer's promise runs before a broken one parks the peer for the group (`seacast-lite.md` §6.1: 400 ms), one value for every object type in the code (`filter_entry`) | the payload's promise stays at 400 ms (§4.13); a promise per peer that follows its answer times is permitted as local policy, with 400 ms the default (§8, decided); a longer promise for cells, so one per object type, is open (below) |
 | `SAMPLE_RETRY` | object type | seconds a sampler waits for its first-phase standing request before the second phase asks another peer (§4.10) | `[D12]`, stated by its bound: longer than the honest path's latest sample, the custodians' tail plus a hop; 2 s in every measurement, LiteDAS suggests 4 s; a shorter wait is open (below) |
 | `SAMPLE_RETRY2` | object type | the second phase's wait per peer (§4.10, LiteDAS) | `[D12]`, stated by its bound: at least a routed request's round trip (two hops out and back); 0.5 s in every measurement, no other value tried |
 | `SAMPLE_OUTSTANDING` | node | the second phase's asks in flight per block, counted across the block's sampled types (§4.10, LiteDAS) | `[D12]`, stated by its bound: at least 1; 4 in every measurement, no other value tried |
@@ -3594,19 +3595,19 @@ nobody withheld.
 | `COVER_HIGH` | object type | families a peer of high custody counts for in the coverage floor (§1.3, §4.1) | `[D12]`; 1, decided, as in the measurements |
 | `ROUTE_FLOOR` | object type | links a node with duty `FORWARD` keeps to custodians at the routing neighbours' distances (§1.3) | `[D12]`; an option, off |
 | `ROUTE_HOPS` | object type | forwarding steps a sampler's routed request may take (§4.10) | `[D12]`; 1, decided (FullDAS's two hops), and at least 1. More is an option where one step does not reach a custodian |
-| `FORWARD_LIMIT` | object type | routed requests a node passes on per peer and slot (§4.5, §4.10) | `[D12]`; X6: a bound, each node's within it (`protocol.md` §8.3's kinds), decided, stated: at least the routed requests that can reach the node over one link in the slot, summed over the blocks whose samples an asking peer may still be hunting: one per block under `ROUTE_HOPS` 1 and one sample per peer, since a sampler routes at most one request per first hop and block; more under `ROUTE_HOPS` above 1, since requests a sampler sends through different first hops can meet at one forwarder and leave over the same link. The count is per object type, as the parameter is, and bounds the requests newly passed on in a slot; the standing requests they leave stay across the reset until answered or dropped with the asker's state for their group (§4.5) |
+| `FORWARD_LIMIT` | object type | routed requests a node passes on per peer and slot (§4.5, §4.10) | `[D12]`; X6: a bound, each node's within it (`seacast-lite.md` §8.3's kinds), decided, stated: at least the routed requests that can reach the node over one link in the slot, summed over the blocks whose samples an asking peer may still be hunting: one per block under `ROUTE_HOPS` 1 and one sample per peer, since a sampler routes at most one request per first hop and block; more under `ROUTE_HOPS` above 1, since requests a sampler sends through different first hops can meet at one forwarder and leave over the same link. The count is per object type, as the parameter is, and bounds the requests newly passed on in a slot; the standing requests they leave stay across the reset until answered or dropped with the asker's state for their group (§4.5) |
 | `EVIDENCE` | object type | the fraud-proof object, if any | `[D6]`: none in this version (decided); the hook stays |
 | `ANSWERS_FIRST` | node | queued answers by rarity before pushes, after a source's own chunks (§4.12) | an option, off in every setting; a wash in three-seed toy checks |
-| `SOURCE_OFFERS` | node | when a source offers each chunk to the peers of its pool (§4.7) it did not choose to push it to: `ACK`, at the chunk's acknowledgement; `PUBLISH`, at publish, its holding growing at each chunk's first write (§4.7) | a default, `ACK`, `protocol.md` §5.1's rule; `PUBLISH` is the source's own choice: sooner for a fast source, later for a slow one, and it names the source (§4.7); decided |
-| groups tracked per slot | node | state for groups we hold or peers want, beyond our interest | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the groups the chunks a node holds or rebuilds project onto (R4, §3), which for a row member or a reconstructor is up to every column of the block, for each block in its live window. The value is the client's; no limit in the measurements |
-| `MAX_RELATIONS`, relations per link | object type, per link | pairs of family and colour a link may have at the node in any state: a relation, a GRAFT of the node's own not yet answered, a backoff not yet run out, a GRAFT or PRUNE of the node's own still owed; over it, a GRAFT for a new pair is ignored without an answer, a PRUNE for one sets no backoff, and the node's upkeep grafts none, without penalty (`relation_room`, §4.1) | X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: at least the families of the node's own interest times `M`, per object type, since an honest peer grafts a relation only for a family the other end's interest holds (`candidates`, §4.1). The value is the client's; no limit in the measurements |
-| `MAX_INDICES` | object type | the most indices a group of the type has, which bounds a WANT's index before the group's count is known (§4.5) | a limit: the payload's `MAX_PLAIN_CHUNKS` (`protocol.md` §8.3), a column's the most blobs a block commits, a row's `NUMBER_OF_COLUMNS` (128) |
-| sampling-only links accepted | node | inbound links joined `(DECLARED, NONE)` that a node accepts (§1.3) | `[D12]`; X6: a bound, each node's within it (`protocol.md` §8.3's kinds), stated: high enough that the network's samplers each keep `SAMPLE_COVER` links per family they sample. The value is the client's; no limit in the measurements, and the serving load not measured |
-| `ASK_UPLINK` | node | the uplink at and above which `IWANT_WINDOW` keeps `protocol.md`'s value; below it the window scales by `ASK_UPLINK / UPLINK` (§4.13); 50 Mbps | scaling by the asked peer's link is open (below) |
-| `IWANT_WINDOW` | node | `protocol.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |
+| `SOURCE_OFFERS` | node | when a source offers each chunk to the peers of its pool (§4.7) it did not choose to push it to: `ACK`, at the chunk's acknowledgement; `PUBLISH`, at publish, its holding growing at each chunk's first write (§4.7) | a default, `ACK`, `seacast-lite.md` §5.1's rule; `PUBLISH` is the source's own choice: sooner for a fast source, later for a slow one, and it names the source (§4.7); decided |
+| groups tracked per slot | node | state for groups we hold or peers want, beyond our interest | X6: a bound, each node's within it (`seacast-lite.md` §8.3's kinds), stated: at least the groups the chunks a node holds or rebuilds project onto (R4, §3), which for a row member or a reconstructor is up to every column of the block, for each block in its live window. The value is the client's; no limit in the measurements |
+| `MAX_RELATIONS`, relations per link | object type, per link | pairs of family and colour a link may have at the node in any state: a relation, a GRAFT of the node's own not yet answered, a backoff not yet run out, a GRAFT or PRUNE of the node's own still owed; over it, a GRAFT for a new pair is ignored without an answer, a PRUNE for one sets no backoff, and the node's upkeep grafts none, without penalty (`relation_room`, §4.1) | X6: a bound, each node's within it (`seacast-lite.md` §8.3's kinds), stated: at least the families of the node's own interest times `M`, per object type, since an honest peer grafts a relation only for a family the other end's interest holds (`candidates`, §4.1). The value is the client's; no limit in the measurements |
+| `MAX_INDICES` | object type | the most indices a group of the type has, which bounds a WANT's index before the group's count is known (§4.5) | a limit: the payload's `MAX_PLAIN_CHUNKS` (`seacast-lite.md` §8.3), a column's the most blobs a block commits, a row's `NUMBER_OF_COLUMNS` (128) |
+| sampling-only links accepted | node | inbound links joined `(DECLARED, NONE)` that a node accepts (§1.3) | `[D12]`; X6: a bound, each node's within it (`seacast-lite.md` §8.3's kinds), stated: high enough that the network's samplers each keep `SAMPLE_COVER` links per family they sample. The value is the client's; no limit in the measurements, and the serving load not measured |
+| `ASK_UPLINK` | node | the uplink at and above which `IWANT_WINDOW` keeps `seacast-lite.md`'s value; below it the window scales by `ASK_UPLINK / UPLINK` (§4.13); 50 Mbps | scaling by the asked peer's link is open (below) |
+| `IWANT_WINDOW` | node | `seacast-lite.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |
 | `MERGE_HOLDINGS` | node | a holding of a group the node publishes that is still in its queue takes the newer chunks instead of a second holding (§4.2; v0.4 §5.1 allows it) | permitted: a source may merge (local policy, as v0.4 words it); the toy keeps it off so that its recorded cells stay comparable |
-| `HAVE_TTL`, `PUSH_TTL`, `GROUP_TTL`, `PARK_TTL`, offers, `GUARD_GRACE`, `RTT_REF`, `TARGET`, `WINDOW_TIMEOUT`, pace tick, `GOSSIP_RETRANSMISSION` | – | `protocol.md` §8.3 unchanged | – |
-| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`protocol.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`protocol-v2-bindings.md` §4) | `protocol.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (below) |
+| `HAVE_TTL`, `PUSH_TTL`, `GROUP_TTL`, `PARK_TTL`, offers, `GUARD_GRACE`, `RTT_REF`, `TARGET`, `WINDOW_TIMEOUT`, pace tick, `GOSSIP_RETRANSMISSION` | – | `seacast-lite.md` §8.3 unchanged | – |
+| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (below) |
 
 **Open, for later study:**
 - *`M`:* the values 1 < M < N are open.
@@ -3637,7 +3638,7 @@ links, in the fast class, pushed mostly duplicates into columns of few custodian
 node in the honest custody and row cells, and a longer tail in the honest row cell. With cells at
 `R`, the honest row cell's tail and copies are back near those without supernodes, the withheld
 cells are as fast or faster at the tail for fewer copies, and the honest custody cell gives up a
-few tens of ms at the median and at the tail for fewer copies (protocol-v2-figures.md, §6.3).
+few tens of ms at the median and at the tail for fewer copies (seacast-figures.md, §6.3).
 
 **`PROMISE`, in the toy.** So far the toy shows this: in the honest row cell the 400 ms promise
 broke thousands of times per run and parked hundreds of honest (peer, group) pairs. Nearly every
@@ -3648,11 +3649,11 @@ promise decides only whom it parks. For the payload, the promise was evaluated w
 (2026-10-19): a promise stretched with the ask window on thin links lets withholders go unparked
 for the payload (with 30 % withholders at 10 Mbps it lengthened the tail in the research harness;
 silent peers, who announce nothing and so are never asked, were not hurt in the toy), so the
-payload's promise stays at 400 ms (protocol-v2-figures.md, §6.3).
+payload's promise stays at 400 ms (seacast-figures.md, §6.3).
 
 **`SAMPLE_RETRY`.** In the toy's 500-node cells the custodians' 99th percentile was well within
 `SAMPLE_RETRY`'s wait. Under 30 % withholders the samplers' median follows that wait
-(protocol-v2-figures.md, §6.3).
+(seacast-figures.md, §6.3).
 
 **`SAMPLE_COVER`.** It is at least 1: without a floor some samplers of eight cells hold a sample no
 link serves at 70 links, and nearly all do at 16 (§1.3). In the toy's 500-node cells, two covers
@@ -3666,73 +3667,73 @@ none on top of 70 and few on top of 16. For the diversity floor, with covers cou
 links (`toy/sampler_match.py`), nearly every draw of eight samples finds eight distinct serving
 links with two covers, at 16 links and at 70; three covers do better still, and they are the floor
 that holds for sixteen samples; one cover falls well short of that at 16 links, and a little short
-at 70 (protocol-v2-figures.md, §6.3).
+at 70 (seacast-figures.md, §6.3).
 
 **`COVER_HIGH`.** At 0, the share of draws that find distinct servers is nearly that at 1, with
 eight samples and with sixteen, at a link more. With one supernode link counted in full and no
-other rule, a draw rarely finds eight distinct servers at 16 links (protocol-v2-figures.md, §6.3).
+other rule, a draw rarely finds eight distinct servers at 16 links (seacast-figures.md, §6.3).
 
 **`ROUTE_FLOOR`.** In the same graphs, without a per-column floor at 16 links: the hypercube rule
 brings every (sampler, column) pair within two hops, and the Kademlia-style rule brings most pairs
-within two and the rest in three, for fewer links added per custodian (protocol-v2-figures.md,
+within two and the rest in three, for fewer links added per custodian (seacast-figures.md,
 §6.3).
 
 **`ROUTE_HOPS` above 1** serves where one step does not reach a custodian, as for the pairs that the
 Kademlia-style rule reaches only in three hops; in a 60-node cell one request that took a second
 step brought its sample early, where with one step it had waited for the second phase
-(protocol-v2-figures.md, §6.3).
+(seacast-figures.md, §6.3).
 
 **`FORWARD_LIMIT`.** In the toy's 60-node cells (one seed, two covers, routed requests on), a limit
 of 1 changed no event, honest or under 30 % withholders; with half the columns withheld it refused
-a small share of the forwards, and the same samples arrived (protocol-v2-figures.md, §6.3).
+a small share of the forwards, and the same samples arrived (seacast-figures.md, §6.3).
 
 **Sampling-only links accepted.** On average the bound is the samplers' added links over the nodes
 that serve them: in the toy's graphs, with a fifth of 500 nodes sampling, that comes to a few links
 per other node, more at 16 links than at 70 (`SAMPLE_COVER`, above), and a limit at the average
-would refuse some, as the draws are not even (protocol-v2-figures.md, §6.3).
+would refuse some, as the draws are not even (seacast-figures.md, §6.3).
 
-**`ASK_UPLINK`.** In the toy, in the research harness's setting, against `protocol.md`'s fixed
+**`ASK_UPLINK`.** In the toy, in the research harness's setting, against `seacast-lite.md`'s fixed
 window, the copies are fewer in every cell; the tail is a little shorter in the all-home network at
 12.5 Mbps, with 30 % silent peers, and in the mixed-bandwidth network at 6 Mbps with a home builder
 and with a datacenter builder, and about the same with 30 % withholders; with 10 % of chunks lost
 it is a little longer (a lost answer is waited for until the longer window closes;
-protocol-v2-figures.md, §6.3).
+seacast-figures.md, §6.3).
 
 **`MERGE_HOLDINGS`.** In the toy (§4.7), for a 50 Mbps proposer of 128 column groups, it takes back
 a small part of what P4 costs at the custody block's median, with writes that complete at once and
-with one write per connection at a time; the copies are unchanged (protocol-v2-figures.md, §6.3).
+with one write per connection at a time; the copies are unchanged (seacast-figures.md, §6.3).
 
 **The IHAVE limits.** A low message limit trades latency for copies. Offers come chunk by chunk, so
 it holds back many asks. An ask held back is likely often never made, because by the heartbeat the
 chunk has come by push: that saves a duplicate pull (not counted). In the toy's `ihave-limits`
-cell (60 nodes, one seed, under v0.9's rules; `toy/run.py --doc v2 --ihave-limits M,5000`),
+cell (60 nodes, one seed, under v0.9's rules; `toy/run.py --doc seacast --ihave-limits M,5000`),
 against no limit, a limit of 10 frames costs the most time at the median for a small saving in
 copies, 20 costs less time and saves the most, 40 costs and saves little, and 100 changes neither
-(protocol-v2-figures.md, §6.3). The 5000 asks never bound. On the libp2p stream binding, not
+(seacast-figures.md, §6.3). The 5000 asks never bound. On the libp2p stream binding, not
 gossipsub's 10, since in that cell 20 saves more copies for less delay. On the gossipsub binding,
 batching a peer's offers into fewer frames avoids the delay, and with it the saving. At
-`protocol.md` §8.3's reference values (4096 frames, 5000 ids, per peer and heartbeat), no ask was
+`seacast-lite.md` §8.3's reference values (4096 frames, 5000 ids, per peer and heartbeat), no ask was
 held back in the toy's 60-node cells under the tier 4 setting, variant C and custody (with and
 without samplers), nor under the rows setting (with and without half the columns withheld), and
 each ran as with no limit; the busiest peer stayed well below both values (§4.3;
-protocol-v2-figures.md, §4.3). What the limits protect is mostly bounded already: one ask per index
-at a time (`protocol.md` §6.1), asks only for groups an installed block commits (§4.2), and the
-offer table's limits (`protocol.md` §8.2).
+seacast-figures.md, §4.3). What the limits protect is mostly bounded already: one ask per index
+at a time (`seacast-lite.md` §6.1), asks only for groups an installed block commits (§4.2), and the
+offer table's limits (`seacast-lite.md` §8.2).
 
 ## 7. Bindings `[D1]`
 
 The protocol is defined on its own messages (§2). A **binding** carries them between two nodes. The
 bindings, their bytes and the rules that hold on one binding only are in
-[`protocol-v2-bindings.md`](protocol-v2-bindings.md). It has four, one per carrier, and a fifth as
+[`seacast-bindings.md`](seacast-bindings.md). It has four, one per carrier, and a fifth as
 a draft:
 - the libp2p stream binding carries them on a libp2p stream of its own
-  (`protocol-v2-bindings.md` §2);
-- the Waggle binding carries the same protocol in Waggle's framing (`protocol-v2-bindings.md` §3);
-- the gossipsub binding uses `protocol.md`'s wire (`protocol-v2-bindings.md` §4);
+  (`seacast-bindings.md` §2);
+- the Waggle binding carries the same protocol in Waggle's framing (`seacast-bindings.md` §3);
+- the gossipsub binding uses `seacast-lite.md`'s wire (`seacast-bindings.md` §4);
 - the partial-messages binding uses gossipsub with the Partial Messages Extension
-  (`protocol-v2-bindings.md` §5);
+  (`seacast-bindings.md` §5);
 - the native QUIC binding, a draft, carries them directly on QUIC, with a stream per chunk
-  (`protocol-v2-bindings.md` §7).
+  (`seacast-bindings.md` §7).
 
 A node may speak more than one binding, and negotiates per link which one a peer takes. This
 section says what every binding provides, and what the rules do where a binding lacks a capability.
@@ -3750,7 +3751,7 @@ section says what every binding provides, and what the rules do where a binding 
 - *Limits before state:* each message kind's size has a bound, checked before the receiver holds
   any state for the message (X6), after the binding's own bound on its frame.
 - *The header:* a cell group's header travels in one of three forms, which the object type's
-  definition fixes (`protocol-v2-bindings.md` §1.6): (a) from the block, with none on the wire;
+  definition fixes (`seacast-bindings.md` §1.6): (a) from the block, with none on the wire;
   (b) in every cell message; (c) in a header message of its own. In all three, a cell is verified
   only once its header is validated, and a cell that comes before its header waits for it (§4.2).
   A binding validates a block's cell header no later than it installs the block (§4.2). It
@@ -3765,7 +3766,7 @@ section says what every binding provides, and what the rules do where a binding 
 **The order, on every binding but the native QUIC binding.** What a node writes to a peer arrives
 in the order written, for each object type at least (Waggle's framing has a stream per type). The
 native QUIC binding, a draft, does not order a chunk with any other message. Which rules rely on
-that order is one of its open questions (`protocol-v2-bindings.md` §7.9). The rule that the source
+that order is one of its open questions (`seacast-bindings.md` §7.9). The rule that the source
 sends a holding just ahead of its first push (§4.7) relies on that order.
 
 Rendezvous and discovery are outside the bindings (§0).
@@ -3774,17 +3775,17 @@ Rendezvous and discovery are outside the bindings (§0).
 
 | capability | the libp2p stream and Waggle bindings | the partial-messages binding | the gossipsub binding | the native QUIC binding (a draft) | without it |
 |---|---|---|---|---|---|
-| interest without subscription: a JOIN per link, `DECLARED` interest told only to the peers asked (§1.2) | yes | for a sampler only | for a sampler only | yes | a sampler subscribes to nothing, its WANTs are its interest, and their answers are admitted by their WANT (`protocol-v2-bindings.md` §6) |
+| interest without subscription: a JOIN per link, `DECLARED` interest told only to the peers asked (§1.2) | yes | for a sampler only | for a sampler only | yes | a sampler subscribes to nothing, its WANTs are its interest, and their answers are admitted by their WANT (`seacast-bindings.md` §6) |
 | relations per family and colour, with a direction and a floor per colour (§1.3, §4.1) | yes | `BOTH` only, a colour field, no floor per colour | stock: `BOTH`, one colour | yes | the relation is the topic's mesh |
 | the answered GRAFT, and `PRUNE_BACKOFF` this document's (§4.1) | yes | no: accepted in silence, gossipsub's backoff | no (the toy runs it under `--upkeep on`) | yes | a GRAFT's sender is in the relation from its GRAFT, and the ends' agreement rests on the backoff after a PRUNE (§4.1) |
-| a holding's claims; the WANT's `standing`, `hops` and `probe` (§2) | yes | in extension fields | in version 4 of the strings (`protocol-v2-bindings.md` §4), charged nothing in the toy | yes | – (every binding carries them) |
+| a holding's claims; the WANT's `standing`, `hops` and `probe` (§2) | yes | in extension fields | in version 4 of the strings (`seacast-bindings.md` §4), charged nothing in the toy | yes | – (every binding carries them) |
 | EVIDENCE (§2) | its kind reserved | a full message on the rendezvous topic | reserved: a full message on the rendezvous topic | its kind reserved | none in this version (`[D6]`) |
 | a frame of one message, or several (§4's `on_frame`) | one | several (gossipsub's frame) | several | one; a chunk's frame is its stream | the handling order of one frame is §4's; where a frame holds one message, the IHAVE limits (§4.3) count messages, and one answer per id per frame (§4.5) is one per message |
 | merging queued entries (`merge_waiting`, §4.2, permitted; §4.1's one GRAFT or PRUNE of a relation per frame) | the client's | the client's | the client's | the client's | – (a choice, not a capability) |
-| how a cell's header travels (§2), in the form the object type's definition fixes (`protocol-v2-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`protocol-v2-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`protocol-v2-bindings.md` §4); the toy charges no header there, as in (a) | as on the libp2p stream binding; (c) on the control stream, before the group's first chunk stream (`protocol-v2-bindings.md` §7.2) | – |
-| an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | yes, where the implementation orders streams (`protocol-v2-bindings.md` §7.4) | the writer's urgent lane alone, as one stream per peer gives |
+| how a cell's header travels (§2), in the form the object type's definition fixes (`seacast-bindings.md` §1.6) | (a) no header in the cell; (b) with the first eager push of its group on a link; (c) a kind of its own, not defined in this version (`seacast-bindings.md` §2.3); the toy runs (b) | (b), by the partial columns' own rule, carried per link | (a) none; (b) in every copy of each cell's message; (c) a header message of its own on each family's topic, its bytes not defined in this version (`seacast-bindings.md` §4); the toy charges no header there, as in (a) | as on the libp2p stream binding; (c) on the control stream, before the group's first chunk stream (`seacast-bindings.md` §7.2) | – |
+| an urgent lane at the transport, beside the writer's (§4.12) | for later study (a second stream) | no | no | yes, where the implementation orders streams (`seacast-bindings.md` §7.4) | the writer's urgent lane alone, as one stream per peer gives |
 | scoring on these messages (P7) | yes | gossipsub's | gossipsub's | yes | gossipsub's scoring of its own messages |
-| a chunk ordered with the messages written before and after it | yes (on Waggle, within its type) | yes, between frames | yes, between frames | no: each chunk has a stream of its own | *Open:* which rules rely on it (`protocol-v2-bindings.md` §7.9) |
+| a chunk ordered with the messages written before and after it | yes (on Waggle, within its type) | yes, between frames | yes, between frames | no: each chunk has a stream of its own | *Open:* which rules rely on it (`seacast-bindings.md` §7.9) |
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
 | a chunk's lost bytes leave a gap only in that chunk's delivery | no: on the libp2p stream binding, every later frame on the stream waits; on Waggle over QUIC, the later messages of the chunk's type wait | no | no | yes: lost bytes leave a gap only on their own stream | lost bytes hold up every later frame on their stream until they are resent, and on TCP every later byte on the connection; on every binding, loss can also slow the connection's sending (congestion control) |
 
@@ -3801,25 +3802,25 @@ not a link. The sampler computes the custody of such a node from its node id.
 - *What it gives:* it reaches a custodian directly where §4.10 would route. That is one hop instead
   of two, nothing disclosed to a forwarder, and fewer links kept for the coverage floor, which
   matters most where a node's connection budget is small (at 16 links the floor of the fewest links
-  nearly doubles a node's links, §6.3; protocol-v2-figures.md, §1.3).
+  nearly doubles a node's links, §6.3; seacast-figures.md, §1.3).
 - *What the protocol needs:* it needs only the notion of such a fetch, a WANT answered by a CHUNK
   from a node that is not a link, and its privacy rule: one sample per node, as on links (§4.10).
   The serving limit and the second phase's cap apply as on a link.
-- *How it is carried* is the binding's (`protocol-v2-bindings.md` §8), so the protocol's rules
+- *How it is carried* is the binding's (`seacast-bindings.md` §8), so the protocol's rules
   do not depend on it.
 
 ## 8. Decisions, and where they bite
 
 The design decisions `[D1]` to `[D12]`, and the others this draft took, are recorded in
-[`protocol-v2-decisions.md`](protocol-v2-decisions.md): for each, the rule decided and where it
+[`seacast-decisions.md`](seacast-decisions.md): for each, the rule decided and where it
 bites here, when it was decided, what was not taken and why, and the runs behind it. The code's
 comments cite the labels where each decision bites.
 
 ## Glossary
 
 This glossary lists the document's own terms, each with the section that defines it. The terms it
-uses as `protocol.md` does, such as announcer, budget, card and tier, expired, last resort, park,
-promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
+uses as `seacast-lite.md` does, such as announcer, budget, card and tier, expired, last resort, park,
+promise, stop-pull and tie, are in [`seacast-lite.md`](seacast-lite.md)'s glossary.
 
 - **acknowledgement**: the holding a node sends the peer a chunk came from (§1.5, §4.2). It frees
   the room the copy took in the sender's window (§4.3, §4.11). At a source, a chunk is acknowledged
@@ -3827,9 +3828,9 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   (§4.7).
 - **announce relation**: the peers a node tells what it holds: every peer that can push to it, every
   peer it pushes to, and beyond them a width that `ANNOUNCE_EXTRA` sets (§1.3, `[D5]`).
-- **ask**: a request for one index of a group, keyed `Ask(g, i)` (`protocol.md`'s `WantIndex`; §3)
-  and carried in a WANT (§2). Asks on offers follow `protocol.md` §6.1's pull discipline (§4.3).
-- **ask window**: `protocol.md`'s `IWANT_WINDOW`, how long one ask of a chunk counts as in flight;
+- **ask**: a request for one index of a group, keyed `Ask(g, i)` (`seacast-lite.md`'s `WantIndex`; §3)
+  and carried in a WANT (§2). Asks on offers follow `seacast-lite.md` §6.1's pull discipline (§4.3).
+- **ask window**: `seacast-lite.md`'s `IWANT_WINDOW`, how long one ask of a chunk counts as in flight;
   its retry comes `RETRY_SLACK` after the window. It stretches as the node's uplink falls below
   `ASK_UPLINK` (§4.13).
 - **axis**: one of the groups a chunk lies in: a cell lies on its column and on its row (`project`,
@@ -3839,12 +3840,12 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   again for the relation the PRUNE named (`PRUNE_BACKOFF`, §4.1); none for a pair new to a link at
   its limit of relations (`MAX_RELATIONS`).
 - **cell**: the chunk of the column and row types: one blob's 2 048 bytes at one column, with its
-  proof (§1.1, `protocol-v2-bindings.md` §1.2). In `protocol-v2-figures.md`, a cell of the toy is
+  proof (§1.1, `seacast-bindings.md` §1.2). In `seacast-figures.md`, a cell of the toy is
   also one run of one configuration (that file's preamble).
 - **chunk**: one index of a group, with the proof that verifies it alone. A payload chunk fills one
   (group, index) pair, and a cell two, in its column and in its row (`project`, §1.1, R4).
 - **claim**: either of the two flags a holding carries besides its bitmap (§1.5, `[D3]`).
-  `claim_all`: the sender holds or can produce every index, `protocol.md`'s decode claim, made at K
+  `claim_all`: the sender holds or can produce every index, `seacast-lite.md`'s decode claim, made at K
   before the decode. `complete`: the sender's interest in the group is satisfied. Both are
   unverified; a probe verifies a `claim_all` that defers a decode (§4.6).
 - **claimant**: a peer whose `claim_all` for a group has arrived on a link that has joined the
@@ -3881,7 +3882,7 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
 - **forwarding node**: any node with duty `FORWARD` (§1.6). §4.4 says whom it pushes and offers a
   chunk to.
 - **frame**: a binding's unit on the wire, which can carry several messages (§4,
-  `protocol-v2-bindings.md` §0).
+  `seacast-bindings.md` §0).
 - **gate**: the event after which a group's chunks can be verified and asked for: the installed
   block for the payload, a validated header for cells (`authenticable`, §4.2).
 - **GRAFT**, **PRUNE**: the messages that form and end a relation for one family and colour, with a
@@ -3894,11 +3895,11 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   its `offer` flag, with the two claims on a holding (§2).
 - **header**: what the verifier needs for a group, arriving through the gate of its object type: the
   descriptor for the payload, the `PartialDataColumnHeader` for cells (`header_of`, §1.1). It is
-  `protocol.md`'s `desc`, read here as `hdr` (§0).
+  `seacast-lite.md`'s `desc`, read here as `hdr` (§0).
 - **high custody**: a custody count above the base one, or interest `ALL` (§1.3). A peer of high
   custody counts for at most `COVER_HIGH` families in the coverage floor.
 - **holding**: a HAVE saying that its sender holds these chunks, verified (`offer` unset), as
-  `protocol.md`'s IDONTWANT with a bitmap (§2). It goes to the suppression scope: it suppresses
+  `seacast-lite.md`'s IDONTWANT with a bitmap (§2). It goes to the suppression scope: it suppresses
   pushes, acknowledges the chunk just received, and counts its sender as a holder (§1.5, §4.3).
 - **interest**: what a node is to receive of a group, declared per link and object type at JOIN, in
   three kinds: `ALL`, the whole object; `DERIVED`, computed by both ends from the node id and
@@ -3917,10 +3918,10 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
   verified alone, how a set is checked and rebuilt, how a receiver learns the header, and how a
   chunk maps onto groups (§1.1). §1.1's table gives the payload, the column and the row.
 - **offer**: a HAVE saying that its sender can be asked for these chunks (`offer` set), as
-  `protocol.md`'s IHAVE with a bitmap (§2). It goes to a peer the sender chose not to push a chunk
+  `seacast-lite.md`'s IHAVE with a bitmap (§2). It goes to a peer the sender chose not to push a chunk
   to, or to a peer outside the relation, and feeds that peer's offer table and nothing else (§1.5,
   §4.3).
-- **owed**: as in `protocol.md`, and also a JOIN, GRAFT or PRUNE that a full queue refused, queued
+- **owed**: as in `seacast-lite.md`, and also a JOIN, GRAFT or PRUNE that a full queue refused, queued
   in order once there is room (§4.1), and a push to a fallback link that a full queue refused
   (§4.7).
 - **phase**: two different things. A sampler's first phase declares every sample at once and waits
@@ -3976,7 +3977,7 @@ promise, stop-pull and tie, are in [`protocol.md`](protocol.md)'s glossary.
 - **WANT**: the message that asks one peer for chunks of a group, by bitmap: what the sender asks
   that peer for, not what it lacks (§2, `[D2]`). Its fields make it a standing request, a routed
   sample request or a probe.
-- **window**: `protocol.md` §7.1's sending window, one per node over every group of every object
+- **window**: `seacast-lite.md` §7.1's sending window, one per node over every group of every object
   type, counted in bytes (`W_BYTES`): a chunk takes its size on the wire (`wire_size`), and control
   takes none (§4.8, §4.11, X3). The ask window is another (§4.13).
 
@@ -4004,7 +4005,7 @@ since v0.9, it names only the chunks acknowledged so far, §4.7).
 | X8 | the source is a role, not a node |
 
 **Decision labels.** Each label names one of the design decisions that
-[`protocol-v2-decisions.md`](protocol-v2-decisions.md) records (§8):
+[`seacast-decisions.md`](seacast-decisions.md) records (§8):
 - `[D1]` identity and bindings
 - `[D2]` two bitmaps, WANT per recipient, no need bitmap
 - `[D3]` two claims

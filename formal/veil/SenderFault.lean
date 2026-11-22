@@ -12,7 +12,7 @@ set_option veil.solver "grind+smt"
 
 /-! # The sender's fault: A1's other penalties, for any number of nodes, blocks and groups
 
-SEACAST, `protocol.md` v0.5 with the live window and the group's key (§1, §8.1, added after v0.6),
+SEACAST, `seacast-lite.md` v0.5 with the live window and the group's key (§1, §8.1, added after v0.6),
 and v0.10's two checks: level 1 checks the slot a copy names against its block's (§3), and an
 IHAVE's bitmap is held to a HAVE's limits (§4.4, §8.2). Besides the claim rule (`ClaimWins.lean`),
 a node penalises a peer for three things: a chunk that fails level 1 (§3, §4.2: "level 1 failures

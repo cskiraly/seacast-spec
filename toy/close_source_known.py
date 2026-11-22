@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""A known answer for a connection's close at a source (the toy's drop_peer, protocol-v2.md §3's lifetimes): the
+"""A known answer for a connection's close at a source (the toy's drop_peer, seacast.md §3's lifetimes): the
 room a closed peer's chunks held in flight is released, and that is not the chunks' acknowledgement. A closed
-connection drops its copy's room (protocol.md §8.1); a chunk is acknowledged at a holding naming it or at a copy's
+connection drops its copy's room (seacast-lite.md §8.1); a chunk is acknowledged at a holding naming it or at a copy's
 window timeout (§4.7), so a close leaves the source's holding and its offers as they were.
 
     python3 close_source_known.py
@@ -20,7 +20,7 @@ def run_to_publish():
     import sim as S
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
+    run.main(["--doc", "seacast", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7"])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + 0.001)   # the writer's first writes
     return sim

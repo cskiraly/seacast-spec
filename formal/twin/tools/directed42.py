@@ -32,8 +32,8 @@ The scenario answers seen, accepted, mark_seen, expired, live, validate_chunk, p
 forward, and the deferral path's installed_block (a block or nothing), admitted, reserve and release. `forward`
 touches none of the twin's tables, and the toy's own needs the simulator's peer data, which these peers have not:
 it is the scenario's here, and the cells run the toy's. The toy's own open_group, store and claim_group run, and
-protocol.md's drop_offer: their reads and writes of the twin's tables are their `cr` and `cw` on the tape. defer
-and tie run as protocol.md has them, and they are the twin's own: in its records, not on the tape. claim_group's
+seacast-lite.md's drop_offer: their reads and writes of the twin's tables are their `cr` and `cw` on the tape. defer
+and tie run as seacast-lite.md has them, and they are the twin's own: in its records, not on the tape. claim_group's
 `close_promises_of_group` reads the toy's index of ask keys per chunk (`_by_index`), which this file keeps for
 the keys it draws.
 

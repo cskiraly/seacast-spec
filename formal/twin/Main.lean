@@ -214,7 +214,7 @@ def main (args : List String) : IO UInt32 := do
         if let some (n, _, rp) := l.find? fun (_, _, rp) => !whole && rp.any replaceableWhole.contains then
           IO.println s!"nodes: node {n} has replaced {rp.filter replaceableWhole.contains}, which only a trace of the whole state may"
           headerOk := false
-        -- (a replaced name is one of the names the trace traces: push_rebuilt at a v2 node, whose header leaves
+        -- (a replaced name is one of the names the trace traces: push_rebuilt at a SEACAST node, whose header leaves
         -- it out, is refused here, also where no record of the node exercises it)
         if let some tr := traced? then
           if let some (n, _, rp) := l.find? fun (_, _, rp) => rp.any (!tr.contains ·) then

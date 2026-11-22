@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """A known answer for the toy's charge on the libp2p stream binding (run.py --wire standalone): for every message kind,
 what the links charge equals the length of the frame standalone_wire_known.py's encoder writes from
-protocol-v2-bindings.md §1 and §2 (before compression, as §1.5's sizes are).
+seacast-bindings.md §1 and §2 (before compression, as §1.5's sizes are).
 
     python3 standalone_charge_known.py
 
-On a small custody run and a small payload run (protocol-v2.md, one block or payload, --wire standalone), entries
+On a small custody run and a small payload run (seacast.md, one block or payload, --wire standalone), entries
 are built by hand and charged by the simulator (sim.standalone_wire):
 - a JOIN, a GRAFT and a PRUNE; a holding (IDONTWANT) and an offer (IHAVE) of a 16-byte bitmap; WANTs of index 3
   and of index 127, plain and flagged;
@@ -47,7 +47,7 @@ def main():
         body = K.enc(kind, m)
         return len(K.uvarint(1 + len(body))) + 1 + len(body)
 
-    sim = sim_of(["--doc", "v2", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1",
+    sim = sim_of(["--doc", "seacast", "--setting", "custody", "--nodes", "8", "--degree", "6", "--msgs", "1",
                   "--seed", "7", "--wire", "standalone"])
     nd = sim.nodes[2]
     p, q = sorted(nd.peers)[:2]
@@ -98,7 +98,7 @@ def main():
          (ws(p, Wm.Entry(chunk=f1)), ws(p, Wm.Entry(chunk=f1, solicited=True)), (charge(Wm.Entry(chunk=f1)),
           ws(p, Wm.Entry(chunk=f1)))[1]), (with_h, without_h, without_h))
 
-    pay = sim_of(["--doc", "v2", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7", "--wire", "standalone"])
+    pay = sim_of(["--doc", "seacast", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", "7", "--wire", "standalone"])
     g = pay.msgs[0][1][0]
     f = next(iter(pay.canonical[g].values()))
     pm = {"slot": 0, "root": b"\0" * 32, "group": b"\0" * 32, "descriptor": b"\0" * 51, "index": 0,

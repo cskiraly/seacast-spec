@@ -1,13 +1,13 @@
 # Control: an answered GRAFT not yet in the text
 
-`protocol-v2.md` §4.1's functions as they stood before 2026-11-04, kept for `graft_check.py --doc`:
+`seacast.md` §4.1's functions as they stood before 2026-11-04, kept for `graft_check.py --doc`:
 a GRAFT's sender recorded nothing, so the two ends of a relation can disagree at rest. The check must
 fail on it.
 
 ```python
 def on_join(p, j: Join):
     T = type_of(j.object_type)
-    if j.colours != T.params.M: return                 # no v2 for T on this link; the stock path remains
+    if j.colours != T.params.M: return                 # no SEACAST for T on this link; the stock path remains
     join_recv[p][T] = j
     if T not in join_sent[p]: send(p, our_join(T), urgent=True)
 
@@ -43,7 +43,7 @@ def on_graft(p, gr: Graft):                            # returns the PRUNEs to s
     return back
 
 def join_push(p, T, fam, c):                           # p joins our push relation for colour c: what we hold of
-    if c in push_out[p][T][fam]: return                #   it is announced (protocol.md §5.4's on_mesh_join);
+    if c in push_out[p][T][fam]: return                #   it is announced (seacast-lite.md §5.4's on_mesh_join);
     push_out[p][T][fam].add(c)                         #   a GRAFT that adds nothing runs nothing
     for g in list(chunks):
         if expired(g) or state[g] == INVALID or type_of_group(g) != T or T.family(g) != fam: continue

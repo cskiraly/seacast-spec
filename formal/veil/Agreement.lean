@@ -2,7 +2,7 @@ import Lean
 
 /-! # Agreement and integrity: level 2 is all or none (L3), in plain Lean
 
-SEACAST, `protocol.md` v0.8, §1 (the descriptor and its commitment), §3 (levels 1 and 2) and §4.6
+SEACAST, `seacast-lite.md` v0.8, §1 (the descriptor and its commitment), §3 (levels 1 and 2) and §4.6
 (decode, the decode claim, repair). A node that has K chunks of a group, each passing level 1 (its
 Merkle proof against the descriptor's root), decodes them, re-encodes the recovered segmented byte
 string into the N leaves, and compares their Merkle root with the descriptor's (level 2); it

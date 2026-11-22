@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""A known answer for protocol-v2-bindings.md §1 to §3, the bytes of SEACAST's message encoding, of the
+"""A known answer for seacast-bindings.md §1 to §3, the bytes of SEACAST's message encoding, of the
 libp2p stream binding and of Waggle's carriage: an encoder written from the text.
 
     python3 standalone_wire_known.py
@@ -27,11 +27,11 @@ import struct
 import sys
 from pathlib import Path
 
-DOC = Path(os.environ.get("BINDINGS_DOC") or Path(__file__).resolve().parent.parent / "protocol-v2-bindings.md")
+DOC = Path(os.environ.get("BINDINGS_DOC") or Path(__file__).resolve().parent.parent / "seacast-bindings.md")
 
 MAX_HAVE_BYTES = 1024
-MAX_SEGMENT_SIZE = 32 * 1024                # protocol.md §8.3: twice UNIT
-MAX_PROOF = 14                              # protocol.md §2's Chunk: List[Bytes32, 14]
+MAX_SEGMENT_SIZE = 32 * 1024                # seacast-lite.md §8.3: twice UNIT
+MAX_PROOF = 14                              # seacast-lite.md §2's Chunk: List[Bytes32, 14]
 BYTES_PER_CELL = 2048
 MAX_BLOB_COMMITMENTS_PER_BLOCK = 4096
 INCLUSION_DEPTH = 4                         # KZG_COMMITMENTS_INCLUSION_PROOF_DEPTH

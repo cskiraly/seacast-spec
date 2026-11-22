@@ -3,7 +3,7 @@ import SpecTwin.Sec2
 import SpecTwin.Sec3
 import SpecTwin.Sec54
 
-/-! # protocol.md §4.2, "A chunk arrives" [c5, c7, c10, c14] (v0.10.4, spec 34f60f8),
+/-! # seacast-lite.md §4.2, "A chunk arrives" [c5, c7, c10, c14] (v0.10.4, spec 34f60f8),
 and §6.1's `close_promises`
 
 `on_chunk`, `on_validated`, `drop_beyond`, `send_have`, `have_bits` and `close_promises`; and the deferral path:
@@ -31,7 +31,7 @@ Python's meanings kept on purpose:
   Python's change in place is no write then;
 - `on_validated` and `defer` call each other. The recursion is cut by a fuel, `deferDepth`: at zero the twin
   stands where the Python would recurse again, with a crash. In the node, what bounds the depth is validate_chunk's
-  own ask of `installed_block` (protocol.md:342). That ask runs inside a call on the tape, past the tracer's
+  own ask of `installed_block` (seacast-lite.md:342). That ask runs inside a call on the tape, past the tracer's
   one-answer check. So the tracer also counts a record's chain of defers and stops at the third.
   The replay would report a crash at zero fuel as a mismatch, so no wrong twin passes.
 

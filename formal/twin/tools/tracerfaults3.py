@@ -284,7 +284,7 @@ def after_install(wrap):
 
 
 def late_rebind():
-    """A traced name bound again after the tracer's install (as Node.__init__ and `_v2` bind theirs), to a function of
+    """A traced name bound again after the tracer's install (as Node.__init__ and `_seacast` bind theirs), to a function of
     this tool's own. The names' second check, at the nodes line, must stop it."""
     def wrap(tr, ns):
         def may_ask(a, p):

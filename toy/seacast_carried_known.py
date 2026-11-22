@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
-"""Known answers for v0.10's rules where protocol-v2.md has functions of its own, for cells and offers. The
+"""Known answers for v0.10's rules where seacast.md has functions of its own, for cells and offers. The
 payload's (`defer`'s limit of unknown groups, `drop_stale_waits` from `on_heartbeat`, `drop_beyond` when a
-group opens) are `deferral_rules_known.py --doc v2`.
+group opens) are `deferral_rules_known.py --doc seacast`.
 
-    python3 v2_carried_known.py
+    python3 seacast_carried_known.py
 
-On one node of a small rows run (protocol-v2.md, one block, run to its end), with states made by hand:
+On one node of a small rows run (seacast.md, one block, run to its end), with states made by hand:
 
-- **An offer's bitmap is held to a HAVE's limits** (§4.3 `on_offer`, as `protocol.md` §4.4's IHAVE bitmap): an
+- **An offer's bitmap is held to a HAVE's limits** (§4.3 `on_offer`, as `seacast-lite.md` §4.4's IHAVE bitmap): an
   offer naming an index at or beyond its group's known count is ignored and counts against the sender. An offer
   of an index the group has and the node lacks, the control, is kept, with no penalty.
 - **At the cell header, a tied index the group, known by then, does not have is dropped, that index alone**
-  (§4.2 `on_header_validated`, as `protocol.md`'s `on_block_installed`). Peer 1 is tied for indices 0 and N of a
+  (§4.2 `on_header_validated`, as `seacast-lite.md`'s `on_block_installed`). Peer 1 is tied for indices 0 and N of a
   column while the column's count is not known yet; the count is then known, and the header validated. Index 0,
   which the node lacks, is an offer of peer 1's again (the control); index N is not.
-- **A sender with nothing left tied under the root loses its tie's slot** (`tie_slot`, `protocol.md` §4.2 and
+- **A sender with nothing left tied under the root loses its tie's slot** (`tie_slot`, `seacast-lite.md` §4.2 and
   §8.1). Peer 4 is tied only for that column: after the header, it is no longer tied under the root and its slot
   is gone. Peer 1 is also tied for a group of the root that is not a cell group: it stays tied, with its slot
   (the control).
 - **At the cell header, a tie on a link that has not joined the group's type is no offer** (§4.2's release, §2).
   A third peer, whose JOIN for columns is taken back, is tied for index 0 of the column; after the header, it is
   not an announcer of it, where peer 1 (the control) is, and it is no longer tied under the root.
-- **A cell's level 1 rejects a copy whose slot is not its header's** (§1's table, as `protocol.md` §3's
+- **A cell's level 1 rejects a copy whose slot is not its header's** (§1's table, as `seacast-lite.md` §3's
   `validate_chunk` for the payload). A cell the node accepted passes again, for its column and for its row (the
   control); the same cell naming an older slot is rejected for both.
 
@@ -42,7 +42,7 @@ def main():
     from bits import bitmap
     got = {}
     run.run = lambda cfg, out=sys.stdout: got.setdefault("sim", S.Sim(cfg))
-    run.main(["--doc", "v2", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
+    run.main(["--doc", "seacast", "--setting", "rows", "--nodes", "8", "--degree", "6", "--msgs", "1", "--seed", str(SEED)])
     sim, cfg = got["sim"], got["sim"].cfg
     sim.run(cfg["first"]); sim.publish(1); sim.run(cfg["first"] + cfg["gap"])    # the run's one block, to its end
     nd = sim.nodes[NODE]
