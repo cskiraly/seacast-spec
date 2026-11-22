@@ -149,6 +149,16 @@ ROW_READS_V2 = ("owed", "planned", "queue", "tied")
 # No name is both here and in CALLS: a question that raises is written with its arguments as they are at exit
 EAGER_V2 = ("enqueue",)
 EAGER_LATE = [False]
+# Under --doc v2, a timer armed inside a question at the node (`after` or `start`, the two kinds): a note of the
+# outermost question open there, [kind, delay, target, args], in its row's fourth member (call_log), in the order
+# armed. The target is a document's timer of that kind, by its name, or a toy callback of TOY_TIMERS, by its
+# qualified name; any other stops the tracer. NOTES_OFF is the self-test's control (the notes' code bypassed)
+TIMER_KINDS = ("after", "start")
+DOC_TIMERS = {"after": ("retry_offer", "ask_parked", "promise_due", "window_timeout",     # protocol.md's
+                        "reconsider", "ask_sample", "resample"),                         # protocol-v2.md's
+              "start": ("decode_group",)}
+TOY_TIMERS = ("Node._alarm.<locals>.alarm_due",)    # --alarm-wait's (node.py), armed by its filter_entry: (g, i, q, at)
+NOTES_OFF = [False]
 # §7.1's three, the twin's own. Under protocol.md a cell holds the count and views hold the line and the sends;
 # under --doc v2 they are not installed (there the count is bytes and a send's value a pair, and no traced function
 # of protocol.md touches them)
@@ -290,21 +300,39 @@ class MissQuestionView(F.View):
         return super().__getitem__(k)
 
 
+def tracers_own(fn):
+    """Whether a function is one of this file's (the tracer's own wrappers, which functools.wraps marks)."""
+    code = getattr(fn, "__code__", None)
+    return code is not None and Path(code.co_filename).resolve() == Path(__file__).resolve()
+
+
+def call_log(cr, cw, timers=()):
+    """A question's fourth member: its accesses of the own tables (`cr`, `cw`) and, under v2, the notes of the timers
+    it armed (`timers`, in the order armed), written where any of the three is not empty. `timers` is there only where
+    the question armed one, so a row whose question armed none is as before."""
+    if timers:
+        return [{"cr": cr, "cw": cw, "timers": list(timers)}]
+    return [{"cr": cr, "cw": cw}] if cr or cw else []
+
+
 def miss_question(rec, enter=lambda: None, leave=lambda: None):
     """The question `own_interest(g)` of MissQuestionView: the toy's own miss (`__missing__`) run as a question's
     callee, its accesses of the own tables its `cr` and `cw`; on the tape as `["own_interest", [g], bits]`, the
     bits in the signed form, as schema_v2.py writes `interest`'s. `enter` and `leave` are the tracer's own around a
-    question (its depth, and the mesh as the node's)."""
+    question (its depth, and the mesh as the node's); `leave` gives the notes of the timers it armed (call_log)."""
     def ask(g, raw):
         enter()
         rec.begin_callee()
+        done = False
         try:
             b = raw.__missing__(g)
+            done = True
         finally:
             cr, cw = rec.end_callee()
-            leave()
-        rec.tape.append(["own_interest", [g.hex()], schema_v2.signed(b.v)]
-                        + ([{"cr": cr, "cw": cw}] if cr or cw else []))
+            timers = leave() or []
+            if timers and not done:
+                raise SystemExit("trace3: own_interest raised after arming a timer: its row cannot hold the notes")
+        rec.tape.append(["own_interest", [g.hex()], schema_v2.signed(b.v)] + call_log(cr, cw, timers))
         return b
     return ask
 
@@ -1094,9 +1122,302 @@ def closure_self_test():
     return closure_v2.self_test(N, manifest_v2, Tracer3.params_schema(), Tracer3.TYPE_FUNCTIONS)
 
 
+def timers_self_test():
+    """The notes of the timers a question arms, and a record's own `after` of v2's three timers, on a stub
+    simulator, a stub node and stub questions, no toy node: each case compares the whole tape row it expects, or the
+    stop's words. Each case's planted fault, run, must fail it. The set's control: the notes' code bypassed (NOTES_OFF:
+    `after` and `start` bare inside a question) fails exactly the cases that expect a note or a stop inside a
+    question, and passes the others. Then the refusal of --source-offers late under v2, with its planted fault."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import wire as Wm                   # noqa: E402: the toy's, beside this repository's documents
+    g = bytes(range(32))
+    gx = g.hex()
+    check_time = 0.5                    # the stub's CHECK_TIME
+    docs, toy = {}, {}                  # the documents' timers under the documents' names; the toy's under node.py
+    exec(compile("def retry_offer(a):\n    pass\ndef ask_parked(a):\n    pass\ndef decode_group(g):\n    pass\n",
+                 DOC_FILE, "exec"), docs)
+    exec(compile("def reconsider(g, at):\n    pass\ndef ask_sample(g, i, first=False):\n    pass\n"
+                 "def resample(g, i, q, first):\n    pass\n", V2_FILE, "exec"), docs)
+    exec(compile("def alarm_due(g, i, q, at):\n    pass\ndef _write(p):\n    pass\n", "node.py", "exec"), toy)
+    toy["alarm_due"].__qualname__ = "Node._alarm.<locals>.alarm_due"
+    toy["_write"].__qualname__ = "Node._write"
+
+    class Sim:                          # the toy's simulator: after(node, delay, fn, *args)
+        def __init__(self):
+            self.q = []
+
+        def after(self, node, delay, fn, *args):
+            self.q.append((delay, fn, args))
+
+    class Node:
+        pass
+
+    def run(body, touched=False, patch=None, whole_hook=False):
+        """One record at a stub node 1, whose own code asks the question `q(7)`; `q` runs `body(ns, nd)`. The record's
+        tape, or the stop's words. `touched`: the question's `cr` holds one read. `patch(tr)`: a planted fault in the
+        tracer's own methods. `whole_hook`: the planted fault of the hook set for the whole question."""
+        tr = object.__new__(Tracer3)
+        tr.Wm, tr.doc_v2, tr.traced, tr.bare = Wm, True, (), Counter()
+        nd = Node()
+        nd.id, nd.sim, nd.cfg = 1, Sim(), {}
+        st = {"depth": 1, "ext": 0, "cur": {"tape": [], "fn": "x"}, "node": 1, "supp": 0}
+        hooked = []
+
+        class Rec:
+            def begin_callee(self):
+                if whole_hook:          # every timer the question arms, through whatever path, is a note
+                    orig = nd.sim.after
+                    nd.sim.after = lambda node, d, f, *a: (hooked.append((d, f, a)), orig(node, d, f, *a))[1]
+
+            def end_callee(self):
+                if whole_hook:
+                    del nd.sim.after
+                    st["notes"].extend(tr.note_of(nd, "after", *t) for t in hooked)
+                return ([["t", 1]], []) if touched else ([], [])
+        if patch is not None:
+            patch(tr)
+        wrap = functools.partial(tr.iface_of, nd, st, Rec(), (), {}, lambda: None, lambda: None)
+        ns = {}
+
+        def after(delay, fn, *args):    # the toy's bindings (node.py's `after` and `start`, and the jittered start)
+            nd.sim.after(nd, delay, fn, *args)
+
+        def start(fn, gg):
+            nd.sim.after(nd, check_time + 0.125, fn, gg)
+        if hasattr(body, "binding"):    # a case's own binding of `after`
+            after = body.binding(nd)
+        never = lambda r, *a, **k: (_ for _ in ()).throw(AssertionError("a record's own row"))    # noqa: E731
+        ns["after"], ns["start"] = wrap("after", after, never), wrap("start", start, never)
+        ns["q2"] = wrap("q2", lambda: body(ns, nd), lambda r, *a: [list(a), None])
+        q = wrap("q", (lambda p: ns["q2"]()) if getattr(body, "nested", False) else (lambda p: body(ns, nd)),
+                 lambda r, *a: [list(a), None])
+        try:
+            q(7)
+        except (SystemExit, TypeError, ValueError, IndexError) as e:
+            return f"{type(e).__name__}: {e}"
+        return st["cur"]["tape"]
+
+    def row(*timers, touched=False):
+        return [["q", [7], None] + call_log([["t", 1]] if touched else [], [], timers)]
+
+    def a_one(ns, nd):
+        ns["after"](0.25, docs["retry_offer"], Wm.WantIndex(g, 3))
+
+    def b_two(ns, nd):                  # the second's key sorts before the first's
+        ns["after"](0.25, docs["retry_offer"], Wm.WantIndex(g, 5))
+        ns["after"](0.75, docs["ask_parked"], Wm.WantIndex(g, 2))
+
+    def c_start(ns, nd):
+        ns["start"](docs["decode_group"], g)
+
+    def d_kick(ns, nd):                 # the writer's kick: node.sim.after itself
+        nd.sim.after(nd, 0.0, toy["_write"], 3)
+
+    def e_none(ns, nd):
+        pass
+
+    def nested(ns, nd):                 # asked by q's callee: q2, which arms the timer
+        ns["after"](0.25, docs["retry_offer"], Wm.WantIndex(g, 3))
+    nested.nested = True
+
+    def g_alarm(ns, nd):
+        ns["after"](0.25, toy["alarm_due"], g, 4, 9, 1.5)
+
+    def g_lambda(ns, nd):
+        ns["after"](0.25, lambda: None)
+
+    def h_raise(ns, nd):
+        ns["after"](0.25, docs["retry_offer"], Wm.WantIndex(g, 3))
+        raise ValueError("the question's own error")
+
+    def i_count(n):                     # an `after` whose binding (its `binding`) schedules n timers
+        def body(ns, nd):
+            ns["after"](0.25, docs["retry_offer"], Wm.WantIndex(g, 3))
+
+        def binding(nd):
+            def after(delay, fn, *args):
+                for _ in range(n):
+                    nd.sim.after(nd, delay, fn, *args)
+            return after
+        body.binding = binding
+        return body
+
+    one = ["after", fbits(0.25), "retry_offer", [[gx, 3]]]
+    note_c = ["start", fbits(check_time + 0.125), "decode_group", [gx]]
+    note_g = ["after", fbits(0.25), "Node._alarm.<locals>.alarm_due", [gx, 4, 9, fbits(1.5)]]
+    orig_log = call_log
+
+    def with_log(f):                    # a planted fault in call_log, the module's own function
+        def p(tr):
+            globals()["call_log"] = f
+        return p
+
+    def by_name(tr):                    # a toy callback's target written by its __name__ (the codec as it is)
+        orig = tr.note_of
+
+        def note_of(nd, kind, d, t, a):
+            n = orig(nd, kind, d, t, a)
+            return n[:2] + [t.__name__] + n[3:] if n[2] in TOY_TIMERS else n
+        tr.note_of = note_of
+
+    def any_target(tr):
+        tr.timer_target = lambda nd, kind, fn: getattr(fn, "__qualname__", "?")
+
+    def check_delay(tr):
+        orig = tr.note_of
+        tr.note_of = lambda nd, kind, d, t, a: orig(nd, kind, check_time if kind == "start" else d, t, a)
+
+    def keep_last(tr):
+        tr.one_timer = lambda nd, kind, seen: seen[-1]
+
+    def per_question(tr):               # notes kept per question: the inner question's own list, dropped
+        orig = tr.iface_of
+
+        def iface_of(nd, st, rec, replaced, calls, mesh_on, mesh_off, name, fn, enc):
+            w = orig(nd, st, rec, replaced, calls, mesh_on, mesh_off, name, fn, enc)
+            if name != "q2":
+                return w
+
+            def inner(*a, **k):
+                outer, st["notes"] = st["notes"], []
+                try:
+                    return w(*a, **k)
+                finally:
+                    st["notes"] = outer
+            return inner
+        tr.iface_of = iface_of
+
+    def raise_drops(tr):
+        tr.raised_with_notes = lambda nd, name, e: None
+
+    # (case, body, its kwargs, what it must give, its planted fault as run() kwargs, whether it expects a note or a
+    # stop inside a question)
+    cases = [
+        ("a, one after", a_one, {}, row(one), dict(patch=with_log(lambda cr, cw, t=(): orig_log(cr, cw, ()))), True),
+        ("b, two afters in arming order", b_two, {},
+         row(one[:3] + [[[gx, 5]]], ["after", fbits(0.75), "ask_parked", [[gx, 2]]]),
+         dict(patch=with_log(lambda cr, cw, t=(): orig_log(cr, cw, sorted(t, key=lambda n: json.dumps(n[3]))))), True),
+        ("c, a jittered start", c_start, {}, row(note_c), dict(patch=check_delay), True),
+        ("d, the kick: no note", d_kick, {}, row(), dict(whole_hook=True), False),
+        ("e, cr and cw alone", e_none, dict(touched=True), row(touched=True),
+         dict(touched=True, patch=with_log(lambda cr, cw, t=(): [{"cr": cr, "cw": cw, "timers": list(t)}])), False),
+        ("f, a question inside a question", nested, {}, row(one), dict(patch=per_question), True),
+        ("g, alarm_due by its qualified name", g_alarm, {}, row(note_g), dict(patch=by_name), True),
+        ("g, a lambda target stops", g_lambda, {},
+         "SystemExit: trace3: node 1: a timer armed inside a question calls timers_self_test.<locals>.g_lambda.<locals>"
+         ".<lambda> (trace3.py:", dict(patch=any_target), True),
+        ("h, a raise after arming stops", h_raise, {},
+         "SystemExit: trace3: node 1: q raised ValueError after arming a timer", dict(patch=raise_drops), True),
+        ("i, an after arming none stops", i_count(0), {},
+         "SystemExit: trace3: node 1: an after inside a question armed 0 timers", dict(patch=keep_last), True),
+        ("i, an after arming two stops", i_count(2), {},
+         "SystemExit: trace3: node 1: an after inside a question armed 2 timers", dict(patch=keep_last), True),
+    ]
+
+    def same(got, want):
+        if isinstance(want, str) and isinstance(got, str):
+            return got.startswith(want)
+        return got == want
+    bad = 0
+    noted = []
+    for what, body, kw, want, plant, expects in cases:
+        got = run(body, **kw)
+        ok = same(got, want)
+        bad += not ok
+        print(f"timers self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+        try:
+            got_p = run(body, **plant)
+        finally:
+            globals()["call_log"] = orig_log
+        ok = not same(got_p, want)
+        bad += not ok
+        print(f"timers self-test, {what}, its planted fault: {'fails it, ok' if ok else 'passes  <-- FAIL'}; it gives "
+              f"{json.dumps(got_p)[:220]}")
+        NOTES_OFF[0] = True
+        try:
+            if not same(run(body, **kw), want):
+                noted.append(what)
+        finally:
+            NOTES_OFF[0] = False
+    want_off = [c[0] for c in cases if c[5]]
+    ok = noted == want_off
+    bad += not ok
+    print(f"timers self-test, the control (the notes' code bypassed): "
+          f"{f'fails exactly the {len(noted)} cases of a note or a stop, ok' if ok else f'fails {noted}  <-- FAIL'}")
+    # j: a record's own `after` of v2's three, each against its row written out by hand from timerV2Json's form
+    tr = object.__new__(Tracer3)
+    tr.Wm, tr.doc_v2 = Wm, True
+
+    def own(fn, *args):
+        try:
+            return json.dumps(tr.after_row(0.25, fn, *args), separators=(",", ":"))
+        except (SystemExit, TypeError) as e:
+            return f"{type(e).__name__}: {e}"
+    w25 = fbits(0.25)
+    jcases = [
+        ("reconsider", lambda: own(docs["reconsider"], g, 1.5), f'[{w25},"reconsider",["{gx}",4609434218613702656]]'),
+        ("ask_sample", lambda: own(docs["ask_sample"], g, 3), f'[{w25},"ask_sample",["{gx}",3]]'),
+        ("resample", lambda: own(docs["resample"], g, 3, 9, True), f'[{w25},"resample",["{gx}",3,9,true]]'),
+        ("ask_sample with a third argument stops", lambda: own(docs["ask_sample"], g, 3, True),
+         "SystemExit: trace3: ask_sample armed with 3 arguments, where the twin's form has two (g, i)"),
+    ]
+
+    def keys_only(name, args):          # the planted fault: protocol.md's codec alone (keys only)
+        out = []
+        for x in args:
+            if not isinstance(x, (bytes, Wm.WantIndex)):
+                raise TypeError(f"§6.1 arms timers on keys only, got {x!r}")
+            out.append(tr.key(x))
+        return out
+    for what, f, want in jcases:
+        got = f()
+        ok = same(got, want)
+        bad += not ok
+        print(f"timers self-test, j, a record's own after of {what}: "
+              f"{'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+        tr.timer_args = keys_only
+        try:
+            ok = not same(f(), want)
+        finally:
+            del tr.timer_args
+        bad += not ok
+        print(f"timers self-test, j, {what}, its planted fault (keys only): "
+              f"{'fails it, ok' if ok else 'passes  <-- FAIL'}")
+    # --source-offers late, refused under v2 alone
+    late_words = ("SystemExit: trace3: --source-offers late is the toy's ablation (publish's own offers queued after "
+                  "the same instant's pushes), a setting of neither document, whose SOURCE_OFFERS is ACK or PUBLISH: "
+                  "not traced under --doc v2")
+
+    def offers(v2, mode, plant=False):
+        t = object.__new__(Tracer3)
+        t.doc_v2 = v2
+        if plant:
+            t.source_offers_check = lambda nd: None
+        nd = Node()
+        nd.id, nd.cfg = 1, {"source_offers": mode}
+        try:
+            t.source_offers_check(nd)
+        except SystemExit as e:
+            return f"SystemExit: {e}"
+        return None
+    modes = ((True, "late"), (True, "on"), (True, "off"), (True, "publish"), (False, "late"))
+    ocases = [(f"--source-offers {m} under {'v2' if v2 else 'protocol.md'}", v2, m,
+               late_words if v2 and m == "late" else None) for v2, m in modes]
+    for what, v2, m, want in ocases:
+        got = offers(v2, m)
+        ok = got == want
+        bad += not ok
+        print(f"timers self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    ok = offers(True, "late", plant=True) != late_words
+    bad += not ok
+    print(f"timers self-test, --source-offers late under v2, its planted fault (the refusal removed): "
+          f"{'fails it, ok' if ok else 'passes  <-- FAIL'}")
+    return bad
+
+
 def self_test_v2():
     bad = (v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
-           + closure_self_test())
+           + closure_self_test() + timers_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -1863,6 +2184,185 @@ class Tracer3(Tracer):
             row[0] = early
         return row
 
+    # ---- timers: a record's own `after`, and the notes of a question's
+    def timer_args(self, name, args):
+        """A timer's arguments as a record writes them, by its target's name, for the record's own `after` and for a
+        note alike: protocol.md's promise_due and window_timeout by their forms, its other timers by their keys;
+        under v2, protocol-v2.md's three as the twin's timerV2Json has them: reconsider [g, at's word], ask_sample
+        [g, i], resample [g, i, q, first]. An ask_sample armed with a third argument stops the tracer: the twin's form
+        has none."""
+        key = self.key
+        if name == "promise_due":                       # filter_entry's `after(PROMISE, promise_due, a, p, now)`
+            a, p, at = args
+            return [key(a), int(p), fbits(at)]
+        if name == "window_timeout":                    # track_in_flight's `after(WINDOW_TIMEOUT, window_timeout,
+            k, at = args                                #   key, now)`
+            return [[int(k[0]), k[1].hex(), int(k[2])], fbits(at)]
+        if self.doc_v2 and name in ("reconsider", "ask_sample", "resample"):
+            g = args[0] if args else None
+            if not isinstance(g, bytes):
+                raise TypeError(f"trace3: {name}'s timer on no group: {args!r}")
+            if name == "reconsider":                    # `after(max(0, at - now), reconsider, g, at)`
+                _, at = args
+                return [g.hex(), fbits(at)]
+            if name == "ask_sample":                    # `after(T.params.SAMPLE_RETRY, ask_sample, g, i)`
+                if len(args) != 2:
+                    raise SystemExit(f"trace3: ask_sample armed with {len(args)} arguments, where the twin's form "
+                                     f"has two (g, i): {args!r}")
+                return [g.hex(), self.nat(args[1])]
+            _, i, q, first = args                       # `after(…, resample, g, i, q, first)`
+            return [g.hex(), self.nat(i), self.nat(q), self.flag(first, "resample's first")]
+        out = []
+        for x in args:
+            if isinstance(x, (bytes, self.Wm.WantIndex)):
+                out.append(key(x))
+            else:
+                raise TypeError(f"§6.1 arms timers on keys only, got {x!r}")
+        return out
+
+    def after_row(self, delay, fn, *args):
+        """A record's own `after(delay, fn, *args)` on its tape: [delay's word, fn's name, its arguments]."""
+        return [fbits(delay), fn.__name__, self.timer_args(fn.__name__, args)]
+
+    def one_timer(self, nd, kind, seen):
+        """The one timer an `after` or `start` inside a question armed (arm_timer): none, or two, stops the tracer."""
+        if len(seen) != 1:
+            raise SystemExit(f"trace3: node {nd.id}: an {kind} inside a question armed {len(seen)} timers, where it "
+                             f"arms one")
+        return seen[0]
+
+    def timer_target(self, nd, kind, fn):
+        """The name a note gives the function its timer calls: a document's timer of that kind (DOC_TIMERS), by its
+        name, where the function is the document's or a listed wrapper of it (own_code), the tracer's own wrappers
+        looked through; or a toy callback of TOY_TIMERS, by its qualified name. Any other stops the tracer, naming its
+        qualified name and first line."""
+        f = fn
+        while hasattr(f, "__wrapped__") and tracers_own(f):
+            f = f.__wrapped__
+        code = getattr(f, "__code__", None)
+        qual = getattr(f, "__qualname__", None) or type(f).__name__
+        where = "no Python function"
+        if code is not None:
+            name = code.co_name
+            if name in DOC_TIMERS[kind] and (code.co_filename in (DOC_FILE, V2_FILE) or own_code(name, f)[0] == "own"):
+                return name
+            if kind == "after" and qual in TOY_TIMERS and Path(code.co_filename).name == "node.py":
+                return qual
+            where = f"{Path(code.co_filename).name}:{code.co_firstlineno}"
+        raise SystemExit(f"trace3: node {nd.id}: a timer armed inside a question calls {qual} ({where}), neither a "
+                         f"document's {kind} target nor a listed toy callback")
+
+    def note_of(self, nd, kind, delay, target, args):
+        """The note of a timer armed inside a question: [kind, the delay's word as the simulator was handed it, the
+        target (timer_target), its arguments]. A `start`'s are [g]; alarm_due's (g, i, q, at) [g, i, q, at's word];
+        a document's timer's as the record's own `after` writes them (timer_args)."""
+        name = self.timer_target(nd, kind, target)
+        if kind == "start":
+            (g,) = args
+            enc = [g.hex()]
+        elif name in TOY_TIMERS:
+            g, i, q, at = args
+            enc = [g.hex(), self.nat(i), self.nat(q), fbits(at)]
+        else:
+            enc = self.timer_args(name, args)
+        return [kind, fbits(delay), name, enc]
+
+    def arm_timer(self, nd, kind, fn, args, kw):
+        """An `after` or `start` called inside a question at the node: it runs with the simulator's `after` hooked
+        for this one call, so that a timer armed otherwise (the writer's kick, `node.sim.after` itself) is no note.
+        The one timer it armed (one_timer) is the note. Returns the call's answer and the note."""
+        sim, seen = nd.sim, []
+        had, prev, orig = "after" in vars(sim), vars(sim).get("after"), sim.after
+
+        def hook(node, delay, f, *a):
+            seen.append((delay, f, a))
+            return orig(node, delay, f, *a)
+        sim.after = hook
+        try:
+            r = fn(*args, **kw)
+        finally:
+            if had:
+                sim.after = prev
+            else:
+                del sim.after
+        delay, target, targs = self.one_timer(nd, kind, seen)
+        return r, self.note_of(nd, kind, delay, target, targs)
+
+    @staticmethod
+    def raised_with_notes(nd, name, e):
+        """A question that raises after arming a timer stops the tracer: no row holds a raise's notes."""
+        raise SystemExit(f"trace3: node {nd.id}: {name} raised {type(e).__name__} after arming a timer: a raising "
+                         f"question's row cannot hold the notes")
+
+    def source_offers_check(self, nd):
+        """Under --doc v2, a node built with --source-offers late is refused: the toy's ablation, a setting of neither
+        document. A protocol.md trace goes as before."""
+        if self.doc_v2 and (getattr(nd, "cfg", None) or {}).get("source_offers", "on") == "late":
+            raise SystemExit("trace3: --source-offers late is the toy's ablation (publish's own offers queued after "
+                             "the same instant's pushes), a setting of neither document, whose SOURCE_OFFERS is ACK or "
+                             "PUBLISH: not traced under --doc v2")
+
+    def iface_of(self, nd, st, rec, replaced, calls, mesh_on, mesh_off, name, fn, enc):
+        """A tape name's (or a replaced name's) wrapper at a node: where §6.1's own code calls it, a question, its
+        row on the record's tape; elsewhere bare. Under v2, an `after` or `start` inside a question at the node is a
+        note of the outermost question there (arm_timer), written in its row (call_log)."""
+        tr = self
+
+        @functools.wraps(fn)
+        def w(*args, **kw):
+            if tr.doc_v2:
+                foreign = st["depth"] and st["node"] != int(nd.id)     # another node's record is open
+                if foreign and not (st["ext"] or st["supp"]):          #   and no question runs: a tape name
+                    raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record "
+                                     f"is open and no question runs")  #   stops as a traced one does
+                if foreign or st["supp"]:       # bare: inside a question at another node, or inside a replaced
+                    if name in tr.traced:       #   name entered outside a record; a traced name (replaced here)
+                        tr.bare[f"{nd.id} {name}"] += 1     # counted as sec61 counts its own; a tape name's
+                    return fn(*args, **kw)                  #   call goes on no tape
+                if not st["depth"] and name in replaced:    # a replaced name entered
+                    st["supp"] += 1                                             #   outside any record:
+                    try:                                                        #   nothing inside it is a
+                        return fn(*args, **kw)                                  #   record
+                    finally:
+                        st["supp"] -= 1
+                if st["depth"] and st["ext"] and name in TIMER_KINDS and not NOTES_OFF[0]:     # a timer armed
+                    r, note = tr.arm_timer(nd, name, fn, args, kw)          #   inside a question at this node:
+                    st["notes"].append(note)                                #   a note of the outermost one
+                    return r
+            if not st["depth"] or st["ext"]:    # not asked by §6.1's own code
+                return fn(*args, **kw)
+            # the tracer's third state: what the rest of the node reads is behind the tape, but its
+            # accesses of the own tables are logged apart, as the callee's `cr` and `cw`
+            # under v2 an argument of EAGER_V2's is written as it was handed over: encoded here, before the call,
+            # so that a callee that changes it does not change its form on the tape
+            early = tr.at_call(name, enc, args, kw)
+            st["ext"] += 1
+            if tr.doc_v2:
+                st["notes"] = []
+            rec.begin_callee()
+            mesh_off()
+            raised = None
+            try:
+                r = fn(*args, **kw)
+            except Exception as e:              # a question that raises: on the tape, for CALLS
+                raised = e
+                raise
+            finally:
+                st["ext"] -= 1
+                cr, cw = rec.end_callee()
+                notes = st.pop("notes", [])
+                mesh_on()
+                if raised is not None and notes:
+                    tr.raised_with_notes(nd, name, raised)
+                if raised is not None and name in calls:
+                    if cr or cw:
+                        raise TypeError(f"trace3: {name} raised after touching the own tables")
+                    st["cur"]["tape"].append([name, calls[name][0](*args, **kw), {"raises": type(raised).__name__}])
+            row = tr.tape_row(enc, r, args, kw, early)
+            st["cur"]["tape"].append([name, *row] + call_log(cr, cw, notes))
+            return r
+        return w
+
     def missing_key(self, miss, e=None):
         """The key a KeyError names, as a record writes it. Under protocol.md a peer alone, as before. Under v2 a group
         is ["group", hex], an object type ["type", id], an integer itself or ["-", n] below zero (a peer, a family
@@ -2116,6 +2616,7 @@ class Tracer3(Tracer):
 
     # ---- the wrappers, per node
     def install(self, nd, ns):
+        self.source_offers_check(nd)
         consts = {c: fbits(ns[c]) for c in CONSTS}
         for c in LIMITS + ("MAX_PLAIN_CHUNKS", "FAN_IN"):     # each a count (a limit may be +inf, none): int() of
             v = ns[c]                                          #   anything else would cut it without a word
@@ -2220,13 +2721,15 @@ class Tracer3(Tracer):
                 raise SystemExit(f"trace3: node {nd.id}: interest answers no missing group here (the toy's "
                                  f"InterestMap does, by own_interest_bits)")
 
-            def enter():                    # around the question, as around any other (iface)
+            def enter():                    # around the question, as around any other (iface_of)
                 st["ext"] += 1
+                st["notes"] = []
                 mesh_off()
 
             def leave():
                 st["ext"] -= 1
                 mesh_on()
+                return st.pop("notes", [])
             ns["interest"] = MissQuestionView(ns["interest"], miss_question(rec, enter, leave))
 
         def sec61(name, fn):
@@ -2329,53 +2832,6 @@ class Tracer3(Tracer):
                 return r
             return w
 
-        def iface(name, fn, enc):
-            @functools.wraps(fn)
-            def w(*args, **kw):
-                if tr.doc_v2:
-                    foreign = st["depth"] and st["node"] != int(nd.id)     # another node's record is open
-                    if foreign and not (st["ext"] or st["supp"]):          #   and no question runs: a tape name
-                        raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record "
-                                         f"is open and no question runs")  #   stops as a traced one does
-                    if foreign or st["supp"]:       # bare: inside a question at another node, or inside a replaced
-                        if name in tr.traced:       #   name entered outside a record; a traced name (replaced here)
-                            tr.bare[f"{nd.id} {name}"] += 1     # counted as sec61 counts its own; a tape name's
-                        return fn(*args, **kw)                  #   call goes on no tape
-                    if not st["depth"] and name in replaced:    # a replaced name entered
-                        st["supp"] += 1                                             #   outside any record:
-                        try:                                                        #   nothing inside it is a
-                            return fn(*args, **kw)                                  #   record
-                        finally:
-                            st["supp"] -= 1
-                if not st["depth"] or st["ext"]:    # not asked by §6.1's own code
-                    return fn(*args, **kw)
-                # the tracer's third state: what the rest of the node reads is behind the tape, but its
-                # accesses of the own tables are logged apart, as the callee's `cr` and `cw`
-                # under v2 an argument of EAGER_V2's is written as it was handed over: encoded here, before the call,
-                # so that a callee that changes it does not change its form on the tape
-                early = tr.at_call(name, enc, args, kw)
-                st["ext"] += 1
-                rec.begin_callee()
-                mesh_off()
-                raised = None
-                try:
-                    r = fn(*args, **kw)
-                except Exception as e:              # a question that raises: on the tape, for CALLS
-                    raised = e
-                    raise
-                finally:
-                    st["ext"] -= 1
-                    cr, cw = rec.end_callee()
-                    mesh_on()
-                    if raised is not None and name in calls:
-                        if cr or cw:
-                            raise TypeError(f"trace3: {name} raised after touching the own tables")
-                        st["cur"]["tape"].append([name, calls[name][0](*args, **kw), {"raises": type(raised).__name__}])
-                row = tr.tape_row(enc, r, args, kw, early)
-                st["cur"]["tape"].append([name, *row] + ([{"cr": cr, "cw": cw}] if cr or cw else []))
-                return r
-            return w
-
         def mesh_on():                              # the block's code sees `mesh` as the question it asks,
             m = ns.get("mesh")                      #   and the gossip history as the node's
             if isinstance(m, set):
@@ -2392,21 +2848,6 @@ class Tracer3(Tracer):
             if isinstance(h, GossipQuestion):
                 ns["gossip_history"] = h.h
 
-        def after_args(delay, fn, *args):
-            if fn.__name__ == "promise_due":                # filter_entry's `after(PROMISE, promise_due, a, p, now)`
-                a, p, at = args
-                return [fbits(delay), fn.__name__, [key(a), int(p), fbits(at)]]
-            if fn.__name__ == "window_timeout":             # track_in_flight's `after(WINDOW_TIMEOUT,
-                k, at = args                                #   window_timeout, key, now)`
-                return [fbits(delay), fn.__name__, [[int(k[0]), k[1].hex(), int(k[2])], fbits(at)]]
-            out = []
-            for x in args:
-                if isinstance(x, (bytes, self.Wm.WantIndex)):
-                    out.append(key(x))
-                else:
-                    raise TypeError(f"§6.1 arms timers on keys only, got {x!r}")
-            return [fbits(delay), fn.__name__, out]
-
         enc = {     # the tape's calls: TAPE's names, and only those (checked below)
             "expired": lambda r, g: [[g.hex()], bool(r)],
             "connected_topic_peers": lambda r: [[], list(r)],
@@ -2420,7 +2861,7 @@ class Tracer3(Tracer):
             "valid_have": lambda r, e: [[tr.offer(e)], bool(r)],          # asked by on_ihave of a bitmap
             "penalise": lambda r, p: [[p], None],
             "enqueue": tr.enqueue_enc,
-            "after": lambda r, delay, fn, *args: [after_args(delay, fn, *args), None],
+            "after": lambda r, delay, fn, *args: [tr.after_row(delay, fn, *args), None],
             # §4.2
             "seen": lambda r, m: [[m.hex()], bool(r)],
             "accepted": lambda r, m: [[m.hex()], bool(r)],
@@ -2503,6 +2944,7 @@ class Tracer3(Tracer):
                         "validate_chunk": lambda r, f: [[tr.chunk(f)], r]}
         if set(replaced_enc) != set(REPLACEABLE):
             raise SystemExit("trace3: the replaceable names' encoders are not REPLACEABLE's")
+        iface = functools.partial(tr.iface_of, nd, st, rec, replaced, calls, mesh_on, mesh_off)
         for name in tr.traced:
             ns[name] = iface(name, ns[name], replaced_enc[name]) if name in replaced else sec61(name, ns[name])
         for name, e in enc.items():
