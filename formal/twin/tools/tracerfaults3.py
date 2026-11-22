@@ -684,8 +684,31 @@ def draws_unrestored_v2():
     before_install_v2(plant)
 
 
+def owed_flipped_v2(kind):
+    """Under v2, a plant of a layer's listing that changes only a return: at every node, a layer of this tool's own over
+    `owed_missing`, bound before the install and holding the toy's (the member check's, which with the check on calls
+    the document's): it calls the layer it holds and returns the opposite. It is listed in LAYERS as `kind`. Listed an
+    observer, the record holds the document's questions and reads, and the twin, running the document's function on
+    them, gets the answer the toy did not: the replay must refuse each record whose call was flipped, and the tracer,
+    whose observer mode stops writes and timers but not a changed return, does not see it. Listed as changing (the
+    control), the call is a question with the flipped answer on the tape, and the replay passes. Counted once for each
+    node (planted) and once for each call ("flipped")."""
+    SEEN["flipped"] = 0
+
+    def plant(ns):
+        inner = ns["owed_missing"]
+
+        def owed_missing(g):
+            SEEN["flipped"] += 1
+            return not inner(g)
+        T.LAYERS[T.layer_key(owed_missing)] = ("owed_missing", kind)
+        ns["owed_missing"] = owed_missing
+
+    before_install_v2(plant)
+
+
 CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-owed-observer-v2",
-                "--chain-owed-changing-v2")
+                "--chain-owed-changing-v2", "--owed-flipped-observer-v2", "--owed-flipped-changing-v2")
 
 
 def hdr_read_v2(raw):
@@ -1096,6 +1119,10 @@ def main(argv):
             layer_classed_v2(OWED_MISSING, T.OBSERVER)
         elif fault == "--chain-owed-changing-v2":
             layer_classed_v2(OWED_MISSING, T.CHANGING)
+        elif fault == "--owed-flipped-observer-v2":
+            owed_flipped_v2(T.OBSERVER)
+        elif fault == "--owed-flipped-changing-v2":
+            owed_flipped_v2(T.CHANGING)
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":
