@@ -11,8 +11,9 @@ this one is made against the tree itself. cells3.py asks it of each trace it has
 What the replay does not check of the header, the second line: the tracer's name, and that the functions traced
 (`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc v2,
 the block's names that are protocol.md's all the way down (trace3.v2_kept), computed here from TOYDIR's documents;
-and that it claims the whole state exactly where it is a directed set's. A trace that passes is printed with its
-kind.
+and that it claims the whole state exactly where it is a directed set's. Its tables (`own`, `foreign`) are
+trace3.py's, or for a trace run with --doc v2 protocol-v2.md's manifest's (`want`). A trace that passes is printed
+with its kind.
 
 Exit code 0 when every trace passes; otherwise each trace's reasons are printed.
 """
@@ -25,9 +26,15 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import content                          # noqa: E402
 import trace3                           # noqa: E402
+import manifest_v2                      # noqa: E402: gen/manifest_v2.py (trace3.py puts gen/ on the path)
 
 
-def want(toy):
+def want(v2):
+    """The header's fields every trace of these tools has, as trace3.py writes them: under --doc v2 the tables are
+    protocol-v2.md's manifest's (its own, protocol.md's and v2's, and its foreign), otherwise trace3.py's own."""
+    if v2:
+        return {"format": 7, "tracer": "trace3.py", "own": list(manifest_v2.OWN),
+                "foreign": list(manifest_v2.FOREIGN)}
     return {"format": 7, "tracer": "trace3.py", "own": list(trace3.OWN), "foreign": list(trace3.FOREIGN)}
 
 
@@ -96,7 +103,8 @@ def check(toy, trace):
     if kind_of(toy, traced, h.get("args")) is None:
         why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept, "
                    "sorted")
-    for name, v in want(toy).items():
+    v2 = trace3.doc_of(h.get("args") or []) == "v2"
+    for name, v in want(v2).items():
         got = h.get(name)
         if got == v:
             continue
@@ -109,7 +117,6 @@ def check(toy, trace):
     if h.get("whole") is not whole:
         why.append(f"whole: {h.get('whole')!r}, must be {whole!r} for this kind of trace")
     # the rows the views read on the way down: under --doc v2 exactly trace3.ROW_READS_V2, and in no other trace
-    v2 = trace3.doc_of(h.get("args") or []) == "v2"
     if v2 and h.get("row_reads") != list(trace3.ROW_READS_V2):
         why.append(f"row_reads: {h.get('row_reads')!r}, must be {list(trace3.ROW_READS_V2)!r} under --doc v2")
     if not v2 and "row_reads" in h:

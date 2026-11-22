@@ -638,6 +638,7 @@ def main(argv):
     hbad += reader_controls(lines, ask, work, head)
     sbad = subset_controls(lines, hand, work, head)
     kbad = header3_controls(hdr, hand[0], work, directed, directed44)
+    kbad += own_controls(hand[0], work)
     rbad = raise_controls(directed, work, head)
     obad = order_controls(directed, work, head)
     wbad = rest_controls(directed, work, head)
@@ -726,17 +727,13 @@ def queue_controls(hand, work, head):
     }, work, head, "queue")
 
 
-def v2_controls(v2trace, work, head):
-    """The controls of a cell's trace under --doc v2, each with the outcome written before it first ran:
-    - header3.py passes its header as v2's kept, and refuses it with on_ihave among its traced (on_ihave calls gated,
-      which v2 redefines), with gated among them (v2 redefines it), and with --doc v2 gone from its args (v2's kept
-      is a kind only for a trace run so);
-    - one of its may_ask records, alone, replays; with its read of asked_at as now (an ask in flight) it fails at
-      that record for the reason hand5's may_ask/read-value fails ("tape": the twin arms no retry).
-    A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-v2)."""
+def v2_header_controls(v2trace, work):
+    """header3.py on a cell's header under --doc v2, each with the outcome written before it first ran: it passes as
+    v2's kept, and is refused with on_ihave among its traced (on_ihave calls gated, which v2 redefines), with gated
+    among them (v2 redefines it), with --doc v2 gone from its args (v2's kept is a kind only for a trace run so), and
+    with protocol.md's own tables as its own (a v2 trace's are the manifest's, protocol.md's and v2's). No replay."""
     toy = layout.toy()
-    hdr, consts, rec = first(v2trace, lambda d: d["fn"] == "may_ask" and d.get("ret") is True and d["reads"][:1] != []
-                             and d["reads"][0][0] == "asked_at" and d["reads"][0][2] is None)
+    hdr = load(v2trace)[0]
     h = hdr["header"]
     assert header3.trace3.doc_of(h["args"]) == "v2", "V2 is not a trace run with --doc v2"
 
@@ -747,24 +744,56 @@ def v2_controls(v2trace, work, head):
 
     args = list(h["args"])
     k = args.index("--doc")
-    hcases = {  # name -> (the header line, whether it must pass)
-        "a v2 cell's header, v2's kept": (hdr, True),
-        "with on_ihave among its traced": (variant(traced=sorted(h["traced"] + ["on_ihave"])), False),
-        "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False),
-        "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False),
+    hcases = {  # name -> (the header line, whether it must pass, the words of its one reason where it must not)
+        "a v2 cell's header, v2's kept": (hdr, True, None),
+        "with on_ihave among its traced": (variant(traced=sorted(h["traced"] + ["on_ihave"])), False, None),
+        "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False, None),
+        "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False, None),
         "with §6.1's twelve alone as its traced": (
-            variant(traced=sorted(header3.trace3.SEC61)), False),
-        "v2's kept, from a trace not run with --doc v2": (variant(args=args[:k] + args[k + 2:]), False),
+            variant(traced=sorted(header3.trace3.SEC61)), False, None),
+        "v2's kept, from a trace not run with --doc v2": (variant(args=args[:k] + args[k + 2:]), False, None),
+        "with protocol.md's own as its own": (variant(own=list(header3.trace3.OWN)), False, "own: "),
     }
     bad = 0
-    for name, (hl, must) in hcases.items():
+    for name, (hl, must, words) in hcases.items():
         f = work / f"v2-header3-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
         write(f, [hl])
         why = header3.check(toy, f)
-        ok = (not why) == must
+        ok = (not why) == must and (must or words is None or (len(why) == 1 and why[0].startswith(words)))
         bad += not ok
         print(f"v2, header3, {name}: {'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, "
               f"must {'pass' if must else 'be refused'}{'' if ok else '  <-- FAIL'}")
+    return bad
+
+
+def own_controls(hand_hdr, work):
+    """header3.py on the hand cell's header (protocol.md) with protocol-v2.md's manifest's own tables as its own:
+    refused, for its one reason, the tables; a trace not run with --doc v2 has trace3.py's own. With
+    v2_header_controls' case of the other way round, the two that tell the header's tables by the trace's
+    document. No replay."""
+    toy = layout.toy()
+    out = copy.deepcopy(hand_hdr)
+    out["header"]["own"] = list(header3.manifest_v2.OWN)
+    f = work / "header3-hand-manifest-own.jsonl"
+    write(f, [out])
+    why = header3.check(toy, f)
+    ok = len(why) == 1 and why[0].startswith("own: ")
+    print(f"protocol.md, header3, the hand cell's header with the manifest's own: "
+          f"{'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, must be refused{'' if ok else '  <-- FAIL'}")
+    print("ok: every control of the headers' own tables as it must be" if ok else
+          "1 control of the headers' own tables wrong")
+    return 0 if ok else 1
+
+
+def v2_controls(v2trace, work, head):
+    """The controls of a cell's trace under --doc v2, each with the outcome written before it first ran:
+    - header3.py's on its header (v2_header_controls);
+    - one of its may_ask records, alone, replays; with its read of asked_at as now (an ask in flight) it fails at
+      that record for the reason hand5's may_ask/read-value fails ("tape": the twin arms no retry).
+    A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-v2)."""
+    hdr, consts, rec = first(v2trace, lambda d: d["fn"] == "may_ask" and d.get("ret") is True and d["reads"][:1] != []
+                             and d["reads"][0][0] == "asked_at" and d["reads"][0][2] is None)
+    bad = v2_header_controls(v2trace, work)
     now = copy.deepcopy(rec)
     now["reads"][0][2] = rec["t"]
     bad += check("v2", {
