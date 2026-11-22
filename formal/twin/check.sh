@@ -882,8 +882,12 @@ s_tracercontrols() {
     also=
     case $f in
       param-after-install-v2) want="^trace3: node [0-9]*: type payload's EAGER changed after the tracer's install \(True there, False now\): the nodes line holds a type's parameters as the install read them" ;;
-      rebind-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under v2 must be the namespace's last binding" ;;
-      rebind-view-v2) want="^trace3: node [0-9]*: offers was bound again after the tracer was installed, which under v2 must be the namespace's last binding: a OfferMap" ;;
+      # a slot bound again after the install: the next record's entry check stops it (bindings_check), and
+      # final_check's words follow at the close, both stops shown
+      rebind-tape-v2) want="^trace3: node [0-9]*: peer_id_bytes is bound to Node\._namespace\.<locals>\.peer_id_bytes \(node\.py:[0-9]*\) at the entry of [a-z_0-9]*'s record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run$"
+        also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node [0-9]*: peer_id_bytes was bound again after the tracer was installed, which under v2 must be the namespace's last binding" ;;
+      rebind-view-v2) want="^trace3: node [0-9]*: offers is bound to OfferMap at the entry of [a-z_0-9]*'s record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run$"
+        also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node [0-9]*: offers was bound again after the tracer was installed, which under v2 must be the namespace's last binding: a OfferMap$" ;;
       close-keyerror-v2) want="^trace3: node [0-9]*: N is called while node [0-9]*'s record is open and no question runs"
         also="^trace3: \(at the close, after the stop\) KeyError: 'planted at the close'$" ;;   # the close's, a note
       rebound-scanned-v2) want="^trace3: node [0-9]*: popcount_again is bound to a function of the toy's that the scan of its bindings does not name: popcount \(bits\.py:[0-9]*\)" ;;
@@ -1109,8 +1113,9 @@ EOF_ERC
   [ "$bad" = 0 ] || no "a plant under v2 (c-tracerplants.txt)"
   [ "$(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt")" = 9 ] || no "not 9 plants under v2 as written (c-tracerplants.txt)"
   echo "  $(grep -c '^[a-z0-9-]*: as it must: ' "$OUT/c-tracerplants.txt") of 9 plants under v2 as written (five, and four controls), and the checks' controls"
-  # under v2, the nodes line's chains: hand5-own traced with its replaced name's chain left out (tracerfaults3's
-  # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words
+  # under v2, the nodes line's chains: hand5-own traced with its replaced names' chains left out (tracerfaults3's
+  # --chains-omit-v2) is written to the end, and the replay's reader must refuse it, with its own words, naming the
+  # first it meets: push_rebuilt, which hand5-own (--rebuilt none) replaces at every node
   rm -f "$OUT/c-chains-omit.jsonl.gz" "$OUT/c-chains-omit.jsonl.gz.bare.json" "$OUT/c-chains-omit.replay"
   if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --chains-omit-v2 . "$OUT/c-chains-omit.jsonl.gz" > "$OUT/c-chains-omit.out" 2> "$OUT/c-chains-omit.err"); then
     no "the trace of a nodes line without a replaced name's chain did not end with 0 (c-chains-omit.err)"
@@ -1118,8 +1123,8 @@ EOF_ERC
     no "no replaced name's chain was left out (c-chains-omit.err)"
   elif replay_of c-chains-omit; then
     no "the replay passed a nodes line without a replaced name's chain (c-chains-omit.replay)"
-  elif has -x "nodes: chains: a replaced name with no chain: on_iwant" "$OUT/c-chains-omit.replay"; then
-    echo "  a nodes line without on_iwant's chain at its replacing node: refused by the replay, with its words"
+  elif has -x "nodes: chains: a replaced name with no chain: push_rebuilt" "$OUT/c-chains-omit.replay"; then
+    echo "  a nodes line without its replaced names' chains: refused by the replay, with its words (push_rebuilt)"
   else no "the replay refused a nodes line without a replaced name's chain otherwise than by its words (c-chains-omit.replay)"; fi
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own

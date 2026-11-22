@@ -537,10 +537,11 @@ def hdr_read_v2(raw):
     """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
     g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
     view, the record as written holds the read of `desc` at g: the line says "desc read in its record: 1". With `raw`
-    (the control), `hdr` is left as the toy bound it, the raw table, and its two guards are bypassed: the read goes
-    unlogged, "desc read in its record: 0", and the body is the plain run's."""
+    (the control), that one read goes through `hdr` as the toy bound it, the raw table (kept from before the tracer
+    re-pointed it), while `hdr` is re-pointed everywhere else, as in a plain run: the read goes unlogged, "desc read
+    in its record: 0", and the body is the plain run's."""
     tracer_instance()
-    nss = {}
+    nss, toy_hdr = {}, {}
     _install = T.Tracer3.install
 
     @functools.wraps(_install)
@@ -554,24 +555,10 @@ def hdr_read_v2(raw):
         _repoint = T.Tracer3.repoint_aliases
 
         def repoint_aliases(self, nd, ns, pre):
-            hdr = ns["hdr"]
-            _repoint(self, nd, ns, pre)
-            ns["hdr"] = hdr                 # left raw
+            toy_hdr[int(nd.id)] = ns["hdr"]     # the toy's own, for the planted read alone
+            return _repoint(self, nd, ns, pre)
 
         T.Tracer3.repoint_aliases = repoint_aliases
-        _final = T.Tracer3.final_check
-
-        def final_check(self):              # its alias guard bypassed: hdr shown installed for the check alone
-            saved = {id(ns): ns["hdr"] for _, ns, _ in self.bound}
-            for _, ns, _ in self.bound:
-                ns["hdr"] = ns["desc"]
-            try:
-                _final(self)
-            finally:
-                for _, ns, _ in self.bound:
-                    ns["hdr"] = saved[id(ns)]
-
-        T.Tracer3.final_check = final_check
     want, inrec = [None, None], Count()     # the open record and the read's path; whether the record holds it
     _write = T.Tracer3.write
 
@@ -593,7 +580,7 @@ def hdr_read_v2(raw):
             if g is not None:
                 PLANTED[0] += 1
                 want[:] = [st["cur"], self.roots["desc"][0].path((g,))]
-                nss[a]["hdr"][g]
+                (toy_hdr[a] if raw else nss[a]["hdr"])[g]
                 SEEN["node a"] = a
                 SEEN["desc read in its record"] = inrec
         return _read(self, t, p)

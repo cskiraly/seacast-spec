@@ -802,15 +802,16 @@ def bindings_check(nid, ns, slots, found, fname, at):
     """Under v2, at a record's entry and at its exit (`at`): every slot the install bound (a traced name, a tape
     name, a table's view) still holds the tracer's own binding, or a draw re-wrapped (rewrap_draws; `found`, the
     toy's draws re-wrapped at the entry, put back before the exit's check). Anything else is a binding the toy made
-    during a call, which the twin would not run: a stop naming the slot and what it holds. A binding made and
-    restored wholly inside one record passes both (a stated limit; the replay's mismatch is its backstop)."""
+    after the install, between records or during a call, which the twin would not run: a stop naming the slot and
+    what it holds. A binding made and restored wholly inside one record passes both (a stated limit; the replay's
+    mismatch is its backstop)."""
     for s, w in slots.items():
         cur = ns.get(s)
         if cur is w or (s in found and cur is found[s]) or (s in DRAWS and getattr(cur, "_trace3_rewrap", False)):
             continue
         raise SystemExit(f"trace3: node {nid}: {s} is bound to {layer_where(cur)} at the {at} of {fname}'s record, "
-                         f"not to the tracer's own binding: a binding made during a call, which the twin would not "
-                         f"run")
+                         f"not to the tracer's own binding: a binding made after the install or during a call, which "
+                         f"the twin would not run")
 
 
 def node_chains(traced, ns, whole=False, lists=None, replaceable=None):
