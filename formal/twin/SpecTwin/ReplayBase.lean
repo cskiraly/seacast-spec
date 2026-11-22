@@ -438,7 +438,7 @@ callback, or a `start` of `decode_group`. The delay is a float's word, and the a
 record's own `after`. -/
 def noteOf (n : Json) : Except String Note := do
   let .arr #[k, d, f, xs] := n | throw s!"a timer note is [kind, delay, target, args]: {n.compress}"
-  let delay ← tryCatch (bits64 d) fun _ => throw s!"a timer note's delay is a 64-bit word: {n.compress}"
+  let delay ← tryCatch (bits64 d) fun _ => throw s!"a timer note's delay is the 64-bit word of a finite float: {n.compress}"
   match k, f with
   | .str "after", .str t =>
     if timerTargetsV1.contains t then return { delay, timer := .v1 (← noteArgs t xs (timerV1Of t)) }

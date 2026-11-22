@@ -286,8 +286,11 @@ def v2Args : List (String × String) :=
 #guard refusedWith "timers: an empty list, which the tracer does not write: " (notesIn (noted "[]"))
 #guard refusedWith "a timer note is [kind, delay, target, args]: " (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\"]]"))
 #guard refusedWith "a timer note's kind is after or start: " (notesIn (noted s!"[[\"later\",{w25},\"retry_offer\",[[\"{g6}\",3]]]]"))
-#guard refusedWith "a timer note's delay is a 64-bit word: " (notesIn (noted s!"[[\"after\",-1,\"retry_offer\",[[\"{g6}\",3]]]]"))
-#guard refusedWith "a timer note's delay is a 64-bit word: " (notesIn (noted s!"[[\"after\",0.25,\"retry_offer\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's delay is the 64-bit word of a finite float: " (notesIn (noted s!"[[\"after\",-1,\"retry_offer\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's delay is the 64-bit word of a finite float: " (notesIn (noted s!"[[\"after\",0.25,\"retry_offer\",[[\"{g6}\",3]]]]"))
+-- a plain integer that is no delay's word: 2^64, and +inf's word
+#guard refusedWith "a timer note's delay is the 64-bit word of a finite float: " (notesIn (noted s!"[[\"after\",18446744073709551616,\"retry_offer\",[[\"{g6}\",3]]]]"))
+#guard refusedWith "a timer note's delay is the 64-bit word of a finite float: " (notesIn (noted s!"[[\"after\",9218868437227405312,\"retry_offer\",[[\"{g6}\",3]]]]"))
 #guard refusedWith "a timer note's target is not one an after arms: " (notesIn (noted s!"[[\"after\",{w25},\"flush\",[[\"{g6}\",3]]]]"))
 #guard refusedWith "a timer note's target is not one an after arms: " (notesIn (noted s!"[[\"after\",{w25},\"decode_group\",[\"{g6}\"]]]"))
 #guard refusedWith "a timer note's target is not one a start arms: " (notesIn (noted s!"[[\"start\",{w25},\"reconsider\",[\"{g6}\",{w75}]]]"))
