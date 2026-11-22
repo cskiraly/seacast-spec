@@ -808,7 +808,105 @@ def bindings_checks_off_v2(both):
     T.bindings_check = bindings_check
 
 
-CELL_PLANTS_V2 = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-checks-off-v2")   # on a cell's arguments
+def per_node_depth_v2():
+    """Under v2, piece E's plant (r), E2: each install gets a depth state of its own (step 1's per-node depth, the
+    planted fault), and the plant makes no call of its own. On a cell where a question at node a reaches node c's
+    traced code (custody-floor-churn1: node a's `keep_floor` opens a link, and node c's `on_open` sends its JOIN and a
+    relation inside a's `open_link` question), those calls at c are then records of c's own, which start inside a's
+    question: the replay must refuse them. Counted once for each install."""
+    tracer_instance()
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0}
+        PLANTED[0] += 1
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+
+
+def suppressed_filter_v2(toy, off):
+    """Under v2, piece E's E3 (carried 9), as `--suppressed-entry-v2` is for hand5-own's `on_iwant`: on hand5-peer,
+    where each node replaces `filter_entry` (`--promise-mode peer`) and the toy enters it outside every record. At such
+    a node, a call of its replaced `filter_entry` from outside any record (from the toy's `Node._write`, which the
+    simulator calls at depth 0). A layer of this tool's own, bound before the install and live for that call alone,
+    calls the same node's traced `held` with a stored chunk's id, and returns, or raises `Planted`, which the call's
+    site catches. The tracer must suppress records inside the entry (no record of `held`, a count "s held") and restore
+    its state on the raise (`supp` 0 at the catch). With `off`, the layer clears the suppression for its call of
+    `held` (depth 0 there, the planted fault): a record of `held` starts inside the replaced name."""
+    sys.path.insert(0, str(Path(toy).resolve()))
+    import node as N                    # noqa: E402: the pinned toy's
+    tracer_instance()
+    live, at, peers = [False], [None], {}
+    watch_records(lambda: at[0])
+
+    def stored(ns):                     # a chunk stored at the node with its id cached, or None
+        for row in F.unwrap(ns["chunks"]).values():
+            for f in (row.values() if hasattr(row, "values") else row):
+                if getattr(f, "mid", None):
+                    return f
+        return None
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        fn = ns["filter_entry"]
+        if getattr(getattr(fn, "__code__", None), "co_filename", None) != T.DOC_FILE:  # the node's own: replaced
+            s = int(nd.id)
+            peers[s] = ns
+            st = self.vst
+
+            def filter_entry(*a, **kw):
+                if live[0]:
+                    mode, live[0] = live[0], False
+                    m = stored(ns).mid
+                    at[0] = (s, "held")
+                    try:
+                        if off:
+                            saved, st["supp"] = st["supp"], 0
+                            try:
+                                ns["held"](m)
+                            finally:
+                                st["supp"] = saved
+                        else:
+                            ns["held"](m)
+                    finally:
+                        at[0] = None
+                    if mode == "raise":
+                        raise Planted()
+                    return None
+                return fn(*a, **kw)
+            ns["filter_entry"] = filter_entry
+            T.LAYERS[T.layer_key(filter_entry)] = ("filter_entry", T.CHANGING)
+        return _install(self, nd, ns)
+
+    T.Tracer3.install = install
+    _w = N.Node._write
+
+    def _write(self, p):            # two entries: the first returns, the second raises (the state restored on both)
+        st = TR[0].vst if TR else None
+        if (PLANTED[0] < 2 and int(self.id) in peers and st and not st["depth"] and not st["supp"]
+                and stored(self.ns) is not None):
+            PLANTED[0] += 1
+            mode = "return" if PLANTED[0] == 1 else "raise"
+            live[0] = mode
+            try:
+                self.ns["filter_entry"](p, None)
+                happened = "returned"
+            except Planted:
+                happened = "raised"
+            SEEN["node s"] = int(self.id)
+            SEEN[f"entry {PLANTED[0]}"] = happened      # what the call did, not what was asked of it
+            SEEN[f"supp after the {mode}"] = st["supp"]
+            SEEN["bare s held"] = TR[0].bare.get(f"{int(self.id)} held", 0)
+        return _w(self, p)
+
+    N.Node._write = _write
+
+
+CELL_PLANTS_V2 = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-checks-off-v2",  # on a cell's arguments
+                  "--per-node-depth-v2", "--suppressed-filter-v2", "--suppressed-filter-v2-off")
 
 
 def hdr_read_v2(raw):
@@ -1232,6 +1330,10 @@ def main(argv):
             noask_in_record_v2()
         elif fault in ("--entry-check-off-v2", "--bindings-checks-off-v2"):
             bindings_checks_off_v2(both=fault == "--bindings-checks-off-v2")
+        elif fault == "--per-node-depth-v2":
+            per_node_depth_v2()
+        elif fault.startswith("--suppressed-filter-v2"):
+            suppressed_filter_v2(rest[0], off=fault.endswith("-off"))
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":
