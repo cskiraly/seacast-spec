@@ -2534,12 +2534,16 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
     assert ov["args"][0][4] is None and ov["args"][0][1] == 2 ** 32 and not ov["tape"]
     within = copy.deepcopy(ov)
     within["args"][0][1] = 2 ** 32 - 1                          # the last index a uint32 holds
-    # the third: a v2 cell's record with its node said to have replaced acquire_slot, the first by name of §7.1's
-    # window, which v2 does not trace
+    # the third: a v2 cell's record with its node said to have replaced a name the header does not trace, picked by a
+    # rule: the first, sorted, of the manifest's replaceable names outside the header's traced. A replaceable name,
+    # so that the nodes line's check of the header's traced refuses it, not the check before it (a replaced name the
+    # twin has no question for)
     hdr2, nodes2, r2 = first(v2trace, lambda d: "raises" not in d)
-    assert "acquire_slot" not in hdr2["header"]["traced"], "V2's header traces acquire_slot"
+    outside = sorted(set(header3.manifest_v2.REPLACEABLE) - set(hdr2["header"]["traced"]))
+    assert outside, "no replaceable name outside v2's traced"
+    name2 = outside[0]
     own2 = node_of(nodes2, r2)
-    untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {"acquire_slot"})}]}
+    untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {name2})}]}
     just = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]]}]}
     return check("a chunk without a descriptor field, an index past a uint32, an untraced name replaced", {
         "design B: a chunk with no descriptor field, accepted, as it is": (alone(hdr, nodes, bb), 0, None),
@@ -2550,8 +2554,8 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
         "message_id of an index beyond a uint32 raises, as it is": (alone(hdr1, nodes1, ov), 0, None),
         "its index written as the last a uint32 holds": (alone(hdr1, nodes1, within), 1, "the Python raises OverflowError"),
         "a v2 cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
-        "that node said to have replaced acquire_slot, which the header does not trace": (
-            alone(hdr2, untraced, r2), 1, "nodes: has replaced [acquire_slot], which the header does not list as traced"),
+        f"that node said to have replaced {name2}, which the header does not trace": (
+            alone(hdr2, untraced, r2), 1, f"nodes: has replaced [{name2}], which the header does not list as traced"),
     }, work, head, "carried")
 
 
