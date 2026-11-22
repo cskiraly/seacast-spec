@@ -1,12 +1,12 @@
-"""protocol-v2.md's tables (§3): the twin's v2 layer, one entry per table, beside schema.py's.
+"""seacast.md's tables (§3): the twin's v2 layer, one entry per table, beside schema.py's.
 
-gen.py appends TABLES_V2 to schema.py's TABLES, so that State.lean, Tables.lean and ReplayTables.lean stay one
-each, with one `Cell`. A trace under protocol.md has none of these
-entries, and they read as missing there. The list a protocol.md trace's header is checked against, `ownTables`,
+gen.py appends TABLES_Seacast to schema.py's TABLES, so that State.lean, Tables.lean and ReplayTables.lean stay one
+each, with one `Cell`. A trace under seacast-lite.md has none of these
+entries, and they read as missing there. The list a seacast-lite.md trace's header is checked against, `ownTables`,
 stays schema.py's; these tables' names are `v2Tables`.
 
 A table's codec follows from two things: what a read of a missing key does in the toy's container
-(toy/node.py, `_v2`), and what the code observes of a stored value.
+(toy/node.py, `_seacast`), and what the code observes of a stored value.
 - **Written as missing.** The tracer writes no empty leaf, and the twin's state holds none, where the container
   reads a missing key as the empty value (`LazySet`, `LazyList`, `LazyBits`, `zero`, `false`, `DefaultMap`) and
   the code observes a leaf's content alone (membership, truth, length, iteration of the leaf). The kinds: `bits`,
@@ -18,7 +18,7 @@ A table's codec follows from two things: what a read of a missing key does in th
 How a record writes them, as the tracer writes them:
 - keys: a type id as its string (`"payload"`, `"column"`, `"row"`); a family as an integer, a natural number or
   `["-", n]`; a block id as 64 hex digits; `backoff`'s inner key as `[colour, direction]`, the direction `"OUT"`,
-  `"IN"` or `"BOTH"`; a member of `probe_asks` as an ask key, as protocol.md's tables write one: an ask by index
+  `"IN"` or `"BOTH"`; a member of `probe_asks` as an ask key, as seacast-lite.md's tables write one: an ask by index
   `[group, index]`, a structured id its hex digits;
 - messages as tagged arrays in §2's field order: `["join", T, interest, custody_count, duty, colours]`,
   `["graft", T, family, colour, direction, answer]`, `["prune", T, family, colour, direction]`, enumerations as
@@ -35,8 +35,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # an isolated Python (-I) puts no directory there itself
 from schema import TABLES, Scan, Table                    # noqa: E402
 
-# kinds of value of v2's tables, as schema.py's VALUES (gen.py writes each kind's arms)
-VALUES_V2 = {
+# kinds of value of SEACAST's tables, as schema.py's VALUES (gen.py writes each kind's arms)
+VALUES_Seacast = {
     # an object type, by its id (`T_of[g]`): a plain dict, tested by `in`
     "typeid":    dict(lean="V2.TypeId", read="option", param="ty", val="typeId"),
     # a bitmap that can be complemented (`interest[g]`, `want_p[p][g]`), an integer in the signed form; a stored 0 is
@@ -64,8 +64,8 @@ VALUES_V2 = {
     "gis":       dict(lean="List GI", read="default", default="[]", param="gs", val="gis", parse="giList",
                       empty="an empty list of groups and indices"),
 }
-# how a key of each of v2's Lean types is read from a record's path (ReplayBase.lean)
-PARSE_V2 = {"V2.TypeId": "typeId", "V2.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir"}
+# how a key of each of SEACAST's Lean types is read from a record's path (ReplayBase.lean)
+PARSE_Seacast = {"V2.TypeId": "typeId", "V2.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir"}
 
 P, G, I = ("p", "Peer"), ("g", "Group"), ("i", "Nat")
 TY, FAM, B = ("T", "V2.TypeId"), ("fam", "V2.Fam"), ("b", "BlockId")
@@ -83,7 +83,7 @@ def rel(name, field, what):
                  scans=[whole(f"{field}All", f"every `{name}`", note=f"every `{name}[p][T][fam]`")])
 
 
-TABLES_V2 = [
+TABLES_Seacast = [
     # per link and object type
     Table("join_recv", "joinRecv", "joinRecv", [P, TY], "join",
           read=("joinRecv?", "`join_recv[p][T]`: what p declared to us, or none (a KeyError in the Python)"),
@@ -161,7 +161,7 @@ TABLES_V2 = [
           read=("probed?", "`probed[g]`, `probed.get(g)`: the claimant we asked, or none"),
           write=("setProbed", "`probed[g] = q`"),
           scans=[whole("probed", "every `probed`")]),
-    # an ask key, as protocol.md's tables keep one: `gated(a)` tests an ask by index or a structured id, two keys
+    # an ask key, as seacast-lite.md's tables keep one: `gated(a)` tests an ask by index or a structured id, two keys
     # even where they name one chunk
     Table("probe_asks", "probeAsks", "probeAsk", [("a", "Key")], "member",
           read=("probeAsk?", "`a in probe_asks`"), write=("setProbeAsk", "`probe_asks.add(a)`, or `.discard(a)`"),
@@ -265,9 +265,9 @@ def colour_dir(k):
     return [c, d]
 
 
-def python_tables_v2(F, key, fbits, msg):
-    """v2's tables as the Python tracer's schema lines (footprint.Table), as `schema.python_tables` gives
-    protocol.md's: how each key and each value is written in a record. `key` writes an ask key as protocol.md's
+def python_tables_seacast(F, key, fbits, msg):
+    """SEACAST's tables as the Python tracer's schema lines (footprint.Table), as `schema.python_tables` gives
+    seacast-lite.md's: how each key and each value is written in a record. `key` writes an ask key as seacast-lite.md's
     tables do (an ask by index `[group, index]`, a structured id its hex digits), `fbits` a float as its 64 bits,
     `msg` a JOIN, GRAFT or PRUNE as its tagged array (the tracer's, which knows the toy's messages)."""
     keyenc = {"Key": key, "Peer": int, "Group": lambda g: g.hex(), "Nat": int, "V2.TypeId": type_id,
@@ -299,7 +299,7 @@ def python_tables_v2(F, key, fbits, msg):
         "gis": lambda l: [[g.hex(), int(i)] for g, i in l] or None,
     }
     out = []
-    for t in TABLES_V2:
+    for t in TABLES_Seacast:
         out.append(F.Table(t.name, [keyenc[ty] for _, ty in t.keys], valenc[t.value], rows=bool(t.rows),
                            ordered=t.ordered, ordered_levels=t.ordered_levels, values_ordered=t.values_ordered,
                            presence_in=t.presence_in))
@@ -308,7 +308,7 @@ def python_tables_v2(F, key, fbits, msg):
 
 def self_test():
     """The encoders' known answers, with stand-ins for the toy's objects (an object type's `.id`, a `Bits`'s `.v`,
-    an ask's `.group` and `.index`). The Lean side of the same forms: SpecTwin/V2/Codecs.lean."""
+    an ask's `.group` and `.index`). The Lean side of the same forms: SpecTwin/Seacast/Codecs.lean."""
     import struct
     from types import SimpleNamespace as NS
     ok = True
@@ -345,10 +345,10 @@ def self_test():
 
     fbits = lambda t: struct.unpack("<Q", struct.pack("<d", t))[0]      # noqa: E731
     msg = lambda m: ["join", m.T, "ALL", 0, "NONE", 1]                   # noqa: E731: the tracer's, here a stand-in
-    by = {t.name: t for t in python_tables_v2(F, key, fbits, msg)}
-    names = [t.name for t in TABLES_V2]
-    case("v2's tables", len(names), 39)
-    case("no name twice, none of protocol.md's", sorted(set(names) - {t.name for t in TABLES}) == sorted(names), True)
+    by = {t.name: t for t in python_tables_seacast(F, key, fbits, msg)}
+    names = [t.name for t in TABLES_Seacast]
+    case("SEACAST's tables", len(names), 39)
+    case("no name twice, none of seacast-lite.md's", sorted(set(names) - {t.name for t in TABLES}) == sorted(names), True)
     g, row = bytes(range(32)), NS(id="row")
     case("a family below zero", signed(-1), ["-", 1])
     case("a family of zero", signed(0), 0)
@@ -380,7 +380,7 @@ def self_test():
     case("claims' groups, ordered", (by["claims"].kw["ordered"], tuple(by["claims"].kw["ordered_levels"])), (True, ()))
     case("probe_waiting[g]'s peers, ordered",
          (by["probe_waiting"].kw["ordered"], tuple(by["probe_waiting"].kw["ordered_levels"])), (False, (1,)))
-    case("no other v2 table ordered", sorted(t.name for t in TABLES_V2 if t.ordered or t.ordered_levels),
+    case("no other v2 table ordered", sorted(t.name for t in TABLES_Seacast if t.ordered or t.ordered_levels),
          ["claims", "probe_waiting"])
     case("samples_in_flight below zero", by["samples_in_flight"].value(-1), ["-", 1])
     case("owed_relations, empty", by["owed_relations"].value([]), None)
@@ -392,5 +392,5 @@ def self_test():
 if __name__ == "__main__":
     if sys.argv[1:] == ["--self-test"]:
         sys.exit(self_test())
-    print("usage: schema_v2.py --self-test", file=sys.stderr)
+    print("usage: schema_seacast.py --self-test", file=sys.stderr)
     sys.exit(2)

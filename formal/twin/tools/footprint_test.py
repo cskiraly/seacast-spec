@@ -670,7 +670,7 @@ def main():
             raise
     ok &= case("Q11 one entry in two lanes: trace3.py's alias check refuses the run", alias, raises="AliasRefused",
                make=Q)
-    # ---- rows read on the way down (`row_reads`, the four tables under --doc v2): RR1 to RR16; their control:
+    # ---- rows read on the way down (`row_reads`, the four tables under --doc seacast): RR1 to RR16; their control:
     #      --broken-row-reads. RR12 to RR16 are the forms that log as in any table, and pass under the control too
     def rr(make):
         def f():

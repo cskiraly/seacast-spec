@@ -1,8 +1,8 @@
-import SpecTwin.V2.Relations
+import SpecTwin.Seacast.Relations
 import SpecTwin.Sec42
 import SpecTwin.Sec52
 
-/-! # protocol-v2.md's offers and holdings: §4.4, §4.2's holding, §4.7's source, §4.8 and §4.9
+/-! # seacast.md's offers and holdings: §4.4, §4.2's holding, §4.7's source, §4.8 and §4.9
 
 The twin of the functions that offer, note pushes and send holdings: §4.4's `announce`, `announce_extra`,
 `fills` and `note_push`; §4.1's `join_push`, which calls `announce`; §4.2's `suppression_scope`, `holding_of`
@@ -10,8 +10,8 @@ and `send_have`; §4.7's `source_pool`, `unpush`, `candidates_for_source`, `orig
 and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes after every function it calls
 (`V2/Relations.lean`'s rule).
 
-- **`protocol.md`'s functions that v2 calls unchanged** run through `v1`: `have_bits` (§4.2 there), `owe`
-  (§5.2) and `N` (§1). v2's functions of the same names as `protocol.md`'s (`announce`, `note_push`, `unpush`,
+- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `v1`: `have_bits` (§4.2 there), `owe`
+  (§5.2) and `N` (§1). SEACAST's functions of the same names as `seacast-lite.md`'s (`announce`, `note_push`, `unpush`,
   `send_have`, `origin_written`, `origin_acked`, `send_gossip`, `projected`) are this namespace's, and calls
   among them name it (`V2.announce`).
 - **`suppression_scope(g)` is a set the tracer proxies**: the twin computes its members in
@@ -19,7 +19,7 @@ and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes a
   the place named for the caller.
 - **`planned` and `origin` are plain dicts** in the toy, so `planned[g][i]` and `origin[g]` raise `KeyError` on
   a missing key, as they crash here, a group named with its kind (`group G`) and an index bare. `planned[g][i]` is read once per peer of the pool, as the comprehension
-  reads it: not at all where the pool is empty. It is read as v2's view logs it, the view that the header's
+  reads it: not at all where the pool is empty. It is read as SEACAST's view logs it, the view that the header's
   `row_reads` names: the row `planned[g]` first (`planned`), so that a missing row raises before any leaf is read,
   then the leaf (`plannedTargets?`, which goes through the row again). A view that logs no read of a row the
   access goes through (`tools/footprint.py`'s `__getitem__`, in a trace without `row_reads`) logs the leaf alone,
@@ -28,13 +28,13 @@ and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes a
   a second time where no relation peer holds the colour, `offer_at_publish` reads `N(d)` twice, and `projected`
   asks `T.threshold(h)` twice.
 - **`pushed[p][g2].clear(i2)`** on an entry that is not there leaves it out (the toy's detached `PushEntry`
-  joins its map at a write that sets a bit, or its clock or its expiry), as `protocol.md`'s `unpush` does. -/
+  joins its map at a write that sets a bit, or its clock or its expiry), as `seacast-lite.md`'s `unpush` does. -/
 
-namespace SpecTwin.V2
+namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeV2 m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m]
 
 /-- `bitmap(s)` of a list of indices -/
 private def bitmapOf (is : List Nat) : Bits := is.foldl (fun b j => b ||| (1 <<< j)) 0
@@ -42,9 +42,9 @@ private def bitmapOf (is : List Nat) : Bits := is.foldl (fun b j => b ||| (1 <<<
 /-- `fills(g, i)` (§4.4, R4): every (group, index) the chunk at index i of g fills, from the ids alone -/
 def fills (g : Group) (i : Nat) : M2 m (List GI) := do
   enter "fills"
-  return (g, i) :: (← NodeV2.cross (← NodeV2.typeOfGroup g) g i)   -- `[(g, i)] + type_of_group(g).cross(g, i)`
+  return (g, i) :: (← NodeSeacast.cross (← NodeSeacast.typeOfGroup g) g i)   -- `[(g, i)] + type_of_group(g).cross(g, i)`
 
-/-- `note_push(p, g, i)` (§4.4): `protocol.md` §5.2's, under every group the chunk fills (R4) -/
+/-- `note_push(p, g, i)` (§4.4): `seacast-lite.md` §5.2's, under every group the chunk fills (R4) -/
 def notePush (p : Peer) (g : Group) (i : Nat) : M2 m Unit := do
   enter "note_push"
   for (g2, i2) in ← fills g i do
@@ -59,17 +59,17 @@ def notePush (p : Peer) (g : Group) (i : Nat) : M2 m Unit := do
 `links(T)`'s order; the caller asks the order it iterates them in -/
 def suppressionScope (g : Group) : M2 m (List Peer) := do
   enter "suppression_scope"
-  let T ← NodeV2.typeOfGroup g
-  let fam ← NodeV2.family T g
+  let T ← NodeSeacast.typeOfGroup g
+  let fam ← NodeSeacast.family T g
   let mut out : List Peer := []
-  for q in ← NodeV2.links T do                                -- `{q for q in links(T) if push_in[q][T][fam]}`
+  for q in ← NodeSeacast.links T do                                -- `{q for q in links(T) if push_in[q][T][fam]}`
     if !(← pushInOf q T fam).isEmpty && !out.contains q then out := out ++ [q]
   return out
 
 /-- `holding_of(g, bits)` (§4.2, §1.5): a holding, with its two claims -/
 def holdingOf (g : Group) (bits : Bits) : M2 m Have := do
   enter "holding_of"
-  let n ← NodeV2.indexCount (← NodeV2.typeOfGroup g) (← desc g)   -- `type_of_group(g).index_count(hdr[g])`
+  let n ← NodeSeacast.indexCount (← NodeSeacast.typeOfGroup g) (← desc g)   -- `type_of_group(g).index_count(hdr[g])`
   if (← origin g).isSome then                                 -- [P4] a group we publish: both claims once every
     branch "holding_of: a group we publish"                   --   chunk is known to have arrived, none before
     let whole := bits.popcount ≥ n
@@ -86,16 +86,16 @@ def sendHave (p : Peer) (g : Group) : M2 m Unit := do
   let h ← holdingOf g (← v1 (haveBits g))                     -- `holding_of(g, have_bits(g))`
   -- `if g in origin and MERGE_HOLDINGS and merge_waiting(p, h): return`
   if (← origin g).isSome && (← read).c2.MERGE_HOLDINGS then
-    if ← NodeV2.mergeWaiting p h then
+    if ← NodeSeacast.mergeWaiting p h then
       branch "send_have: merged"                              -- [P4] merged (§4.7)
       return
-  let _ ← NodeV2.send p (.have h) true
+  let _ ← NodeSeacast.send p (.have h) true
   branch "send_have: sent"
 
 /-- A call `send_have(p, g)` as the node binds the name: the node's own where its line names it as replaced, a
 question to the node, else the document's -/
 def sendHaveCall (p : Peer) (g : Group) : M2 m Unit := do
-  if (← read).base.replaced.contains "send_have" then NodeV2.sendHaveNode p g else sendHave p g
+  if (← read).base.replaced.contains "send_have" then NodeSeacast.sendHaveNode p g else sendHave p g
 
 /-- `announce(p, g, bits)` (§4.4) [c3, c7]: an offer, of what p does not hold, was not pushed and wants -/
 def announce (p : Peer) (g : Group) (bits : Bits) : M2 m Unit := do
@@ -108,7 +108,7 @@ def announce (p : Peer) (g : Group) (bits : Bits) : M2 m Unit := do
     branch "announce: nothing to offer"
     return
   let h : Have := { group := g, bits := b, offer := true, claimAll := false, complete := false }
-  if ← NodeV2.send p (.have h) false then
+  if ← NodeSeacast.send p (.have h) false then
     branch "announce: sent"
   else
     v1 (owe p g b)                                            -- refused by a full queue: owed (v0.5)
@@ -117,26 +117,26 @@ def announce (p : Peer) (g : Group) (bits : Bits) : M2 m Unit := do
 /-- `announce_extra(g, i)` (§4.4, [D5]): the links outside the relation that want chunk i, at forward time -/
 def announceExtra (g : Group) (i : Nat) : M2 m (List Peer) := do
   enter "announce_extra"
-  let T ← NodeV2.typeOfGroup g
-  let fam ← NodeV2.family T g
+  let T ← NodeSeacast.typeOfGroup g
+  let fam ← NodeSeacast.family T g
   if (← param T "ANNOUNCE_EXTRA" (·.ANNOUNCE_EXTRA)) != .allJoined then
     branch "announce_extra: not ALL_JOINED"                   -- SAMPLE: the heartbeat's paced gossip (§4.8)
     return []
   -- `related = {q for q in links(T) if push_out[q][T][fam] or push_in[q][T][fam]}`: push_in read only where
   -- push_out is empty
   let mut related : List Peer := []
-  for q in ← NodeV2.links T do
+  for q in ← NodeSeacast.links T do
     let r ← if !(← pushOutOf q T fam).isEmpty then pure true else do pure !(← pushInOf q T fam).isEmpty
     if r then related := related ++ [q]
   -- `[q for q in links(T) if q not in related and wants_from_me(q, g).has(i)]`: links(T) asked again
-  let out ← (← NodeV2.links T).filterM fun q => do
+  let out ← (← NodeSeacast.links T).filterM fun q => do
     if related.contains q then return false
     return (← wantsFromMe q g).has i
   branch "announce_extra: ALL_JOINED"
   return out
 
 /-- `join_push(p, T, fam, c)` (§4.1): p joins our push relation for colour c: what we hold of it is announced
-(`protocol.md` §5.4's `on_mesh_join`); a GRAFT that adds nothing runs nothing -/
+(`seacast-lite.md` §5.4's `on_mesh_join`); a GRAFT that adds nothing runs nothing -/
 def joinPush (p : Peer) (T : TypeId) (fam : Fam) (c : Nat) : M2 m Unit := do
   enter "join_push"
   let s ← pushOutOf p T fam
@@ -152,10 +152,10 @@ def joinPush (p : Peer) (T : TypeId) (fam : Fam) (c : Nat) : M2 m Unit := do
     if (← state? g) == some .invalid then
       branch "join_push: a dropped group"
       continue
-    if (← NodeV2.typeOfGroup g) != T then
+    if (← NodeSeacast.typeOfGroup g) != T then
       branch "join_push: another type"
       continue
-    if (← NodeV2.family T g) != fam then
+    if (← NodeSeacast.family T g) != fam then
       branch "join_push: another family"
       continue
     -- `bitmap({i for i in chunks[g] if colour_of(g, i) == c})`
@@ -167,13 +167,13 @@ def joinPush (p : Peer) (T : TypeId) (fam : Fam) (c : Nat) : M2 m Unit := do
 peers of colour c, or the links where there are none -/
 def sourcePool (T : TypeId) (g : Group) (c : Nat) : M2 m (List Peer) := do
   enter "source_pool"
-  let fam ← NodeV2.family T g
-  let rel ← (← NodeV2.links T).filterM fun q => do return (← pushOutOf q T fam).contains c
+  let fam ← NodeSeacast.family T g
+  let rel ← (← NodeSeacast.links T).filterM fun q => do return (← pushOutOf q T fam).contains c
   if !rel.isEmpty then
     branch "source_pool: the relation"
     return rel
   branch "source_pool: the links"
-  NodeV2.links T                                              -- `rel or links(T)`: asked again
+  NodeSeacast.links T                                              -- `rel or links(T)`: asked again
 
 /-- `unpush(p, g, i)` (§4.7) [c3]: a chosen push that will not be made: not counted, under every group
 `note_push` marked, and owed to a relation peer, or at a source to a peer of the pool as it stands now -/
@@ -187,7 +187,7 @@ def unpush (p : Peer) (g : Group) (i : Nat) : M2 m Unit := do
   let owes ← if ← meshHas p then pure true else do
     let o ← origin g                                          -- read only where p is not in the mesh
     if o.isNone then pure false else do
-      let T ← NodeV2.typeOfGroup g
+      let T ← NodeSeacast.typeOfGroup g
       let c ← colourOf g i
       pure ((← sourcePool T g c).contains p)
   if owes then
@@ -199,14 +199,14 @@ def unpush (p : Peer) (g : Group) (i : Nat) : M2 m Unit := do
 /-- `candidates_for_source(f)` (§4.7): whom a source may push chunk f to -/
 def candidatesForSource (f : ChunkF) : M2 m (List Peer) := do
   enter "candidates_for_source"
-  let T ← NodeV2.typeOfGroup f.g
+  let T ← NodeSeacast.typeOfGroup f.g
   let g := f.g
-  let _fam ← NodeV2.family T g                                -- `fam = T.family(g)`: asked, not used
+  let _fam ← NodeSeacast.family T g                                -- `fam = T.family(g)`: asked, not used
   let c ← colourOf g f.i
   let cfg := (← read).base.c
   let pool ← if cfg.UPLINK ≥ cfg.STRIPE_UPLINK then do        -- [c13] every link
       branch "candidates_for_source: every link"
-      NodeV2.links T
+      NodeSeacast.links T
     else do                                                   -- the relation, as the other nodes do
       branch "candidates_for_source: the pool"
       sourcePool T g c
@@ -224,7 +224,7 @@ def originWritten (f : ChunkF) : M2 m Unit := do
       branch "origin_written: in our holding already"
     else
       setOrigin g (b.set f.i)                                 -- `origin[g].set(f.index)`
-      for q in ← NodeV2.order "origin_written" (← suppressionScope g) do
+      for q in ← NodeSeacast.order "origin_written" (← suppressionScope g) do
         sendHaveCall q g
       branch "origin_written: the holding grows"
 
@@ -233,9 +233,9 @@ to the peers `origin_acked` would offer it to, and our holding names every chunk
 def offerAtPublish (g : Group) (d : Descriptor) : M2 m Unit := do
   enter "offer_at_publish"
   setOrigin g ((1 <<< (← v1 (N (some d)))) - 1)              -- `origin[g] = all_bits(N(d))`
-  for q in ← NodeV2.order "offer_at_publish" (← suppressionScope g) do
+  for q in ← NodeSeacast.order "offer_at_publish" (← suppressionScope g) do
     sendHaveCall q g
-  let T ← NodeV2.typeOfGroup g
+  let T ← NodeSeacast.typeOfGroup g
   -- `offers.setdefault(q, set()).add(i)`: a dict, in the order its keys were first set
   let mut offers : List (Peer × Bits) := []
   for i in List.range (← v1 (N (some d))) do                  -- `range(N(d))`: N read again
@@ -258,14 +258,14 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
     branch "origin_acked: acknowledged before"
     return
   setOrigin g (b.set i)                                       -- `origin[g].set(i)`
-  for q in ← NodeV2.order "origin_acked" (← suppressionScope g) do
+  for q in ← NodeSeacast.order "origin_acked" (← suppressionScope g) do
     sendHaveCall q g
-  let T ← NodeV2.typeOfGroup g
-  let _fam ← NodeV2.family T g                                -- `fam = T.family(g)`: asked, not used
+  let T ← NodeSeacast.typeOfGroup g
+  let _fam ← NodeSeacast.family T g                                -- `fam = T.family(g)`: asked, not used
   let c ← colourOf g i
   -- `[q for q in source_pool(T, g, c) if q not in planned[g][i]]`: planned[g][i] read once per peer
   let ps ← (← sourcePool T g c).filterM fun q => do
-    if !(← planned g) then                                    -- the row, then the leaf, as v2's view logs them
+    if !(← planned g) then                                    -- the row, then the leaf, as SEACAST's view logs them
       return (← crash s!"KeyError: group {g} (origin_acked: planned[g])")
     match ← plannedTargets? g i with
     | some ts => return !ts.contains q
@@ -278,24 +278,24 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
 def sendGossip (q : Peer) (ids : List Key) : M2 m Unit := do
   enter "send_gossip"
   for (g, bits) in ← groupBits ids do                         -- `for g, bits in group_bits(ids):`
-    if (← param (← NodeV2.typeOfGroup g) "ANNOUNCE_EXTRA" (·.ANNOUNCE_EXTRA)) == .sample then
+    if (← param (← NodeSeacast.typeOfGroup g) "ANNOUNCE_EXTRA" (·.ANNOUNCE_EXTRA)) == .sample then
       V2.announce q g bits                                    -- [D5] ALL_JOINED offered at forward time already
       branch "send_gossip: offered"
     else
       branch "send_gossip: not SAMPLE"
 
-/-- `projected(p, g)` (§4.9) [c12]: `protocol.md` §7.2's, read per object type -/
+/-- `projected(p, g)` (§4.9) [c12]: `seacast-lite.md` §7.2's, read per object type -/
 def projected (p : Peer) (g : Group) : M2 m Bool := do
   enter "projected"
-  let T ← NodeV2.typeOfGroup g                                -- `T, h = type_of_group(g), hdr[g]`
+  let T ← NodeSeacast.typeOfGroup g                                -- `T, h = type_of_group(g), hdr[g]`
   let h ← desc g
-  if (← NodeV2.threshold T h) == (← NodeV2.indexCount T h) then
+  if (← NodeSeacast.threshold T h) == (← NodeSeacast.indexCount T h) then
     branch "projected: no code"                               -- every index is needed: nothing is projected
     return false
   let has ← v1 (peerHas p g)                                  -- `has, sent = peer_has[p][g].bits, sent_to[p][g]`
   let sent ← sentToBits p g
-  let r := has.popcount + (← read).base.c.FAN_IN * (sent.minus has).popcount ≥ (← NodeV2.threshold T h)
+  let r := has.popcount + (← read).base.c.FAN_IN * (sent.minus has).popcount ≥ (← NodeSeacast.threshold T h)
   branch (if r then "projected: the threshold reached without us" else "projected: not yet")
   return r
 
-end SpecTwin.V2
+end SpecTwin.Seacast

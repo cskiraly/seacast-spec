@@ -1,37 +1,37 @@
-import SpecTwin.V2.Announce
-import SpecTwin.V2.Receive
+import SpecTwin.Seacast.Announce
+import SpecTwin.Seacast.Receive
 import SpecTwin.Sec41
 import SpecTwin.Sec42
 import SpecTwin.Sec61
 import SpecTwin.Sec64
 
-/-! # protocol.md's functions that v2 keeps, in the forms they take under v2
+/-! # seacast-lite.md's functions that v2 keeps, in the forms they take under v2
 
-The Python binds a name when it calls it, so under protocol-v2.md `on_pace_tick` sends v2's gossip and
-`on_block_installed` validates with v2's `on_validated`. The twin binds a name when the function is defined, so
-each of the two has a copy here, in `M2`, that calls v2's. `respond` calls nothing v2 redefines, but the IWANT it
-builds is one a record under v2 writes in v2's form: the toy has one IWANT class, and a lane's IWANT under v2 is
-`.iwantV2`, so its copy builds that constructor. Each copy is its original's text (`Sec64.lean`'s `paceTurns` and
+The Python binds a name when it calls it, so under seacast.md `on_pace_tick` sends SEACAST's gossip and
+`on_block_installed` validates with SEACAST's `on_validated`. The twin binds a name when the function is defined, so
+each of the two has a copy here, in `M2`, that calls SEACAST's. `respond` calls nothing v2 redefines, but the IWANT it
+builds is one a record under v2 writes in SEACAST's form: the toy has one IWANT class, and a lane's IWANT under v2 is
+`.iwantSeacast`, so its copy builds that constructor. Each copy is its original's text (`Sec64.lean`'s `paceTurns` and
 `onPaceTick`, `Sec42.lean`'s `onBlockInstalled`, `Sec41.lean`'s `respond`) with these differences alone, to which
 `tools/keptcopy.py` holds it:
 
-- The monad is `M2 m`, and `paceTurns` takes protocol.md's context as `(← read).base`.
-- A function of protocol.md's Lean runs through `v1`. The node's questions and the tables are called as they are.
-- A call that the Python binds late names v2's function: `V2.sendGossip`, `V2.paceTurns` and `V2.onValidated`.
-  v2's `on_validated` takes no fuel, since it does not recurse through `defer`.
+- The monad is `M2 m`, and `paceTurns` takes seacast-lite.md's context as `(← read).base`.
+- A function of seacast-lite.md's Lean runs through `v1`. The node's questions and the tables are called as they are.
+- A call that the Python binds late names SEACAST's function: `V2.sendGossip`, `V2.paceTurns` and `V2.onValidated`.
+  SEACAST's `on_validated` takes no fuel, since it does not recurse through `defer`.
 - The no-bid branch of `on_block_installed` is reached under v2, for a block of columns. There the Python calls
   `ledger(None)`: it enters `ledger`, asks the connected topic peers, and reads `offered[q][None]` for each,
   which the tracer does not write. No table holds a group of `None`, so the call returns no ask. The copy enters
   `ledger` and asks the peers.
-- `respond`'s IWANT is `.iwantV2 false`, its asks plain, where the original builds `.iwant`. -/
+- `respond`'s IWANT is `.iwantSeacast false`, its asks plain, where the original builds `.iwant`. -/
 
-namespace SpecTwin.V2
+namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeV2 m] [V2Later m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [V2Later m]
 
-/-- The turns of `on_pace_tick`'s loop under v2, at most `fuel`: protocol.md's, with v2's `send_gossip`. -/
+/-- The turns of `on_pace_tick`'s loop under v2, at most `fuel`: seacast-lite.md's, with SEACAST's `send_gossip`. -/
 def paceTurns : Nat → M2 m Unit
   | 0 => do
     if (← paceJobs .jobs).isEmpty then branch "on_pace_tick: the queue ran out"
@@ -52,12 +52,12 @@ def paceTurns : Nat → M2 m Unit
         V2.sendGossip job.q job.ids
         branch "on_pace_tick: one job's gossip sent"        -- one peer per tick, even if nothing was left to send
 
-/-- `on_pace_tick()` under v2: protocol.md's, with v2's turns -/
+/-- `on_pace_tick()` under v2: seacast-lite.md's, with SEACAST's turns -/
 def onPaceTick : M2 m Unit := do
   enter "on_pace_tick"
   V2.paceTurns (← paceJobs .jobs).length
 
-/-- `on_block_installed(root)` under v2: protocol.md's, with v2's `on_validated`, and its no-bid branch entering `ledger` -/
+/-- `on_block_installed(root)` under v2: seacast-lite.md's, with SEACAST's `on_validated`, and its no-bid branch entering `ledger` -/
 def onBlockInstalled (root : Root) : M2 m Unit := do
   enter "on_block_installed"
   let waits ← pendingOf root                                -- `for p, f in pending.pop(root, []):`, in the list's
@@ -103,12 +103,12 @@ def onBlockInstalled (root : Root) : M2 m Unit := do
     branch "on_block_installed: no group committed"         --   not write; no table holds a group of None, so
                                                             --   it returns no ask
 
-/-- `respond(p, asks, answers, prunes)` under v2: protocol.md's, its IWANT in v2's form -/
+/-- `respond(p, asks, answers, prunes)` under v2: seacast-lite.md's, its IWANT in SEACAST's form -/
 def respond (p : Peer) (asks : List Key) (answers : List ChunkF) (prunes : Nat) : M2 m Unit := do
   enter "respond"
   -- `control = IWANT(asks) + PRUNE(prunes) if asks or prunes else None`: an empty part is left out by the queue
   let control : Option (List Ctl) :=
-    if !asks.isEmpty || prunes > 0 then some [.iwantV2 false (asks.map fun k => { key := k }), .prune] else none
+    if !asks.isEmpty || prunes > 0 then some [.iwantSeacast false (asks.map fun k => { key := k }), .prune] else none
   if answers.isEmpty then
     if control.isSome then
       let _ ← enqueue p (.entry { chunk := none, control, solicited := false }) false
@@ -124,4 +124,4 @@ def respond (p : Peer) (asks : List Key) (answers : List ChunkF) (prunes : Nat) 
       branch "respond: an answer refused, owed"
   branch "respond: answers"
 
-end SpecTwin.V2
+end SpecTwin.Seacast

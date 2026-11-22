@@ -1,7 +1,7 @@
 import SpecTwin.Basic
-import SpecTwin.V2.Types
+import SpecTwin.Seacast.Types
 
-/-! # The v2 layer's basic types: bitmaps that can be complemented (protocol-v2.md §3)
+/-! # The v2 layer's basic types: bitmaps that can be complemented (seacast.md §3)
 
 `EVERY_INDEX` is the toy's `Bits(-1)`, and interest flows into bitmaps through `&`, `|` and `~` on Python ints, so a
 bitmap that interest reaches is an `IBits`, an `Int` read in two's complement, as Python reads it. Core Lean has
@@ -12,7 +12,7 @@ The `#guard` cases below are Python's own values (`python3 -c`), over both signs
 The typing rule: `Bits & IBits` is a `Bits` (`Bits.andI`), since one side
 is not negative; `IBits & ~Bits` and `IBits | Bits` are `IBits`. -/
 
-namespace SpecTwin.V2
+namespace SpecTwin.Seacast
 
 /-- A `Bits` as an `IBits` (`IBits` is in `V2/Types.lean`). -/
 def IBits.ofBits (b : Bits) : IBits := Int.ofNat b
@@ -61,7 +61,7 @@ def IBits.toBits? : IBits → Option Bits
 
 /-- A type's 24 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
 `REPAIR_TO`, which are questions), and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
-`REPAIR_REASK`). `SAMPLE_OUTSTANDING` is no type's but the node's (`ConstsV2`). Each is optional: the toy gives
+`REPAIR_REASK`). `SAMPLE_OUTSTANDING` is no type's but the node's (`ConstsSeacast`). Each is optional: the toy gives
 its payload and row types no `SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT`
 (`toy/node.py:1231-1243`, `toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it
 crashes here. The two
@@ -95,7 +95,7 @@ structure TypeParams where
   REPAIR_REASK : Option Bool := none
   deriving Repr, Inhabited
 
-/-! ## What v2's code asks of the rest of the node
+/-! ## What SEACAST's code asks of the rest of the node
 
 A type is its id; its methods and its three parameters that
 are functions are questions with the id first. The helpers the document does not write out are questions too,
@@ -110,15 +110,15 @@ structure Cover where
   high : Option Bool := none
   deriving BEq, Repr, Inhabited
 
-/-- v2's timers (§4.6, §4.10), asked through `afterV2`. `promise_due`, which v2's `filter_entry` arms, stays on
-`protocol.md`'s `after`. -/
-inductive TimerV2 where
+/-- SEACAST's timers (§4.6, §4.10), asked through `afterSeacast`. `promise_due`, which SEACAST's `filter_entry` arms, stays on
+`seacast-lite.md`'s `after`. -/
+inductive TimerSeacast where
   | reconsider (g : Group) (at_ : Float)
   | askSample (g : Group) (i : Nat)
   | resample (g : Group) (i : Nat) (q : Peer) (first : Bool)
   deriving BEq, Repr
 
-class NodeV2 (m : Type → Type) where
+class NodeSeacast (m : Type → Type) where
   /-- `type_of_group(g)` (§3): the group's type, as its id -/
   typeOfGroup : Group → m TypeId
   /-- `type_of(tid)` (§3): the type of that id at this node -/
@@ -149,9 +149,9 @@ class NodeV2 (m : Type → Type) where
   /-- `T.params.REPAIR_TO(g)`: peers, in the order the set iterates -/
   repairTo : TypeId → Group → m (List Peer)
   /-- `send(p, msg, urgent)` (§7): whether it went or was queued -/
-  send : Peer → MsgV2 → Bool → m Bool
-  /-- `after(delay, fn, …)` for v2's timers -/
-  afterV2 : Float → TimerV2 → m Unit
+  send : Peer → MsgSeacast → Bool → m Bool
+  /-- `after(delay, fn, …)` for SEACAST's timers -/
+  afterSeacast : Float → TimerSeacast → m Unit
   /-- `links(T)`: the peers linked for the type -/
   links : TypeId → m (List Peer)
   /-- `link_cover(q, T)`: the families q serves and whether its custody is high; no id -/
@@ -183,7 +183,7 @@ class NodeV2 (m : Type → Type) where
   /-- `interest_satisfied(g)` -/
   interestSatisfied : Group → m Bool
   /-- `valid_have(h)` for a whole `Have` (§8.2's limits) -/
-  validHaveV2 : Have → m Bool
+  validHaveSeacast : Have → m Bool
   /-- `merge_waiting(p, h)`: whether a holding of h's group to p merged into one waiting -/
   mergeWaiting : Peer → Have → m Bool
   /-- `deferred_offers(p, h)`: offers recorded now, asked when the start delay has run; its answer, `[]` -/
@@ -212,7 +212,7 @@ class NodeV2 (m : Type → Type) where
   shuffledPairs : List (Nat × ChunkF) → m (List (Nat × ChunkF))
   /-- `sample_without_replacement(xs, k)` of records -/
   sampleCovers : List Cover → Nat → m (List Cover)
-  /-- the order in which a proxied set of peers iterates at a place of v2's code, an `order` entry on the tape: a permutation of
+  /-- the order in which a proxied set of peers iterates at a place of SEACAST's code, an `order` entry on the tape: a permutation of
   the members the twin computed -/
   order : String → List Peer → m (List Peer)
   /-- the order in which `probe_waiting[g]`'s keys iterate (`probe_waiting[g].items()` in `serve_waiting_probe`,
@@ -225,7 +225,7 @@ class NodeV2 (m : Type → Type) where
   ownInterest : Group → m IBits
   -- The eight names of the 71 that a node can replace, by a binding of its own that changes what the function
   -- does, and that have a call site inside the replayed closure: where the node's line names one as replaced, the
-  -- Python asks the node, and the twin asks this question in place of the document's body, as `protocol.md`'s
+  -- Python asks the node, and the twin asks this question in place of the document's body, as `seacast-lite.md`'s
   -- `forwardNode` is.
   /-- `forward(f, from_peer, axes)` as the node binds it -/
   forwardNode : ChunkF → Peer → Option (List GI) → m Unit
@@ -250,10 +250,10 @@ class V2Later (m : Type → Type) where
   /-- `window_release(p, g, i)` (§4.11) -/
   windowRelease : Peer → Group → Nat → m Unit
 
-namespace NodeV2
+namespace NodeSeacast
 
 /-- Asking through a monad transformer, as `Node61.lift`. -/
-abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α) : NodeV2 n where
+abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α → n α) : NodeSeacast n where
   typeOfGroup a := f (typeOfGroup a)
   typeOf a := f (typeOf a)
   indexCount a b := f (indexCount a b)
@@ -269,7 +269,7 @@ abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α
   decodeLater a b := f (decodeLater a b)
   repairTo a b := f (repairTo a b)
   send a b c := f (send a b c)
-  afterV2 a b := f (afterV2 a b)
+  afterSeacast a b := f (afterSeacast a b)
   links a := f (links a)
   linkCover a b := f (linkCover a b)
   coverCandidates a := f (coverCandidates a)
@@ -285,7 +285,7 @@ abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α
   groupOf a b := f (groupOf a b)
   nodeId a := f (nodeId a)
   interestSatisfied a := f (interestSatisfied a)
-  validHaveV2 a := f (validHaveV2 a)
+  validHaveSeacast a := f (validHaveSeacast a)
   mergeWaiting a b := f (mergeWaiting a b)
   deferredOffers a b := f (deferredOffers a b)
   openGroupSource a b := f (openGroupSource a b)
@@ -312,25 +312,25 @@ abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α
   noteClaimNode a b := f (noteClaimNode a b)
   knownInScopeNode a := f (knownInScopeNode a)
 
-instance {m : Type → Type} {σ : Type} [Monad m] [NodeV2 m] : NodeV2 (StateT σ m) :=
+instance {m : Type → Type} {σ : Type} [Monad m] [NodeSeacast m] : NodeSeacast (StateT σ m) :=
   lift (m := m) (n := StateT σ m) fun x => monadLift x
-instance {m : Type → Type} {ρ : Type} [Monad m] [NodeV2 m] : NodeV2 (ReaderT ρ m) :=
+instance {m : Type → Type} {ρ : Type} [Monad m] [NodeSeacast m] : NodeSeacast (ReaderT ρ m) :=
   lift (m := m) (n := ReaderT ρ m) fun x => monadLift x
 
-end NodeV2
+end NodeSeacast
 
 instance {m : Type → Type} {σ : Type} [Monad m] [V2Later m] : V2Later (StateT σ m) where
   windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
 instance {m : Type → Type} {ρ : Type} [Monad m] [V2Later m] : V2Later (ReaderT ρ m) where
   windowRelease p g i := monadLift (V2Later.windowRelease (m := m) p g i)
 
-/-- v2's node-wide constants this cycle reads that `protocol.md`'s `Consts` lacks. Two of v2's
+/-- SEACAST's node-wide constants this cycle reads that `seacast-lite.md`'s `Consts` lacks. Two of SEACAST's
 constants are `Consts`' own fields, read there, so that v2 and the kept functions it calls read one value:
 `SOURCE_OFFERS` is `SOURCE_OFFERS_PUBLISH` (whether it is `PUBLISH`), and `IWANT_WINDOW` is the effective window,
 already scaled by `ask_scale()` at load time, which `may_ask`, `retry_offer` and `ask_parked` read. -/
-structure ConstsV2 where
+structure ConstsSeacast where
   ANSWERS_FIRST : Bool
-  /-- §4.13's uplink, in bits per second, at and above which `IWANT_WINDOW` keeps `protocol.md`'s value; 0 never
+  /-- §4.13's uplink, in bits per second, at and above which `IWANT_WINDOW` keeps `seacast-lite.md`'s value; 0 never
   scales (the toy's `--ask-uplink 0`) -/
   ASK_UPLINK : Float
   MERGE_HOLDINGS : Bool
@@ -341,16 +341,16 @@ structure ConstsV2 where
   SERVE_BUDGET : Option Nat
   deriving Repr, Inhabited
 
-/-- What a call of v2's code reads that does not change during it: `protocol.md`'s context, v2's constants, and
+/-- What a call of SEACAST's code reads that does not change during it: `seacast-lite.md`'s context, SEACAST's constants, and
 the types' parameters at the node (none for an id the node has no type of). -/
 structure Ctx2 where
   base : Ctx
-  c2 : ConstsV2
+  c2 : ConstsSeacast
   params : TypeId → Option TypeParams
 
 abbrev M2 (m : Type → Type) := ReaderT Ctx2 m
 
-/-- A call of `protocol.md`'s Lean from v2's: it reads the base context. -/
+/-- A call of `seacast-lite.md`'s Lean from SEACAST's: it reads the base context. -/
 def v1 {m : Type → Type} {α : Type} (x : M m α) : M2 m α := fun c => x c.base
 
 /-- `T.params.X`: the twin reads it from the context, with no question. A type the node has no parameters for,
@@ -509,7 +509,7 @@ def param {m : Type → Type} [Monad m] [Node61 m] {α : Type} [Inhabited α] (T
 #guard Bits.andI 255 (-13) == 243
 #guard Bits.andI 255 (-256) == 0
 
-/-! ## The new constructors in `protocol.md`'s pure case analyses
+/-! ## The new constructors in `seacast-lite.md`'s pure case analyses
 
 `QEntry.asks` reads every IWANT, marked or not, as the toy's `entry.iwants()` does, and drops the flags; a
 relation and a holding hold no ask. `Ctl.isEmpty` is the toy's `_Msg.empty`: an IWANT with no asks is empty, a
@@ -520,17 +520,17 @@ private def k2 : Key := .want "g" 2
 private def rel : Relation := .prune { objectType := "payload", family := -1, colour := 0, direction := .outward }
 private def ctlE (cs : List Ctl) : QEntry := { chunk := none, control := some cs, solicited := false }
 
-#guard (ctlE [.iwantV2 true [{ key := k1, standing := true, hops := 2 }, { key := k2 }]]).asks == [k1, k2]
-#guard (ctlE [.iwantV2 false [{ key := k1, probe := true }]]).asks == [k1]
-#guard (ctlE [.iwant [k2], .iwantV2 true [{ key := k1 }]]).asks == [k2, k1]
+#guard (ctlE [.iwantSeacast true [{ key := k1, standing := true, hops := 2 }, { key := k2 }]]).asks == [k1, k2]
+#guard (ctlE [.iwantSeacast false [{ key := k1, probe := true }]]).asks == [k1]
+#guard (ctlE [.iwant [k2], .iwantSeacast true [{ key := k1 }]]).asks == [k2, k1]
 #guard (ctlE [.relation rel, .idontwant [.holding "g" 5 true false]]).asks == []
-#guard (ctlE [.iwantV2 true []]).asks == []
-#guard (Ctl.iwantV2 true []).isEmpty
-#guard !(Ctl.iwantV2 false [{ key := k1 }]).isEmpty
+#guard (ctlE [.iwantSeacast true []]).asks == []
+#guard (Ctl.iwantSeacast true []).isEmpty
+#guard !(Ctl.iwantSeacast false [{ key := k1 }]).isEmpty
 #guard !(Ctl.relation rel).isEmpty
 #guard (Ctl.idontwant [.holding "g" 0 false false]).isEmpty == false
 #guard (Ctl.idontwant []).isEmpty
-#guard (ctlE [.iwantV2 true []]).isEmpty
+#guard (ctlE [.iwantSeacast true []]).isEmpty
 #guard !(ctlE [.relation rel]).isEmpty
 
-end SpecTwin.V2
+end SpecTwin.Seacast

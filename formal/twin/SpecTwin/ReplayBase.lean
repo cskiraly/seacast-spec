@@ -1,6 +1,6 @@
 import Lean.Data.Json
 import SpecTwin.Basic
-import SpecTwin.V2.Basic
+import SpecTwin.Seacast.Basic
 
 /-! # What the replay's reading of a record starts from
 
@@ -29,7 +29,7 @@ inductive Val where
   | desc (d : Descriptor)                 -- a group's descriptor
   | int (n : Int)                         -- a signed count, not zero (the window's `in_flight`)
   | ids (l : List Hex)                    -- a set of opaque ids as hex, sorted (`unwanted[p]`)
-  -- protocol-v2.md's (tools/gen/schema_v2.py)
+  -- seacast.md's (tools/gen/schema_seacast.py)
   | typeId (t : V2.TypeId)                -- an object type's id (`T_of`)
   | ibits (b : V2.IBits)                  -- a bitmap that can be complemented (`interest`, `want_p`); 0 is a value
   | join (m : V2.Join)                    -- a JOIN (`join_recv`, `join_sent`)
@@ -181,8 +181,8 @@ def admitOf (j : Json) : Except String Admit :=
   | _ => throw s!"not what admitted is asked of, a chunk, a HAVE, a holding or an offered id: {j.compress}"
 
 /-- A chunk where the document writes it narrow: `[group, index, slot, root, id]` exactly, read as `chunkF` reads
-it, and a sixth member refused. Under protocol-v2.md a chunk is wide only where it arrives or waits, as its writer
-has it (`tools/records_v2.py`, and trace3.py's `wchunk`); a lane's entry, a read of `chunks`, a decode answer,
+it, and a sixth member refused. Under seacast.md a chunk is wide only where it arrives or waits, as its writer
+has it (`tools/records_seacast.py`, and trace3.py's `wchunk`); a lane's entry, a read of `chunks`, a decode answer,
 `respond`'s answers and the chunk arguments of the other records are narrow. -/
 def chunkN (j : Json) : Except String ChunkF := do
   if let .ok a := j.getArr? then
@@ -224,7 +224,7 @@ def intOf (j : Json) : Except String Int := do
     return -(n : Int)
   | j => return ((← nat j) : Int)
 
-/-! ### protocol-v2.md's keys and values, in the forms the tracer writes -/
+/-! ### seacast.md's keys and values, in the forms the tracer writes -/
 
 /-- An object type's id: its string, as the toy names it (`"payload"`, `"column"`, `"row"`), not empty. -/
 def typeId (j : Json) : Except String V2.TypeId := do
@@ -334,15 +334,15 @@ def sortBy {α} (f : α → α → Bool) (l : List α) : List α := (l.toArray.q
 
 /-! ### Values whose form is the document's: a peer's holding (`peer_has`) and a lane's controls (`queue`) -/
 
-/-- The document whose forms a record's values take: `protocol.md`'s or protocol-v2.md's. Under each, the other's
+/-- The document whose forms a record's values take: `seacast-lite.md`'s or seacast.md's. Under each, the other's
 forms are refused, as any form the reader does not know is. -/
 inductive Form where
   | v1
   | v2
   deriving BEq, Repr, Inhabited
 
-/-- A chunk under a record's document, at a place where protocol-v2.md writes it narrow: `chunkN` under
-protocol-v2.md, and `chunkF` under protocol.md, as before. -/
+/-- A chunk under a record's document, at a place where seacast.md writes it narrow: `chunkN` under
+seacast.md, and `chunkF` under seacast-lite.md, as before. -/
 def chunkIn (f : Form) (j : Json) : Except String ChunkF :=
   match f with
   | .v2 => chunkN j
@@ -350,35 +350,35 @@ def chunkIn (f : Form) (j : Json) : Except String ChunkF :=
 
 /-- An ask with its flags: `[key, standing, hops, probe]`. A structured id carries no flags, since the Python's is
 bytes, so its ask is `[id, false, 0, false]` and any other is refused. -/
-def askV2Of (j : Json) : Except String AskV2 := do
+def askV2Of (j : Json) : Except String AskSeacast := do
   let #[k, s, h, p] ← j.getArr? | throw s!"not an ask with its flags: {j.compress}"
-  let a : AskV2 := { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
+  let a : AskSeacast := { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
   if let .id .. := a.key then
     if a.standing || a.hops != 0 || a.probe then throw s!"an ask of a structured id has no flags: {j.compress}"
   return a
 
-/-- An entry of an IDONTWANT under protocol-v2.md: an id, as an IHAVE's entry is, or a holding,
+/-- An entry of an IDONTWANT under seacast.md: an id, as an IHAVE's entry is, or a holding,
 `["holding", group, bits, claim_all, complete]`. A bitmap without its claims is refused. -/
-def idontwantV2 (j : Json) : Except String IhaveEntry := do
+def idontwantSeacast (j : Json) : Except String IhaveEntry := do
   match j with
   | .arr #[.str "holding", g, b, ca, c] => return .holding (← groupKey g) (← nat b) (← boolOf ca) (← boolOf c)
-  | .arr #[.str "bits", _, _] => throw s!"under protocol-v2.md an IDONTWANT's bitmap is a holding: {j.compress}"
+  | .arr #[.str "bits", _, _] => throw s!"under seacast.md an IDONTWANT's bitmap is a holding: {j.compress}"
   | j => ihaveEntry j
 
 /-- A control message of a queue entry.
-- Under `protocol.md`: `[kind, ids]`. A PRUNE has no ids in the toy's runs; a GRAFT, a JOIN, a PRUNE with ids, or
+- Under `seacast-lite.md`: `[kind, ids]`. A PRUNE has no ids in the toy's runs; a GRAFT, a JOIN, a PRUNE with ids, or
   another kind is not one the record can hold.
-- Under protocol-v2.md: an IWANT is `["iwant", [ask, ...], want]`, each ask with its flags, whatever its mark and
-  flags. An IHAVE is as under `protocol.md`. An IDONTWANT's bitmaps are holdings. A JOIN, a GRAFT or a PRUNE of
+- Under seacast.md: an IWANT is `["iwant", [ask, ...], want]`, each ask with its flags, whatever its mark and
+  flags. An IHAVE is as under `seacast-lite.md`. An IDONTWANT's bitmaps are holdings. A JOIN, a GRAFT or a PRUNE of
   v2 is `[kind, [message]]`, with one message, of that kind. gossipsub's PRUNE stays `["prune", []]`. -/
 def ctl (j : Json) (f : Form := .v1) : Except String Ctl := do
   match f, ← j.getArr? with
   | .v1, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
-  | .v2, #[.str "iwant", asks, w] => return .iwantV2 (← boolOf w) (← (← arr asks).mapM askV2Of)
-  | .v2, #[.str "iwant", _] => throw s!"under protocol-v2.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
+  | .v2, #[.str "iwant", asks, w] => return .iwantSeacast (← boolOf w) (← (← arr asks).mapM askV2Of)
+  | .v2, #[.str "iwant", _] => throw s!"under seacast.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
   | _, #[.str "ihave", ids] => return .ihave (← (← arr ids).mapM ihaveEntry)
   | .v1, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM ihaveEntry)
-  | .v2, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM idontwantV2)
+  | .v2, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM idontwantSeacast)
   | _, #[.str "prune", .arr #[]] => return .prune
   | .v2, #[.str k, .arr ms] =>
     if !["join", "graft", "prune"].contains k then throw s!"not a control message of a queue entry: {j.compress}"
@@ -390,7 +390,7 @@ def ctl (j : Json) (f : Form := .v1) : Except String Ctl := do
   | _, _ => throw s!"not a control message of a queue entry: {j.compress}"
 
 /-- A queue entry: `[chunk or null, control or null, solicited]`, its chunk and its controls in the document's forms
-(the chunk narrow under protocol-v2.md, `chunkIn`). -/
+(the chunk narrow under seacast.md, `chunkIn`). -/
 def qentry (j : Json) (f : Form := .v1) : Except String QEntry := do
   let #[c, ctrl, .bool sol] ← j.getArr? | throw s!"not a queue entry: {j.compress}"
   let chunk ← if c == .null then pure none else some <$> chunkIn f c
@@ -400,8 +400,8 @@ def qentry (j : Json) (f : Form := .v1) : Except String QEntry := do
 /-- A lane's value: its entries, in order. -/
 def laneEntries (j : Json) (f : Form := .v1) : Except String (List QEntry) := do (← arr j).mapM (qentry · f)
 
-/-- An entry of `peer_has` (§4.3): `[bits, ttl]` under `protocol.md`, and `[bits, ttl, claim_all, complete]` under
-protocol-v2.md, with §1.5's two claims of a holding as JSON booleans. -/
+/-- An entry of `peer_has` (§4.3): `[bits, ttl]` under `seacast-lite.md`, and `[bits, ttl, claim_all, complete]` under
+seacast.md, with §1.5's two claims of a holding as JSON booleans. -/
 def haveEntry (j : Json) (f : Form := .v1) : Except String HaveEntry := do
   match f with
   | .v1 =>
@@ -409,7 +409,7 @@ def haveEntry (j : Json) (f : Form := .v1) : Except String HaveEntry := do
     return { bits := ← nat b, ttl := ← nat t }
   | .v2 =>
     let #[b, t, .bool ca, .bool c] ← j.getArr?
-      | throw s!"not an entry of peer_has under protocol-v2.md, [bits, ttl, claim_all, complete]: {j.compress}"
+      | throw s!"not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: {j.compress}"
     return { bits := ← nat b, ttl := ← nat t, claimAll := ca, complete := c }
 
 /-! ### Timers, by their target and arguments: a record's own `after`, and a question's notes -/
@@ -423,27 +423,27 @@ def timerV1Of : String → Array Json → Option (Except String Timer)
   | "window_timeout", #[k, t] => some do return .windowTimeout (← sendKey k) (Float.ofBits (← bits64 t))
   | _, _ => none
 
-/-- v2's three timers by their target and arguments, in `timerV2Json`'s form: `reconsider [g, at]`,
+/-- SEACAST's three timers by their target and arguments, in `timerV2Json`'s form: `reconsider [g, at]`,
 `ask_sample [g, i]` and `resample [g, i, q, first]`, with a time as its word. `ask_sample` takes two arguments. -/
-def timerV2Of : String → Array Json → Option (Except String V2.TimerV2)
+def timerV2Of : String → Array Json → Option (Except String V2.TimerSeacast)
   | "reconsider", #[g, t] => some do return .reconsider (← groupKey g) (Float.ofBits (← bits64 t))
   | "ask_sample", #[g, i] => some do return .askSample (← groupKey g) (← nat i)
   | "resample", #[g, i, q, f] => some do return .resample (← groupKey g) (← nat i) (← nat q) (← boolOf f)
   | _, _ => none
 
-/-- The targets an `after` in a note may name: §6.1's four and v2's three. -/
+/-- The targets an `after` in a note may name: §6.1's four and SEACAST's three. -/
 def timerTargetsV1 : List String := ["retry_offer", "ask_parked", "promise_due", "window_timeout"]
-def timerTargetsV2 : List String := ["reconsider", "ask_sample", "resample"]
+def timerTargetsSeacast : List String := ["reconsider", "ask_sample", "resample"]
 
 /-- The one toy callback a note may name, by its qualified name: the timer that `--alarm-wait`'s `filter_entry`
 arms. -/
 def alarmDue : String := "Node._alarm.<locals>.alarm_due"
 
-/-- What a timer that a question armed runs: one of §6.1's timers, one of v2's three, the toy callback
+/-- What a timer that a question armed runs: one of §6.1's timers, one of SEACAST's three, the toy callback
 `alarm_due (g, i, q, at)`, or `decode_group (g)` by a `start`. -/
 inductive NoteTimer where
   | v1 (t : Timer)
-  | v2 (t : V2.TimerV2)
+  | v2 (t : V2.TimerSeacast)
   | alarmDue (g : Group) (i : Nat) (q : Peer) (at_ : Float)
   | start (g : Group)
   deriving BEq, Repr
@@ -462,7 +462,7 @@ def noteArgs {α} (name : String) (xs : Json) (p : Array Json → Option (Except
   | some r => tryCatch r fun _ => bad
   | none => bad
 
-/-- A timer note, `[kind, delay, target, args]`: an `after` of §6.1's four, of v2's three or of the toy
+/-- A timer note, `[kind, delay, target, args]`: an `after` of §6.1's four, of SEACAST's three or of the toy
 callback, or a `start` of `decode_group`. The delay is a float's word, and the arguments are in the codec of the
 record's own `after`. -/
 def noteOf (n : Json) : Except String Note := do
@@ -471,7 +471,7 @@ def noteOf (n : Json) : Except String Note := do
   match k, f with
   | .str "after", .str t =>
     if timerTargetsV1.contains t then return { delay, timer := .v1 (← noteArgs t xs (timerV1Of t)) }
-    if timerTargetsV2.contains t then return { delay, timer := .v2 (← noteArgs t xs (timerV2Of t)) }
+    if timerTargetsSeacast.contains t then return { delay, timer := .v2 (← noteArgs t xs (timerV2Of t)) }
     if t == alarmDue then
       return { delay, timer := ← noteArgs t xs fun
         | #[g, i, q, a] => some do return .alarmDue (← groupKey g) (← nat i) (← nat q) (Float.ofBits (← bits64 a))

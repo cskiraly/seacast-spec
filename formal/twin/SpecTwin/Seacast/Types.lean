@@ -1,17 +1,17 @@
-/-! # The types of v2's messages and tables (protocol-v2.md §2, §3)
+/-! # The types of SEACAST's messages and tables (seacast.md §2, §3)
 
-The abstract messages of protocol-v2.md §2, the values their fields take, and the other types v2's tables hold.
+The abstract messages of seacast.md §2, the values their fields take, and the other types SEACAST's tables hold.
 They sit below `Basic.lean`, which imports this file and names `Relation` in a queue entry's control (a JOIN,
 GRAFT or PRUNE queued by `send`), and below the generated `State.lean`, whose v2 tables hold them
 (`owed_relations`, `join_recv`, `join_sent`, `interest`). So this file uses core Lean only, and writes a group as
-the `String` that `Basic.lean`'s `Group` is. (A WANT's asks with their flags, `AskV2`, hold a `Key`, so they are
+the `String` that `Basic.lean`'s `Group` is. (A WANT's asks with their flags, `AskSeacast`, hold a `Key`, so they are
 `Basic.lean`'s.)
 
 A bitmap of a message is a natural number: a bitmap that arrives from outside the node (a HAVE's, a WANT's,
 `sample`'s argument) is never negative in a record, and the tracer refuses one that is. The toy would take a
 negative HAVE in places, but no run makes one. -/
 
-namespace SpecTwin.V2
+namespace SpecTwin.Seacast
 
 /-- A bitmap that can be complemented: a Python int (`Bits.v`), negative where it holds every index but finitely
 many. Its operations are in `V2/Basic.lean`. -/
@@ -116,10 +116,10 @@ structure Want where
   deriving BEq, Repr, Inhabited
 
 /-- A message `send(p, msg, urgent)` takes. -/
-inductive MsgV2 where
+inductive MsgSeacast where
   | have (m : Have)
   | want (m : Want)
   | relation (m : Relation)
   deriving BEq, Repr, Inhabited
 
-end SpecTwin.V2
+end SpecTwin.Seacast

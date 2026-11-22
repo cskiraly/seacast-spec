@@ -1,14 +1,14 @@
-/-! # protocol-v2.md's manifest: what a trace under it holds, by name (generated)
+/-! # seacast.md's manifest: what a trace under it holds, by name (generated)
 
-This file is written whole by `tools/gen/gen.py` from `gen/manifest_v2.py`, and `gen.py --check` compares it
+This file is written whole by `tools/gen/gen.py` from `gen/manifest_seacast.py`, and `gen.py --check` compares it
 byte for byte. Do not edit it: change the manifest, or the generator.
 
-The lists by which the replay routes a record of a trace under `protocol-v2.md`, and against which it reads the
-trace's header and nodes line. `gen/manifest_v2.py` says what each list holds, and the rules they keep. -/
+The lists by which the replay routes a record of a trace under `seacast.md`, and against which it reads the
+trace's header and nodes line. `gen/manifest_seacast.py` says what each list holds, and the rules they keep. -/
 
-namespace SpecTwin.V2.Manifest
+namespace SpecTwin.Seacast.Manifest
 
-/-- `protocol-v2.md`'s functions the twin transcribes, each a record of its own. -/
+/-- `seacast.md`'s functions the twin transcribes, each a record of its own. -/
 def covered : List String :=
   ["colour_of", "send_relation", "send_join", "prune", "yes", "no", "queue_owed_relations", "interest_of_peer",
    "wants_from_me", "serves", "counted", "keep_coverage", "keep_floor", "fills", "note_push", "suppression_scope",
@@ -21,7 +21,7 @@ def covered : List String :=
    "on_chunk", "on_holding", "on_offer", "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
    "on_pace_tick", "on_block_installed", "joined", "drop_wants_beyond"]
 
-/-- `protocol.md`'s functions a record under `protocol-v2.md` may name, kept all the way down. -/
+/-- `seacast-lite.md`'s functions a record under `seacast.md` may name, kept all the way down. -/
 def kept : List String :=
   ["K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
    "committed_descriptor", "drop_beyond", "drop_group", "drop_offer", "drop_stale_waits", "drop_tie", "expand",
@@ -43,11 +43,11 @@ def replaceable : List String :=
 def replaceableWhole : List String :=
   ["validate_chunk"]
 
-/-- `protocol-v2.md`'s functions not transcribed this cycle: a question at every node. -/
+/-- `seacast.md`'s functions not transcribed this cycle: a question at every node. -/
 def cut : List String :=
   ["window_release"]
 
-/-- The twin's tables, `protocol.md`'s and then `protocol-v2.md`'s, by the names a trace gives them. -/
+/-- The twin's tables, `seacast-lite.md`'s and then `seacast.md`'s, by the names a trace gives them. -/
 def own : List String :=
   ["asked_at", "tried", "offers", "promises", "offered", "park", "asked_parked", "last_resort_armed", "ihave_frames",
    "ihave_asked", "held_back", "received", "mine", "state", "tied", "queue", "pending", "pending_ids", "tie_slot",
@@ -63,7 +63,7 @@ def own : List String :=
 def foreign : List String :=
   ["known_id", "chunks"]
 
-/-- The names the replay of a trace under `protocol-v2.md` reads as questions, answered from the tape. -/
+/-- The names the replay of a trace under `seacast.md` reads as questions, answered from the tape. -/
 def questions : List String :=
   ["accepted", "admitted", "after", "authenticable", "bid_group", "block_of", "choice", "close_promises_of_group",
    "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
@@ -77,8 +77,8 @@ def questions : List String :=
 
 /-- The questions that no covered function loads, each with its reason. -/
 def questionsUnloaded : List (String × String) :=
-  [("group_of", "loaded by protocol-v2.md's code outside COVERED, on publish's path"),
-   ("open_group_source", "loaded by protocol-v2.md's code outside COVERED, on publish's path"),
+  [("group_of", "loaded by seacast.md's code outside COVERED, on publish's path"),
+   ("open_group_source", "loaded by seacast.md's code outside COVERED, on publish's path"),
    ("own_interest", "interest's miss, asked as a question")]
 
-end SpecTwin.V2.Manifest
+end SpecTwin.Seacast.Manifest

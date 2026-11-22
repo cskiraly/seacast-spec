@@ -370,11 +370,11 @@ def tracer_instance():
     T.Tracer3.__init__ = init
 
 
-def early_install_v2(toy):
-    """Under v2: the tracer installed where protocol.md has it, inside `Node._override`, before `_v2` and the options'
-    bindings, and the install at the end of construction skipped. `_v2` then binds its `promise_due` over the tracer's
-    wrapper, a listed wrapper that protocol.md's reading accepts. The install must be refused there, and it is refused
-    first by what the namespace lacks before `_v2`: the install-time check of the closure rule's lists. (Under v2 the
+def early_install_seacast(toy):
+    """Under v2: the tracer installed where seacast-lite.md has it, inside `Node._override`, before `_seacast` and the options'
+    bindings, and the install at the end of construction skipped. `_seacast` then binds its `promise_due` over the tracer's
+    wrapper, a listed wrapper that seacast-lite.md's reading accepts. The install must be refused there, and it is refused
+    first by what the namespace lacks before `_seacast`: the install-time check of the closure rule's lists. (Under v2 the
     install is also the namespace's last binding; rebind-tape-v2 and rebind-view-v2 reach that check.)"""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node as N                    # noqa: E402: the pinned toy's
@@ -409,7 +409,7 @@ def early_install_v2(toy):
     N.Node._override = _override
 
 
-def raw_alias_v2():
+def raw_alias_seacast():
     """Under v2: the aliases `hdr` and `chunk_id` left as the toy bound them, to the raw objects of before the
     install. The names' check at the nodes line must stop it: a raw `hdr` makes every `hdr[g]` read unlogged."""
     def repoint_aliases(self, nd, ns, pre):
@@ -418,7 +418,7 @@ def raw_alias_v2():
     T.Tracer3.repoint_aliases = repoint_aliases
 
 
-def raw_chunk_id_v2():
+def raw_chunk_id_seacast():
     """Under v2: `hdr` re-pointed, `chunk_id` left as the toy bound it (the toy's message_id, not the installed one).
     The names' check at the nodes line must stop it at `chunk_id`, `hdr`'s check having passed."""
     def repoint_aliases(self, nd, ns, pre):
@@ -428,7 +428,7 @@ def raw_chunk_id_v2():
     T.Tracer3.repoint_aliases = repoint_aliases
 
 
-def before_install_v2(plant):
+def before_install_seacast(plant):
     """Run `plant(ns)` on the node's namespace just before the tracer installs itself (under v2, at the end of the
     node's construction)."""
     _install = T.Tracer3.install
@@ -442,31 +442,31 @@ def before_install_v2(plant):
     T.Tracer3.install = install
 
 
-def hdr_other_v2():
+def hdr_other_seacast():
     """Under v2: `hdr` bound, before the install, to another object than the toy's `desc` (a copy of it). Re-pointing
     it would hide that; the check before the re-pointing must stop it."""
     def plant(ns):
         ns["hdr"] = dict(ns["desc"])
-    before_install_v2(plant)
+    before_install_seacast(plant)
 
 
-def alias_missing_v2():
+def alias_missing_seacast():
     """Under v2: `chunk_id` taken out of the namespace before the install. The check before the re-pointing must stop
     it (a missing alias is not left alone)."""
     def plant(ns):
         del ns["chunk_id"]
-    before_install_v2(plant)
+    before_install_seacast(plant)
 
 
-def rebound_scanned_v2():
+def rebound_scanned_seacast():
     """Under v2: a function the scan names in one slot (`popcount`) bound, before the install, in another slot that no
     binding of the toy's names (`popcount_again`). The install check is by slot and function together: it must stop."""
     def plant(ns):
         ns["popcount_again"] = ns["popcount"]
-    before_install_v2(plant)
+    before_install_seacast(plant)
 
 
-def rebind_tape_v2():
+def rebind_tape_seacast():
     """Under v2: a tape name bound again after the install to the function the tracer wrapped as its question (as
     `_repair_bias` writes back its captured `shuffled`). final_check, which under v2 holds every installed slot, must
     stop it."""
@@ -477,7 +477,7 @@ def rebind_tape_v2():
     after_install(wrap)
 
 
-def rebind_view_v2():
+def rebind_view_seacast():
     """Under v2: a table's view replaced, after the install, by its raw table (`offers`). final_check must stop it:
     the table would go on unlogged."""
     def wrap(tr, ns):
@@ -486,10 +486,10 @@ def rebind_view_v2():
     after_install(wrap)
 
 
-def close_keyerror_v2():
+def close_keyerror_seacast():
     """Under v2: a stop (a traced call at another node in an open record, as `--other-node-v2`), and an ordinary
     exception raised at the trace's close after it. The stop's reason must be the one raised; the close's is a note."""
-    other_node_v2()
+    other_node_seacast()
     _close = T.Tracer3.close
 
     @functools.wraps(_close)
@@ -502,7 +502,7 @@ def close_keyerror_v2():
     T.Tracer3.close = close
 
 
-def chains_omit_v2():
+def chains_omit_seacast():
     """Under v2, a plant for the replay: the nodes line's chains walked as trace3.py's interim writer walks them, and
     written without any replaced name's chain. The trace is written to the end; the twin's reader must refuse it
     ("nodes: chains: a replaced name with no chain")."""
@@ -517,7 +517,7 @@ def chains_omit_v2():
     T.node_chains = node_chains
 
 
-def hdr_read_v2(raw):
+def hdr_read_seacast(raw):
     """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
     g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
     view, the record as written holds the read of `desc` at g: the line says "desc read in its record: 1". With `raw`
@@ -585,10 +585,10 @@ def hdr_read_v2(raw):
     F.Recorder.read = read
 
 
-def unscanned_layer_v2(toy):
+def unscanned_layer_seacast(toy):
     """Under v2: a layer over `on_frame` that claims to be the toy's (its code compiled as node.py's, at a line where
     no binding is) and holds the bound `on_frame` in a closure cell, so that the namespace check, which follows the
-    layers to v2's own function, passes it. Bound just before the install: the scan of the toy's bindings names no
+    layers to SEACAST's own function, passes it. Bound just before the install: the scan of the toy's bindings names no
     such function, and the tracer must stop at the install."""
     node_py = str(Path(toy).resolve() / "node.py")
     g = {}
@@ -605,7 +605,7 @@ def unscanned_layer_v2(toy):
     T.Tracer3.install = install
 
 
-def other_node_v2():
+def other_node_seacast():
     """Under v2: at the first table read inside a record at node a, outside any question, node c's traced `N` is
     called. The tracer must stop before the call runs (its argument, None, is never reached)."""
     tracer_instance()
@@ -660,7 +660,7 @@ def watch_records(inside):
     T.Tracer3.write = write
 
 
-def bare_in_question_v2(per_node, callee="N"):
+def bare_in_question_seacast(per_node, callee="N"):
     """Under v2: a question at node a (`peer_id_bytes`, its function replaced before the install by a layer of this
     tool's own, which the tracer then wraps as the question) calls a name at node c, once. The tracer-wide depth makes
     that call bare at node c: no record there, and the trace's body that of the run without the plant.
@@ -762,7 +762,7 @@ def bare_in_question_v2(per_node, callee="N"):
     T.Tracer3.install = install
 
 
-def other_node_tape_v2():
+def other_node_tape_seacast():
     """Under v2: at the first table read inside a record at node a, outside any question, node c's tape question
     `peer_id_bytes` is called (a tape name, not a traced one). The tracer must stop before the call runs, as it does for
     a traced name (the rule kept stricter than "a traced call")."""
@@ -796,7 +796,7 @@ class Planted(Exception):
     """The exception the suppressed-entry plant raises inside the replaced name, and catches outside it."""
 
 
-def suppressed_entry_v2(toy, off):
+def suppressed_entry_seacast(toy, off):
     """Under v2, hand5-own's arguments: at the node whose `on_iwant` is replaced (the silent node), a call of it from
     outside any record (from the toy's `Node._write`, which the simulator calls at depth 0). A layer of this tool's own,
     bound before the install and live for that call alone, calls the same node's traced `N` and raises `Planted`, which
@@ -876,7 +876,7 @@ PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppress
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
           "--hdr-read-v2-raw", "--chains-omit-v2")
 HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
-HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
+HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's seacast/hand5-own
 
 
 def main(argv):
@@ -887,49 +887,49 @@ def main(argv):
     fault, rest = argv[0], argv[1:]
     if fault.endswith("-v2") or "-v2-" in fault:    # under v2: trace3.py's own run of hand5 (or hand5-own)
         if fault == "--early-install-v2":
-            early_install_v2(rest[0])
+            early_install_seacast(rest[0])
         elif fault == "--raw-alias-v2":
-            raw_alias_v2()
+            raw_alias_seacast()
         elif fault == "--other-node-v2":
-            other_node_v2()
+            other_node_seacast()
         elif fault == "--unscanned-layer-v2":
-            unscanned_layer_v2(rest[0])
+            unscanned_layer_seacast(rest[0])
         elif fault == "--raw-chunk-id-v2":
-            raw_chunk_id_v2()
+            raw_chunk_id_seacast()
         elif fault == "--hdr-other-v2":
-            hdr_other_v2()
+            hdr_other_seacast()
         elif fault == "--alias-missing-v2":
-            alias_missing_v2()
+            alias_missing_seacast()
         elif fault.startswith("--bare-in-question-v2"):
-            bare_in_question_v2(per_node=fault.endswith("-per-node"))
+            bare_in_question_seacast(per_node=fault.endswith("-per-node"))
         elif fault == "--bare-replaced-v2":
-            bare_in_question_v2(per_node=False, callee="on_iwant")
+            bare_in_question_seacast(per_node=False, callee="on_iwant")
         elif fault == "--bare-timer-v2":
-            bare_in_question_v2(per_node=False, callee="after")
+            bare_in_question_seacast(per_node=False, callee="after")
         elif fault == "--bare-timer-v2-now":
-            bare_in_question_v2(per_node=False, callee="after-now")
+            bare_in_question_seacast(per_node=False, callee="after-now")
         elif fault == "--other-node-tape-v2":
-            other_node_tape_v2()
+            other_node_tape_seacast()
         elif fault == "--rebound-scanned-v2":
-            rebound_scanned_v2()
+            rebound_scanned_seacast()
         elif fault == "--rebind-tape-v2":
-            rebind_tape_v2()
+            rebind_tape_seacast()
         elif fault == "--rebind-view-v2":
-            rebind_view_v2()
+            rebind_view_seacast()
         elif fault == "--stale-id-bare-v2":
-            bare_in_question_v2(per_node=False, callee="stale-id")
+            bare_in_question_seacast(per_node=False, callee="stale-id")
         elif fault == "--close-keyerror-v2":
-            close_keyerror_v2()
+            close_keyerror_seacast()
         elif fault.startswith("--hdr-read-v2"):
-            hdr_read_v2(raw=fault.endswith("-raw"))
+            hdr_read_seacast(raw=fault.endswith("-raw"))
         elif fault == "--chains-omit-v2":
-            chains_omit_v2()
+            chains_omit_seacast()
         else:
-            suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
+            suppressed_entry_seacast(rest[0], off=fault.endswith("-off"))
         args = (HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault in ("--bare-replaced-v2", "--chains-omit-v2")
                 else HAND5)
-        try:                            # the arguments as check.sh's v2/hand5 and v2/hand5-own have them
-            T.main([rest[0], rest[1], *args, "--doc", "v2", "--digest"])
+        try:                            # the arguments as check.sh's seacast/hand5 and seacast/hand5-own have them
+            T.main([rest[0], rest[1], *args, "--doc", "seacast", "--digest"])
         finally:
             seen = "".join(f"; {k}: {v}" for k, v in SEEN.items())
             print(f"tracerfaults3: {fault[2:]}, planted {PLANTED[0]} time{'s' if PLANTED[0] != 1 else ''}{seen}",

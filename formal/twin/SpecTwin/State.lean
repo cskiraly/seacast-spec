@@ -2,7 +2,7 @@ import SpecTwin.Basic
 
 /-! # The twin's state and the names of its entries (generated)
 
-This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_v2.py`, one
+This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_seacast.py`, one
 entry there per table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema,
 or the generator.
 
@@ -278,7 +278,7 @@ def ownTables : List String :=
    "owed", "owed_answers", "sent_to", "slot_held", "pace_queue", "stop_pull", "peer_has", "holders", "serve_count",
    "origin", "planned", "pushed", "desc", "in_flight", "waiters", "sent", "unwanted"]
 
-/-- `protocol-v2.md`'s tables (`gen/schema_v2.py`), by the names its records give them, in the schema's order. -/
+/-- `seacast.md`'s tables (`gen/schema_seacast.py`), by the names its records give them, in the schema's order. -/
 def v2Tables : List String :=
   ["join_recv", "join_sent", "push_out", "push_in", "grafted_out", "grafted_in", "owed_relations", "backoff", "T_of",
    "rebuilt", "interest", "known_at", "standing", "routed_standing", "claims", "reconsider_at", "deferred", "duty_at",

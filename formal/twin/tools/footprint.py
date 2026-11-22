@@ -70,7 +70,7 @@ What is logged, exactly (the contract; footprint_test.py has a case for each lin
 - **A row made in the call:** every entry under it is written, each missing before the call, in a callee's `cw`
   and in the record. So a new PeerQueue's other lane is there, as the toy's is, and a later touch of it is no
   value "before the call".
-- **Rows read on the way down (`row_reads`: the tables a trace's header names so; under protocol-v2.md, `owed`,
+- **Rows read on the way down (`row_reads`: the tables a trace's header names so; under seacast.md, `owed`,
   `planned`, `queue` and `tied`).** In such a table a row above an entry touched is read, not observed: the
   Python's `t[g][i]` evaluates `t[g]` first. And each consulting form on a level above the last logs the row's
   presence, there or not: `t[g]` before it indexes (so a missing row is read as missing, then raises KeyError(g)),

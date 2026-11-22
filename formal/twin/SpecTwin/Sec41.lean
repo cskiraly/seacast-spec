@@ -93,7 +93,7 @@ def onFrame (p : Peer) (fr : Frame) : M m Unit := do
     | .bitmap g bits => onHave p g bits                     --   lifetime (§8.1)
     | .id a => setUnwanted p ((← unwantedOf p).insert a.idHex)      -- `unwanted[p].add(h)`
     | .other raw => setUnwanted p ((← unwantedOf p).insert raw)
-    | .holding .. => crash "twin: a v2 holding reached protocol.md's on_frame, which v2 redefines (D1)"
+    | .holding .. => crash "twin: a v2 holding reached seacast-lite.md's on_frame, which v2 redefines (D1)"
   respond p asks answers prunes
 
 end SpecTwin

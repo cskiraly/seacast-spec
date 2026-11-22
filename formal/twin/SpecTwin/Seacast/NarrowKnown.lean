@@ -1,9 +1,9 @@
-import SpecTwin.V2.ReplayKnown
-import SpecTwin.V2.FormsRows
+import SpecTwin.Seacast.ReplayKnown
+import SpecTwin.Seacast.FormsRows
 
-/-! # A chunk where protocol-v2.md writes it narrow: its guards
+/-! # A chunk where seacast.md writes it narrow: its guards
 
-protocol-v2.md's writer writes a chunk wide, with a sixth member (what level 1 reads of it), only where it arrives or
+seacast.md's writer writes a chunk wide, with a sixth member (what level 1 reads of it), only where it arrives or
 waits: `on_chunk`, `on_validated` and `defer`'s arguments, and the encoder's other wide places, which the twin reads
 with `chunkF` as before. Everywhere else it writes five members, and there a sixth is refused, with "a chunk here is
 narrow, five members: ". The places, each guarded below:
@@ -11,19 +11,19 @@ narrow, five members: ". The places, each guarded below:
 2. a read of `chunks`;
 3. a queue entry's chunk;
 4. the chunk arguments of the covered records but the three wide ones, and of `message_id`, `tie_room` and
-   `choose_push`, which protocol.md's run reads under the v2 form;
+   `choose_push`, which seacast-lite.md's run reads under the v2 form;
 5. `respond`'s answers.
 
 Each place refuses a six-member chunk and does not refuse the same chunk with five members. The guards use only the
 places themselves, so that they build at the code before the narrow reader, and fail there at each refusal. Under
-protocol.md nothing changes: the same three kept records and a queue entry read six members as before. -/
+seacast-lite.md nothing changes: the same three kept records and a queue entry read six members as before. -/
 
-namespace SpecTwin.V2.NarrowKnown
+namespace SpecTwin.Seacast.NarrowKnown
 
 open Lean (Json)
 open SpecTwin.Replay
-open SpecTwin.V2
-open SpecTwin.V2.ReplayKnown (g gq root id3 chunk3 c0 line replay ret traced)
+open SpecTwin.Seacast
+open SpecTwin.Seacast.ReplayKnown (g gq root id3 chunk3 c0 line replay ret traced)
 
 /-- The same chunk with a sixth member, what level 1 reads of it: no descriptor, no proof, a blob. -/
 def chunk6 : String := s!"[{gq}, 3, 1, \"{root}\", \"{id3}\", [null, [], [16, \"x\"]]]"
@@ -54,16 +54,16 @@ def decodeAsk (c : String) : Except String Json := do
 
 /-! ## 2. A read of `chunks` -/
 
-#guard isNarrow (chunksReadV2 (parse s!"[{gq}, 3]") (parse chunk6))
-#guard (chunksReadV2 (parse s!"[{gq}, 3]") (parse chunk3)).isOk
+#guard isNarrow (chunksReadSeacast (parse s!"[{gq}, 3]") (parse chunk6))
+#guard (chunksReadSeacast (parse s!"[{gq}, 3]") (parse chunk3)).isOk
 
 /-! ## 3. A queue entry's chunk, under each document -/
 
 #guard isNarrow (qentry (parse s!"[{chunk6}, null, false]") .v2)
 #guard (qentry (parse s!"[{chunk3}, null, false]") .v2).isOk
-#guard (qentry (parse s!"[{chunk6}, null, false]") .v1).isOk         -- protocol.md's, as before
+#guard (qentry (parse s!"[{chunk6}, null, false]") .v1).isOk         -- seacast-lite.md's, as before
 
-/-! ## 4 and 5. Records' chunk arguments and `respond`'s answers, replayed by `runV2` -/
+/-! ## 4 and 5. Records' chunk arguments and `respond`'s answers, replayed by `runSeacast` -/
 
 /-- A record of `fn` with these arguments and nothing else: what a refusal of its arguments needs. -/
 def rec1 (fn args : String) : String := line fn args "[]" "[]" "[]" "[]" (ret "null") s!"[\"{fn}\"]" "[]"
@@ -84,12 +84,12 @@ def wideRecords (c : String) : List (String × String) :=
   [("on_chunk", s!"[2, {c}]"), ("on_validated", s!"[2, {c}, \"ACCEPT\"]"), ("defer", s!"[2, {c}]")]
 #guard (wideRecords chunk6).all fun (fn, a) => !isNarrow (replay (rec1 fn a))
 
-/-- The same record replayed under protocol.md: its run with protocol.md's form. -/
+/-- The same record replayed under seacast-lite.md: its run with seacast-lite.md's form. -/
 def replayV1 (l : String) : Except String (Array String × Nat) := do
   run c0 [] traced (← record (← Json.parse l)) [] .v1
 
--- the kept three under protocol.md read six members, as before
+-- the kept three under seacast-lite.md read six members, as before
 #guard [("message_id", s!"[{chunk6}]"), ("tie_room", s!"[2, {chunk6}]"),
         ("choose_push", s!"[{chunk6}, [2, 3], 1, false]")].all fun (fn, a) => !isNarrow (replayV1 (rec1 fn a))
 
-end SpecTwin.V2.NarrowKnown
+end SpecTwin.Seacast.NarrowKnown

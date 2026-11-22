@@ -1,21 +1,21 @@
-import SpecTwin.V2.DispatchKnown
+import SpecTwin.Seacast.DispatchKnown
 
 /-! # The v0.11.1 sync: its known answer
 
-protocol-v2.md's change from v0.10.11 to v0.11.1 in the twin's functions, case by case, written before the code:
+seacast.md's change from v0.10.11 to v0.11.1 in the twin's functions, case by case, written before the code:
 G1 to G10 for the six functions that changed and `admitted`'s holding, then S2 for the two new ones. Each record is
 a JSON line in the tracer's form, made by hand and replayed by `ReplayKnown`'s `passes` and `failsWith`, or, where
-the serving budget matters, at a node whose constants the header's reader (`Header.constsV2`) reads from a nodes
+the serving budget matters, at a node whose constants the header's reader (`Header.constsSeacast`) reads from a nodes
 entry's `consts`. The module names nothing the sync adds, so it compiles at the commit before the sync too, where
 its cases of new behaviour fail: there the reader refuses the two new constants, and the replay runs with
 `ReplayKnown`'s. -/
 
-namespace SpecTwin.V2.SyncKnown
+namespace SpecTwin.Seacast.SyncKnown
 
 open Lean (Json)
 open SpecTwin.Replay
-open SpecTwin.V2
-open SpecTwin.V2.ReplayKnown
+open SpecTwin.Seacast
+open SpecTwin.Seacast.ReplayKnown
 
 /-- A block, and a second group of it. -/
 def b : String := String.ofList (List.replicate 64 'd')
@@ -27,13 +27,13 @@ def tog (x T : String) : String := s!"[\"type_of_group\", [{x}], \"{T}\"]"
 def bo (x : String) : String := s!"[\"block_of\", [{x}], {bq}]"
 def exp (x : String) (v : Bool := false) : String := s!"[\"expired\", [{x}], {v}]"
 
-/-- v2's five constants with this serving budget (a JSON value), read by the header's reader from a nodes entry's
+/-- SEACAST's five constants with this serving budget (a JSON value), read by the header's reader from a nodes entry's
 `consts`; `ReplayKnown`'s where the reader refuses them -/
-def budgetConsts (budget : String) : ConstsV2 :=
+def budgetConsts (budget : String) : ConstsSeacast :=
   let five : List (String × Json) :=
     [("ANSWERS_FIRST", Json.bool false), ("ASK_UPLINK", DispatchKnown.word0), ("MERGE_HOLDINGS", Json.bool false),
      ("SAMPLE_OUTSTANDING", DispatchKnown.jn 1), ("SERVE_BUDGET", (Json.parse budget).toOption.getD Json.null)]
-  match Header.constsV2 (Json.mkObj (DispatchKnown.consts31 ++ five)) with
+  match Header.constsSeacast (Json.mkObj (DispatchKnown.consts31 ++ five)) with
   | .ok (_, k) => k
   | .error _ => c2
 
@@ -42,7 +42,7 @@ def paramsB : TypeId → Option TypeParams := fun T =>
   if T == "row" then some { M := some 4, SERVE_LIMIT := some 64.0 } else none
 
 def replayB (budget l : String) : Except String (Array String × Nat) := do
-  runV2 c0 (budgetConsts budget) paramsB [] traced (← record (← Json.parse l) docV2)
+  runSeacast c0 (budgetConsts budget) paramsB [] traced (← record (← Json.parse l) docSeacast)
 
 def passesB (budget l : String) : Bool :=
   match replayB budget l with
@@ -202,4 +202,4 @@ def dwb (w7 : String) (out : List (String × String)) : String :=
 -- a complemented interest: iterating it raises, as the toy's bitmap does
 #guard passes (dwb "[\"-\", 1]" [("raises", "\"ValueError\"")])
 
-end SpecTwin.V2.SyncKnown
+end SpecTwin.Seacast.SyncKnown

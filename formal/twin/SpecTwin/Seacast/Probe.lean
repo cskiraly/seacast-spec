@@ -1,6 +1,6 @@
-import SpecTwin.V2.Announce
+import SpecTwin.Seacast.Announce
 
-/-! # protocol-v2.md's probe, standing answers and repair checks: §4.5, §4.6
+/-! # seacast.md's probe, standing answers and repair checks: §4.5, §4.6
 
 The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`, `probe_promise`,
 `probe_waits`, `probe_settled`, `probe_of_claim` and `serve_probe`; §4.5's `serve_standing`,
@@ -8,7 +8,7 @@ The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`,
 `repair_verdict` and `owed_missing`. Each comes after every function it calls (`V2/Relations.lean`'s rule).
 `serve_standing` and `drop_wants_beyond` are v0.11.1's text.
 
-- **An ask with its flags** is an `AskV2`. `group_index(a)` is the twin's own: an ask by
+- **An ask with its flags** is an `AskSeacast`. `group_index(a)` is the twin's own: an ask by
   index is itself, with its flags; a structured id gives its group and index with none, as the toy's
   `GroupIndex` carries none. Every `Key` has a group and an index, so it is never none here; `probe_waits`,
   `probe_settled` and `probe_of_claim` test it all the same, as the Python does, with no read where it is none.
@@ -24,15 +24,15 @@ The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`,
 - **`repair_verdict`'s steps:** a `None` list crashes as `TypeError` at its first subscript, a step
   past the list as `IndexError`; `want` is an `Int`, and the loop stops at `want == 0` alone. -/
 
-namespace SpecTwin.V2
+namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeV2 m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m]
 
 /-- `group_index(a)`: the ask itself where it is by index, with its flags; a structured id's group
 and index, with none -/
-def groupIndex (a : AskV2) : Option AskV2 :=
+def groupIndex (a : AskSeacast) : Option AskSeacast :=
   match a.key with
   | .want _ _ => some a
   | .id _ g i => some { key := .want g i }
@@ -41,9 +41,9 @@ def groupIndex (a : AskV2) : Option AskV2 :=
 def interestOf (g : Group) : M2 m IBits := do
   match ← interest? g with
   | some v => return v
-  | none => NodeV2.ownInterest g
+  | none => NodeSeacast.ownInterest g
 
-/-- `gated(a)` (protocol.md §6.2, [c6]): stop-pull, with the probe exempt -/
+/-- `gated(a)` (seacast-lite.md §6.2, [c6]): stop-pull, with the probe exempt -/
 def gated (a : Key) : M2 m Bool := do
   enter "gated"
   -- `stop_pull[group(a)] and a not in probe_asks`
@@ -100,7 +100,7 @@ def probePromise (g : Group) (i : Nat) : M2 m (Option ((Key × Peer) × Float)) 
   | none => return none
 
 /-- `probe_waits(a, p)` (§4.6, R5): a is our probe of p, flagged and not yet answered or judged -/
-def probeWaits (a : AskV2) (p : Peer) : M2 m Bool := do
+def probeWaits (a : AskSeacast) (p : Peer) : M2 m Bool := do
   enter "probe_waits"
   let some gi := groupIndex a | return false
   let g := gi.key.group
@@ -112,7 +112,7 @@ def probeWaits (a : AskV2) (p : Peer) : M2 m Bool := do
   return (← probeOk? g).isNone
 
 /-- `probe_settled(a)` (§4.6, R5): a is our probe, judged or given no verdict -/
-def probeSettled (a : AskV2) : M2 m Bool := do
+def probeSettled (a : AskSeacast) : M2 m Bool := do
   enter "probe_settled"
   let some gi := groupIndex a | return false
   if !gi.probe then return false
@@ -120,7 +120,7 @@ def probeSettled (a : AskV2) : M2 m Bool := do
 
 /-- `probe_of_claim(p, gi)` (§4.6, R5): as the claimant, p's flagged ask of an index we claim, while no flagged
 ask of the group from p was answered and none of another index of it is kept -/
-def probeOfClaim (p : Peer) (gi : Option AskV2) : M2 m Bool := do
+def probeOfClaim (p : Peer) (gi : Option AskSeacast) : M2 m Bool := do
   enter "probe_of_claim"
   let some gi := gi | return false
   let g := gi.key.group; let i := gi.key.index
@@ -152,7 +152,7 @@ private def answer (who : String) (q : Peer) (g : Group) (i : Nat) : M2 m Unit :
 them -/
 private def servedOut (q : Peer) (g : Group) : M2 m Bool := do
   let n ← servedCount q g
-  let lim ← param (← NodeV2.typeOfGroup g) "SERVE_LIMIT" (·.SERVE_LIMIT)
+  let lim ← param (← NodeSeacast.typeOfGroup g) "SERVE_LIMIT" (·.SERVE_LIMIT)
   return n.toFloat ≥ lim
 
 /-- `serve_standing(g, i)` (§4.5): the chunk a WANT waited for is here (§4.10) -/
@@ -163,7 +163,7 @@ def serveStanding (g : Group) (i : Nat) : M2 m Unit := do
   -- `standing[g].pop(i, ())`: a present set is deleted, a missing one left; its order asked, empty or not
   let popped ← standing? g i
   if popped.isSome then eraseStanding g i
-  for q in ← NodeV2.order "serve_standing" ((popped.getD {}).toList) do
+  for q in ← NodeSeacast.order "serve_standing" ((popped.getD {}).toList) do
     -- `peer_has[q][g].has(i) or served[q][g] >= …SERVE_LIMIT`
     if (← v1 (peerHas q g)).has i then
       branch "serve_standing: held already"
@@ -189,8 +189,8 @@ standing requests and their route marks, and a DECLARED peer's interest bits. Th
 before their loops, as the Python builds them, and neither loop asks anything, so their orders are not asked. -/
 def dropWantsBeyond (g : Group) : M2 m Unit := do
   enter "drop_wants_beyond"
-  let T ← NodeV2.typeOfGroup g                                -- `n = type_of_group(g).index_count(hdr[g])`
-  let n ← NodeV2.indexCount T (← desc g)
+  let T ← NodeSeacast.typeOfGroup g                                -- `n = type_of_group(g).index_count(hdr[g])`
+  let n ← NodeSeacast.indexCount T (← desc g)
   -- `for i in [i for i in standing[g] if i >= n]:`
   for (i, _) in (← allStanding g).filter (·.1 ≥ n) do
     let _ ← standing? g i                                     -- `standing[g].pop(i, None)`, there by the scan
@@ -211,7 +211,7 @@ def serveWaitingProbe (g : Group) (i : Nat) : M2 m Unit := do
   -- `[q for q, j in probe_waiting[g].items() if j == i]`, in the keys' order
   let items ← allProbeWaiting g
   let mut qs : List Peer := []
-  for q in ← NodeV2.probeWaitingOrder g (items.map (·.1)) do
+  for q in ← NodeSeacast.probeWaitingOrder g (items.map (·.1)) do
     match items.lookup q with
     | some j => if j == i then qs := qs ++ [q]
     | none => return (← crash "twin: serve_waiting_probe: the order names a peer probe_waiting[g] has not")
@@ -238,7 +238,7 @@ counts for nothing -/
 def knownInScope (g : Group) : M2 m Bits := do
   enter "known_in_scope"
   let mut known ← mineBits g                                  -- `known = mine[g].copy()`
-  for q in ← NodeV2.order "known_in_scope" (← suppressionScope g) do
+  for q in ← NodeSeacast.order "known_in_scope" (← suppressionScope g) do
     if ((← claims? g).getD {}).contains q then continue       -- `if q in claims[g]: continue`
     known := known ||| (← v1 (peerHas q g))                   -- `known |= peer_has[q][g].bits`
   return known
@@ -246,14 +246,14 @@ def knownInScope (g : Group) : M2 m Bits := do
 /-- `known_across(g)` (§4.6, R4): what our relation peers on the other axis hold of g -/
 def knownAcross (g : Group) : M2 m Bits := do
   enter "known_across"
-  let T ← NodeV2.typeOfGroup g
+  let T ← NodeSeacast.typeOfGroup g
   let mut known ← mineBits g                                  -- `known = mine[g].copy()`
-  for i in List.range (← NodeV2.indexCount T (← desc g)) do   -- `range(T.index_count(hdr[g]))`
+  for i in List.range (← NodeSeacast.indexCount T (← desc g)) do   -- `range(T.index_count(hdr[g]))`
     if known.has i then continue
-    for (g2, i2) in ← NodeV2.cross T g i do
+    for (g2, i2) in ← NodeSeacast.cross T g i do
       -- `any(peer_has[q][g2].has(i2) for q in suppression_scope(g2))`: the reads stop at the first holder
       let mut held := false
-      for q in ← NodeV2.order "known_across" (← suppressionScope g2) do
+      for q in ← NodeSeacast.order "known_across" (← suppressionScope g2) do
         if (← v1 (peerHas q g2)).has i2 then
           held := true
           break
@@ -266,25 +266,25 @@ def knownAcross (g : Group) : M2 m Bits := do
 not a claimant -/
 def askCustodian (g : Group) (i : Nat) : M2 m Bool := do
   enter "ask_custodian"
-  let T ← NodeV2.typeOfGroup g
-  let some (g2, i2) := (← NodeV2.cross T g i).head?           -- `T.cross(g, i)[0]`
+  let T ← NodeSeacast.typeOfGroup g
+  let some (g2, i2) := (← NodeSeacast.cross T g i).head?           -- `T.cross(g, i)[0]`
     | crash "IndexError: list index out of range (ask_custodian: T.cross(g, i)[0])"
   if ← expired g2 then                                        -- an expired column is not asked for (§8.1 there)
     branch "ask_custodian: an expired column"
     return false
   -- `[q for q in links(type_of_group(g2)) if interest_of_peer(q, g2).has(i2) and q not in claims[g] and q not in
   -- rsample_asked[g][i]]`, left to right
-  let qs ← (← NodeV2.links (← NodeV2.typeOfGroup g2)).filterM fun q => do
+  let qs ← (← NodeSeacast.links (← NodeSeacast.typeOfGroup g2)).filterM fun q => do
     if !(← interestOfPeer q g2).has i2 then return false
     if ((← claims? g).getD {}).contains q then return false
     return !(← rsampleAskedOf g i).contains q
   if qs.isEmpty then
     branch "ask_custodian: nobody to ask"
     return false
-  let q ← NodeV2.choicePeer qs
+  let q ← NodeSeacast.choicePeer qs
   setRsampleAsked g i ((← rsampleAskedOf g i).insert q)       -- `rsample_asked[g][i].add(q)`
   let w : Want := { group := g2, bits := (0 : Bits).set i2, standing := false, hops := 0, probe := false }
-  let _ ← NodeV2.send q (.want w) false
+  let _ ← NodeSeacast.send q (.want w) false
   branch "ask_custodian: asked"
   return true
 
@@ -303,7 +303,7 @@ private def step (steps : Option (List (Nat × Nat))) (j : Nat) (where_ : String
 their columns' custodians, each step's sample containing the last -/
 def repairVerdict (g : Group) : M2 m RepairVerdict := do
   enter "repair_verdict"
-  let T ← NodeV2.typeOfGroup g
+  let T ← NodeSeacast.typeOfGroup g
   let steps ← param T "REPAIR_SAMPLE" (·.REPAIR_SAMPLE)
   let k ← rsampleStep g
   if k > 0 then                                               -- step k's sample was asked SAMPLE_WAIT ago
@@ -329,7 +329,7 @@ def repairVerdict (g : Group) : M2 m RepairVerdict := do
       return .asked
   let mut want : Int := ((← step steps k "steps[k]").1 : Int) - ((← rsampleOf g).length : Int)
   -- `[i for i in range(T.index_count(hdr[g])) if not (received… or rebuilt…) and i not in rsample[g]]`
-  let cand ← (List.range (← NodeV2.indexCount T (← desc g))).filterM fun i => do
+  let cand ← (List.range (← NodeSeacast.indexCount T (← desc g))).filterM fun i => do
     if ← heldHere g i then return false
     return !(← rsampleOf g).contains i
   for i in ← shuffledNats cand do
@@ -347,11 +347,11 @@ def repairVerdict (g : Group) : M2 m RepairVerdict := do
 /-- `owed_missing(g)` (§4.6, R5): the member check: a chunk of g that is ours on the other axis is still missing -/
 def owedMissing (g : Group) : M2 m Bool := do
   enter "owed_missing"
-  let T ← NodeV2.typeOfGroup g
+  let T ← NodeSeacast.typeOfGroup g
   -- `any(interest[g2].has(i2) and not (received[g].has(i) or rebuilt[g].has(i)) for i in range(…) for (g2, i2)
   -- in T.cross(g, i))`: the range is made first, the crosses one i at a time, and the reads stop at the first
-  for i in List.range (← NodeV2.indexCount T (← desc g)) do
-    for (g2, i2) in ← NodeV2.cross T g i do
+  for i in List.range (← NodeSeacast.indexCount T (← desc g)) do
+    for (g2, i2) in ← NodeSeacast.cross T g i do
       if (← interestOf g2).has i2 then
         if !(← heldHere g i) then
           branch "owed_missing: missing"
@@ -366,18 +366,18 @@ names it as replaced, a question, and the document's otherwise. -/
 
 /-- A call `serve_standing(g, i)` as the node binds the name -/
 def serveStandingCall (g : Group) (i : Nat) : M2 m Unit := do
-  if (← read).base.replaced.contains "serve_standing" then NodeV2.serveStandingNode g i else serveStanding g i
+  if (← read).base.replaced.contains "serve_standing" then NodeSeacast.serveStandingNode g i else serveStanding g i
 
 /-- A call `known_in_scope(g)` as the node binds the name -/
 def knownInScopeCall (g : Group) : M2 m Bits := do
-  if (← read).base.replaced.contains "known_in_scope" then NodeV2.knownInScopeNode g else knownInScope g
+  if (← read).base.replaced.contains "known_in_scope" then NodeSeacast.knownInScopeNode g else knownInScope g
 
 /-- A call `repair_verdict(g)` as the node binds the name -/
 def repairVerdictCall (g : Group) : M2 m RepairVerdict := do
-  if (← read).base.replaced.contains "repair_verdict" then NodeV2.repairVerdictNode g else repairVerdict g
+  if (← read).base.replaced.contains "repair_verdict" then NodeSeacast.repairVerdictNode g else repairVerdict g
 
 /-- A call `owed_missing(g)` as the node binds the name -/
 def owedMissingCall (g : Group) : M2 m Bool := do
-  if (← read).base.replaced.contains "owed_missing" then NodeV2.owedMissingNode g else owedMissing g
+  if (← read).base.replaced.contains "owed_missing" then NodeSeacast.owedMissingNode g else owedMissing g
 
-end SpecTwin.V2
+end SpecTwin.Seacast

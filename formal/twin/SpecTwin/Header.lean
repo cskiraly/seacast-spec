@@ -1,14 +1,14 @@
 import SpecTwin.Replay
-import SpecTwin.V2.Replay
-import SpecTwin.V2.Manifest
+import SpecTwin.Seacast.Replay
+import SpecTwin.Seacast.Manifest
 
 /-! # The header's and the nodes line's readers, for both documents
 
-A trace's header (its second line) names the document it was made under in its arguments (`--doc v2`, or none for
-`protocol.md`), and the document decides the rest: the tables the header must name, the functions `traced` may
+A trace's header (its second line) names the document it was made under in its arguments (`--doc seacast`, or none for
+`seacast-lite.md`), and the document decides the rest: the tables the header must name, the functions `traced` may
 list, the names a subset may pick, the members of each nodes entry, and the names a node may replace. Under
-`protocol.md` every list is this twin's own, as the replay has always read them. Under `protocol-v2.md` the lists
-are its manifest's (`V2/Manifest.lean`, generated from `tools/gen/manifest_v2.py`). `Main.lean`'s loop calls these
+`seacast-lite.md` every list is this twin's own, as the replay has always read them. Under `seacast.md` the lists
+are its manifest's (`V2/Manifest.lean`, generated from `tools/gen/manifest_seacast.py`). `Main.lean`'s loop calls these
 readers and prints each failure they give. -/
 
 namespace SpecTwin.Header
@@ -92,29 +92,29 @@ def nodesLine (j : Json) : Except String (List (Nat × Consts × List String)) :
 /-! ## The header, by its document -/
 
 /-- The header's document, from its arguments (`argsOf`, a list of strings where present) as the tracer reads them
-(`docOf`, as `rowReadsOf` reads them): none, or `v03`, is `protocol.md`; `v2` is `protocol-v2.md`. The toy's parser
+(`docOf`, as `rowReadsOf` reads them): none, or `v03`, is `seacast-lite.md`; `v2` is `seacast.md`. The toy's parser
 takes those two words alone. -/
 def headerForm (hd : Json) : Except String Form := do
   match docOf (← argsOf hd) with
   | none | some "v03" => return .v1
-  | some "v2" => return .v2
+  | some "seacast" => return .v2
   | some d => throw s!"header: a document this replay does not read: {d}"
 
-/-- The tables a header names under each document: its own, then the other sections' it reads. Under `protocol.md`
+/-- The tables a header names under each document: its own, then the other sections' it reads. Under `seacast-lite.md`
 the twin's own tables as the schema names them (`ownTables`, generated) and the two it reads (`unwanted` is the
-twin's own); under `protocol-v2.md` the manifest's two lists. -/
+twin's own); under `seacast.md` the manifest's two lists. -/
 def docTables : Form → List String × List String
   | .v1 => (ownTables, ["known_id", "chunks"])
   | .v2 => (V2.Manifest.own, V2.Manifest.foreign)
 
-/-- Under `protocol-v2.md`, what is wrong with the header's `traced`: a name the manifest cuts at every node first,
+/-- Under `seacast.md`, what is wrong with the header's `traced`: a name the manifest cuts at every node first,
 then the names it does not list as covered, kept or the node's own. -/
-def tracedV2 (traced : List String) : Option String :=
+def tracedSeacast (traced : List String) : Option String :=
   let known := V2.Manifest.covered ++ V2.Manifest.kept ++ V2.Manifest.nodeOwn.map (·.1)
   match traced.find? V2.Manifest.cut.contains, traced.filter (!known.contains ·) with
   | some f, _ => some s!"header: traced holds {f}, which is cut at every node"
   | none, [] => none
-  | none, l => some s!"header: traced names that protocol-v2.md's manifest does not list: {", ".intercalate l}"
+  | none, l => some s!"header: traced names that seacast.md's manifest does not list: {", ".intercalate l}"
 
 /-- A subset's word, `fn=NAME` or `table=NAME`, names a function the header lists as traced, or a table the
 document's header names as the twin's own: else it would pick no record, and a mutant replayed on it would pass
@@ -136,7 +136,7 @@ structure HeaderRead where
 
 /-- The header read: its document, its format, its tables, `traced`, `row_reads` and the subset's word against the
 document's lists. (Its members, `whole` and its place in the trace are `Main.lean`'s.) A document the replay does not
-read is a failure, and the rest is read as `protocol.md`'s. -/
+read is a failure, and the rest is read as `seacast-lite.md`'s. -/
 def readHeader (hd : Json) (only? : Option String) : HeaderRead := Id.run do
   let mut fails : List String := []
   let form := match headerForm hd with
@@ -149,7 +149,7 @@ def readHeader (hd : Json) (only? : Option String) : HeaderRead := Id.run do
   let traced? := (do names "traced" (← hd.getObjVal? "traced") : Except String (List String)).toOption
   if traced?.isNone then fails := fails ++ ["header: traced is not a sorted list of names, none twice"]
   if form == .v2 then
-    if let some e := traced?.bind tracedV2 then fails := fails ++ [e]
+    if let some e := traced?.bind tracedSeacast then fails := fails ++ [e]
   let mut rowReads : List String := []
   match rowReadsOf hd with
   | .ok l => rowReads := l
@@ -174,20 +174,20 @@ too little. -/
 def asks (form : Form) (line f : String) : Bool :=
   (asksNames form).contains f && (line.splitOn s!"[\"{f}\",").length > 1
 
-/-! ## The nodes line under protocol-v2.md -/
+/-! ## The nodes line under seacast.md -/
 
-/-- v2's constants beyond `protocol.md`'s 31, which a v2 entry's `consts` holds besides. -/
-def constNamesV2 : List String :=
+/-- SEACAST's constants beyond `seacast-lite.md`'s 31, which a v2 entry's `consts` holds besides. -/
+def constNamesSeacast : List String :=
   ["ANSWERS_FIRST", "ASK_UPLINK", "MERGE_HOLDINGS", "SAMPLE_OUTSTANDING", "SERVE_BUDGET"]
 
-/-- A v2 entry's `consts`: `protocol.md`'s 31 and v2's five, exactly. `ANSWERS_FIRST` and `MERGE_HOLDINGS` are
+/-- A v2 entry's `consts`: `seacast-lite.md`'s 31 and SEACAST's five, exactly. `ANSWERS_FIRST` and `MERGE_HOLDINGS` are
 JSON's booleans; `ASK_UPLINK` is a float as its 64-bit word, finite and not negative; `SAMPLE_OUTSTANDING` is a
 JSON integer of at least 1; `SERVE_BUDGET` is one too, or `null` for no limit (the toy's `math.inf`, written as a
 limit the client does not set is). -/
-def constsV2 (j : Json) : Except String (Consts × V2.ConstsV2) := do
-  members "consts" j (constNames ++ constNamesV2) (constNames ++ constNamesV2)
+def constsSeacast (j : Json) : Except String (Consts × V2.ConstsSeacast) := do
+  members "consts" j (constNames ++ constNamesSeacast) (constNames ++ constNamesSeacast)
   let .ok kvs := j.getObj? | throw "consts: not an object"
-  let c ← consts (Json.mkObj (kvs.toList.filter fun (k, _) => !constNamesV2.contains k))
+  let c ← consts (Json.mkObj (kvs.toList.filter fun (k, _) => !constNamesSeacast.contains k))
   let b (k : String) : Except String Bool := do
     match ← j.getObjVal? k with
     | .bool x => return x
@@ -228,25 +228,25 @@ def chainsOf (j : Json) : Except String (List (String × List String)) := do
       | _ => throw bad
     return (k, l)
 
-/-- One node's configuration under `protocol-v2.md`. -/
+/-- One node's configuration under `seacast.md`. -/
 structure NodeV2Cfg where
   c : Consts
-  c2 : V2.ConstsV2
+  c2 : V2.ConstsSeacast
   /-- the parameters of each type the node can answer `type_of_group` with, the payload's always -/
   types : List (V2.TypeId × V2.TypeParams)
   replaced : List String
 
-/-- The nodes line under `protocol-v2.md`: its entries, each `{"n": [...], "consts": {...}, "replaced": [...],
+/-- The nodes line under `seacast.md`: its entries, each `{"n": [...], "consts": {...}, "replaced": [...],
 "types": {...}, "chains": {...}}`, every member required and no other. Every node once. A replaced name is never the
 manifest's cut, is one the manifest lets a node replace, is `validate_chunk` only in a trace of the whole state, and
 is one the header lists as traced. Of `chains`: every key is traced, every replaced name is a key, and a key whose
 innermost layer is not the document's is replaced. Nothing more of `chains` is read. The first failure. -/
-def nodesLineV2 (j : Json) (whole : Bool) (traced : List String) : Except String (List (Nat × NodeV2Cfg)) := do
+def nodesLineSeacast (j : Json) (whole : Bool) (traced : List String) : Except String (List (Nat × NodeV2Cfg)) := do
   let mem := ["n", "consts", "replaced", "types", "chains"]
   let mut out : List (Nat × NodeV2Cfg) := []
   for e in (← j.getArr?) do
     members "nodes" e mem mem
-    let (c, c2) ← (constsV2 (← e.getObjVal? "consts")).mapError ("nodes: " ++ ·)
+    let (c, c2) ← (constsSeacast (← e.getObjVal? "consts")).mapError ("nodes: " ++ ·)
     let rp ← names "nodes: replaced" (← e.getObjVal? "replaced")
     let ids ← (← (← e.getObjVal? "n").getArr?).toList.mapM (·.getNat?)
     let some n0 := ids.head? | throw "nodes: an entry of no node"

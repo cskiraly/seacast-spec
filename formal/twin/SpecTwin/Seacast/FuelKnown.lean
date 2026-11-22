@@ -1,4 +1,4 @@
-import SpecTwin.V2.ReplayKnown
+import SpecTwin.Seacast.ReplayKnown
 
 /-! # `resample`'s fuel: its known answer
 
@@ -8,14 +8,14 @@ where the cap is reached. The loop's guard and that test read the same number, a
 `samples_in_flight` between them, so a popped sample is never held again: the twin's loop has `n+1` turns for the n
 samples held at the first guard, n removals and one exit test, and running out of them is a crash of the twin's own
 name. (Before the cap was the node's, a type's cap below the loop's could hold a sample back on every turn, and the
-Python's loop did not end.) The records here are made by hand, in the tracer's form, and replayed by `runV2` as
+Python's loop did not end.) The records here are made by hand, in the tracer's form, and replayed by `runSeacast` as
 `ReplayKnown`'s are. -/
 
-namespace SpecTwin.V2.FuelKnown
+namespace SpecTwin.Seacast.FuelKnown
 
 open Lean (Json)
 open SpecTwin.Replay
-open SpecTwin.V2
+open SpecTwin.Seacast
 
 /-- Two groups of one block: g of type `row`, g2 of type `col`. -/
 def g : String := String.ofList (List.replicate 64 'a')
@@ -25,7 +25,7 @@ def q (s : String) : String := s!"\"{s}\""
 
 /-- At `ReplayKnown`'s node: its constants, `SAMPLE_OUTSTANDING` 1 among them. -/
 def replay (l : String) : Except String (Array String × Nat) := do
-  runV2 ReplayKnown.c0 ReplayKnown.c2 ReplayKnown.params [] ReplayKnown.traced (← record (← Json.parse l) docV2)
+  runSeacast ReplayKnown.c0 ReplayKnown.c2 ReplayKnown.params [] ReplayKnown.traced (← record (← Json.parse l) docSeacast)
 
 def tog (x T : String) : String := s!"[\"type_of_group\", [{q x}], \"{T}\"]"
 def bo (x : String) : String := s!"[\"block_of\", [{q x}], {q b}]"
@@ -76,4 +76,4 @@ def failsWith (pre : String) (x : Except String (Array String × Nat)) : Bool :=
 -- F3: no sample held: the loop ends at once
 #guard passes (replay none_held)
 
-end SpecTwin.V2.FuelKnown
+end SpecTwin.Seacast.FuelKnown

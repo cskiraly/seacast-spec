@@ -1,41 +1,41 @@
 import SpecTwin.Replay
-import SpecTwin.V2.Sample
-import SpecTwin.V2.Kept
-import SpecTwin.V2.Manifest
+import SpecTwin.Seacast.Sample
+import SpecTwin.Seacast.Kept
+import SpecTwin.Seacast.Manifest
 
-/-! # Replaying a record of a trace under protocol-v2.md
+/-! # Replaying a record of a trace under seacast.md
 
-`runV2` replays one record of a trace whose header names protocol-v2.md, as `Replay.run` replays one under
-`protocol.md`, and with the same verdict (`Replay.judge`).
+`runSeacast` replays one record of a trace whose header names seacast.md, as `Replay.run` replays one under
+`seacast-lite.md`, and with the same verdict (`Replay.judge`).
 
-- **The tape.** v2's questions are the replay's `call` entries: a name, the arguments as compact JSON, the answer
-  (`Replay.askCall`), in the forms the instance below writes. `entryV2` reads the entries whose form
-  `protocol.md`'s reader does not take or reads otherwise: an `order` and two `keys` entries, `after` with v2's
+- **The tape.** SEACAST's questions are the replay's `call` entries: a name, the arguments as compact JSON, the answer
+  (`Replay.askCall`), in the forms the instance below writes. `entrySeacast` reads the entries whose form
+  `seacast-lite.md`'s reader does not take or reads otherwise: an `order` and two `keys` entries, `after` with SEACAST's
   timers, `valid_have` of a whole HAVE, `shuffled` of pairs, `forward` with three arguments, a read of `chunks`
-  with no check of the chunk's place (`chunksReadV2`), and v2's question names.
+  with no check of the chunk's place (`chunksReadSeacast`), and SEACAST's question names.
 - **The draws.** A `choice` answer must be a member of the question's list; where the Python draws from a set
   (`choice(list(s))`), the question's list is compared as a set. A `shuffled` answer must be a permutation of
   its question, and a `sample_without_replacement` answer k distinct members.
 - **The orders.** An `order` or `keys` answer must be a permutation of the members the twin computed
   (`Replay.permOf`).
-- **The values.** A record's values are read in protocol-v2.md's forms (`docV2`, `Form.v2`): `peer_has`'s entry
-  with its two claims, and a lane's controls with v2's IWANT, holdings and relation controls. Each position has
-  one codec, injective there. An IWANT that `protocol.md`'s code enqueues on its own reads into `Msg.iwant`, and
-  `respond`'s entry, whose IWANT a lane holds as `.iwantV2`, is built so by its v2 form.
-- **The functions.** `runV2` routes a record by the manifest (`routeV2`, `V2/Manifest.lean`). It runs v2's 68
-  functions by their Python names, hands a record of one of `protocol.md`'s functions that v2 keeps, or of the
-  node's own `held` (`keptV2`), to `Replay.run`, runs the three that take another form under v2 (`keptFormsV2`) in
+- **The values.** A record's values are read in seacast.md's forms (`docSeacast`, `Form.v2`): `peer_has`'s entry
+  with its two claims, and a lane's controls with SEACAST's IWANT, holdings and relation controls. Each position has
+  one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
+  `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
+- **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `V2/Manifest.lean`). It runs SEACAST's 68
+  functions by their Python names, hands a record of one of `seacast-lite.md`'s functions that v2 keeps, or of the
+  node's own `held` (`keptSeacast`), to `Replay.run`, runs the three that take another form under v2 (`keptFormsSeacast`) in
   their v2 forms (`V2/Kept.lean`), and refuses every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
 
-namespace SpecTwin.V2
+namespace SpecTwin.Seacast
 
 open Lean (Json)
 open SpecTwin.Replay
 
-/-! ## v2's values as a record writes them -/
+/-! ## SEACAST's values as a record writes them -/
 
 /-- An integer in a record's signed form: a natural number, or `["-", n]` for −n (`intOf` reads it). -/
 def intJson : Int → Json
@@ -90,7 +90,7 @@ def wantJson (w : Want) : Json :=
   Json.arr #[Json.str "want", Json.str w.group, (w.bits : Json), Json.bool w.standing, (w.hops : Json),
              Json.bool w.probe]
 
-def msgV2Json : MsgV2 → Json
+def msgV2Json : MsgSeacast → Json
   | .have h => haveJson h
   | .want w => wantJson w
   | .relation r => relationJson r
@@ -102,7 +102,7 @@ def coverJson (r : Cover) : Json :=
               (match r.high with | some b => [("high", Json.bool b)] | none => []))
 
 /-- A v2 timer's target and arguments, as `after(delay, fn, *args)` names them. -/
-def timerV2Json : TimerV2 → String × Json
+def timerV2Json : TimerSeacast → String × Json
   | .reconsider g t => ("reconsider", Json.arr #[Json.str g, floatJson t])
   | .askSample g i => ("ask_sample", Json.arr #[Json.str g, (i : Json)])
   | .resample g i q first => ("resample", Json.arr #[Json.str g, (i : Json), (q : Json), Json.bool first])
@@ -232,11 +232,11 @@ def groupList (what : String) (j : Json) : Except String (List Group) := do
 def member {α} [BEq α] (what : String) (xs : List α) (x : α) : Except String α :=
   if xs.contains x then pure x else throw s!"{what}: not a member of the question's"
 
-/-! ## v2's tape entries -/
+/-! ## SEACAST's tape entries -/
 
-/-- v2's questions whose entries are calls as they are. `sample_without_replacement` and
-`push_rebuilt` are `protocol.md`'s `call` names already. -/
-def callNamesV2 : List String :=
+/-- SEACAST's questions whose entries are calls as they are. `sample_without_replacement` and
+`push_rebuilt` are `seacast-lite.md`'s `call` names already. -/
+def callNamesSeacast : List String :=
   ["type_of_group", "type_of", "index_count", "threshold", "verify", "decode", "header_of", "project", "cross",
    "family", "derived_interest", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "send", "links", "link_cover",
    "cover_candidates", "floor_candidates", "floor_links", "high_custody", "families", "families_with_duty",
@@ -245,21 +245,21 @@ def callNamesV2 : List String :=
    "open_sampling_link", "choice", "own_interest", "window_release", "send_have", "serve_standing", "owed_missing",
    "repair_verdict", "note_claim", "known_in_scope"]
 
-/-- v2's own timers, the targets `after` names beside `protocol.md`'s four. -/
-def timersV2 : List String := ["reconsider", "ask_sample", "resample"]
+/-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
+def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
 
 /-- A read of `chunks[g][i]` under v2: the chunk held there, which need not name that place. A rebuilt row's
 chunks are column chunks, which `decode_group` stores under the row's places, and `fill` stores a received chunk
 under each axis's place the same way; the chunk keeps its own coordinates and id. Its own id must still agree
 with its own coordinates, and the store holds it narrow (`chunkN`). A missing chunk is outside the domain, as under
-`protocol.md`. -/
-def chunksReadV2 (path v : Json) : Except String Entry := do
+`seacast-lite.md`. -/
+def chunksReadSeacast (path v : Json) : Except String Entry := do
   let #[g, i] ← path.getArr? | throw s!"not a place of chunks: {path.compress}"
   if v == .null then throw s!"chunks: no chunk there, where the Python raises: {path.compress}"
   return .readChunkAt (← Replay.groupKey g) (← nat i) (← chunkN v)
 
-/-- The entries of a v2 record that `protocol.md`'s reader does not take, or reads otherwise. -/
-def entryV2 (j : Json) : Option (Except String Entry) :=
+/-- The entries of a v2 record that `seacast-lite.md`'s reader does not take, or reads otherwise. -/
+def entrySeacast (j : Json) : Option (Except String Entry) :=
   match j.getArr? with
   | .ok #[.str "order", .str place, ms] =>
     some (pure (.call "order" (Json.arr #[Json.str place]).compress ms.compress))
@@ -267,37 +267,37 @@ def entryV2 (j : Json) : Option (Except String Entry) :=
     some (pure (.call "keys" (Json.arr #[Json.str "probe_waiting", Json.arr #[g]]).compress ks.compress))
   | .ok #[.str "keys", .str "claims", .arr #[], ks] =>
     some (pure (.call "keys" (Json.arr #[Json.str "claims", Json.arr #[]]).compress ks.compress))
-  | .ok #[.str "read", .str "chunks", path, v] => some (chunksReadV2 path v)
+  | .ok #[.str "read", .str "chunks", path, v] => some (chunksReadSeacast path v)
   | .ok #[.str name, args@(.arr as), r] =>
     let call : Option (Except String Entry) := some (pure (.call name args.compress r.compress))
-    if callNamesV2.contains name then call
+    if callNamesSeacast.contains name then call
     else match name, as with
-      | "after", #[_, .str f, _] => if timersV2.contains f then call else none
+      | "after", #[_, .str f, _] => if timersSeacast.contains f then call else none
       | "valid_have", #[h] => match h.getArrVal? 0 with
         | .ok (.str "have") => call
         | _ => none
-      | "shuffled", #[.arr xs] =>                -- of pairs `[i, f]`; peers and indices are protocol.md's entry
+      | "shuffled", #[.arr xs] =>                -- of pairs `[i, f]`; peers and indices are seacast-lite.md's entry
         match (xs[0]? : Option Json) with
         | some (.arr p) => match (p[0]? : Option Json) with
           | some (.num _) => call
           | _ => none
         | _ => none
-      | "forward", #[_, _, _] => call            -- v2's, with its axes; protocol.md's has two arguments
+      | "forward", #[_, _, _] => call            -- SEACAST's, with its axes; seacast-lite.md's has two arguments
       | _, _ => none
   | _ => none
 
 /-- A `KeyError`'s key under v2, as the twin's crash names it, with its kind: a group `["group", g]` is
 `group G`, a type `["type", tid]` is `type T`, and an integer in the signed form is bare. -/
-def raisesKeyV2 (j : Json) : Except String String :=
+def raisesKeySeacast (j : Json) : Except String String :=
   match j with
   | .arr #[.str "group", g] => do return s!"group {← Replay.groupKey g}"
   | .arr #[.str "type", t] => do return s!"type {← typeId t}"
   | j => do return toString (← intOf j)
 
-/-- How a record of a trace under protocol-v2.md is read. -/
-def docV2 : Doc := { entry := entryV2, raisesKey := raisesKeyV2, form := .v2 }
+/-- How a record of a trace under seacast.md is read. -/
+def docSeacast : Doc := { entry := entrySeacast, raisesKey := raisesKeySeacast, form := .v2 }
 
-/-! ## Answering v2's questions from the tape -/
+/-! ## Answering SEACAST's questions from the tape -/
 
 /-- A question kept as a call whose arguments the twin compares by a test, not as text: the tape's next entry
 must be this question, with arguments the test takes. Its answer is read as `askCall` reads one. -/
@@ -322,12 +322,12 @@ def retIs {α} [BEq α] (ret : Json) (f : Json → Except String α) (v : α) : 
 /-- The same peers, as sets. -/
 def samePeers (a b : List Peer) : Bool := sortBy (· < ·) a == sortBy (· < ·) b
 
-instance : NodeV2 R where
+instance : NodeSeacast R where
   typeOfGroup g := askCall "type_of_group" [Json.str g] typeId
   typeOf t := askCall "type_of" [Json.str t] typeId
   indexCount T h := askCall "index_count" [Json.str T, optJson descriptorJson h] nat
   threshold T h := askCall "threshold" [Json.str T, optJson descriptorJson h] nat
-  -- a chunk in v2's questions is written narrow, `[group, index, slot, root, id]`
+  -- a chunk in SEACAST's questions is written narrow, `[group, index, slot, root, id]`
   verify T f h := askCall "verify" [Json.str T, chunkJson f, optJson descriptorJson h] verdict
   decode T g h := askCall "decode" [Json.str T, Json.str g, optJson descriptorJson h] fun j => do
     if j == .null then return none
@@ -344,7 +344,7 @@ instance : NodeV2 R where
   decodeLater T g := askCall "DECODE_LATER" [Json.str T, Json.str g] (optOf floatOf)
   repairTo T g := askCall "REPAIR_TO" [Json.str T, Json.str g] (peerList "REPAIR_TO")
   send p x u := askCall "send" [(p : Json), msgV2Json x, Json.bool u] boolOf
-  afterV2 d t := let (f, xs) := timerV2Json t; askCall "after" [floatJson d, Json.str f, xs] nothing
+  afterSeacast d t := let (f, xs) := timerV2Json t; askCall "after" [floatJson d, Json.str f, xs] nothing
   links T := askCall "links" [Json.str T] (peerList "links")
   linkCover q T := askCall "link_cover" [(q : Json), Json.str T] fun j => do
     let r ← coverOf j
@@ -371,7 +371,7 @@ instance : NodeV2 R where
   groupOf b h := askCall "group_of" [blockJson b, descriptorJson h] Replay.groupKey
   nodeId p := askCall "node_id" [(p : Json)] hex
   interestSatisfied g := askCall "interest_satisfied" [Json.str g] boolOf
-  validHaveV2 h := askCall "valid_have" [haveJson h] boolOf
+  validHaveSeacast h := askCall "valid_have" [haveJson h] boolOf
   mergeWaiting p h := askCall "merge_waiting" [(p : Json), haveJson h] boolOf
   deferredOffers p h := askCall "deferred_offers" [(p : Json), haveJson h] fun j => do (← arr j).mapM key
   openGroupSource g d := askCall "open_group_source" [Json.str g, descriptorJson d] nothing
@@ -391,10 +391,10 @@ instance : NodeV2 R where
   choiceNat xs := askCall "choice" [natsJson xs] fun j => do member "choice" xs (← nat j)
   choiceCover xs := askCall "choice" [Json.arr (xs.map coverJson).toArray] fun j => do
     member "choice" xs (← coverOf j)
-  shuffledPeers xs := Node61.shuffledNats xs        -- protocol.md's entry
+  shuffledPeers xs := Node61.shuffledNats xs        -- seacast-lite.md's entry
   shuffledPairs xs := do
     let enc := fun (p : Nat × ChunkF) => Json.arr #[(p.1 : Json), chunkJson p.2]
-    if xs.isEmpty then                  -- `shuffled([])`, which protocol.md's reader takes as one of keys
+    if xs.isEmpty then                  -- `shuffled([])`, which seacast-lite.md's reader takes as one of keys
       match ← pop with
       | some (.shuffled [] []) => return []
       | e => asked "shuffled([])" e
@@ -416,7 +416,7 @@ instance : NodeV2 R where
       if l.eraseDups.length != l.length then throw s!"a record twice: {j.compress}"
       if !l.all xs.contains then throw s!"a record that is not of the question's: {j.compress}"
       return l
-  -- the orders of proxied sets and of v2's own levels: a permutation of what the twin holds
+  -- the orders of proxied sets and of SEACAST's own levels: a permutation of what the twin holds
   order place xs := do
     permOf s!"the order at {place}" xs (← askCall "order" [Json.str place] (peerList s!"the order at {place}"))
   probeWaitingOrder g xs := do
@@ -442,50 +442,50 @@ instance : V2Later R where
 
 /-! ## One record -/
 
-/-- The functions of `protocol.md` that a record under v2 may name and that take another form under v2: the two
-that call a name v2 redefines, and `respond`, whose IWANT a record under v2 writes in v2's form. The replay serves
+/-- The functions of `seacast-lite.md` that a record under v2 may name and that take another form under v2: the two
+that call a name v2 redefines, and `respond`, whose IWANT a record under v2 writes in SEACAST's form. The replay serves
 them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`. -/
-def keptFormsV2 : List String := ["on_pace_tick", "on_block_installed", "respond"]
+def keptFormsSeacast : List String := ["on_pace_tick", "on_block_installed", "respond"]
 
-/-- v2's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
+/-- SEACAST's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
 the 66, main's `fill` and `serve_standing`, and v0.11.1's `joined` and `drop_wants_beyond`. -/
-def fnsV2 : List String := Manifest.covered.filter (!keptFormsV2.contains ·)
+def fnsSeacast : List String := Manifest.covered.filter (!keptFormsSeacast.contains ·)
 
-/-- The functions of `protocol.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
-form): the manifest's kept names, `protocol.md`'s all the way down by both documents' code, and the node's own
+/-- The functions of `seacast-lite.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
+form): the manifest's kept names, `seacast-lite.md`'s all the way down by both documents' code, and the node's own
 helpers (`held`). -/
-def keptV2 : List String := Manifest.kept ++ Manifest.nodeOwn.map (·.1)
+def keptSeacast : List String := Manifest.kept ++ Manifest.nodeOwn.map (·.1)
 
 /-- Where a record under v2 goes, by its function's name. -/
 inductive Route where
-  /-- v2's own code, by one of `runV2`'s cases -/
+  /-- SEACAST's own code, by one of `runSeacast`'s cases -/
   | v2
   /-- a kept function's v2 form (`V2/Kept.lean`) -/
   | form
-  /-- `protocol.md`'s code, by `Replay.run` with v2's forms -/
+  /-- `seacast-lite.md`'s code, by `Replay.run` with SEACAST's forms -/
   | kept
   /-- no function of the twin under v2: a name v2 redefines and this cycle does not cover, or any other -/
   | refused
   deriving BEq, Repr
 
-/-- The route of a record of `f` under v2: a kept form first, then v2's covered names, then the kept names and the
+/-- The route of a record of `f` under v2: a kept form first, then SEACAST's covered names, then the kept names and the
 node's own helpers, and every other name refused. -/
-def routeV2 (f : String) : Route :=
-  if keptFormsV2.contains f then .form
-  else if fnsV2.contains f then .v2
-  else if keptV2.contains f then .kept
+def routeSeacast (f : String) : Route :=
+  if keptFormsSeacast.contains f then .form
+  else if fnsSeacast.contains f then .v2
+  else if keptSeacast.contains f then .kept
   else .refused
 
 set_option maxHeartbeats 1600000 in
-/-- What one replayed record of a trace under protocol-v2.md gives: the branches it took and how many of the
+/-- What one replayed record of a trace under seacast.md gives: the branches it took and how many of the
 Python's reads the twin did not make, or the first difference. `params` are the types' parameters at the node;
 `rowReads` the tables whose rows the trace's view logs as read (`rowReadsOf`, the header's `row_reads`). -/
-def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (replaced traced : List String)
+def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option TypeParams) (replaced traced : List String)
     (r : Record) (rowReads : List String := []) : Except String (Array String × Nat) := do
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
-  match routeV2 r.fn with
+  match routeSeacast r.fn with
   | .kept => return ← run c replaced traced r rowReads .v2
-  | .refused => throw s!"not a function of the twin under protocol-v2.md: {r.fn}"
+  | .refused => throw s!"not a function of the twin under seacast.md: {r.fn}"
   | _ => pure ()
   let ctx : Ctx2 := { base := { c, now := Float.ofBits r.t, replaced }, c2, params }
   let rs0 : RSt := { tape := r.tape, twin := ← load r, rowReads }
@@ -583,12 +583,12 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "resample", #[g, i, q, b] => do
       exec (resample (← Replay.groupKey g) (← nat i) (← nat q) (← boolOf b)) none_
     | "sample", #[g, b] => do exec (sample (← Replay.groupKey g) (← nat b)) none_
-    -- protocol.md's two that call v2's functions, in their v2 forms
+    -- seacast-lite.md's two that call SEACAST's functions, in their v2 forms
     | "on_pace_tick", #[] => do exec onPaceTick none_
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_
     | "respond", #[p, asks, answers, prunes] => do
       exec (V2.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkN) (← nat prunes)) none_
-    | f, _ => throw s!"not a function of the twin under protocol-v2.md, or not its arguments: {f}"
+    | f, _ => throw s!"not a function of the twin under seacast.md, or not its arguments: {f}"
   judge traced r res rs
 
-end SpecTwin.V2
+end SpecTwin.Seacast

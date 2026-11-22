@@ -1,11 +1,11 @@
-"""protocol-v2.md's closure rule and the call-closure check, for trace3.py under --doc v2 and for gen.py's comparison
+"""seacast.md's closure rule and the call-closure check, for trace3.py under --doc seacast and for gen.py's comparison
 of the manifest's QUESTIONS with the code.
 
 The closure rule. Every global that a COVERED function loads is in one class: a view (the manifest's OWN and
-FOREIGN), a listed alias (CLOSURE_ALIASES), a constant of the nodes line (NODES_LINE_V2), a function in the
+FOREIGN), a listed alias (CLOSURE_ALIASES), a constant of the nodes line (NODES_LINE_Seacast), a function in the
 manifest's lists (COVERED, KEPT, NODE_OWN's keys, CUT), a question (the manifest's QUESTIONS), a listed enumeration
-(ENUMS_V2), a builtin of PURE_BUILTINS_V2, a pure operation (PURE_V2), a constructor (CONSTRUCTORS_V2), or the
-record's context (CONTEXT_V2). The attributes read off a type's `.params` are checked too: a value against the
+(ENUMS_Seacast), a builtin of PURE_BUILTINS_Seacast, a pure operation (PURE_Seacast), a constructor (CONSTRUCTORS_Seacast), or the
+record's context (CONTEXT_Seacast). The attributes read off a type's `.params` are checked too: a value against the
 parameter schema the tracer gives, a call against the type's parameter functions and QUESTIONS.
 
 The call-closure check. Over COVERED and KEPT, a global load of a function the documents define must be a function
@@ -14,8 +14,8 @@ out of them reaches either code the twin has or a question on the tape. Visiting
 and not the covered ones alone, makes the check transitive.
 
 The type's functions and the context. Over COVERED and KEPT, every attribute call named like one of the type's nine
-functions (TYPE_CALLS_V2) must be a question in QUESTIONS, and a read of one that is not a call is a read the check
-cannot follow. Every use of a context global must be in CONTEXT_USES_V2 (a question) or CONTEXT_REASONS_V2 (a named
+functions (TYPE_CALLS_Seacast) must be a question in QUESTIONS, and a read of one that is not a call is a read the check
+cannot follow. Every use of a context global must be in CONTEXT_USES_Seacast (a question) or CONTEXT_REASONS_Seacast (a named
 reason why it touches no node state). The limit, as stated when this was decided: methods on a view go through the
 view's proxy, so the view logs their effect; methods on a local or on a message argument act on values the record
 already holds.
@@ -34,19 +34,19 @@ uses' questions. gen.py holds QUESTIONS less QUESTIONS_UNLOADED to it, and the t
 QUESTIONS.
 
 The install's checks hold the classes' lists to what a node runs: `enum_check` (each enumeration's value),
-`consts_keys_check` (the nodes entry's constants are NODES_LINE_V2) and `type_attrs_check` (a type object's
-attributes are TYPE_ATTRS_V2).
+`consts_keys_check` (the nodes entry's constants are NODES_LINE_Seacast) and `type_attrs_check` (a type object's
+attributes are TYPE_ATTRS_Seacast).
 """
 import ast
 import symtable
 from types import SimpleNamespace
 
 CLOSURE_ALIASES = {
-    "hdr": "desc, a view, under the name protocol-v2.md's code gives it",
-    "chunk_id": "message_id, a traced function, under the name protocol-v2.md's code gives it (chunk_id = message_id)"}
+    "hdr": "desc, a view, under the name seacast.md's code gives it",
+    "chunk_id": "message_id, a traced function, under the name seacast.md's code gives it (chunk_id = message_id)"}
 # the nodes entry's constants under v2, as trace3.py's install writes them: trace61's four, the client's three limits,
-# MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and v2's five
-NODES_LINE_V2 = (
+# MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and SEACAST's five
+NODES_LINE_Seacast = (
     "IWANT_WINDOW", "RETRY_SLACK", "PROMISE", "PARK_TTL",
     "MAX_IHAVE_MESSAGES", "MAX_IHAVE_LENGTH", "MAX_PENDING_GROUPS", "MAX_PLAIN_CHUNKS",
     "CANCEL", "PROJECT", "RAREST", "FAN_IN",
@@ -54,32 +54,32 @@ NODES_LINE_V2 = (
     "D_LAZY", "PACED", "HAVE_TTL", "GOSSIP_RETRANSMISSION", "DESCRIPTOR_IN_CHUNK", "PUSH_TTL", "R", "R_NODE",
     "GUARD_GRACE", "UPLINK", "STRIPE_UPLINK", "W", "WINDOW_TIMEOUT", "SOURCE_OFFERS",
     "ANSWERS_FIRST", "MERGE_HOLDINGS", "ASK_UPLINK", "SAMPLE_OUTSTANDING", "SERVE_BUDGET")
-# the toy's enumerations (node.py's namespace and _v2): each label a string equal to its name, but the two bitmaps,
+# the toy's enumerations (node.py's namespace and _seacast): each label a string equal to its name, but the two bitmaps,
 # given as ("Bits", their int)
-ENUMS_V2 = dict({k: k for k in (
+ENUMS_Seacast = dict({k: k for k in (
     "ACCEPT", "REJECT", "DEFER", "COLLECTING", "DECODING", "COMPLETE", "INVALID", "REPAIRED", "ASKED", "NOT_REPAIRED",
     "ACK", "PUBLISH", "ALL", "DERIVED", "DECLARED", "FORWARD", "NONE", "IN", "OUT", "BOTH", "ALL_JOINED", "SAMPLE",
     "FAST", "HOME")}, EVERY_INDEX=("Bits", -1), EMPTY=("Bits", 0))
 # the builtins a covered function may load: functions of their arguments alone. Any other builtin (getattr, globals,
 # vars, print, ...) is in no class: it reaches state or effects by another way than a view
-PURE_BUILTINS_V2 = (
+PURE_BUILTINS_Seacast = (
     "abs", "all", "any", "bool", "dict", "divmod", "enumerate", "filter", "float", "frozenset", "int", "isinstance",
     "iter", "len", "list", "map", "max", "min", "next", "range", "reversed", "round", "set", "sorted", "str", "sum",
     "tuple", "zip", "True", "False", "None")
-PURE_V2 = ("popcount", "all_bits", "bitmap",        # bits.py's
+PURE_Seacast = ("popcount", "all_bits", "bitmap",        # bits.py's
            "group", "group_index", "index")         # node.py's, each a function of its argument alone
-CONSTRUCTORS_V2 = ("Ask", "Entry", "Graft", "Have", "Join", "Prune", "Want", "WantIndex")
-CONTEXT_V2 = ("now", "mesh", "gossip_history")
+CONSTRUCTORS_Seacast = ("Ask", "Entry", "Graft", "Have", "Join", "Prune", "Want", "WantIndex")
+CONTEXT_Seacast = ("now", "mesh", "gossip_history")
 # each use of a context global, by its receiver and its kind (`uses`), that is a question on the tape
-CONTEXT_USES_V2 = {("gossip_history", ".put()"): "gossip_put",
+CONTEXT_USES_Seacast = {("gossip_history", ".put()"): "gossip_put",
                    ("gossip_history", ".remove_group()"): "gossip_remove_group",
                    ("mesh", "in"): "mesh_has"}
 # each use that is no question, with the reason that it touches no node state
-CONTEXT_REASONS_V2 = {("now", "value"): "the record's clock, a number; it is read as a value, and no method of it "
+CONTEXT_REASONS_Seacast = {("now", "value"): "the record's clock, a number; it is read as a value, and no method of it "
                                         "is called"}
-TYPE_CALLS_V2 = ("cross", "decode", "derived_interest", "family", "header_of", "index_count", "project", "threshold",
+TYPE_CALLS_Seacast = ("cross", "decode", "derived_interest", "family", "header_of", "index_count", "project", "threshold",
                  "verify")
-TYPE_ATTRS_V2 = ("name", "id", "params") + TYPE_CALLS_V2
+TYPE_ATTRS_Seacast = ("name", "id", "params") + TYPE_CALLS_Seacast
 
 COMPS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
 STOPS = tuple(getattr(ast, k) for k in ("Global", "Nonlocal", "ClassDef", "AsyncFunctionDef", "Await", "AsyncFor",
@@ -141,16 +141,16 @@ def _annotation_ids(fn):
 
 
 class Reading:
-    """The two documents' top-level functions, protocol-v2.md's over protocol.md's of the same name, each with its
+    """The two documents' top-level functions, seacast.md's over seacast-lite.md's of the same name, each with its
     symtable, and each function's global loads (`loads`), read once. `annotations=False` reads annotations as loads:
     the self-test's control. `drop` names globals whose loads the reading leaves out: the self-test's planted miss,
     which the comparison with symtable must find."""
 
-    def __init__(self, p_src, v2_src, annotations=True, drop=()):
+    def __init__(self, p_src, seacast_src, annotations=True, drop=()):
         self.skip_annotations = annotations
         self.drop = frozenset(drop)
         self.defs = {}
-        for src in (p_src, v2_src):
+        for src in (p_src, seacast_src):
             tree = ast.parse(src)
             tables = {}
             for t in symtable.symtable(src, "<document>", "exec").get_children():
@@ -258,15 +258,15 @@ def _not_question(k, mm):
         return "view"
     if k in CLOSURE_ALIASES:
         return "alias"
-    if k in NODES_LINE_V2:
+    if k in NODES_LINE_Seacast:
         return "nodes-line constant"
     if k in mm.COVERED or k in mm.KEPT or k in mm.NODE_OWN or k in mm.CUT:
         return "listed function"
-    if k in ENUMS_V2:
+    if k in ENUMS_Seacast:
         return "enumeration"
-    if k in PURE_BUILTINS_V2 or k in PURE_V2 or k in CONSTRUCTORS_V2:
+    if k in PURE_BUILTINS_Seacast or k in PURE_Seacast or k in CONSTRUCTORS_Seacast:
         return "builtin or pure"
-    if k in CONTEXT_V2:
+    if k in CONTEXT_Seacast:
         return "context"
     return None
 
@@ -350,7 +350,7 @@ def groups(rd, m, context_over=("COVERED", "KEPT")):
         fn = rd.defs[f][0]
         par = _parents(fn)
         for n in ast.walk(fn):
-            if isinstance(n, ast.Attribute) and n.attr in TYPE_CALLS_V2:
+            if isinstance(n, ast.Attribute) and n.attr in TYPE_CALLS_Seacast:
                 up = par.get(id(n))
                 if isinstance(up, ast.Call) and up.func is n:
                     tcalls.setdefault(n.attr, set()).add(f)
@@ -361,10 +361,10 @@ def groups(rd, m, context_over=("COVERED", "KEPT")):
     for f in ctx:
         par = _parents(rd.defs[f][0])
         for n, up in rd.loads(f)[0]:
-            if n.id in CONTEXT_V2:
+            if n.id in CONTEXT_Seacast:
                 kind = _context_kind(n, up, par)
                 cuses.append((n.id, kind, f))
-                q = CONTEXT_USES_V2.get((n.id, kind))
+                q = CONTEXT_USES_Seacast.get((n.id, kind))
                 if q:
                     cq.setdefault(q, set()).add(f)
     return g1, pcalls, pvals, podd, tcalls, todd, cq, cuses, classes
@@ -426,19 +426,19 @@ def type_call_check(rd, m):
 
 
 def context_check(rd, m, over=("COVERED", "KEPT")):
-    """Each use of a context global, over `over`, is a question in QUESTIONS (CONTEXT_USES_V2) or
-    has its named reason (CONTEXT_REASONS_V2). `over=("COVERED",)` is the self-test's control."""
+    """Each use of a context global, over `over`, is a question in QUESTIONS (CONTEXT_USES_Seacast) or
+    has its named reason (CONTEXT_REASONS_Seacast). `over=("COVERED",)` is the self-test's control."""
     mm = _manifest(m)
     _, _, _, _, _, _, _, cuses, _ = groups(rd, m, context_over=over)
     out, counts = [], {}
     for recv, kind, f in cuses:
-        q = CONTEXT_USES_V2.get((recv, kind))
+        q = CONTEXT_USES_Seacast.get((recv, kind))
         if q is not None:
             if q not in mm.QUESTIONS:
                 out.append(f"{_use(recv, kind)} in {f}: its question {q} is not in QUESTIONS")
-        elif (recv, kind) not in CONTEXT_REASONS_V2:
-            out.append(f"{_use(recv, kind)} in {f}: a use of the record's context in neither CONTEXT_USES_V2 nor "
-                       f"CONTEXT_REASONS_V2")
+        elif (recv, kind) not in CONTEXT_REASONS_Seacast:
+            out.append(f"{_use(recv, kind)} in {f}: a use of the record's context in neither CONTEXT_USES_Seacast nor "
+                       f"CONTEXT_REASONS_Seacast")
         counts[_use(recv, kind)] = counts.get(_use(recv, kind), 0) + 1
     return sorted(set(out), key=out.index), counts
 
@@ -451,11 +451,11 @@ def check(rd, m, schema_values, type_functions):
     bc, cc = context_check(rd, m)
     order = ("view", "alias", "nodes-line constant", "listed function", "question", "enumeration", "builtin or pure",
              "context")
-    lines = [f"closure_v2: the closure rule: {sum(counts.values())} globals of COVERED ("
+    lines = [f"closure_seacast: the closure rule: {sum(counts.values())} globals of COVERED ("
              + ", ".join(f"{c} {counts.get(c, 0)}" for c in order) + f"); .params {nv} values and {nc} calls",
-             f"closure_v2: the call closure: {edges} edges out of the lists",
-             f"closure_v2: the type's functions: {tn} names in {tp} (name, caller) pairs",
-             f"closure_v2: the context uses, {sum(cc.values())}: "
+             f"closure_seacast: the call closure: {edges} edges out of the lists",
+             f"closure_seacast: the type's functions: {tn} names in {tp} (name, caller) pairs",
+             f"closure_seacast: the context uses, {sum(cc.values())}: "
              + ", ".join(f"{k} {v}" for k, v in sorted(cc.items()))]
     return bad + b19 + bt + bc, lines
 
@@ -463,7 +463,7 @@ def check(rd, m, schema_values, type_functions):
 def enum_check(ns):
     """Each listed enumeration has its value in the node's namespace."""
     out = []
-    for k, want in ENUMS_V2.items():
+    for k, want in ENUMS_Seacast.items():
         if k not in ns:
             out.append(f"{k} is not in the namespace")
             continue
@@ -479,16 +479,16 @@ def enum_check(ns):
 
 
 def consts_keys_check(consts):
-    """The nodes entry's constants are NODES_LINE_V2, name for name."""
-    have, want = set(consts), set(NODES_LINE_V2)
-    return ([f"the nodes line has {k}, which NODES_LINE_V2 does not list" for k in sorted(have - want)]
-            + [f"NODES_LINE_V2 lists {k}, which the nodes line does not have" for k in sorted(want - have)])
+    """The nodes entry's constants are NODES_LINE_Seacast, name for name."""
+    have, want = set(consts), set(NODES_LINE_Seacast)
+    return ([f"the nodes line has {k}, which NODES_LINE_Seacast does not list" for k in sorted(have - want)]
+            + [f"NODES_LINE_Seacast lists {k}, which the nodes line does not have" for k in sorted(want - have)])
 
 
 def type_attrs_check(tid, t):
-    """A type object's attributes are TYPE_ATTRS_V2, name for name."""
-    have, want = set(vars(t)), set(TYPE_ATTRS_V2)
-    return ([f"type {tid}: attribute {a}, not in TYPE_ATTRS_V2" for a in sorted(have - want)]
+    """A type object's attributes are TYPE_ATTRS_Seacast, name for name."""
+    have, want = set(vars(t)), set(TYPE_ATTRS_Seacast)
+    return ([f"type {tid}: attribute {a}, not in TYPE_ATTRS_Seacast" for a in sorted(have - want)]
             + [f"type {tid}: no attribute {a}" for a in sorted(want - have)])
 
 
@@ -499,10 +499,10 @@ def self_test(N, m, schema_values, type_functions):
     COVERED alone fails exactly the transitive case, and a context check over COVERED alone fails exactly the KEPT
     case. Returns the number of lines wrong."""
     import copy
-    p_src, v2_src = N.SPEC_SRC, N.generate(N.DOC2)
+    p_src, seacast_src = N.SPEC_SRC, N.generate(N.DOC2)
     base = {k: copy.deepcopy(list(getattr(m, k)) if k != "QUESTIONS_UNLOADED" else dict(getattr(m, k)))
             for k in ("COVERED", "KEPT", "NODE_OWN", "CUT", "OWN", "FOREIGN", "QUESTIONS", "QUESTIONS_UNLOADED")}
-    real = {True: Reading(p_src, v2_src), False: Reading(p_src, v2_src, annotations=False)}
+    real = {True: Reading(p_src, seacast_src), False: Reading(p_src, seacast_src, annotations=False)}
 
     def man(**kw):
         d = copy.deepcopy(base)
@@ -518,11 +518,11 @@ def self_test(N, m, schema_values, type_functions):
 
     tf_without_repair = tuple(x for x in type_functions if x != "REPAIR_TO")
     Bits = N.Bits
-    good_ns = {k: (Bits(v[1]) if isinstance(v, tuple) else v) for k, v in ENUMS_V2.items()}
-    good_consts = dict.fromkeys(NODES_LINE_V2, 0)
+    good_ns = {k: (Bits(v[1]) if isinstance(v, tuple) else v) for k, v in ENUMS_Seacast.items()}
+    good_consts = dict.fromkeys(NODES_LINE_Seacast, 0)
 
     def tobj(extra=(), drop=()):
-        o = SimpleNamespace(**{a: None for a in TYPE_ATTRS_V2 if a not in drop})
+        o = SimpleNamespace(**{a: None for a in TYPE_ATTRS_Seacast if a not in drop})
         for a in extra:
             setattr(o, a, None)
         return o
@@ -557,10 +557,10 @@ def self_test(N, m, schema_values, type_functions):
         ("enum_check, EMPTY bound to Bits(1)", "enum", dict(good_ns, EMPTY=Bits(1)),
          ["EMPTY is Bits(1), not Bits(0)"]),
         ("consts_keys_check, a key added", "consts", dict(good_consts, EXTRA=0),
-         ["the nodes line has EXTRA, which NODES_LINE_V2 does not list"]),
+         ["the nodes line has EXTRA, which NODES_LINE_Seacast does not list"]),
         ("consts_keys_check, a key taken out", "consts",
          {k: v for k, v in good_consts.items() if k != "HEARTBEAT"},
-         ["NODES_LINE_V2 lists HEARTBEAT, which the nodes line does not have"]),
+         ["NODES_LINE_Seacast lists HEARTBEAT, which the nodes line does not have"]),
         ("(a): the documents with decode taken out of QUESTIONS", "types",
          (None, man(QUESTIONS=without("decode"))),
          ["the type's function decode, called by decode_group, is not a question in QUESTIONS"]),
@@ -569,23 +569,23 @@ def self_test(N, m, schema_values, type_functions):
          ["a read of the type's function decode that is not a call, in c: f = T.decode"]),
         ("the addition: a covered function calling gossip_history.clear()", "context",
          synth("def c():\n    gossip_history.clear()\n", ["c"]),
-         ["gossip_history.clear() in c: a use of the record's context in neither CONTEXT_USES_V2 nor "
-          "CONTEXT_REASONS_V2"]),
+         ["gossip_history.clear() in c: a use of the record's context in neither CONTEXT_USES_Seacast nor "
+          "CONTEXT_REASONS_Seacast"]),
         ("the addition: a kept function calling gossip_history.clear()", "context",
          synth("def c():\n    gossip_history.clear()\n", [], ["c"]),
-         ["gossip_history.clear() in c: a use of the record's context in neither CONTEXT_USES_V2 nor "
-          "CONTEXT_REASONS_V2"]),
+         ["gossip_history.clear() in c: a use of the record's context in neither CONTEXT_USES_Seacast nor "
+          "CONTEXT_REASONS_Seacast"]),
         ("f(mesh)", "context", synth("def c(f):\n    return f(mesh)\n", ["c"]),
-         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
+         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
         ("for q in mesh", "context", synth("def c():\n    for q in mesh:\n        pass\n", ["c"]),
-         ["mesh (iterated) in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
+         ["mesh (iterated) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
         ("now.x", "context", synth("def c():\n    return now.x\n", ["c"]),
-         ["now.x in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
+         ["now.x in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
         ("the documents with gossip_put taken out of QUESTIONS", "context",
          (None, man(QUESTIONS=without("gossip_put"))),
          ["gossip_history.put() in forward: its question gossip_put is not in QUESTIONS"]),
         ("type_attrs_check, a tenth function added", "attrs", tobj(extra=("extra",)),
-         ["type payload: attribute extra, not in TYPE_ATTRS_V2"]),
+         ["type payload: attribute extra, not in TYPE_ATTRS_Seacast"]),
         ("type_attrs_check, verify taken out", "attrs", tobj(drop=("verify",)),
          ["type payload: no attribute verify"]),
         ("the documents with held, a key of NODE_OWN, added to COVERED", "closure",
@@ -600,10 +600,10 @@ def self_test(N, m, schema_values, type_functions):
           "not read: ['FOO']"]),
         ("1 in s == mesh: mesh compared with ==, not tested for a member", "context",
          synth("def c(s):\n    return 1 in s == mesh\n", ["c"]),
-         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
+         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
         ("p in mesh == x: mesh the left side of == too", "context",
          synth("def c(p, x):\n    return p in mesh == x\n", ["c"]),
-         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
+         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
     ]
 
     def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False):

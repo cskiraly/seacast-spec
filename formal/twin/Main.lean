@@ -1,13 +1,13 @@
 import SpecTwin.Replay
 import SpecTwin.Strict
 import SpecTwin.Header
-import SpecTwin.V2.FormsRows
+import SpecTwin.Seacast.FormsRows
 
 /-! `replay [--only fn=NAME|table=NAME] [--content FILE] [TRACE]`: replay a trace of `trace3.py` (JSON lines; stdin
 when no file is named, so that a gzipped trace goes through `zcat`) through the twin, and print what matched,
 what did not, and how often each branch of the twin ran.
 
-`replay --forms FILE`: the rows of v2's questions in FILE, each read and refused by the twin's readers, and the
+`replay --forms FILE`: the rows of SEACAST's questions in FILE, each read and refused by the twin's readers, and the
 checker's controls (`V2/FormsRows.lean`).
 
 A trace's first line is its content line: what it was made from, each document by the sha256 of its code and each
@@ -16,8 +16,8 @@ caller made over the tree it replays against, and the two must be the same bytes
 other code, another toy or other tools fails, and so does every trace where no file is given.
 The header is the second line and the nodes line the third (each node's constants and the traced names
 its namespace has replaced). The header's arguments name the document the trace was made under, and the document
-decides how the rest is read (`Header.lean`): under protocol-v2.md the header's lists are its manifest's, each
-nodes entry has v2's members, and a record is read in v2's forms and replayed by `runV2`.
+decides how the rest is read (`Header.lean`): under seacast.md the header's lists are its manifest's, each
+nodes entry has SEACAST's members, and a record is read in SEACAST's forms and replayed by `runSeacast`.
 A trace also fails with a header that is not its only one, with a record of a node the nodes line does not name, with a line the tracer would not write (`Strict.lean`: a member given twice, which
 the parser would drop in silence, a number that is not a plain integer, white space), with an envelope line that
 has a member it should not, or with a trailer whose counts (the records, function by function, and the entries
@@ -71,10 +71,10 @@ structure Tally where
 def sorted (m : Std.HashMap String Nat) : List (String × Nat) := sortBy (·.1 < ·.1) m.toList
 
 def main (args : List String) : IO UInt32 := do
-  -- `--forms FILE`: the rows of v2's questions, read and refused, and the checker's controls; no trace is read
+  -- `--forms FILE`: the rows of SEACAST's questions, read and refused, and the checker's controls; no trace is read
   if let "--forms" :: rest := args then
     let [f] := rest | throw (IO.userError "usage: replay --forms FILE")
-    return ← SpecTwin.V2.FormsRows.formsMain f
+    return ← SpecTwin.Seacast.FormsRows.formsMain f
   -- `--only fn=NAME` or `--only table=NAME`: a mutant's replay. Only the records whose line says, at its end,
   -- that the call reached that function, or touched that table, are read (and, for a replaceable name, the
   -- records that ask it on the tape: `asks` below); the others are counted and skipped
@@ -113,7 +113,7 @@ def main (args : List String) : IO UInt32 := do
   let mut headers := 0
   let mut form : Form := .v1            -- the header's document (`Header.headerForm`)
   let mut nodes : Std.HashMap Nat (Consts × List String) := {}   -- each node's constants and replaced names
-  let mut nodesV2 : Std.HashMap Nat NodeV2Cfg := {}               -- under protocol-v2.md, each node's configuration
+  let mut nodesSeacast : Std.HashMap Nat NodeV2Cfg := {}               -- under seacast.md, each node's configuration
   let mut nodesSeen := false
   let mut whole := false                -- the header's: a trace of the whole state (a directed set)
   let mut traced? : Option (List String) := none   -- the functions the tracer traced, as the header lists them
@@ -201,9 +201,9 @@ def main (args : List String) : IO UInt32 := do
         headerOk := false
         continue
       nodesSeen := true
-      if form == .v2 then                -- under protocol-v2.md: its members, and its checks, are the reader's
-        match (do members "the nodes line" j ["nodes"] ["nodes"]; nodesLineV2 nj whole (traced?.getD []) : Except String _) with
-        | .ok l => nodesV2 := l.foldl (fun m (n, cfg) => m.insert n cfg) nodesV2
+      if form == .SEACAST then                -- under seacast.md: its members, and its checks, are the reader's
+        match (do members "the nodes line" j ["nodes"] ["nodes"]; nodesLineSeacast nj whole (traced?.getD []) : Except String _) with
+        | .ok l => nodesSeacast := l.foldl (fun m (n, cfg) => m.insert n cfg) nodesSeacast
         | .error e =>
           IO.println e
           headerOk := false
@@ -235,7 +235,7 @@ def main (args : List String) : IO UInt32 := do
     if !nodesSeen then throw (IO.userError "a record before the nodes line")
     t := { t with records := t.records + 1 }
     let r ← match (do
-        let r ← record j (if form == .v2 then V2.docV2 else {})   -- the values in the trace's document's forms
+        let r ← record j (if form == .SEACAST then V2.docSeacast else {})   -- the values in the trace's document's forms
         -- the line must end with the two members a subset is picked by, saying what the record says
         if tail? != some (r.reached, r.tables) then throw "its line does not end with reached and tables, as the record has them"
         -- and a call reaches only functions the tracer traced
@@ -243,7 +243,7 @@ def main (args : List String) : IO UInt32 := do
           if let some f := r.reached.find? (!tr.contains ·) then
             throw s!"reached: a function the header does not list as traced: {f}"
         -- and it is a record of a node the nodes line names
-        if !(if form == .v2 then nodesV2.contains r.n else nodes.contains r.n) then
+        if !(if form == .SEACAST then nodesSeacast.contains r.n else nodes.contains r.n) then
           throw s!"n: a node the nodes line does not name: {r.n}"
         pure r : Except String Record) with
       | .ok r => pure r
@@ -258,9 +258,9 @@ def main (args : List String) : IO UInt32 := do
     byFn := byFn.insert counted (byFn.getD counted 0 + 1)
     let (n, ok) := t.perFn.getD r.fn (0, 0)
     let res : Except String (Array String × Nat) ← match form with   -- by the trace's document
-      | .v2 => do
-        let some cfg := nodesV2[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
-        pure (V2.runV2 cfg.c cfg.c2 (fun T => cfg.types.lookup T) cfg.replaced (traced?.getD []) r rowReads)
+      | .SEACAST => do
+        let some cfg := nodesSeacast[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
+        pure (V2.runSeacast cfg.c cfg.c2 (fun T => cfg.types.lookup T) cfg.replaced (traced?.getD []) r rowReads)
       | .v1 => do
         let some (c, rp) := nodes[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
         pure (run c rp (traced?.getD []) r rowReads)

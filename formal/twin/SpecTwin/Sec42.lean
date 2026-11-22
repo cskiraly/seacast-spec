@@ -121,7 +121,7 @@ def dropOffer (g : Group) (i : Nat) (p : Peer) : M m Unit := do
     -- `for c in e.iwants(): c.ids = [b for b in c.ids if (group(b), index(b)) != k]`: an ask of it still queued
     let cut : Ctl → Ctl
       | .iwant ids => .iwant (ids.filter fun b => b.chunk != k)
-      | .iwantV2 w asks => .iwantV2 w (asks.filter fun b => b.key.chunk != k)   -- (v2: each survivor's flags kept)
+      | .iwantSeacast w asks => .iwantSeacast w (asks.filter fun b => b.key.chunk != k)   -- (v2: each survivor's flags kept)
       | c => c
     let filtered := normal.map fun e => { e with control := e.control.map (·.map cut) }
     setLane p .normal (filtered.filter (!·.isEmpty))        -- `queue[p].normal = [e … if not e.is_empty()]`

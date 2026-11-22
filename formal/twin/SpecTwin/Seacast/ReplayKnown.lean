@@ -1,18 +1,18 @@
-import SpecTwin.V2.Replay
+import SpecTwin.Seacast.Replay
 
-/-! # v2's replay: its known answer
+/-! # SEACAST's replay: its known answer
 
 The replay's known answer, written before `V2/Replay.lean`.
-Each record is a JSON line in the tracer's form, read by `Replay.record` with protocol-v2.md's reading (`docV2`)
-and replayed by `runV2`, with the node's constants built here. A case passes where `runV2` returns a "fewer"
+Each record is a JSON line in the tracer's form, read by `Replay.record` with seacast.md's reading (`docSeacast`)
+and replayed by `runSeacast`, with the node's constants built here. A case passes where `runSeacast` returns a "fewer"
 count of 0, and fails where its error starts with the quoted prefix (and, for the order entry, holds the quoted words). A
 planted case is the passing record with one change. -/
 
-namespace SpecTwin.V2.ReplayKnown
+namespace SpecTwin.Seacast.ReplayKnown
 
 open Lean (Json)
 open SpecTwin.Replay
-open SpecTwin.V2
+open SpecTwin.Seacast
 
 /-- A group's key, a root, and the structured id of chunk 3 of the group: the group, the index's four bytes
 little-endian, a content id. -/
@@ -25,12 +25,12 @@ def chunk3 : String := s!"[{gq}, 3, 1, \"{root}\", \"{id3}\"]"
 def c0 : Consts :=
   { IWANT_WINDOW := 0.2, RETRY_SLACK := 0.05, PROMISE := 1.0, PARK_TTL := 3.0, MAX_PLAIN_CHUNKS := 256,
     UPLINK := 10e6 }
-/-- v2's constants: a cap of 1 sample in flight per block, and no serving budget, which no record here meets -/
-def c2 : ConstsV2 :=
+/-- SEACAST's constants: a cap of 1 sample in flight per block, and no serving budget, which no record here meets -/
+def c2 : ConstsSeacast :=
   { ANSWERS_FIRST := false, ASK_UPLINK := 50e6, MERGE_HOLDINGS := false, SAMPLE_OUTSTANDING := 1, SERVE_BUDGET := none }
 /-- The type `row` has M = 4; no other type has parameters at the node. -/
 def params : TypeId → Option TypeParams := fun T => if T == "row" then some { M := some 4 } else none
-def traced : List String := fnsV2 ++ keptV2
+def traced : List String := fnsSeacast ++ keptSeacast
 
 /-- A record's line: its fields as JSON text, in the tracer's order. -/
 def line (fn args reads writes rest tape : String) (out : List (String × String)) (reached tables : String)
@@ -44,7 +44,7 @@ def line (fn args reads writes rest tape : String) (out : List (String × String
 an access goes through them (a header's `row_reads`). -/
 def replay (l : String) (c : Consts := c0) (replaced : List String := []) (rowReads : List String := []) :
     Except String (Array String × Nat) := do
-  runV2 c c2 params replaced traced (← record (← Json.parse l) docV2) rowReads
+  runSeacast c c2 params replaced traced (← record (← Json.parse l) docSeacast) rowReads
 
 def passes (l : String) (c : Consts := c0) (replaced : List String := []) : Bool :=
   match replay l c replaced with
@@ -95,7 +95,7 @@ def e3 : String := s!"[{chunk3}, null, false]"
 
 /-! ## An order entry: `known_in_scope(g)` -/
 
-/-- `peer_has`'s entries in v2's form, with the two claims; `v1` writes them in `protocol.md`'s. -/
+/-- `peer_has`'s entries in SEACAST's form, with the two claims; `v1` writes them in `seacast-lite.md`'s. -/
 def reads4 (v1 : Bool := false) : String :=
   let claims := if v1 then "" else ", false, false"
   s!"[[\"mine\", [{gq}], 1], [\"push_in\", [5, \"row\", 0], [0]], [\"push_in\", [7, \"row\", 0], [1]], " ++
@@ -108,8 +108,8 @@ def r4 (order : List String) (v1 : Bool := false) : String :=
     "[\"known_in_scope\", \"suppression_scope\"]" "[\"claims\", \"mine\", \"peer_has\", \"push_in\"]"
 
 #guard passes (r4 ["[\"order\", \"known_in_scope\", [7, 5]]"])
--- `protocol.md`'s form of a `peer_has` entry is refused under v2
-#guard failsWith "not an entry of peer_has under protocol-v2.md, [bits, ttl, claim_all, complete]: "
+-- `seacast-lite.md`'s form of a `peer_has` entry is refused under v2
+#guard failsWith "not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: "
   (r4 ["[\"order\", \"known_in_scope\", [7, 5]]"] (v1 := true))
 #guard passes (r4 ["[\"order\", \"known_in_scope\", [5, 7]]"])
 #guard failsHolding "tape: " "is not of the twin's rows" (r4 ["[\"order\", \"known_in_scope\", [9, 5]]"])
@@ -153,7 +153,7 @@ def r6raise (out : List (String × String)) : String :=
 
 /-! ## Rows read on the way down: `tie(7, f)` under a view that logs them
 
-protocol.md's `tie`, which v2 keeps, on its path where the copy's group is tied for the peer already: it reads
+seacast-lite.md's `tie`, which v2 keeps, on its path where the copy's group is tied for the peer already: it reads
 `tied[root][7][g]` in `tie_room` and again to set the index, and the view logs the two rows the subscripts go
 through, `tied[root]` and `tied[root][7]`, before the entry. With the rows named in `row_reads` the twin's
 accesses read them too; without, the twin reads the entry alone, and the Python's two row reads are counted as
@@ -198,15 +198,15 @@ def refused (pre : String) (s : String) : Bool :=
   | .ok _ => false
 
 #guard readsAs rowTables s!"\{\"args\": [\"--doc\", \"v2\"], \"row_reads\": {four}}"
-#guard readsAs rowTables s!"\{\"args\": [\"--doc=v2\"], \"row_reads\": {four}}"
+#guard readsAs rowTables s!"\{\"args\": [\"--doc=seacast\"], \"row_reads\": {four}}"
 #guard readsAs [] "{\"args\": [\"--doc\", \"v2\"]}"
 #guard readsAs [] "{\"args\": []}"
-#guard refused "header: row_reads in a trace of protocol.md" s!"\{\"args\": [], \"row_reads\": {four}}"
-#guard refused "header: row_reads in a trace of protocol.md" s!"\{\"row_reads\": {four}}"
-#guard refused "header: row_reads in a trace of protocol.md" s!"\{\"args\": [\"--doc\"], \"row_reads\": {four}}"
+#guard refused "header: row_reads in a trace of seacast-lite.md" s!"\{\"args\": [], \"row_reads\": {four}}"
+#guard refused "header: row_reads in a trace of seacast-lite.md" s!"\{\"row_reads\": {four}}"
+#guard refused "header: row_reads in a trace of seacast-lite.md" s!"\{\"args\": [\"--doc\"], \"row_reads\": {four}}"
 #guard refused "header: row_reads is not " "{\"args\": [\"--doc\", \"v2\"], \"row_reads\": [\"tied\"]}"
 #guard refused "header: row_reads is not "
   "{\"args\": [\"--doc\", \"v2\"], \"row_reads\": [\"tied\", \"queue\", \"planned\", \"owed\"]}"
 #guard refused "header: row_reads is not " "{\"args\": [\"--doc\", \"v2\"], \"row_reads\": true}"
 
-end SpecTwin.V2.ReplayKnown
+end SpecTwin.Seacast.ReplayKnown

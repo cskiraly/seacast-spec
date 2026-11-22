@@ -1,13 +1,13 @@
 import SpecTwin.ReplayTables
 
-/-! # protocol-v2.md's tables as a record writes them: known answers
+/-! # seacast.md's tables as a record writes them: known answers
 
-Each case reads an entry of one of v2's tables as a record writes it (its table, its path and its value, in the
-forms of `tools/gen/schema_v2.py`), puts it into an empty state, and reads the state back (`cell`, `val`, `put`,
+Each case reads an entry of one of SEACAST's tables as a record writes it (its table, its path and its value, in the
+forms of `tools/gen/schema_seacast.py`), puts it into an empty state, and reads the state back (`cell`, `val`, `put`,
 `valueAt`, all generated). The refusals are the record forms the reader must not take: an empty value where the
 codec writes it as missing, an unsorted set, a non-finite time, a direction or a family in another form. -/
 
-namespace SpecTwin.V2.Codecs
+namespace SpecTwin.Seacast.Codecs
 
 open Lean (Json)
 open SpecTwin.Replay
@@ -94,4 +94,4 @@ def twoForms : Except String Bool := do
 #guard (level (Json.arr #[.str "claims", .arr #[]])).toOption == some .claims
 #guard (level (Json.arr #[.str "probe_waiting", .arr #[.str gk]])).toOption == some (.probeWaiting gk)
 
-end SpecTwin.V2.Codecs
+end SpecTwin.Seacast.Codecs

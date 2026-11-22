@@ -2,7 +2,7 @@ import SpecTwin.State
 
 /-! # The twin's state, read and written entry by entry (generated)
 
-This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_v2.py`, one
+This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/schema_seacast.py`, one
 entry there per table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema,
 or the generator.
 

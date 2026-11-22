@@ -136,7 +136,7 @@ def filterEntry (p : Peer) (entry : QEntry) : M m (Option QEntry) := do
             setPromise a p (← read).now                     --   `promises[(a, p)] = now`
             after c.PROMISE (.promiseDue a p (← read).now)  --   `after(PROMISE, promise_due, a, p, now)`
         out := out ++ [.iwant kept]
-      | .iwantV2 .. => crash "twin: a v2 IWANT reached protocol.md's filter_entry, which v2 redefines (D1)"
+      | .iwantSeacast .. => crash "twin: a v2 IWANT reached seacast-lite.md's filter_entry, which v2 redefines (D1)"
       | m => out := out ++ [m]
     e := { e with control := some out }
   return if e.isEmpty then none else some e                 -- control rides on and survives
