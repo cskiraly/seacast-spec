@@ -727,9 +727,31 @@ def known_replaced_v2():
     before_install_v2(plant)
 
 
+def verdict_replaced_v2():
+    """Under v2, R3-9's plant (l): a fixture for the rows of `repair_verdict`, as (j) is for `known_in_scope`. The toy's
+    one layer that replaces it, `--repair-bias`'s, cannot be traced: it restores a `shuffled` it took before the
+    install (node.py's `_repair_bias`), and the record's exit check stops it. At every node, a layer of this tool's own
+    over `repair_verdict`, bound before the install and holding what the node held (the member check's observer over
+    the document's): it calls it and returns its answer unchanged, and it is listed in LAYERS as changing. So the run is
+    the cell's own (the same digest), and each call of `repair_verdict` inside a record is a question, its answer on the
+    tape. Counted once for each node (planted) and once for each call ("calls")."""
+    SEEN["calls"] = 0
+
+    def plant(ns):
+        inner = ns["repair_verdict"]
+
+        def repair_verdict(g):
+            SEEN["calls"] += 1
+            return inner(g)
+        T.LAYERS[T.layer_key(repair_verdict)] = ("repair_verdict", T.CHANGING)
+        ns["repair_verdict"] = repair_verdict
+
+    before_install_v2(plant)
+
+
 CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-owed-observer-v2",
                 "--chain-owed-changing-v2", "--owed-flipped-observer-v2", "--owed-flipped-changing-v2",
-                "--known-replaced-v2")
+                "--known-replaced-v2", "--verdict-replaced-v2")
 
 
 def hdr_read_v2(raw):
@@ -1146,6 +1168,8 @@ def main(argv):
             owed_flipped_v2(T.CHANGING)
         elif fault == "--known-replaced-v2":
             known_replaced_v2()
+        elif fault == "--verdict-replaced-v2":
+            verdict_replaced_v2()
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":

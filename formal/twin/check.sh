@@ -890,7 +890,7 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     das-claim) echo "$DAS30 --fault claim10" ;;                # send_have, at the liars
     das-keeper-ignore) echo "$DAS30 --keeper-claims ignore" ;; # note_claim, at the supernodes
     das-hoardcol-bias) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16 --repair-bias 0.5" ;;
-    #                                                            repair_verdict, the bias layer outermost
+    #                     control (m): the bias layer restores a shuffled taken before the install, and the tracer stops
   esac
 }
 chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.py's), one a line
@@ -1135,6 +1135,113 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
   if [ -n "$NODAS" ]; then
     echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5, and $said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
   else echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5 and ${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
+}
+stop_cell() {           # $1: a cell of chain_args: traced alone under rows/, its status kept (a cell the tracer must stop)
+  rm -f "$OUT/rows/$1".*
+  # shellcheck disable=SC2046
+  (cd "$TOY" && $PY "$T/trace3.py" . "$OUT/rows/$1.jsonl.gz" $(chain_args "$1") --digest > "$OUT/rows/$1.out" 2> "$OUT/rows/$1.err")
+  echo $? > "$OUT/rows/$1.rc"
+  return 0
+}
+rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's rows on its tapes, to rows/NAME.rows
+  $PY "$T/chaincases.py" --rows "$1" "$OUT/$2.jsonl.gz" > "$OUT/rows/$1.rows" 2>&1
+}
+replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's tapes, where a node replaces it; plant
+  #                       (k), a row with an argument left out, which the replay must refuse; and control (m), the
+  #                       bias cell, which the record's exit check must stop
+  local names="forward push_rebuilt" name fx n calls c d plain k=0 counts= why rec pr sum stop also mwant caught=0 stopped=0
+  rm -rf "$OUT/rows"; mkdir -p "$OUT/rows"; : > "$OUT/c-rows.txt"
+  if [ -z "$NODAS" ]; then
+    names="forward push_rebuilt serve_standing owed_missing send_have note_claim repair_verdict known_in_scope"
+    # shellcheck disable=SC2046
+    { for c in das-claim das-keeper-ignore; do par small "$c" rows "" $(chain_args "$c"); done
+      par chain_plant j known-replaced-v2 das-samplers-mcoff
+      par chain_plant l verdict-replaced-v2 das-hoardcol-w16
+      par stop_cell das-hoardcol-bias; }
+    par_end || true     # each run's status and digest are read below
+  fi
+  fixture() {           # $1: a name: its fixture, a trace without .jsonl.gz
+    case $1 in
+      forward|push_rebuilt) echo v2/hand5-own ;;
+      serve_standing) echo chains/das-hoardcol-w16 ;;
+      owed_missing) echo chains/das-samplers-mcoff ;;
+      send_have) echo rows/das-claim ;;
+      note_claim) echo rows/das-keeper-ignore ;;
+      repair_verdict) echo chains/plant-l ;;
+      known_in_scope) echo chains/plant-j ;;
+    esac
+  }
+  for name in $names; do par rows_to "$name" "$(fixture "$name")"; done
+  par_end || true
+  for name in $names; do
+    fx=$(fixture "$name")
+    n=$(sed -n -E "s/^chaincases: $name on the tapes: ([0-9]+) rows.*/\\1/p" "$OUT/rows/$name.rows")
+    case $name in
+      send_have|note_claim)     # a cell of its own: traced with the untraced run's digest
+        if ! grep -q ': the same$' "$OUT/$fx.digest" 2> /dev/null; then
+          echo "$name: $fx not traced, or its digest is not the untraced run's  <-- NOT" >> "$OUT/c-rows.txt"; continue
+        fi ;;
+      repair_verdict|known_in_scope)    # a plant of its own on a chain cell: the cell's run, each call a row
+        d=${fx#chains/plant-}
+        calls=$(sed -n -E "s/^tracerfaults3: [a-z]+-replaced-v2, planted [1-9][0-9]* times?; calls: ([0-9]+)\$/\\1/p" "$OUT/$fx.err" 2> /dev/null)
+        c=$([ "$d" = l ] && echo das-hoardcol-w16 || echo das-samplers-mcoff)
+        plain=$(sed -n -E 's/^[^ ]+: digest traced [^ ]+, untraced ([^ :]+): the same$/\1/p' "$OUT/chains/$c.digest" 2> /dev/null)
+        if [ "$(cat "$OUT/$fx.rc" 2> /dev/null)" != 0 ] || [ -z "$calls" ]; then
+          echo "$name: plant ($d) did not end with 0, or its line is not as written  <-- NOT" >> "$OUT/c-rows.txt"; continue
+        elif [ -z "$plain" ] || [ "$(digest_of "$OUT/$fx.out")" != "$plain" ]; then
+          echo "$name: plant ($d)'s digest is not $c's untraced one (${plain:-none})  <-- NOT" >> "$OUT/c-rows.txt"; continue
+        elif [ "$n" != "$calls" ]; then
+          echo "$name: plant ($d)'s ${n:-no} rows are not its $calls calls  <-- NOT" >> "$OUT/c-rows.txt"; continue
+        fi ;;
+    esac
+    if ! why=$(replay_clean "$fx"); then echo "$name: $fx's replay: $why  <-- NOT" >> "$OUT/c-rows.txt"; continue; fi
+    if [ "${n:-0}" -ge 1 ]; then
+      echo "$name on $fx: $(cut -c13- "$OUT/rows/$name.rows"); $(grep -m 1 '^replay: ' "$OUT/$fx.replay"); bare calls counted: $(bare_count "$fx")" >> "$OUT/c-rows.txt"
+      k=$((k + 1)); counts="$counts${counts:+, }$name $n"
+    else echo "$name on $fx: no row on its tapes  <-- NOT" >> "$OUT/c-rows.txt"; fi
+  done
+  # (k) push_rebuilt's last argument left out of each of its rows on v2/hand5-own: the replay must refuse each such
+  # record, with C8's words (the run's: the entry unparenthesised, its fields three spaces apart), and nothing else
+  pr=$(sed -n -E 's/^chaincases: push_rebuilt on the tapes: ([0-9]+) rows.*/\1/p' "$OUT/rows/push_rebuilt.rows")
+  rec=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/v2/hand5-own.replay" 2> /dev/null)
+  mwant='^mismatch decode_group: tape: push_rebuilt\["[0-9a-f]{64}",\[[0-9,]*\]\] asked, SpecTwin\.Replay\.Entry\.call   "push_rebuilt"   "\[\\"[0-9a-f]{64}\\"\]"   "null" logged: [0-9]+$'
+  if [ -z "$pr" ] || [ "$pr" = 0 ] || [ -z "$rec" ]; then
+    echo "(k) the argument left out: no push_rebuilt row on v2/hand5-own, or no replay of it  <-- NOT" >> "$OUT/c-rows.txt"
+  elif ! $PY "$T/chaincases.py" --drop-arg push_rebuilt "$OUT/v2/hand5-own.jsonl.gz" "$OUT/rows/plant-k.jsonl.gz" > "$OUT/rows/plant-k.err" 2>&1 \
+      || ! has -E "^chaincases: the last argument of push_rebuilt left out in $pr rows?, in [0-9]+ records?\$" "$OUT/rows/plant-k.err"; then
+    echo "(k) the argument left out: not made, or not in each of the $pr rows  <-- NOT" >> "$OUT/c-rows.txt"
+  elif replay_of rows/plant-k; then
+    echo "(k) the argument left out: the replay passed it  <-- NOT" >> "$OUT/c-rows.txt"
+  elif ! has -x "replay: $rec records, $((rec - pr)) ok, $pr mismatched" "$OUT/rows/plant-k.replay" \
+      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/rows/plant-k.replay"; then
+    echo "(k) the argument left out: not refused at its $pr records alone: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay")  <-- NOT" >> "$OUT/c-rows.txt"
+  elif sum=$(sed -n -E 's/^mismatch .* logged: ([0-9]+)$/\1/p' "$OUT/rows/plant-k.replay" | awk '{s += $1} END {print s + 0}') \
+      && { [ "$(grep '^mismatch ' "$OUT/rows/plant-k.replay" | grep -c -v -E "$mwant")" != 0 ] || [ "$sum" != "$pr" ]; }; then
+    echo "(k) the argument left out: refused otherwise than by its words: $(grep -m 1 '^mismatch ' "$OUT/rows/plant-k.replay" | cut -c1-160)  <-- NOT" >> "$OUT/c-rows.txt"
+  else
+    echo "(k) the argument left out: caught: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay"); $(grep -m 1 '^mismatch ' "$OUT/rows/plant-k.replay" | cut -c1-160)" >> "$OUT/c-rows.txt"
+    caught=1
+  fi
+  # (m) the bias cell: --repair-bias's layer restores the shuffled it took before the install (node.py's _repair_bias),
+  # so the record's exit check must stop the tracer at node 2's first reconsider that asks repair_verdict, with
+  # final_check's words after the stop: plant (g)'s pair, made by the toy's own layer
+  stop="^trace3: node 2: shuffled is bound to Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\) at the exit of reconsider's record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run\$"
+  also="^trace3: \\(at the close, after the stop\\) SystemExit: trace3: node 2: shuffled was bound again after the tracer was installed, which under v2 must be the namespace's last binding: Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\)\$"
+  if [ -z "$NODAS" ]; then
+    if [ "$(cat "$OUT/rows/das-hoardcol-bias.rc" 2> /dev/null)" = 0 ] || [ ! -f "$OUT/rows/das-hoardcol-bias.rc" ]; then
+      echo "(m) the bias cell: not run, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-rows.txt"
+    elif has -E "$stop" "$OUT/rows/das-hoardcol-bias.err" && has -E "$also" "$OUT/rows/das-hoardcol-bias.err"; then
+      echo "(m) the bias cell: stopped, as it must: $(grep -m 1 -E "$stop" "$OUT/rows/das-hoardcol-bias.err" | cut -c1-200)" >> "$OUT/c-rows.txt"
+      stopped=1
+    else echo "(m) the bias cell: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-rows.txt"; fi
+  fi
+  if grep -q '<-- NOT' "$OUT/c-rows.txt"; then no "the replaced names' rows (c-rows.txt)"; fi
+  local said="plant (k) caught" bias="the bias cell stopped at its binding, as it must"
+  [ "$caught" = 1 ] || said="plant (k) not caught"
+  [ "$stopped" = 1 ] || bias="the bias cell not stopped as it must be"
+  if [ -n "$NODAS" ]; then
+    echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said (--no-das: the six DAS names and the bias cell skipped)"
+  else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:455, :491)"; fi
 }
 s_tracercontrols() {
   local f want bad
@@ -1407,6 +1514,11 @@ EOF_ERC
   # tapes; (f) the re-wrap off, which the replay must refuse at each keep_floor record; (g) the swap left unrestored,
   # which the record's exit check must stop (c-draws.txt)
   swapped_draws
+  # the replaced names' rows (R3-9): each of the eight names the twin asks, with rows on a fixture's tapes where a
+  # node replaces it (repair_verdict's and known_in_scope's fixtures are plants (l) and (j), layers of tracerfaults3's
+  # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, which the record's
+  # exit check must stop (c-rows.txt)
+  replaced_rows
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
