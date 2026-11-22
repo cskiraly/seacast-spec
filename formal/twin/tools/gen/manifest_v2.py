@@ -21,9 +21,18 @@ The lists:
 - OWN: the twin's tables, protocol.md's (schema.py) and then protocol-v2.md's (schema_v2.py), by the names a trace
   gives them.
 - FOREIGN: the tables of other sections that a covered function reads, which the twin answers from the tape.
+- QUESTIONS: the names the replay of a trace under protocol-v2.md reads as questions, which the tracer tapes and
+  the twin asks: the globals that covered functions load and that are answered from the tape, the callables of a
+  type's parameters, the object type's functions, the context globals' uses by their tape names, and the names of
+  QUESTIONS_UNLOADED. check.sh's scope step holds the list to the twin both ways: each name is read by an `askCall`
+  or a case of the tape reader, and each name the twin asks or reads as a call under protocol-v2.md is a question, a
+  covered or cut function, or one of the replay's own entries (`keys`, `order`).
+- QUESTIONS_UNLOADED: the questions that no covered function loads, each with its reason; a comparison of
+  QUESTIONS with the covered functions' code leaves them out.
 
 The manifest's own rules, which `gen.py --check` holds it to: no list holds a name twice; COVERED and KEPT share no
-name; NODE_OWN's keys are in neither; CUT's names are in no other list; REPLACEABLE_WHOLE is within KEPT.
+name; NODE_OWN's keys are in neither; CUT's names are in no other list; REPLACEABLE_WHOLE is within KEPT; QUESTIONS
+shares no name with COVERED or KEPT, and holds no key of NODE_OWN; QUESTIONS_UNLOADED's keys are within QUESTIONS.
 """
 import sys
 from pathlib import Path
@@ -82,6 +91,30 @@ OWN = [t.name for t in schema.TABLES] + [t.name for t in schema_v2.TABLES_V2]
 # neither list is kept by the twin as state or joins this one
 FOREIGN = ["known_id", "chunks"]
 
+QUESTIONS = [
+    # the globals that covered functions load, classed as questions: each is answered from the tape
+    "accepted", "admitted", "after", "authenticable", "bid_group", "block_of", "choice", "close_promises_of_group",
+    "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
+    "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room", "high_custody",
+    "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id", "open_group",
+    "open_link", "open_sampling_link", "payload_of", "penalise", "release", "reserve", "route_next",
+    "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
+    "valid_have", "wake", "wants_family",
+    # the callables of a type's parameters (`T.params`)
+    "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
+    # the object type's functions, which covered functions call on a type
+    "cross", "decode", "derived_interest", "family", "header_of", "index_count", "project", "threshold", "verify",
+    # asked by the twin and loaded by no covered function: QUESTIONS_UNLOADED's
+    "group_of", "open_group_source", "own_interest",
+    # the context globals' uses, by their tape names: `gossip_history.put(f)` in forward, `p in mesh` in unpush, and
+    # `gossip_history.remove_group(g)` in drop_group, a kept function the twin runs as its own
+    "gossip_put", "mesh_has", "gossip_remove_group"]
+
+QUESTIONS_UNLOADED = {
+    "group_of": "loaded by protocol-v2.md's code outside COVERED, on publish's path",
+    "open_group_source": "loaded by protocol-v2.md's code outside COVERED, on publish's path",
+    "own_interest": "interest's miss, asked as a question"}
+
 # the lists, in the order Manifest.lean has them, each with its Lean name and its doc comment there
 LISTS = (("COVERED", "covered",
           "`protocol-v2.md`'s functions the twin transcribes, each a record of its own."),
@@ -98,4 +131,8 @@ LISTS = (("COVERED", "covered",
          ("OWN", "own",
           "The twin's tables, `protocol.md`'s and then `protocol-v2.md`'s, by the names a trace gives them."),
          ("FOREIGN", "foreign",
-          "Other sections' tables that a covered function reads, answered from the tape."))
+          "Other sections' tables that a covered function reads, answered from the tape."),
+         ("QUESTIONS", "questions",
+          "The names the replay of a trace under `protocol-v2.md` reads as questions, answered from the tape."),
+         ("QUESTIONS_UNLOADED", "questionsUnloaded",
+          "The questions that no covered function loads, each with its reason."))

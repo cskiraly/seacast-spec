@@ -12,14 +12,15 @@ The four files, each generated from its first byte to its last and compared byte
 - SpecTwin/ReplayTables.lean: the replay's per-table functions (`cell`, `val`, `level`, `valueAt`, `put`, `drop`,
   `entries`, `under`, `covers`);
 - SpecTwin/V2/Manifest.lean: protocol-v2.md's manifest, the lists by name of manifest_v2.py (`covered`, `kept`,
-  `nodeOwn`, `replaceable`, `replaceableWhole`, `cut`, `own`, `foreign`).
+  `nodeOwn`, `replaceable`, `replaceableWhole`, `cut`, `own`, `foreign`, `questions`, `questionsUnloaded`).
 So nothing in these files is written by hand: not a first line, not a line after a body, not a comment. (A check
 that compares slices of hand-written files, regions or declarations' bodies, misses text that the slices do not
 hold.)
 
 Two more checks hold the manifest. Its own rules (manifest_v2.py's docstring): no list holds a name twice, COVERED
-and KEPT share no name, NODE_OWN's keys are in neither, CUT's names are in no other list, and REPLACEABLE_WHOLE is
-within KEPT. And KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
+and KEPT share no name, NODE_OWN's keys are in neither, CUT's names are in no other list, REPLACEABLE_WHOLE is
+within KEPT, QUESTIONS shares no name with COVERED or KEPT and holds no key of NODE_OWN, and QUESTIONS_UNLOADED's
+keys are within QUESTIONS. And KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
 (header3.py's `v2_kind`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. The tripwire
 below is the first three files' alone: the manifest's names are plain words that other files may declare.
 
@@ -942,17 +943,22 @@ def hand_files(twin):
 
 def manifest_rules(m):
     """What breaks the manifest's own rules, each named: a name twice in a list, a name in both COVERED and KEPT, a
-    key of NODE_OWN in either, a name of CUT in another list, a name of REPLACEABLE_WHOLE not in KEPT."""
+    key of NODE_OWN in either, a name of CUT in another list, a name of REPLACEABLE_WHOLE not in KEPT, a name of
+    QUESTIONS in COVERED or KEPT, a key of NODE_OWN in QUESTIONS, a key of QUESTIONS_UNLOADED not in QUESTIONS."""
     out = []
     for key, _, _ in manifest_v2.LISTS:
         names = list(m[key])
         out += [f"the manifest: {n} twice in {key}" for n in sorted({x for x in names if names.count(x) > 1})]
     out += [f"the manifest: {n} in both COVERED and KEPT" for n in sorted(set(m["COVERED"]) & set(m["KEPT"]))]
     out += [f"the manifest: {n}, a key of NODE_OWN, in {key}" for n in sorted(m["NODE_OWN"])
-            for key in ("COVERED", "KEPT") if n in m[key]]
+            for key in ("COVERED", "KEPT", "QUESTIONS") if n in m[key]]
     out += [f"the manifest: {n}, in CUT, in {key} too" for n in m["CUT"]
             for key, _, _ in manifest_v2.LISTS if key != "CUT" and n in m[key]]
     out += [f"the manifest: {n} in REPLACEABLE_WHOLE, not in KEPT" for n in m["REPLACEABLE_WHOLE"] if n not in m["KEPT"]]
+    out += [f"the manifest: {n} in both QUESTIONS and {key}" for key in ("COVERED", "KEPT")
+            for n in sorted(set(m["QUESTIONS"]) & set(m[key]))]
+    out += [f"the manifest: {n} in QUESTIONS_UNLOADED, not in QUESTIONS" for n in sorted(m["QUESTIONS_UNLOADED"])
+            if n not in m["QUESTIONS"]]
     return out
 
 
@@ -1054,7 +1060,8 @@ def check(twin):
         print(f"{i}  <-- FAIL")
     if not rules:
         print("the manifest's own rules hold: no name twice in a list, COVERED and KEPT apart, NODE_OWN's keys in "
-              "neither, CUT in no other list, REPLACEABLE_WHOLE within KEPT")
+              "neither, CUT in no other list, REPLACEABLE_WHOLE within KEPT, QUESTIONS apart from COVERED, KEPT and "
+              f"NODE_OWN's keys, QUESTIONS_UNLOADED within QUESTIONS ({len(MANIFEST['QUESTIONS'])} questions)")
     if not kept:
         print(f"the manifest's KEPT and NODE_OWN are v2_kept's rule over the toy's documents: {len(v2_kept_rule())} names")
     total = sum(m for _, _, m, _, _ in files)
@@ -1276,6 +1283,14 @@ def controls(twin, work):
              [MF, "the manifest: window_release, in CUT, in REPLACEABLE too"])
     manifest("forward in REPLACEABLE_WHOLE", lambda m: m["REPLACEABLE_WHOLE"].append("forward"),
              [MF, "the manifest: forward in REPLACEABLE_WHOLE, not in KEPT"])
+    manifest("links twice in QUESTIONS", lambda m: m["QUESTIONS"].append("links"),
+             [MF, "the manifest: links twice in QUESTIONS"])
+    manifest("announce, a covered name, in QUESTIONS too", lambda m: m["QUESTIONS"].append("announce"),
+             [MF, "the manifest: announce in both QUESTIONS and COVERED"])
+    manifest("held, a key of NODE_OWN, in QUESTIONS too", lambda m: m["QUESTIONS"].append("held"),
+             [MF, "the manifest: held, a key of NODE_OWN, in QUESTIONS"])
+    manifest("own_interest taken out of QUESTIONS", lambda m: m["QUESTIONS"].remove("own_interest"),
+             [MF, "the manifest: own_interest in QUESTIONS_UNLOADED, not in QUESTIONS"])
     for bad in (["--chek", str(twin)], [], ["--check"], ["--check", str(twin), "x"], ["--control", str(twin)]):
         rc = main(bad, quiet=True)
         ok &= rc == 2

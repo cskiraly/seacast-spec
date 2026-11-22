@@ -62,4 +62,22 @@ def own : List String :=
 def foreign : List String :=
   ["known_id", "chunks"]
 
+/-- The names the replay of a trace under `protocol-v2.md` reads as questions, answered from the tape. -/
+def questions : List String :=
+  ["accepted", "admitted", "after", "authenticable", "bid_group", "block_of", "choice", "close_promises_of_group",
+   "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
+   "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room", "high_custody",
+   "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id", "open_group",
+   "open_link", "open_sampling_link", "payload_of", "penalise", "release", "reserve", "route_next",
+   "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group", "valid_have",
+   "wake", "wants_family", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "cross", "decode", "derived_interest", "family",
+   "header_of", "index_count", "project", "threshold", "verify", "group_of", "open_group_source", "own_interest",
+   "gossip_put", "mesh_has", "gossip_remove_group"]
+
+/-- The questions that no covered function loads, each with its reason. -/
+def questionsUnloaded : List (String × String) :=
+  [("group_of", "loaded by protocol-v2.md's code outside COVERED, on publish's path"),
+   ("open_group_source", "loaded by protocol-v2.md's code outside COVERED, on publish's path"),
+   ("own_interest", "interest's miss, asked as a question")]
+
 end SpecTwin.V2.Manifest

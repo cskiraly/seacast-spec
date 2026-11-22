@@ -34,7 +34,10 @@
 #   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
 #             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused.
 #             And v2's part: every name protocol-v2.md's manifest covers has an `enter` in SpecTwin/V2/ and a case
-#             of runV2, and runV2 has no case the manifest does not cover but respond; two controls refused
+#             of runV2, and runV2 has no case the manifest does not cover but respond; two controls refused. And
+#             v2's questions, both ways: each name of the manifest's QUESTIONS is read by an askCall or a case of
+#             the tape reader, and each name the twin asks or reads as a call under protocol-v2.md is a question, a
+#             covered or cut function, or the replay's own (keys, order); three controls refused
 #   mutants   every mutant's text stands in the twin once (--places), and each type-checks alone against the build
 #   screen    every cell's header and nodes line, under both documents, read by the replay; a nodes line without a
 #             constant refused
@@ -384,6 +387,68 @@ if bad or not ok1 or not ok2:
 print(f"{len(covered)} of {len(covered)} of protocol-v2.md's covered functions have their twin, by name")
 EOF
   [ $? = 0 ] || no "a covered function of protocol-v2.md without its twin, a case of runV2 not covered, or v2's scope controls (scope.txt)"
+  # v2's questions, both ways: each name of the manifest's QUESTIONS is read by the twin (an askCall, or a case of
+  # the tape reader), and each name the twin asks or reads as a call under protocol-v2.md is a question, a covered
+  # or cut function, or one of the replay's own entries
+  $PY - "$T/gen" "$HERE/SpecTwin" >> "$OUT/scope.txt" 2>&1 <<'EOF'
+import re, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import manifest_v2
+twin = Path(sys.argv[2])
+questions = list(manifest_v2.QUESTIONS)
+OWN_ENTRIES = {"keys", "order"}               # the replay's own entries under v2: a table's keys, an iteration's order
+ASK = re.compile(r'askCall[A-Za-z]* "([A-Za-z_0-9]+)"')
+CASE = re.compile(r'^\s*\| "([A-Za-z_0-9]+)", #\[', re.M)
+
+def body(f, name):                            # a def's text, to the next line that starts a def
+    text = f.read_text()
+    i = text.index(f"\ndef {name} ")
+    j = text.find("\ndef ", i + 1)
+    return text[i:j if j > 0 else len(text)]
+
+def asks(files):                              # each name an askCall reads, with its first place
+    out = {}
+    for f in files:
+        for k, line in enumerate(f.read_text().split("\n"), 1):
+            for n in ASK.findall(line):
+                out.setdefault(n, f"{f.relative_to(twin.parent)}:{k}")
+    return out
+asked = asks(sorted(twin.rglob("*.lean")))
+entries = set(CASE.findall(body(twin / "Replay.lean", "entry"))) | set(CASE.findall(body(twin / "V2" / "Replay.lean", "entryV2")))
+asked_v2 = asks(sorted((twin / "V2").glob("*.lean")))
+calls_v2 = body(twin / "V2" / "Replay.lean", "callNamesV2").split(":=", 1)[1].split("\n\n")[0]
+for n in re.findall(r'"([A-Za-z_0-9]+)"', calls_v2) + sorted(CASE.findall(body(twin / "V2" / "Replay.lean", "entryV2"))):
+    asked_v2.setdefault(n, "SpecTwin/V2/Replay.lean's tape reader")
+
+def wrong(questions, asked_v2):
+    listed = set(questions) | set(manifest_v2.COVERED) | set(manifest_v2.CUT) | OWN_ENTRIES
+    out = [f"{n}: in QUESTIONS, read by no askCall and no tape entry of the twin"
+           for n in questions if n not in asked and n not in entries]
+    return out + [f"{n}: asked by the twin under protocol-v2.md ({p}), in no list of the manifest"
+                  for n, p in sorted(asked_v2.items()) if n not in listed]
+bad = wrong(questions, asked_v2)
+for b in bad:
+    print(f"v2's questions: {b}")
+by_ask = sum(n in asked for n in questions)
+ctl1 = wrong([n for n in questions if n != "links"], asked_v2)
+ok1 = any(c.startswith("links: asked by the twin under protocol-v2.md (") for c in ctl1)
+print(f"control, QUESTIONS without links: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
+ctl2 = wrong(questions, {**asked_v2, "made_up": "a planted askCall"})
+ok2 = "made_up: asked by the twin under protocol-v2.md (a planted askCall), in no list of the manifest" in ctl2
+print(f"control, an askCall of made_up under V2/: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
+ctl3 = wrong(questions + ["made_up"], asked_v2)
+ok3 = "made_up: in QUESTIONS, read by no askCall and no tape entry of the twin" in ctl3
+print(f"control, QUESTIONS with made_up: {'refused, as it must be' if ok3 else 'NOT refused  <-- FAIL'}")
+if bad or not (ok1 and ok2 and ok3) or not questions:
+    print(f"NOT every one of protocol-v2.md's questions is read by the twin, or the twin asks one the manifest does not list: {len(bad)}")
+    sys.exit(1)
+print(f"{len(questions)} of {len(questions)} of protocol-v2.md's questions are read by the twin: {by_ask} by an askCall, "
+      f"{len(questions) - by_ask} by a tape entry alone")
+print(f"the {len(asked_v2)} names the twin asks or reads as calls under protocol-v2.md are each a question, a covered "
+      f"function, a cut one or the replay's own ({', '.join(sorted(OWN_ENTRIES))})")
+EOF
+  [ $? = 0 ] || no "a question of protocol-v2.md the twin does not read, a name the twin asks that the manifest does not list, or the questions' controls (scope.txt)"
   sed 's/^/  /' "$OUT/scope.txt"
 }
 s_mutants() {

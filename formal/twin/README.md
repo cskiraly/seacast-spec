@@ -65,10 +65,10 @@ one to one.
 - The twin leaves out the events that `protocol.md` gives in prose: a connection closing, an announcer's offers
   ageing out, and a group expiring.
 - The twin of `protocol-v2.md`'s functions is in `SpecTwin/V2/`, and its manifest (`SpecTwin/V2/Manifest.lean`,
-  generated from `tools/gen/manifest_v2.py`) lists them. The replay reads a trace's document from its header. A
-  trace under `protocol-v2.md` replays through those functions and through the functions of `protocol.md` that
-  `protocol-v2.md` keeps. A record of a function that `protocol-v2.md` redefines and the twin does not cover is
-  refused.
+  generated from `tools/gen/manifest_v2.py`) lists them, and the questions a trace under it asks. The replay reads
+  a trace's document from its header. A trace under `protocol-v2.md` replays through those functions and through
+  the functions of `protocol.md` that `protocol-v2.md` keeps. A record of a function that `protocol-v2.md`
+  redefines and the twin does not cover is refused.
 
 ## The record
 
