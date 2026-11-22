@@ -509,8 +509,8 @@ def chains_omit_v2():
     _nc = T.node_chains
 
     @functools.wraps(_nc)
-    def node_chains(traced, ns, whole=False, lists=None):
-        replaced, chains = _nc(traced, ns, whole, lists)
+    def node_chains(traced, ns, whole=False, lists=None, replaceable=None):
+        replaced, chains = _nc(traced, ns, whole, lists, replaceable)
         PLANTED[0] += len(replaced)
         return replaced, {n: c for n, c in chains.items() if n not in replaced}
 

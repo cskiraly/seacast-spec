@@ -34,7 +34,9 @@ Each function bound has a class:
   its result, or nothing where the document's function returns nothing (a least fixpoint over both documents:
   `return f(...)` of a function that returns nothing returns nothing). `message_id`'s cache is an observer by name
   (it skips the call on a hit). What the test cannot establish is not an observer: an unknown effect denies.
-- **layer**: it holds the earlier binding and fails the test (the reason is given);
+- **layer**: it holds the earlier binding and fails the test (the reason is given); one that passes it where it
+  may name and bind a draw's slot (DRAWS: `choice`, `sample_without_replacement`, `shuffled`) is marked a swapped
+  draw, which the tracer re-wraps while it is bound;
 - **closure-dependent**: its first statement branches on a value the node is made with (no parameter of its own,
   no field, call or element, each name bound exactly once in the nearest enclosing function that binds it and
   rebound by no `nonlocal` or `global` there; a module's global is state): its class per branch is given, under
@@ -77,6 +79,9 @@ READONLY_BUILTINS = {"len", "list", "tuple", "set", "frozenset", "dict", "sorted
 # the methods above and the builtins above (`Scanner.toy_reads`); else it is no read
 TOY_READS = {"has"}
 BY_NAME = {"message_id": "a cache: it skips the call on a hit"}     # observers by name
+# the draws a layer may swap (trace3.py's DRAWS, held to it by lists): a layer that passes the observer test where
+# it may name and bind these slots is a swapped draw
+DRAWS = ("choice", "sample_without_replacement", "shuffled")
 
 
 def is_ns(e):
@@ -144,6 +149,7 @@ class Scanner:
         self.reads = set(READONLY_METHODS)  # with the toy's reads that hold (scan(), toy_reads)
         self.attr_captures = {}     # (file, attribute) -> the namespace name a node attribute was assigned from
         self.traced, self.questions = TRACED, QUESTIONS_DOC
+        self.exempt = ()            # the slots the observer test lets a layer name and bind (observer_test)
         self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
         self.imports = {}           # (file, local name) -> (module file, name), or (module file, None) for a module
 
@@ -424,6 +430,10 @@ class Scanner:
                         r["class"] = "observer" if why is None else "layer"
                         if why:
                             r["why"] = why
+                            # a swapped draw: a layer that is an observer but for binding a draw's slot (and
+                            # naming it) under each document
+                            if all(self.observer_test(fn, name, held, d, DRAWS) is None for d in docs):
+                                r["swapped_draw"] = True
                     else:                   # an observer under one, not the other
                         r["class"] = "per-document"
                         r["by_document"] = {d: "observer" if w is None else f"layer ({w})" for d, w in by.items()}
@@ -519,9 +529,11 @@ class Scanner:
                         s.captures[tt.id] = "<table>"
         return s
 
-    def observer_test(self, fn, name, held, doc):
+    def observer_test(self, fn, name, held, doc, exempt=()):
         """None for an observer, or why it is not one, under one document's namespace ("protocol.md" or "v2": its
-        questions, its traced names, and whether its function of that name returns a value)."""
+        questions, its traced names, and whether its function of that name returns a value). The slots of `exempt`
+        may be named and bound (the swapped draw's test: DRAWS)."""
+        self.exempt = exempt
         if name in BY_NAME and "by-name" not in self.off:
             return None
         self.questions = QUESTIONS_V2 if doc == "v2" else QUESTIONS_DOC
@@ -548,7 +560,7 @@ class Scanner:
                 k = ns_key(n)
             elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id != held:
                 k = scope.lookup(n.id, "captures")
-            if k is not None and k != name:
+            if k is not None and k != name and k not in self.exempt:
                 if k in self.questions and "question" not in self.off:
                     return f"names the question {k}"
                 if k in self.traced and "traced" not in self.off:
@@ -561,6 +573,9 @@ class Scanner:
             for t in targets:
                 for tt in (t.elts if isinstance(t, ast.Tuple) else [t]):
                     clause = "delete" if isinstance(n, ast.Delete) else "assign"
+                    if (isinstance(tt, ast.Subscript) and is_ns(tt.value) and ns_key(tt) in self.exempt
+                            and clause == "assign"):
+                        continue        # an exempt slot bound (a swapped draw's)
                     if clause not in self.off and self.ns_rooted(tt, scope):
                         return f"{'deletes' if clause == 'delete' else 'writes'} {ast.unparse(tt)[:60]}"
             if not isinstance(n, ast.Call):
@@ -972,6 +987,7 @@ class Scanner:
 
 
 QUESTIONS_DOC, QUESTIONS_V2, TRACED, TRACED_V2, CALLABLES = set(), set(), set(), set(), set()
+TRACED_V2_KEPT = set()      # TRACED_V2's kept names alone: protocol.md's lists (WRAPPERS, REPLACEABLE) are of these
 DEFS_DOC, DEFS_V2, RETURNS_DOC, RETURNS_V2 = set(), set(), set(), set()
 BUILTIN_NAMES = set(dir(__import__("builtins")))
 
@@ -1037,7 +1053,8 @@ def load_names(toy):
     v2_bound = {r["name"] for r in scan(toy).rows if r["v2_only"]}
     QUESTIONS_V2.update(questions_of(v2, set(doc) | set(v2)) & v2_bound)
     TRACED.update(T.BLOCK)
-    TRACED_V2.update(n for n in T.v2_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
+    TRACED_V2_KEPT.update(n for n in T.v2_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
+    TRACED_V2.update(TRACED_V2_KEPT, T.manifest_v2.COVERED)    # under v2 the kept names and v2's covered ones
     return T, N
 
 
@@ -1071,10 +1088,25 @@ def at(fl, q, ln):
     return f"{q}@{ln}" if fl == "node.py" else f"{q}@{fl}:{ln}"
 
 
+def closure_kind_of(split, T):
+    """A closure-dependent row's split as trace3.py's ClosureKind: a test `X` or `not X` on one closure value X, each
+    branch's class one under both documents (an observer; own or a layer, changing). None for any other split."""
+    test, cls = split["on"], {"observer": T.OBSERVER, "own": T.CHANGING, "layer": T.CHANGING}
+    t, f = cls.get(split["true"]) if isinstance(split["true"], str) else None, \
+        cls.get(split["false"]) if isinstance(split["false"], str) else None
+    if t is None or f is None:
+        return None
+    if test.isidentifier():
+        return T.ClosureKind(test, t, f)
+    if test.startswith("not ") and test[4:].isidentifier():
+        return T.ClosureKind(test[4:], f, t)
+    return None
+
+
 def lists(sc, T):
     """The lists the rows give over node.py's bindings of traced names (under v2, of its kept names for a v2-only
     binding), beside trace3.py's hand-kept ones: each name and qualified name the same, or the difference named."""
-    rows = [r for r in sc.rows if r["file"] == "node.py" and r["name"] in (TRACED_V2 if r["v2_only"] else TRACED)]
+    rows = [r for r in sc.rows if r["file"] == "node.py" and r["name"] in (TRACED_V2_KEPT if r["v2_only"] else TRACED)]
     defined = CALLABLES
     obs = sorted({(r["name"], r["value"]["qual"]) for r in rows if r["class"] == "observer"})
     own = sorted({(r["name"], r["value"]["qual"]) for r in rows if r["class"] == "own" and r["name"] not in defined})
@@ -1128,15 +1160,35 @@ def lists(sc, T):
             sites = [f"{r['in']}:{r['line']}{' v2-only' if r['v2_only'] else ''}" for r in rows
                      if r["name"] == n and r["class"] in ("own", "layer")]
             out.append(f"replaced {n}, not REPLACEABLE (the tracer stops a trace where it is replaced): {', '.join(sites)}")
-    if layers is not None:  # LAYERS against every node.py binding of a name traced under v2, function by function:
-        kind = {"observer": T.OBSERVER, "own": T.CHANGING, "layer": T.CHANGING}     # an observer; the node's own
-        want = {}                                                                   #   helper; any other is changing
+    # LAYERS against every node.py binding of a name traced under v2, function by function: an observer; the node's
+    # own helper; a function bound inside another's body, during its call (a binding in a local function that runs
+    # at the construction would be named so too, and the install would stop on it: loud); a swapped draw; a
+    # closure-dependent layer by its split; any other is changing
+    if layers is not None:
+        kind = {"observer": T.OBSERVER, "own": T.CHANGING, "layer": T.CHANGING}
+        want = {}
+        if tuple(DRAWS) != tuple(T.DRAWS):
+            other += 1
+            out.append(f"DRAWS: {list(DRAWS)} here, {list(T.DRAWS)} in trace3.py")
         for r in sc.rows:
             if r["file"] != "node.py" or r["name"] not in TRACED_V2 or not isinstance(r["value"], dict):
                 continue
-            k = T.NODE_HELPER if r["class"] == "own" and r["name"] not in defined else kind.get(r["class"])
-            if k is not None:           # a class of more than one kind is named above
+            if r["class"] == "own" and r["name"] not in defined:
+                k = T.NODE_HELPER
+            elif "<locals>" in r["in"]:
+                k = T.DURING_CALL
+            elif r.get("swapped_draw"):
+                k = T.SWAPPED_DRAW
+            elif r["class"] == "closure-dependent":
+                k = closure_kind_of(r["closure"], T)
+            else:
+                k = kind.get(r["class"])
+            if k is not None:
                 want[fn_key(r["value"])] = (r["name"], k)
+            elif r not in rows:         # (one in `rows` is named above)
+                other += 1
+                out.append(f"{r['class']} {r['name']} {r['value']['qual']}: NOT one kind, which LAYERS needs "
+                           f"({r['file']}:{r['line']})")
         for (fl, q, ln), v in sorted(want.items(), key=lambda kv: (kv[0][0], kv[0][2])):
             if layers.get((fl, q, ln)) == v:
                 out.append(f"layer {v[0]} {at(fl, q, ln)}: {v[1]}, as LAYERS")

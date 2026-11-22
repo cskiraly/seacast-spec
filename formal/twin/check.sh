@@ -682,9 +682,20 @@ s_headers() {
   $PY "$T/header3.py" "$TOY" $(for t in $TRACES; do echo "$OUT/$t.jsonl.gz"; done) > "$OUT/headers.txt" 2>&1 || no "a header is not these tools' and these documents' (headers.txt)"
   [ "$(grep -c "tracing §6.1's 12 alone\$" "$OUT/headers.txt")" = 1 ] && has -E "/hand5-sec61\.jsonl\.gz: .*tracing §6.1's 12 alone\$" "$OUT/headers.txt" \
     || no "hand5-sec61 alone must be of §6.1's twelve"
-  [ "$(grep -c -E "/v2/hand5(-own)?\.jsonl\.gz: .*tracing v2's kept, " "$OUT/headers.txt")" = 2 ] || no "the two small v2 traces must be of v2's kept names"
-  [ "$(grep -c -E "/v2/[a-z0-9-]+\.jsonl\.gz: .*tracing v2's kept, " "$OUT/headers.txt")" = "$(grep -c -E '/v2/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a v2 trace is not of v2's kept names"
+  [ "$(grep -c -E "/v2/hand5(-own)?\.jsonl\.gz: .*tracing v2's kept and covered, " "$OUT/headers.txt")" = 2 ] || no "the two small v2 traces must be of v2's kept and covered names"
+  [ "$(grep -c -E "/v2/[a-z0-9-]+\.jsonl\.gz: .*tracing v2's kept and covered, " "$OUT/headers.txt")" = "$(grep -c -E '/v2/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a v2 trace is not of v2's kept and covered names"
   echo "  $(grep -c . "$OUT/headers.txt") headers read (headers.txt)"
+  # the question writers' example rows (tools/forms-v2-examples.tsv, which the build step's replay --forms reads),
+  # made again by the writers from this run's v2/hand5: so that the file cannot drift from the writers
+  if [ -s "$OUT/v2/hand5.jsonl.gz" ]; then
+    $PY "$T/forms_v2_examples.py" "$OUT/v2/hand5.jsonl.gz" > "$OUT/forms-v2-examples.tsv" 2> "$OUT/forms-v2-examples.err" \
+      || no "the example rows were not made from v2/hand5 (forms-v2-examples.err)"
+    [ "$(sha256sum < "$OUT/forms-v2-examples.tsv")" = "$(sha256sum < "$T/forms-v2-examples.tsv")" ] \
+      || no "the example rows made from v2/hand5 differ from tools/forms-v2-examples.tsv (forms-v2-examples.tsv)"
+    echo "  the example rows made again from v2/hand5: $(grep -c . "$OUT/forms-v2-examples.tsv"), as tools/forms-v2-examples.tsv"
+  else
+    no "no v2/hand5 to make the example rows from"
+  fi
   # each trace's two hashes, by its name under --out: two runs of one tree, on any machine, give the same file
   # shellcheck disable=SC2046
   (cd "$OUT" && $PY "$T/content.py" --hashes $(for t in $TRACES; do echo "$t.jsonl.gz"; done) > hashes.txt 2> hashes.err) || no "a trace's hashes (hashes.err)"

@@ -82,7 +82,7 @@ import math
 import os
 import re
 import sys
-from collections import Counter
+from collections import Counter, namedtuple
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -260,16 +260,16 @@ def sec3_check(names, v2=OWN_V2, undeclared=UNDECLARED_V2):
 
 def manifest_check(traced, m=manifest_v2, own=OWN + OWN_V2, foreign=FOREIGN, node_own=None):
     """Under --doc v2, the tracer's own lists against protocol-v2.md's manifest (gen/manifest_v2.py), which the
-    replay reads the trace by: the traced names (v2_kept over the two documents, without §7.1's) are KEPT and
-    NODE_OWN's keys; NODE_OWN is the tracer's; the header's `own` is OWN, in its order, and `foreign` is FOREIGN.
-    What differs, as one line each, naming the names. `traced` None (§6.1's twelve alone, TRACE3_ONLY=sec61): the
-    traced names are not compared."""
+    replay reads the trace by: the traced names (v2_kept over the two documents, without §7.1's, and v2's covered
+    names) are KEPT, COVERED and NODE_OWN's keys; NODE_OWN is the tracer's; the header's `own` is OWN, in its order,
+    and `foreign` is FOREIGN. What differs, as one line each, naming the names. `traced` None (§6.1's twelve alone,
+    TRACE3_ONLY=sec61): the traced names are not compared."""
     node_own = NODE_OWN if node_own is None else node_own
     out = []
-    want = set(m.KEPT) | set(m.NODE_OWN)
+    want = set(m.KEPT) | set(m.COVERED) | set(m.NODE_OWN)
     if traced is not None and set(traced) != want:
-        out.append(f"traced, not in the manifest's KEPT or NODE_OWN: {sorted(set(traced) - want)}; in them, not "
-                   f"traced: {sorted(want - set(traced))}")
+        out.append(f"traced, not in the manifest's KEPT, COVERED or NODE_OWN: {sorted(set(traced) - want)}; in them, "
+                   f"not traced: {sorted(want - set(traced))}")
     if dict(m.NODE_OWN) != dict(node_own):
         out.append(f"NODE_OWN is {dict(node_own)!r} here, {dict(m.NODE_OWN)!r} in the manifest")
     if list(m.OWN) != list(own):
@@ -435,7 +435,16 @@ REPLACEABLE_WHOLE = ("validate_chunk",)
 # constant (scan_bindings.py's observer test); the node's own helper is a traced name the documents do not define
 # (NODE_OWN); a changing layer changes the function on some path, so that the name is a question at that node. Each
 # read in toy/node.py, and held to the scan of the toy's bindings by scan_bindings.py --lists.
+# Two kinds more, under v2's covered names: a swapped draw, an observer that binds a draw's slot (DRAWS) to the toy's
+# own draw around its call, and restores it after (the tracer re-wraps the draw while it is bound, so that it is a
+# question on the tape: rewrap_draws); and a layer bound only during a call (inside a toy function's body, restored
+# after it), which no install finds bound, and which a record's entry or exit finds and stops at (bindings_check).
+# A closure-dependent layer (ClosureKind) has its kind read at each node from a closure value the node is made with:
+# `cell`'s truth value picks `if_true` or `if_false`.
 OBSERVER, NODE_HELPER, CHANGING = "observer", "node's own", "changing"
+SWAPPED_DRAW, DURING_CALL = "swapped draw", "bound during a call"
+ClosureKind = namedtuple("ClosureKind", "cell if_true if_false")
+DRAWS = ("choice", "sample_without_replacement", "shuffled")    # the draws a toy's layer may swap (K13)
 LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),  # counts
           ("node.py", "Node._namespace.<locals>.held", 700): ("held", NODE_HELPER),         # the asks held back
           ("node.py", "Node._override.<locals>.message_id", 940): ("message_id", OBSERVER),     # a cache: it skips
@@ -444,7 +453,58 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._override.<locals>.close_promises", 966): ("close_promises", OBSERVER),   # toy's index
           ("node.py", "Node._faults.<locals>.<lambda>", 1099): ("on_iwant", CHANGING),     # a withholder's: no answer
           ("node.py", "Node._peer_promise.<locals>.close_promises", 1174): ("close_promises", OBSERVER),  # answer times
-          ("node.py", "Node._v2.<locals>.promise_due", 1697): ("promise_due", OBSERVER)}   # notes a broken promise
+          ("node.py", "Node._v2.<locals>.promise_due", 1697): ("promise_due", OBSERVER),   # notes a broken promise
+          # over v2's covered names. Observers: a count or a note after the call (--alarm's, the member check's, the
+          # peer promise's sender, the measurement point, the reach report)
+          ("node.py", "Node._hoard_column.<locals>.defer_on_claim", 274): ("defer_on_claim", OBSERVER),
+          ("node.py", "Node._member_check.<locals>.repair_verdict", 509): ("repair_verdict", OBSERVER),
+          ("node.py", "Node._peer_promise.<locals>.fill", 1167): ("fill", OBSERVER),
+          ("node.py", "Node._v2.<locals>.check_completion", 1653): ("check_completion", OBSERVER),
+          ("node.py", "Node._v2.<locals>.fill", 1688): ("fill", OBSERVER),
+          # swapped draws: the floor's draw on sim.floor_rng; the probed index's on a stream of its own
+          ("node.py", "Node._v2.<locals>.keep_floor", 1618): ("keep_floor", SWAPPED_DRAW),
+          ("node.py", "Node._v2.<locals>.defer_on_claim", 1707): ("defer_on_claim", SWAPPED_DRAW),
+          # closure-dependent: --member-check off returns False without the document's call; on, it counts
+          ("node.py", "Node._member_check.<locals>.owed_missing", 500): ("owed_missing",
+                                                                         ClosureKind("on", OBSERVER, CHANGING)),
+          # changing, over one of the eight names the twin asks where a node replaces it (ASKED_V2)
+          ("node.py", "Node.__init__.<locals>.note_claim", 219): ("note_claim", CHANGING),        # a liar's
+          ("node.py", "Node._hoard_column.<locals>.push_rebuilt", 256): ("push_rebuilt", CHANGING),   # a hoarder's
+          ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 524): ("push_rebuilt", CHANGING),
+          ("node.py", "Node._faults.<locals>.<lambda>", 1107): ("push_rebuilt", CHANGING),        # --fault's
+          ("node.py", "Node._rebuilt.<locals>.<lambda>", 1137): ("push_rebuilt", CHANGING),       # --rebuilt's
+          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1139): ("push_rebuilt", CHANGING),   #   variants
+          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1146): ("push_rebuilt", CHANGING),
+          ("node.py", "Node._v2.<locals>.<lambda>", 1740): ("push_rebuilt", CHANGING),            # --fault hoard's
+          ("node.py", "Node._v2.<locals>.push_rebuilt", 1742): ("push_rebuilt", CHANGING),        # hoardcol's
+          ("node.py", "Node._alarm.<locals>.serve_standing", 420): ("serve_standing", CHANGING),  # asks type_of_group
+          ("node.py", "Node._v2.<locals>.serve_standing", 1773): ("serve_standing", CHANGING),
+          ("node.py", "Node._repair_bias.<locals>.repair_verdict", 469): ("repair_verdict", CHANGING),
+          ("node.py", "Node._faults.<locals>.forward", 1103): ("forward", CHANGING),              # a silent node's
+          ("node.py", "Node._v2.<locals>.send_have", 1731): ("send_have", CHANGING),              # a liar's
+          # changing, over a name the manifest makes replaceable and the twin cannot ask (NOASK_V2): entered outside
+          # every record alone (iface_of stops a record's own call of one)
+          ("node.py", "Node._alarm.<locals>.filter_entry", 349): ("filter_entry", CHANGING),
+          ("node.py", "Node._peer_promise.<locals>.filter_entry", 1188): ("filter_entry", CHANGING),
+          ("node.py", "Node._writer_variants.<locals>.choose", 1046): ("choose", CHANGING),
+          ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 437): ("decode_group", CHANGING),
+          # bound during a call: publish's announce under --source-offers off and late
+          ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 994): ("announce", DURING_CALL),
+          ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1012): ("announce", DURING_CALL)}
+# Under v2: the replaceable names (the manifest's, and the directed sets' validate_chunk); the eight the twin asks as
+# questions where a node replaces them (its NodeV2, V2/Replay.lean); and those it cannot ask, which a record's own
+# code must not call where they are replaced: the manifest's replaceable covered names but the eight
+REPLACEABLE_V2 = tuple(manifest_v2.REPLACEABLE) + tuple(manifest_v2.REPLACEABLE_WHOLE)
+ASKED_V2 = ("forward", "push_rebuilt", "send_have", "serve_standing", "owed_missing", "repair_verdict", "note_claim",
+            "known_in_scope")
+NOASK_V2 = tuple(n for n in manifest_v2.REPLACEABLE if n not in ASKED_V2 and n not in manifest_v2.KEPT)
+# Under v2, the questions an object type answers (its functions, wrapped per node on the type: type_enc_v2; its
+# parameters' three are Tracer3.TYPE_FUNCTIONS, param_enc_v2), and the manifest's questions whose rows an adapter
+# writes (the gossip history's, the mesh's, `interest`'s miss)
+TYPE_QUESTIONS_V2 = ("index_count", "threshold", "verify", "decode", "header_of", "project", "cross", "family",
+                     "derived_interest")
+COVERED_SET = frozenset(manifest_v2.COVERED)    # the covered names, whose records records_v2.py writes under v2
+ADAPTED_V2 = ("gossip_put", "gossip_remove_group", "mesh_has", "own_interest")
 
 
 def own_code(name, fn):
@@ -518,6 +578,20 @@ def layer_key(f):
     return Path(f.__code__.co_filename).name, f.__qualname__, f.__code__.co_firstlineno
 
 
+def closure_kind(name, f, ck):
+    """A closure-dependent layer's kind at its node: `ck.if_true` where the closure value `ck.cell` is true, else
+    `ck.if_false`, the truth value the layer's own test reads. A layer without that cell, or with it empty, stops."""
+    names = f.__code__.co_freevars
+    if ck.cell not in names:
+        raise ChainStop(f"{name}: a closure-dependent layer without its closure value {ck.cell}: {layer_where(f)}")
+    try:
+        v = f.__closure__[names.index(ck.cell)].cell_contents
+    except ValueError:
+        raise ChainStop(f"{name}: a closure-dependent layer whose closure value {ck.cell} is empty: "
+                        f"{layer_where(f)}") from None
+    return ck.if_true if v else ck.if_false
+
+
 def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
     """Under --doc v2, a traced name's chain at a node and whether the node replaces it: (chain, replaced).
 
@@ -526,7 +600,9 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
     name is bound to the document's function itself, or to the node's own helper alone: such a name has no key in
     `chains`. Each layer above `doc` must be listed in `lists` (LAYERS) for this name, by its file's name, its
     qualified name and its first line (layer_key): the toy's in node.py, and a fixture's that the fixture lists
-    before the install. The name is replaced where any layer is changing, and only a REPLACEABLE name may be. A
+    before the install. The name is replaced where any layer is changing (an observer and a swapped draw are not; a
+    closure-dependent layer's kind is read at the node, closure_kind), and only a name of `replaceable` may be
+    (REPLACEABLE, or under v2 REPLACEABLE_V2). A layer listed as bound only during a call stops here. A
     walk that does not reach `doc` ends in a changing layer, or is the node's own helper alone. In a trace of the
     whole state, a REPLACEABLE_WHOLE name bound to a function outside node.py (a directed set's level 1) is changing.
     Anything else raises ChainStop, naming the layer."""
@@ -554,7 +630,13 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
             raise ChainStop(f"{name}: a layer in none of the tracer's lists: {layer_where(f)}")
         if listed[0] != name:
             raise ChainStop(f"{name}: a layer listed for {listed[0]}, not for {name}: {layer_where(f)}")
-        kinds.append(listed[1])
+        kind = listed[1]
+        if isinstance(kind, ClosureKind):
+            kind = closure_kind(name, f, kind)
+        if kind == DURING_CALL:
+            raise ChainStop(f"{name}: a layer listed as bound only during a call, bound at the install: "
+                            f"{layer_where(f)}")
+        kinds.append(kind)
     if NODE_HELPER in kinds:
         if kinds != [NODE_HELPER] or doc:
             raise ChainStop(f"{name}: the node's own helper with other layers: "
@@ -570,12 +652,45 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
     return [getattr(f, "__qualname__", None) for f in above] + (["doc"] if doc else []), replaced
 
 
-def node_chains(traced, ns, whole=False, lists=None):
+REWRAP = [True]         # the draws' re-wrap (rewrap_draws); off only in a planted fault
+
+
+def rewrap_draws(ns, slots, rewrap):
+    """K13: each draw slot (DRAWS) that the toy has bound to its own draw, re-wrapped as the question it is
+    (`rewrap`, iface_of over the toy's draw), until the caller puts the toy's back. The slots re-wrapped, with the
+    toy's draws found there."""
+    found = {}
+    for d in DRAWS if REWRAP[0] else ():
+        if d not in slots:
+            continue
+        cur = ns.get(d)
+        if cur is not slots[d] and not getattr(cur, "_trace3_rewrap", False):
+            found[d] = cur
+            ns[d] = rewrap(d, cur)
+    return found
+
+
+def bindings_check(nid, ns, slots, found, fname, at):
+    """Under v2, at a record's entry and at its exit (`at`): every slot the install bound (a traced name, a tape
+    name, a table's view) still holds the tracer's own binding, or a draw re-wrapped (rewrap_draws; `found`, the
+    toy's draws re-wrapped at the entry, put back before the exit's check). Anything else is a binding the toy made
+    during a call, which the twin would not run: a stop naming the slot and what it holds. A binding made and
+    restored wholly inside one record passes both (a stated limit; the replay's mismatch is its backstop)."""
+    for s, w in slots.items():
+        cur = ns.get(s)
+        if cur is w or (s in found and cur is found[s]) or (s in DRAWS and getattr(cur, "_trace3_rewrap", False)):
+            continue
+        raise SystemExit(f"trace3: node {nid}: {s} is bound to {layer_where(cur)} at the {at} of {fname}'s record, "
+                         f"not to the tracer's own binding: a binding made during a call, which the twin would not "
+                         f"run")
+
+
+def node_chains(traced, ns, whole=False, lists=None, replaceable=None):
     """Under --doc v2, a node's replaced names, sorted, and its nodes entry's `chains`, by name: the chain rule over
     each traced name. Raises ChainStop."""
     replaced, chains = [], {}
     for name in traced:
-        chain, rep = chain_rule(name, ns.get(name), whole, lists)
+        chain, rep = chain_rule(name, ns.get(name), whole, lists, replaceable)
         if rep:
             replaced.append(name)
         if chain is not None:
@@ -1070,11 +1185,12 @@ def manifest_self_test():
     import types
     sys.path.insert(0, str(HERE.parents[2] / "toy"))
     import node as N                    # noqa: E402: the toy beside this repository's documents
-    traced = tuple(n for n in v2_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+    kept = tuple(n for n in v2_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+    traced = kept + tuple(n for n in manifest_v2.COVERED if n not in kept)     # as Tracer3 traces under v2
     m = manifest_v2
 
     def copy(**kw):
-        d = {k: getattr(m, k) for k in ("KEPT", "NODE_OWN", "OWN", "FOREIGN")}
+        d = {k: getattr(m, k) for k in ("KEPT", "COVERED", "NODE_OWN", "OWN", "FOREIGN")}
         d.update(kw)
         return types.SimpleNamespace(**d)
     own2 = list(m.OWN)
@@ -1084,10 +1200,17 @@ def manifest_self_test():
         ("§6.1's twelve alone (traced not compared)", lambda chk: chk(None), []),
         ("a KEPT name dropped from the manifest (retry_offer)", lambda chk: chk(traced, copy(
             KEPT=[n for n in m.KEPT if n != "retry_offer"])),
-         ["traced, not in the manifest's KEPT or NODE_OWN: ['retry_offer']; in them, not traced: []"]),
+         ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: ['retry_offer']; in them, not traced: []"]),
         ("a name in the manifest's KEPT that is not traced (window_release)", lambda chk: chk(traced, copy(
             KEPT=list(m.KEPT) + ["window_release"])),
-         ["traced, not in the manifest's KEPT or NODE_OWN: []; in them, not traced: ['window_release']"]),
+         ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: []; in them, not traced: ['window_release']"]),
+        # H1: a covered name left out, of the manifest and of the traced names in turn
+        ("a COVERED name dropped from the manifest (keep_floor)", lambda chk: chk(traced, copy(
+            COVERED=[n for n in m.COVERED if n != "keep_floor"])),
+         ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: ['keep_floor']; in them, not traced: []"]),
+        ("a COVERED name left out of the traced names (keep_floor)", lambda chk: chk(
+            tuple(n for n in traced if n != "keep_floor")),
+         ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: []; in them, not traced: ['keep_floor']"]),
         ("NODE_OWN's helper under another qualified name", lambda chk: chk(traced, copy(
             NODE_OWN={"held": "Node._planted.<locals>.held"})),
          [f"NODE_OWN is {dict(NODE_OWN)!r} here, {{'held': 'Node._planted.<locals>.held'}} in the manifest"]),
@@ -1110,8 +1233,8 @@ def manifest_self_test():
     bad += not ok
     print(f"manifest self-test, the control (a check that finds nothing): {len(fails)} cases fail, the "
           f"{len(planted)} planted ones: {'ok' if ok else f'got {fails!r}  <-- FAIL'}")
-    print(f"manifest self-test: {len(traced)} traced names, the manifest's KEPT {len(m.KEPT)} and NODE_OWN "
-          f"{len(m.NODE_OWN)}; own {len(m.OWN)}, foreign {len(m.FOREIGN)}")
+    print(f"manifest self-test: {len(traced)} traced names, the manifest's KEPT {len(m.KEPT)}, COVERED "
+          f"{len(m.COVERED)} and NODE_OWN {len(m.NODE_OWN)}; own {len(m.OWN)}, foreign {len(m.FOREIGN)}")
     return bad
 
 
@@ -1649,9 +1772,42 @@ def timers_self_test():
     return bad
 
 
+def questions_self_test():
+    """H2: the question writers make the example rows (forms-v2-examples.tsv, beside this file) byte for byte from
+    the rows' own leaves; and with decode's writer planted without its type, its row differs and the case fails."""
+    import forms_v2_examples as X        # noqa: E402: this directory's
+    path = HERE / "forms-v2-examples.tsv"
+    want = path.read_text().splitlines()
+    leaves = X.leaves_from_tsv(path)
+
+    def made(w=None):
+        return [f"{form}\t{row}" for form, row in X.rows(*leaves, w)]
+
+    class NoT(Tracer3):                 # the planted fault: decode's arguments without the type
+        def type_enc_v2(self, T):
+            out = super().type_enc_v2(T)
+            dec = out["decode"]
+            out["decode"] = lambda r, fr, h: [dec(r, fr, h)[0][1:], dec(r, fr, h)[1]]
+            return out
+    bad = 0
+    got = made()
+    ok = got == want
+    bad += not ok
+    diff = next((f"{a[:100]} / made {b[:100]}" for a, b in zip(want, got) if a != b), f"{len(want)} != {len(got)}")
+    print(f"questions self-test, the {len(want)} example rows made by the writers: "
+          f"{'ok' if ok else f'differ: {diff}  <-- FAIL'}")
+    got_p = made(NoT.__new__(NoT))
+    rows_p = [a.split("\t")[0] for a, b in zip(want, got_p) if a != b]
+    ok = rows_p == ["decode"]
+    bad += not ok
+    print(f"questions self-test, its planted fault (decode without its type): "
+          f"{'the decode row differs, ok' if ok else f'rows differing: {rows_p}  <-- FAIL'}")
+    return bad
+
+
 def self_test_v2():
     bad = (v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
-           + closure_self_test() + timers_self_test())
+           + closure_self_test() + timers_self_test() + questions_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -1679,6 +1835,8 @@ class Tracer3(Tracer):
         self.nodes_written = False
         self.bound = []                 # (node, namespace, {traced name: the tracer's wrapper of it there}), for the
         #                                   names' second check (final_check)
+        self.type_slots = []            # under v2, (node, a type or its params, attribute, the tracer's question
+        #                                   there), for final_check too
         self.doc_mid = {}               # and m2_check's reference function, a node's own
         self.cur_nid = None             # the node of the record being written (mid_of's reference)
         self.built_objs = {}            # the chunks the record's publish built (built, content_id_asked)
@@ -1724,10 +1882,13 @@ class Tracer3(Tracer):
             self.traced = SEC61
         elif self.doc_v2:
             # (under v2 the window's count is bytes and a send's value a pair, and the three tables are not
-            # installed: the six are not traced there, by name)
-            self.traced = tuple(n for n in v2_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+            # installed: the six are not traced there, by name); and v2's covered names, its own functions
+            self.kept = tuple(n for n in v2_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+            self.traced = self.kept + tuple(n for n in manifest_v2.COVERED if n not in self.kept)
         else:
             self.traced = BLOCK
+        if not self.doc_v2 or self.only61:
+            self.kept = self.traced
         for d in (N.DOC, N.DOC2):       # the documents the toy reads are the two the content line names
             if Path(d).resolve() != self.toy.parent / Path(d).name:
                 raise SystemExit(f"trace3: the toy reads a document that is not beside it: {d}")
@@ -1988,7 +2149,12 @@ class Tracer3(Tracer):
         slot is held, a traced name to the tracer's own wrapper (no listed wrapper over it: one there means an install
         before the toy's bindings), a tape name to its question adapter and a table to its view (so that a slot the toy
         writes back, as `_repair_bias` writes its captured `shuffled`, or a view replaced by its raw table, is seen);
-        and the two aliases must still be the installed objects (`repoint_aliases`)."""
+        and the two aliases must still be the installed objects (`repoint_aliases`); and each object type's
+        questions still the tracer's."""
+        for nd, obj, a, w in self.type_slots:
+            if getattr(obj, a, None) is not w:
+                raise SystemExit(f"trace3: node {nd.id}: an object type's {a} was bound again after the tracer was "
+                                 f"installed: {layer_where(getattr(obj, a, None))}")
         for nd, ns, bound in self.bound:
             if self.doc_v2:                     # both aliases there and still the installed objects
                 for alias, name in (("hdr", "desc"), ("chunk_id", "message_id")):
@@ -2033,6 +2199,9 @@ class Tracer3(Tracer):
 
     def args_of(self, fn, args, kw=None):
         kw = kw or {}
+        if self.doc_v2 and fn in COVERED_SET:                       # v2's covered names: the forms runV2 reads
+            import records_v2                                       #   (records_v2.py, which imports this module)
+            return records_v2.args_v2(self, fn, args, kw)
         if fn == "choose_push":                                     # §5.3: the document calls it
             names = ("f", "cands", "budget", "at_source")           #   with `budget=` and `at_source=`
             v = dict(zip(names, args))
@@ -2214,6 +2383,9 @@ class Tracer3(Tracer):
         return super().args_of(fn, args)
 
     def ret_of(self, fn, r):
+        if self.doc_v2 and fn in COVERED_SET:
+            import records_v2
+            return records_v2.ret_v2(self, fn, r)
         if fn in ("on_ihave", "expand"):
             return [self.key(a) for a in r]
         if fn == "have_bits":
@@ -2329,6 +2501,177 @@ class Tracer3(Tracer):
         if not isinstance(i, int) or isinstance(i, bool):
             raise TypeError(f"trace3: not an integer: {i!r}")
         return i if i >= 0 else ["-", -i]
+
+    # ---- v2's questions, in the forms the twin asks them (V2/Replay.lean's NodeV2; forms-v2-examples.tsv)
+    @staticmethod
+    def tid(T):
+        """An object type by its id."""
+        return schema_v2.type_id(T)
+
+    def hdr_v2(self, h):
+        """A group's header, or none: a descriptor's seven fields, for every type (a column's and a row's carry more,
+        which the twin reads through questions alone)."""
+        return None if h is None else self.descriptor(h)
+
+    def cover_v2(self, r):
+        """A record of a node or of a link, with the fields it has: {"id", "families", "high"} (V2's coverJson)."""
+        out = {"id": self.nat(r.id)} if hasattr(r, "id") else {}
+        out["families"] = [self.integer(x) for x in r.families]
+        if hasattr(r, "high"):
+            out["high"] = self.flag(r.high, "a record's high")
+        return out
+
+    def member_v2(self, x):
+        """A member of a draw's list (choice, sample_without_replacement, shuffled), by its Python type: a peer or an
+        index as it is; an (index, chunk) pair as [i, f]; a record as cover_v2 writes it; an ask by its key."""
+        if isinstance(x, int) and not isinstance(x, bool):
+            return x
+        if isinstance(x, tuple) and len(x) == 2:
+            return [self.nat(x[0]), self.chunk(x[1])]
+        if hasattr(x, "families"):
+            return self.cover_v2(x)
+        return self.key(x)
+
+    def have_msg_v2(self, h):
+        """A HAVE: ["have", g, bits, offer, claim_all, complete], its bits a natural."""
+        return ["have", h.group.hex(), self.nat(h.bits.v), self.flag(h.offer, "a HAVE's offer"),
+                self.flag(h.claim_all, "a HAVE's claim_all"), self.flag(h.complete, "a HAVE's complete")]
+
+    def want_v2(self, w):
+        """A WANT: ["want", g, bits, standing, hops, probe], its fields left at their defaults written too."""
+        return ["want", w.group.hex(), self.nat(w.bits.v), self.flag(getattr(w, "standing", False), "a WANT's standing"),
+                self.nat(getattr(w, "hops", 0)), self.flag(getattr(w, "probe", False), "a WANT's probe")]
+
+    def rel_v2(self, m):
+        """A relation message: ["join", T, interest, custody_count, duty, colours], ["graft", T, family, colour,
+        direction, answer] or ["prune", T, family, colour, direction]."""
+        kind = type(m).__name__
+        if kind == "Join":
+            return ["join", self.type_word(m.object_type), m.interest, self.nat(m.custody_count), m.duty,
+                    self.nat(m.colours)]
+        if kind == "Graft":
+            return ["graft", self.type_word(m.object_type), self.integer(m.family), self.nat(m.colour), m.direction,
+                    self.flag(m.answer, "a GRAFT's answer")]
+        if kind == "Prune":
+            return ["prune", self.type_word(m.object_type), self.integer(m.family), self.nat(m.colour), m.direction]
+        raise TypeError(f"trace3: not a relation message of v2's: {m!r}")
+
+    @staticmethod
+    def type_word(t):
+        """A message's object type: its id, a string."""
+        if not isinstance(t, str):
+            raise TypeError(f"trace3: an object type that is not its id: {t!r}")
+        return t
+
+    def msg_v2(self, m):
+        """A message `send` takes: a HAVE, a WANT or a relation message (V2's msgV2Json)."""
+        kind = type(m).__name__
+        return self.have_msg_v2(m) if kind == "Have" else self.want_v2(m) if kind == "Want" else self.rel_v2(m)
+
+    @staticmethod
+    def verdict_v2(r):
+        if r not in ("ACCEPT", "REJECT", "DEFER"):
+            raise TypeError(f"trace3: not a verdict: {r!r}")
+        return r
+
+    def questions_enc_v2(self, Have):
+        """Under v2, the namespace's questions that protocol-v2.md adds (24 of the 36; the other twelve are the object
+        types' and their parameters', type_enc_v2), each as [arguments, answer]; and valid_have and shuffled in
+        their v2 forms beside protocol.md's (a v2 HAVE; an (index, chunk) pair or a record as a member). `Have` is
+        the node's HAVE class."""
+        t, g_, n, i_ = self.tid, (lambda g: g.hex()), self.nat, self.integer
+        peers = lambda r: [n(q) for q in r]         # noqa: E731
+        fams = lambda r: [i_(x) for x in r]         # noqa: E731
+        nothing, boolean = self.nothing, self.boolean
+        return {
+            "type_of_group": lambda r, g: [[g_(g)], t(r)],
+            "type_of": lambda r, tid: [[self.type_word(tid)], t(r)],
+            "links": lambda r, T: [[t(T)], peers(r)],
+            "link_cover": lambda r, q, T: [[n(q), t(T)], self.cover_v2(r)],
+            "cover_candidates": lambda r, T: [[t(T)], [self.cover_v2(x) for x in r]],
+            "floor_candidates": lambda r, T: [[t(T)], [self.cover_v2(x) for x in r]],
+            "floor_links": lambda r, T, fam: [[t(T), i_(fam)], peers(r)],
+            "high_custody": lambda r, q, T: [[n(q), t(T)], boolean(r)],
+            "families": lambda r, T: [[t(T)], fams(r)],
+            "families_with_duty": lambda r, T: [[t(T)], fams(r)],
+            "wants_family": lambda r, T, fam: [[t(T), i_(fam)], boolean(r)],
+            "duty_for": lambda r, g: [[g_(g)], self.type_word(r)],
+            "route_next": lambda r, T, fam, qs: [[t(T), i_(fam), peers(qs)], peers(r)],
+            "block_of": lambda r, g: [[g_(g)], bytes(r).hex()],
+            "group_of": lambda r, block, h: [[self.block(block), self.hdr_v2(h)], bytes(r).hex()],
+            "node_id": lambda r, p: [[n(p)], bytes(r).hex()],
+            "interest_satisfied": lambda r, g: [[g_(g)], boolean(r)],
+            "merge_waiting": lambda r, p, h: [[n(p), self.have_msg_v2(h)], boolean(r)],
+            "deferred_offers": lambda r, p, h: [[n(p), self.have_msg_v2(h)], self.none_listed(r)],
+            "open_group_source": lambda r, g, d: [[g_(g), self.hdr_v2(d)], nothing(r)],
+            "open_link": lambda r, x, T: [[self.cover_v2(x), t(T)], nothing(r)],
+            "open_sampling_link": lambda r, x, T: [[self.cover_v2(x), t(T)], nothing(r)],
+            "choice": lambda r, xs: [[[self.member_v2(x) for x in xs]], self.member_v2(r)],
+            "send": lambda r, p, m, urgent=False: [[n(p), self.msg_v2(m), self.flag(urgent, "send's urgent")],
+                                                   boolean(r)],
+            # the manifest's CUT: protocol-v2.md's functions the twin does not transcribe, a question at every node
+            "window_release": lambda r, p, g, i: [[n(p), g_(g), n(i)], nothing(r)],
+            # protocol.md's two, in v2's forms where v2 asks them so (protocol.md's form for an IHAVE's entry)
+            "valid_have": lambda r, e: [[self.have_msg_v2(e) if isinstance(e, Have) else self.offer(e)], bool(r)],
+            "shuffled": lambda r, xs: [[[self.member_v2(a) for a in (xs.m if isinstance(xs, MeshQuestion) else xs)]],
+                                       [self.member_v2(a) for a in r]]}
+
+    def swr_v2(self):
+        """sample_without_replacement's encoders under v2 (CALLS' form: arguments, answer): its members by their
+        type (member_v2), records (keep_floor's floor candidates) as well as peers."""
+        return (lambda xs, k: [[self.member_v2(q) for q in xs], self.nat(k)],
+                lambda r: [self.member_v2(q) for q in r])
+
+    @staticmethod
+    def none_listed(r):                 # deferred_offers' answer: the toy's is always empty, the only form agreed
+        if list(r):
+            raise TypeError(f"trace3: deferred_offers answered a list that is not empty: {r!r}")
+        return []
+
+    def type_enc_v2(self, T):
+        """An object type's nine functions as questions, the type first among the arguments."""
+        t, hd, ch, n = self.tid(T), self.hdr_v2, self.chunk, self.nat
+        gis = lambda r: [[g.hex(), n(i)] for g, i in r]     # noqa: E731
+        return {
+            "index_count": lambda r, h: [[t, hd(h)], n(r)],
+            "threshold": lambda r, h: [[t, hd(h)], n(r)],
+            "verify": lambda r, f, h: [[t, ch(f), hd(h)], self.verdict_v2(r)],
+            "decode": lambda r, fr, h: [[t, self.store_group(fr), hd(h)], self.rebuilt(r)],
+            "header_of": lambda r, f: [[t, ch(f)], hd(r)],
+            "project": lambda r, f: [[t, ch(f)], gis(r)],
+            "cross": lambda r, g, i: [[t, g.hex(), n(i)], gis(r)],
+            "family": lambda r, g: [[t, g.hex()], self.integer(r)],
+            "derived_interest": lambda r, g, h, nid, j: [[t, g.hex(), hd(h), bytes(nid).hex(), self.rel_v2(j)],
+                                                         self.integer(r.v)]}
+
+    def param_enc_v2(self, T):
+        """An object type's three parameter functions as questions, the type first among the arguments."""
+        t = self.tid(T)
+        return {"DECODE_AT_K": lambda r, g: [[t, g.hex()], self.boolean(r)],
+                "DECODE_LATER": lambda r, g: [[t, g.hex()], None if r is None else fbits(r)],
+                "REPAIR_TO": lambda r, g: [[t, g.hex()], [self.nat(q) for q in r]]}
+
+    def asked_enc_v2(self):
+        """The eight names the twin asks where a node replaces them (ASKED_V2), in its NodeV2's forms: `forward` with
+        its axes or null, `known_in_scope`'s bitmap as a natural."""
+        n, nothing = self.nat, self.nothing
+        return {
+            "forward": lambda r, f, p, axes=None: [[self.chunk(f), n(p),
+                                                    None if axes is None else [[g.hex(), n(i)] for g, i in axes]],
+                                                   nothing(r)],
+            "push_rebuilt": lambda r, g, new: [[g.hex(), [n(i) for i in new]], nothing(r)],
+            "send_have": lambda r, p, g: [[n(p), g.hex()], nothing(r)],
+            "serve_standing": lambda r, g, i: [[g.hex(), n(i)], nothing(r)],
+            "owed_missing": lambda r, g: [[g.hex()], self.boolean(r)],
+            "repair_verdict": lambda r, g: [[g.hex()], self.repair_word(r)],
+            "note_claim": lambda r, p, g: [[n(p), g.hex()], nothing(r)],
+            "known_in_scope": lambda r, g: [[g.hex()], n(r.v)]}
+
+    @staticmethod
+    def repair_word(r):
+        if r not in ("REPAIRED", "NOT_REPAIRED", "ASKED"):
+            raise TypeError(f"trace3: not a repair verdict: {r!r}")
+        return r
 
     def descriptor(self, d):
         """A descriptor, whole: [version, hash_id, encoding, count, segment_size, total_length, root]."""
@@ -2565,6 +2908,11 @@ class Tracer3(Tracer):
                     return r
             if not st["depth"] or st["ext"]:    # not asked by §6.1's own code
                 return fn(*args, **kw)
+            # under v2, a replaced name the twin cannot ask (NOASK_V2), called by a record's own code: the twin would
+            # run its own function there, where the node ran another
+            if tr.doc_v2 and name in NOASK_V2:
+                raise SystemExit(f"trace3: node {nd.id}: {name} is replaced here, and {st['cur']['fn']}'s record "
+                                 f"calls it: the twin has no question for {name}, and would run its own code there")
             # the tracer's third state: what the rest of the node reads is behind the tape, but its
             # accesses of the own tables are logged apart, as the callee's `cr` and `cw`
             # under v2 an argument of EAGER_V2's is written as it was handed over: encoded here, before the call,
@@ -2906,7 +3254,7 @@ class Tracer3(Tracer):
         replaced, chains = [], None
         if self.doc_v2:
             try:
-                replaced, chains = node_chains(self.traced, ns, self.whole)
+                replaced, chains = node_chains(self.traced, ns, self.whole, replaceable=REPLACEABLE_V2)
             except ChainStop as e:
                 raise SystemExit(f"trace3: node {nd.id}: {e}")
         for name in () if self.doc_v2 else self.traced:
@@ -2999,6 +3347,10 @@ class Tracer3(Tracer):
                         st["depth"] -= 1
                         if name == "defer":
                             st["defers"] -= 1
+                found = {}                          # under v2 every installed slot checked at the record's entry, a
+                if tr.doc_v2:                       #   draw the toy has bound re-wrapped for the record (K13)
+                    found = rewrap_draws(ns, slots, rewrap)
+                    bindings_check(nd.id, ns, slots, found, name, "entry")
                 if not tr.nodes_written:            # the nodes line, before the first record
                     tr.write_nodes()
                 tr.cur_queue = F.unwrap(ns["queue"])    # rarest's peer, by its queue (args_of)
@@ -3010,6 +3362,11 @@ class Tracer3(Tracer):
 
                 def finish(**out):
                     rec.on = False
+                    if tr.doc_v2:                   # and at its exit, with the toy's draws put back where the
+                        for d, cur in found.items():    # re-wrap still holds them
+                            if getattr(ns.get(d), "_trace3_rewrap", False):
+                                ns[d] = cur
+                        bindings_check(nd.id, ns, slots, found, name, "exit")
                     for wname, wobj in window.items():      # a name of the window's rebound to another object
                         if ns[wname] is not wobj:           #   would go on unlogged
                             raise SystemExit(f"trace3: node {nd.id}: {wname} no longer holds the tracer's own object "
@@ -3042,8 +3399,10 @@ class Tracer3(Tracer):
                     st["node"] = int(nd.id)
                 mesh_on()
                 rec.on = True
-                if name == "rarest":            # v2's choose passes the raw queue it took outside a record;
-                    args = (ns["queue"][r_["args"][0]],)    # the view of queue[p] logs its read of the lane
+                if name == "rarest" or (tr.doc_v2 and name in ("choose", "pick")):  # v2's choose passes the raw
+                    #                             queue it took outside a record, and next_to_send passes choose
+                    #                             its own; the view of queue[p] logs the read of the lane
+                    args = (ns["queue"][r_["args"][0]],) + tuple(args[1:])
                 try:
                     r = fn(*args, **kw)
                     if name == "message_id":        # its content_id, a question at every call
@@ -3157,13 +3516,30 @@ class Tracer3(Tracer):
         if set(EAGER_V2) & set(calls):      # a question's raise writes its arguments as they are at exit (iface)
             raise SystemExit(f"trace3: EAGER_V2 and CALLS share {', '.join(sorted(set(EAGER_V2) & set(calls)))}: a "
                              "question's raise writes its arguments as at exit")
+        if tr.doc_v2:       # a draw over records (keep_floor's floor candidates) as well as over peers
+            calls["sample_without_replacement"] = tr.swr_v2()
         for name, (ea, er) in calls.items():
             enc[name] = lambda r, *a, _ea=ea, _er=er: [_ea(*a), _er(r)]
-        # the namespace must agree with the documents' source: no traced function is v2's, and under --doc v2 every
-        # name of the block that v2 defines is v2's here (two derivations of the set, each checking the other)
-        if set(enc) != set(TAPE):
+        if tr.doc_v2:       # protocol-v2.md's questions of the namespace, and protocol.md's two in their v2 forms
+            enc.update(tr.questions_enc_v2(ns["Have"]))
+        # the namespace must agree with the documents' source: no traced function of protocol.md's (a kept one) is
+        # v2's, and under --doc v2 every name of the block and of v2's covered names that v2 defines is v2's here
+        # (two derivations of the set, each checking the other)
+        if tr.doc_v2:       # under v2 the tape's names are TAPE's, the manifest's QUESTIONS and its CUT (a question
+            #                 at every node), but those an adapter writes (TYPE_QUESTIONS_V2 and the params' are the
+            #                 types')
+            want = (set(TAPE) | set(manifest_v2.QUESTIONS) | set(manifest_v2.CUT)) - set(ADAPTED_V2)
+            have = set(enc) | set(TYPE_QUESTIONS_V2) | set(self.TYPE_FUNCTIONS)
+            if have != want:
+                raise SystemExit(f"trace3: the tape's calls are not TAPE's and the manifest's QUESTIONS and CUT: "
+                                 f"{sorted(have ^ want)}")
+        elif set(enc) != set(TAPE):
             raise SystemExit(f"trace3: the tape's calls are not TAPE's: {sorted(set(enc) ^ set(TAPE))}")
-        why = namespace_check(BLOCK, tr.traced, tr.v2_defs, ns, layers=tr.doc_v2)
+        if tr.doc_v2:
+            why = namespace_check(BLOCK + tuple(n for n in manifest_v2.COVERED if n not in BLOCK), tr.kept,
+                                  tr.v2_defs, ns, replaceable=REPLACEABLE_V2, layers=True)
+        else:
+            why = namespace_check(BLOCK, tr.traced, tr.v2_defs, ns)
         if why:
             raise SystemExit(f"trace3: node {nd.id}: {why}")
         if tr.doc_v2:
@@ -3175,13 +3551,60 @@ class Tracer3(Tracer):
                                                       [tr.chunk(f) for f in r]],
                         "push_rebuilt": lambda r, g, new: [[g.hex(), [tr.nat(i) for i in new]], tr.nothing(r)],
                         "validate_chunk": lambda r, f: [[tr.chunk(f)], r]}
-        if set(replaced_enc) != set(REPLACEABLE):
+        if tr.doc_v2:   # under v2: the eight the twin asks, in its forms (asked_enc_v2); on_iwant, a kept name, and the
+            #             directed sets' validate_chunk in protocol.md's; and no form for a name the twin cannot ask
+            #             (iface_of stops a record's own call of one)
+            replaced_enc = ({n: replaced_enc[n] for n in ("on_iwant", "validate_chunk")} | tr.asked_enc_v2()
+                            | {n: None for n in NOASK_V2})
+            if set(replaced_enc) != set(REPLACEABLE_V2):
+                raise SystemExit(f"trace3: the replaceable names' encoders are not REPLACEABLE_V2's: "
+                                 f"{sorted(set(replaced_enc) ^ set(REPLACEABLE_V2))}")
+        elif set(replaced_enc) != set(REPLACEABLE):
             raise SystemExit("trace3: the replaceable names' encoders are not REPLACEABLE's")
         iface = functools.partial(tr.iface_of, nd, st, rec, replaced, calls, mesh_on, mesh_off)
+
+        def rewrap(d, cur):                 # a draw the toy bound during a call: the question it is, while bound
+            w = iface(d, cur, enc[d])
+            w._trace3_rewrap = True
+            return w
+
+        def swap_shim(inner):               # what a swapped draw's layer calls in place of the function it holds:
+            def shim(*a, **k):              #   the draw it has bound re-wrapped around that call (K13)
+                found = rewrap_draws(ns, slots, rewrap)
+                try:
+                    return inner(*a, **k)
+                finally:
+                    for d, cur in found.items():
+                        if getattr(ns.get(d), "_trace3_rewrap", False):
+                            ns[d] = cur
+            return shim
+        if tr.doc_v2:                       # each swapped draw's layer, by its key in LAYERS (the chain rule has
+            for name in tr.traced:          #   passed every layer): its cell that holds the next layer, the shim
+                ls = layers_of(name, ns[name])
+                for f, nxt in zip(ls, ls[1:]):
+                    if LAYERS.get(layer_key(f), (None, None))[1] == SWAPPED_DRAW:
+                        cell = next(c for c in f.__closure__ if c.cell_contents is nxt)
+                        cell.cell_contents = swap_shim(nxt)
         for name in tr.traced:
             ns[name] = iface(name, ns[name], replaced_enc[name]) if name in replaced else sec61(name, ns[name])
         for name, e in enc.items():
             ns[name] = iface(name, ns[name], e)
+        if tr.doc_v2:       # each object type's functions and its parameters' three, questions at this node: the
+            tys = dict(nd._types)               # types are the node's own objects (the toy makes them per node);
+            tys.setdefault(schema_v2.type_id(nd._P), nd._P)     # one already wrapped is shared, and stops
+            for T in tys.values():
+                for obj, encs in ((T, tr.type_enc_v2(T)), (T.params, tr.param_enc_v2(T))):
+                    for a, e in encs.items():
+                        f = getattr(obj, a, None)
+                        if f is None:           # a parameter the type lacks: the twin's read is the toy's
+                            continue            #   AttributeError (types_v2)
+                        if getattr(f, "_trace3_q", False):
+                            raise SystemExit(f"trace3: node {nd.id}: the type {tr.tid(T)}'s {a} is wrapped already: "
+                                             f"a type another node shares")
+                        w = iface(a, f, e)
+                        w._trace3_q = True
+                        setattr(obj, a, w)
+                        tr.type_slots.append((nd, obj, a, w))
         slots = {name: ns[name] for name in tr.traced}          # for final_check: the traced names; under v2,
         if tr.doc_v2:                                           #   where the install is the namespace's last
             slots.update({name: ns[name] for name in enc})      #   binding, every installed slot (the tape

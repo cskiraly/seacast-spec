@@ -45,11 +45,13 @@ KINDS = {tuple(sorted(trace3.BLOCK)): f"the block's {len(trace3.BLOCK)} function
 
 
 def v2_kind(toy):
-    """v2's kept names, sorted, from TOYDIR's documents: the toy's node.py makes their extracted code."""
+    """v2's kept names and its covered ones (the manifest's COVERED), sorted, the kept from TOYDIR's documents: the
+    toy's node.py makes their extracted code."""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node                         # noqa: E402: the pinned toy, from TOYDIR
-    return tuple(sorted(n for n in trace3.v2_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
-                        if n not in trace3.SEC71))      # the window's six are not traced under v2
+    kept = [n for n in trace3.v2_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
+            if n not in trace3.SEC71]   # the window's six are not traced under v2
+    return tuple(sorted(set(kept) | set(manifest_v2.COVERED)))
 
 
 def kind_of(toy, traced, args):
@@ -60,7 +62,7 @@ def kind_of(toy, traced, args):
     if trace3.doc_of(args or []) == "v2":           # the words of the trace's arguments: see trace3.doc_of
         if t is not None and t == tuple(sorted(trace3.SEC61)):
             return f"§6.1's {len(trace3.SEC61)} alone, under --doc v2"
-        return f"v2's kept, {len(t)} functions" if t is not None and t == v2_kind(toy) else None
+        return f"v2's kept and covered, {len(t)} functions" if t is not None and t == v2_kind(toy) else None
     return KINDS.get(t)
 
 
@@ -137,8 +139,8 @@ def check(toy, trace):
         why.append(f"args: a document trace3.py does not write: {doc}")
     traced = h.get("traced")
     if kind_of(toy, traced, args) is None:
-        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept or "
-                   "§6.1's alone, sorted")
+        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept "
+                   "and covered or §6.1's alone, sorted")
     v2 = doc == "v2"
     for name, v in want(v2).items():
         got = h.get(name)
