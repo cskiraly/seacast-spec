@@ -808,16 +808,20 @@ def own_controls(hand_hdr, work):
 def v2_controls(v2trace, work, head):
     """The controls of a cell's trace under --doc v2, each with the outcome written before it first ran:
     - header3.py's on its header (v2_header_controls);
-    - one of its may_ask records, alone, replays; with its read of asked_at as now (an ask in flight) it fails at
-      that record for the reason hand5's may_ask/read-value fails ("tape": the twin arms no retry).
+    - its first record that reaches may_ask with no ask in flight (a read of asked_at as None), alone, replays; with
+      that read as now (an ask in flight) it fails at that record ("tape": may_ask answers no, and the twin stops
+      asking where the Python's tape goes on). Under v2, may_ask runs inside its covered caller's record (on_offer's
+      in hand5), so it has no record of its own.
     A third control, a traced list with a redefined name left in, is trace3.py's own (--self-test-v2)."""
-    hdr, consts, rec = first(v2trace, lambda d: d["fn"] == "may_ask" and d.get("ret") is True and d["reads"][:1] != []
-                             and d["reads"][0][0] == "asked_at" and d["reads"][0][2] is None)
+    def unasked(d):                     # the index of its read of asked_at as None, or None
+        return next((j for j, x in enumerate(d["reads"]) if x[0] == "asked_at" and x[2] is None), None)
+    hdr, consts, rec = first(v2trace, lambda d: "may_ask" in (d.get("reached") or []) and "raises" not in d
+                             and unasked(d) is not None)
     bad = v2_header_controls(v2trace, work)
     now = copy.deepcopy(rec)
-    now["reads"][0][2] = rec["t"]
+    now["reads"][unasked(rec)][2] = rec["t"]
     bad += check("v2", {
-        "a may_ask record of a v2 cell, alone": (alone(hdr, consts, rec), 0, None),
+        f"a {rec['fn']} record of a v2 cell that reaches may_ask, alone": (alone(hdr, consts, rec), 0, None),
         "the same, its read of asked_at as now": (alone(hdr, consts, now), 1, "]: tape"),
     }, work, head, "v2")
     return bad + row_reads_controls(v2trace, work, head)
@@ -2530,11 +2534,12 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
     assert ov["args"][0][4] is None and ov["args"][0][1] == 2 ** 32 and not ov["tape"]
     within = copy.deepcopy(ov)
     within["args"][0][1] = 2 ** 32 - 1                          # the last index a uint32 holds
-    # the third: a v2 cell's record with its node said to have replaced push_rebuilt, which v2's kept leaves out
-    hdr2, nodes2, r2 = first(v2trace, lambda d: d["fn"] == "may_ask" and "raises" not in d)
-    assert "push_rebuilt" not in hdr2["header"]["traced"], "V2's header traces push_rebuilt"
+    # the third: a v2 cell's record with its node said to have replaced acquire_slot, the first by name of §7.1's
+    # window, which v2 does not trace
+    hdr2, nodes2, r2 = first(v2trace, lambda d: "raises" not in d)
+    assert "acquire_slot" not in hdr2["header"]["traced"], "V2's header traces acquire_slot"
     own2 = node_of(nodes2, r2)
-    untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {"push_rebuilt"})}]}
+    untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {"acquire_slot"})}]}
     just = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]]}]}
     return check("a chunk without a descriptor field, an index past a uint32, an untraced name replaced", {
         "design B: a chunk with no descriptor field, accepted, as it is": (alone(hdr, nodes, bb), 0, None),
@@ -2545,8 +2550,8 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
         "message_id of an index beyond a uint32 raises, as it is": (alone(hdr1, nodes1, ov), 0, None),
         "its index written as the last a uint32 holds": (alone(hdr1, nodes1, within), 1, "the Python raises OverflowError"),
         "a v2 cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
-        "that node said to have replaced push_rebuilt, which the header does not trace": (
-            alone(hdr2, untraced, r2), 1, "nodes: has replaced [push_rebuilt], which the header does not list as traced"),
+        "that node said to have replaced acquire_slot, which the header does not trace": (
+            alone(hdr2, untraced, r2), 1, "nodes: has replaced [acquire_slot], which the header does not list as traced"),
     }, work, head, "carried")
 
 
