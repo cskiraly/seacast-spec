@@ -249,8 +249,9 @@ def main (args : List String) : IO UInt32 := do
       | .ok r => pure r
       | .error e =>                     -- a malformed record is a mismatch at itself
         let reason := s!"malformed record: {(e.splitOn ":").head!}"
+        let first := !t.reasons.contains reason     -- its reason's first record: an example whatever the cap
         t := { t with reasons := t.reasons.insert reason (t.reasons.getD reason 0 + 1) }
-        if t.examples.size < 20 then t := { t with examples := t.examples.push s!"malformed record: {e}" }
+        if t.examples.size < 20 || first then t := { t with examples := t.examples.push s!"malformed record: {e}" }
         continue
     restRead := restRead + r.rest.length
     let counted := if r.raises.isSome then r.fn ++ " (raises)" else r.fn
@@ -271,8 +272,11 @@ def main (args : List String) : IO UInt32 := do
     | .error e =>
       -- one line, whatever a printed value holds: the reports are read line by line
       let reason := (s!"{r.fn}: {(e.splitOn ":").take 2 |> String.intercalate ":"}").replace "\n" " "
+      -- an example for the first 20 records, and for each reason's first record whatever the cap, so that no
+      -- reason is counted with none of its records named
+      let first := !t.reasons.contains reason
       t := { t with perFn := t.perFn.insert r.fn (n + 1, ok), reasons := t.reasons.insert reason (t.reasons.getD reason 0 + 1) }
-      if t.examples.size < 20 then
+      if t.examples.size < 20 || first then
         let ex := (s!"node {r.n} at {Float.ofBits r.t} {r.fn}{(Json.arr r.args).compress}: {e}").replace "\n" " "
         t := { t with examples := t.examples.push ex }
   IO.println s!"replay: {t.records} records, {t.ok} ok, {t.records - t.ok} mismatched"
