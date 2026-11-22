@@ -21,7 +21,8 @@ another tree, and the traces are made again. An edit of a document's other prose
 | `trace61.py` | the base class and the encodings of the tracer; the names of §6.1 |
 | `footprint.py` | the recording views that the tracer wraps the toy's tables in |
 | `gen/schema.py` | the tables of the twin, in one schema, from which both the tracer and the generated Lean of the twin come |
-| `gen/gen.py`, `gen/makers.py` | the generated Lean files, held to the schema (`gen.py`); where the built replay makes a `Tables` value (`makers.py`) |
+| `gen/manifest_v2.py` | protocol-v2.md's manifest: the lists by name by which the replay routes a record under protocol-v2.md and reads its header and nodes line |
+| `gen/gen.py`, `gen/makers.py` | the generated Lean files, held to the schema and the manifest (`gen.py`); where the built replay makes a `Tables` value (`makers.py`) |
 | `cells3.py` | the toy's cells (those of its `check.py`), traced and replayed; the header and the nodes line of each |
 | `header3.py` | the check that the first line of a trace is the content line of this tree, and that its header is of a known kind |
 | `directed*.py` | the directed sets: the toy's own functions called on generated states. There are 22 sets. `directed3.py` runs the samples of `directed61.py`, `directed44.py` runs with and without its limits, and `directed7.py` runs three ways |

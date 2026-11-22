@@ -1,18 +1,27 @@
 #!/usr/bin/env python3
-"""The Lean code of the twin's tables, from schema.py: three files of the twin, written whole.
+"""The Lean code of the twin's tables, from schema.py, and protocol-v2.md's manifest, from manifest_v2.py: four files
+of the twin, written whole.
 
     python3 gen.py --check TWINDIR            # each generated file against the twin's; exit code 1 if one differs
-    python3 gen.py --write TWINDIR            # write the three files
+    python3 gen.py --write TWINDIR            # write the four files
     python3 gen.py --control TWINDIR WORKDIR  # the check's controls: each must make the same check fail
 
-The three files, each generated from its first byte to its last and compared byte for byte:
+The four files, each generated from its first byte to its last and compared byte for byte:
 - SpecTwin/State.lean: `State`, `Cell`, `Level`, `Touch`, and `ownTables`, the tables' names as a trace gives them;
 - SpecTwin/Tables.lean: the class `Tables`, `Tables.ofState`, `Tables.lift` and its instance through ReaderT;
 - SpecTwin/ReplayTables.lean: the replay's per-table functions (`cell`, `val`, `level`, `valueAt`, `put`, `drop`,
-  `entries`, `under`, `covers`).
+  `entries`, `under`, `covers`);
+- SpecTwin/V2/Manifest.lean: protocol-v2.md's manifest, the lists by name of manifest_v2.py (`covered`, `kept`,
+  `nodeOwn`, `replaceable`, `replaceableWhole`, `cut`, `own`, `foreign`).
 So nothing in these files is written by hand: not a first line, not a line after a body, not a comment. (A check
 that compares slices of hand-written files, regions or declarations' bodies, misses text that the slices do not
 hold.)
+
+Two more checks hold the manifest. Its own rules (manifest_v2.py's docstring): no list holds a name twice, COVERED
+and KEPT share no name, NODE_OWN's keys are in neither, CUT's names are in no other list, and REPLACEABLE_WHOLE is
+within KEPT. And KEPT by its rule: trace3.py's `v2_kept` over the toy's two documents, less §7.1's window
+(header3.py's `v2_kind`, the toy as layout.py finds it), is KEPT and NODE_OWN's keys, name for name. The tripwire
+below is the first three files' alone: the manifest's names are plain words that other files may declare.
 
 A tripwire beside it, a heuristic and no proof. It looks in the twin's other files for a declaration of one of
 the 16 names in NAMES, which these files declare (a `def drop` in another namespace, say), and says whether it
@@ -72,6 +81,7 @@ always says that it went. For such a table:
 A schema line of another shape is refused (`validate`), not written.
 """
 import copy
+import functools
 import re
 import shutil
 import sys
@@ -80,6 +90,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))    # an isolated Python (-I) puts no directory there itself
 from schema import PARSE, STATE_ORDER, TABLES, VALUES     # noqa: E402
 import schema_v2                                            # noqa: E402
+import manifest_v2                                          # noqa: E402
 
 # protocol-v2.md's tables after protocol.md's, in one State and one Cell (schema_v2.py). The lists are new objects:
 # schema.py's own, which the tracer reads, stay protocol.md's
@@ -89,6 +100,8 @@ PARSE = {**PARSE, **schema_v2.PARSE_V2}
 V2_NAMES = frozenset(t.name for t in schema_v2.TABLES_V2)
 
 WIDTH = 120
+# the manifest as the generator and its checks read it: manifest_v2.py's lists, which a control may change
+MANIFEST = {k: copy.deepcopy(getattr(manifest_v2, k)) for k, _, _ in manifest_v2.LISTS}
 NOT_SOURCES = (".lake", "tools", "record", "__pycache__")    # what is not the twin's sources (as ../layout.py's)
 
 
@@ -877,9 +890,31 @@ def replay_tables_file():
     ])
 
 
+def manifest_file():
+    lines = [
+        "/-! # protocol-v2.md's manifest: what a trace under it holds, by name (generated)",
+        "",
+        "This file is written whole by `tools/gen/gen.py` from `gen/manifest_v2.py`, and `gen.py --check` compares it",
+        "byte for byte. Do not edit it: change the manifest, or the generator.",
+        "",
+        "The lists by which the replay routes a record of a trace under `protocol-v2.md`, and against which it reads the",
+        "trace's header and nodes line. `gen/manifest_v2.py` says what each list holds, and the rules they keep. -/",
+        "",
+        "namespace SpecTwin.V2.Manifest",
+    ]
+    for key, name, doc in manifest_v2.LISTS:
+        v = MANIFEST[key]
+        if isinstance(v, dict):
+            typ, items = "List (String × String)", [f'("{k}", "{x}")' for k, x in v.items()]
+        else:
+            typ, items = "List String", [f'"{x}"' for x in v]
+        lines += ["", f"/-- {doc} -/", f"def {name} : {typ} :=", *wrapped(items, "  ")]
+    return "\n".join(lines + ["", "end SpecTwin.V2.Manifest", ""])
+
+
 FILES = {"SpecTwin/State.lean": state_file, "SpecTwin/Tables.lean": tables_file,
-         "SpecTwin/ReplayTables.lean": replay_tables_file}
-# the names the three files declare, which no other file of the twin may declare (the tripwire). `lift` and
+         "SpecTwin/ReplayTables.lean": replay_tables_file, "SpecTwin/V2/Manifest.lean": manifest_file}
+# the names the first three files declare, which no other file of the twin may declare (the tripwire). `lift` and
 # `instReaderT` are left out: `Node61` has a `lift` of its own, by hand.
 NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "v2Tables", "Tables", "ofState",
          "cell", "val", "level", "valueAt", "put", "drop", "entries", "under", "covers")
@@ -898,17 +933,52 @@ REPLAY_INSTANCE = 'instance : Tables R :=\n  let _ : MonadStateOf State R := {\n
 
 
 def hand_files(twin):
-    """The twin's Lean files that are written by hand: every .lean under it but the three generated ones, what a
+    """The twin's Lean files that are written by hand: every .lean under it but the four generated ones, what a
     build left, and what is not its sources (the tools' own Lean file among them)."""
     twin = Path(twin)
     return sorted(str(f.relative_to(twin)) for f in twin.rglob("*.lean")
                   if not set(f.relative_to(twin).parts) & set(NOT_SOURCES) and str(f.relative_to(twin)) not in FILES)
 
 
+def manifest_rules(m):
+    """What breaks the manifest's own rules, each named: a name twice in a list, a name in both COVERED and KEPT, a
+    key of NODE_OWN in either, a name of CUT in another list, a name of REPLACEABLE_WHOLE not in KEPT."""
+    out = []
+    for key, _, _ in manifest_v2.LISTS:
+        names = list(m[key])
+        out += [f"the manifest: {n} twice in {key}" for n in sorted({x for x in names if names.count(x) > 1})]
+    out += [f"the manifest: {n} in both COVERED and KEPT" for n in sorted(set(m["COVERED"]) & set(m["KEPT"]))]
+    out += [f"the manifest: {n}, a key of NODE_OWN, in {key}" for n in sorted(m["NODE_OWN"])
+            for key in ("COVERED", "KEPT") if n in m[key]]
+    out += [f"the manifest: {n}, in CUT, in {key} too" for n in m["CUT"]
+            for key, _, _ in manifest_v2.LISTS if key != "CUT" and n in m[key]]
+    out += [f"the manifest: {n} in REPLACEABLE_WHOLE, not in KEPT" for n in m["REPLACEABLE_WHOLE"] if n not in m["KEPT"]]
+    return out
+
+
+@functools.lru_cache(maxsize=None)
+def v2_kept_rule():
+    """trace3.py's v2_kept over the toy's two documents, less §7.1's window: header3.py's v2_kind, over the toy that
+    layout.py finds (SPEC_TOY, or the repository's toy/). Computed once."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+    import header3                      # noqa: E402: tools/, beside gen/
+    import layout                       # noqa: E402
+    return frozenset(header3.v2_kind(layout.toy()))
+
+
+def manifest_kept(m):
+    """KEPT and NODE_OWN's keys against v2_kept's rule, name for name: each name in one and not the other."""
+    rule, have = v2_kept_rule(), set(m["KEPT"]) | set(m["NODE_OWN"])
+    return ([f"the manifest: {n} in v2_kept, not in the manifest" for n in sorted(rule - have)]
+            + [f"the manifest: {n} in the manifest, not in v2_kept" for n in sorted(have - rule)])
+
+
 def compare(twin):
     """The check itself, which --check prints and every control runs: per generated file (its path, the lines the
     twin's has or None if it is not there, the lines generated, whether the two are the same bytes, the first line
-    that differs), and the tripwire's finds (a hand-written file, a name the generated files declare)."""
+    that differs), the tripwire's finds (a hand-written file, a name the generated files declare), the instances of
+    Tables by hand that are not the replay's fixed one, and what breaks the manifest's own rules and its rule for
+    KEPT."""
     validate()
     out = []
     for f, make in FILES.items():
@@ -947,17 +1017,18 @@ def compare(twin):
     text = replay.read_text() if replay.is_file() else ""
     if len(allowed) != 1 or text.count(unit) != 1 or text.index(unit) != allowed[0][2]:
         insts.append("SpecTwin/Replay.lean: its instance of Tables is not the fixed text")
-    return out, trips, insts
+    return out, trips, insts, manifest_rules(MANIFEST), manifest_kept(MANIFEST)
 
 
 def differing(twin):
     """What the check finds wrong: the generated files that are not the schema's, and the tripwire's finds."""
-    files, trips, insts = compare(twin)
-    return [f for f, _, _, same, _ in files if not same] + [f"{f} declares {name}" for f, name in trips] + insts
+    files, trips, insts, rules, kept = compare(twin)
+    return ([f for f, _, _, same, _ in files if not same] + [f"{f} declares {name}" for f, name in trips] + insts
+            + rules + kept)
 
 
 def check(twin):
-    files, trips, insts = compare(twin)
+    files, trips, insts, rules, kept = compare(twin)
     bad = 0
     for f, n, m, same, diff in files:
         print(f"{f}: {n if n is not None else 'no'} lines in the twin, {m} generated: "
@@ -978,6 +1049,14 @@ def check(twin):
     if not insts:
         print(f"the instances of Tables written by hand: one, Replay.lean's, its text as fixed "
               f"({REPLAY_INSTANCE.count(chr(10))} lines)")
+    for i in rules + kept:
+        bad += 1
+        print(f"{i}  <-- FAIL")
+    if not rules:
+        print("the manifest's own rules hold: no name twice in a list, COVERED and KEPT apart, NODE_OWN's keys in "
+              "neither, CUT in no other list, REPLACEABLE_WHOLE within KEPT")
+    if not kept:
+        print(f"the manifest's KEPT and NODE_OWN are v2_kept's rule over the toy's documents: {len(v2_kept_rule())} names")
     total = sum(m for _, _, m, _, _ in files)
     print(f"{len(files)} of {len(files)} generated files are the schema's, whole, {total} lines; {len(TABLES)} tables"
           if not bad else f"{bad} files or names are NOT the schema's")
@@ -1018,7 +1097,7 @@ def controls(twin, work):
         print(f"control, the schema with {what}: the check finds {', '.join(d) or 'nothing'}"
               f"{'' if good else '  <-- must find ' + ', '.join(must)}")
 
-    S, T, R = FILES
+    S, T, R, MF = FILES
     def rename_read(ts):
         ts[0].read = (ts[0].read[0].rstrip("?") + "X", ts[0].read[1])
 
@@ -1166,6 +1245,37 @@ def controls(twin, work):
     files("(a limit) drop declared by hand as an axiom, in a namespace of its own",
           append("SpecTwin/Replay.lean", "\nnamespace SpecTwin.Replay.Mine\naxiom drop : Nat\nend SpecTwin.Replay.Mine\n"),
           [])
+    # the manifest: its rule for KEPT, its file, and its own rules, one control each
+    def manifest(what, change, must):
+        nonlocal ok
+        global MANIFEST
+        mine = MANIFEST
+        MANIFEST = copy.deepcopy(mine)
+        try:
+            change(MANIFEST)
+            got = differing(twin)
+        finally:
+            MANIFEST = mine
+        good = got == must
+        ok &= good
+        print(f"control, the manifest with {what}: the check finds {', '.join(got) or 'nothing'}"
+              f"{'' if good else '  <-- must find ' + ', '.join(must)}")
+
+    manifest("respond taken out of KEPT", lambda m: m["KEPT"].remove("respond"),
+             [MF, "the manifest: respond in v2_kept, not in the manifest"])
+    manifest("on_frame, a name protocol-v2.md defines, added to KEPT", lambda m: m["KEPT"].append("on_frame"),
+             [MF, "the manifest: on_frame in the manifest, not in v2_kept"])
+    files("one name of Manifest.lean changed", change(MF, '"respond"', '"respond2"'), [MF])
+    manifest("announce twice in COVERED", lambda m: m["COVERED"].append("announce"),
+             [MF, "the manifest: announce twice in COVERED"])
+    manifest("announce in KEPT too", lambda m: m["KEPT"].append("announce"),
+             [MF, "the manifest: announce in both COVERED and KEPT", "the manifest: announce in the manifest, not in v2_kept"])
+    manifest("held, a key of NODE_OWN, in COVERED too", lambda m: m["COVERED"].append("held"),
+             [MF, "the manifest: held, a key of NODE_OWN, in COVERED"])
+    manifest("window_release, which is cut, in REPLACEABLE", lambda m: m["REPLACEABLE"].append("window_release"),
+             [MF, "the manifest: window_release, in CUT, in REPLACEABLE too"])
+    manifest("forward in REPLACEABLE_WHOLE", lambda m: m["REPLACEABLE_WHOLE"].append("forward"),
+             [MF, "the manifest: forward in REPLACEABLE_WHOLE, not in KEPT"])
     for bad in (["--chek", str(twin)], [], ["--check"], ["--check", str(twin), "x"], ["--control", str(twin)]):
         rc = main(bad, quiet=True)
         ok &= rc == 2
