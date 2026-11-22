@@ -423,13 +423,12 @@ def own_code(name, fn):
     return "replaced", where
 
 
-def innermost(name, fn):
-    """The function a name's layers lead to: from fn, the closure cell holding a function of the same name, until
-    none does. A layer holds the next as a closure cell (node.py's `doc_on_frame`). Raises ValueError where a layer
-    holds two such functions (no layer is guessed) or the chain loops."""
-    seen = set()
-    while id(fn) not in seen:
-        seen.add(id(fn))
+def layers_of(name, fn):
+    """A name's layers, outermost first: from fn, the closure cell holding a function of the same name, until none
+    does. A layer holds the next as a closure cell (node.py's `doc_on_frame`). Raises ValueError where a layer holds
+    two such functions (no layer is guessed) or the chain loops."""
+    out, seen = [fn], {id(fn)}
+    while True:
         nxt = []
         for cell in getattr(fn, "__closure__", None) or ():
             try:
@@ -439,11 +438,56 @@ def innermost(name, fn):
             if inner is not fn and getattr(getattr(inner, "__code__", None), "co_name", None) == name:
                 nxt.append(inner)
         if not nxt:
-            return fn
+            return out
         if len(nxt) > 1:
             raise ValueError(f"a layer of {name} holds {len(nxt)} functions of that name")
         fn = nxt[0]
-    raise ValueError(f"the layers of {name} loop")
+        if id(fn) in seen:
+            raise ValueError(f"the layers of {name} loop")
+        seen.add(id(fn))
+        out.append(fn)
+
+
+def innermost(name, fn):
+    """The function a name's layers lead to (`layers_of`), with its ValueErrors."""
+    return layers_of(name, fn)[-1]
+
+
+# INTERIM: step 2's `chains` writer, which step 3's R3 (the chain rule) replaces. It writes the replaced names'
+# chains alone; an observer (a listed wrapper) and the document's bare function have no key, and the replaced set
+# is own_code's, as at step 1. The reader's three checks pass with observers' chains empty, and until R3 nothing
+# checks an observer's chain.
+def chain_of(name, fn):
+    """A name's chain at a node: its layers (`layers_of`), outermost first, each by its qualified name, and `doc` in
+    place of a document's function of that name (protocol.md's or protocol-v2.md's) where the walk ends at one.
+    Raises layers_of's ValueErrors."""
+    ls = layers_of(name, fn)
+    code = getattr(ls[-1], "__code__", None)
+    doc = code is not None and code.co_filename in (DOC_FILE, V2_FILE) and code.co_name == name
+    qual = [getattr(f, "__qualname__", None) or type(f).__name__ for f in ls]
+    return qual[:-1] + ["doc"] if doc else qual
+
+
+def node_chains(replaced, ns):
+    """INTERIM (R3 replaces it): a v2 nodes entry's `chains`, the replaced names' alone."""
+    return {name: chain_of(name, ns.get(name)) for name in sorted(replaced)}
+
+
+def group_nodes(nodes):
+    """The nodes line's entries: one per distinct (constants, replaced names, types, chains), in the order of its
+    first node, with the nodes that have it. `types` and `chains` are members only where given (under v2)."""
+    entries = []
+    for nid, consts, replaced, types, chains in nodes:
+        for e in entries:
+            if (e["consts"] == consts and e["replaced"] == replaced and e.get("types") == types
+                    and e.get("chains") == chains):
+                e["n"].append(nid)
+                break
+        else:
+            entries.append({"n": [nid], "consts": consts, "replaced": replaced}
+                           | ({} if types is None else {"types": types})
+                           | ({} if chains is None else {"chains": chains}))
+    return entries
 
 
 def namespace_check(names, traced, v2_defs, ns, replaceable=None, layers=False):
@@ -961,8 +1005,86 @@ def manifest_self_test():
     return bad
 
 
+def chains_self_test():
+    """The interim `chains` writer (node_chains; step 3's R3 replaces it) on stub functions, and the nodes line's
+    grouping by it. The controls: a writer that walks but leaves out every replaced name's chain must fail exactly
+    the three chain cases and the grouping case; a writer that never writes `doc` must fail exactly the two cases
+    whose chain ends in it."""
+    g = {}
+    exec(compile("def on_iwant(p, iw):\n    return []\n\ndef message_id(f):\n    return b''\n", V2_FILE, "exec"), g)
+    doc, doc_mid = g["on_iwant"], g["message_id"]
+    own = lambda p, iw: []      # noqa: E731: a withholder's, holding nothing
+
+    def make_layer(inner):
+        def on_iwant(p, iw):
+            return inner(p, iw)
+        return on_iwant
+    layer = make_layer(doc)
+    outer = make_layer(make_layer(doc))
+    inner_q = outer.__closure__[0].cell_contents.__qualname__
+
+    def make_two(a, b):
+        def on_iwant(p, iw):
+            return a(p, iw) + b(p, iw)
+        return on_iwant
+
+    def make_wrapper(spec):
+        def message_id(f):
+            return spec(f)
+        return message_id
+    two = make_two(doc, layer)
+    c = {"R": 2}
+
+    def grouped(writer):
+        nodes = [(1, c, ["on_iwant"], {}, writer(["on_iwant"], {"on_iwant": own})),
+                 (2, c, ["on_iwant"], {}, writer(["on_iwant"], {"on_iwant": layer}))]
+        return [e["n"] for e in group_nodes(nodes)]
+
+    def run(writer, f):
+        try:
+            return f(writer)
+        except ValueError as e:
+            return f"ValueError: {e}"
+    cases = [
+        ("a replaced name bound to a function holding none of its name",
+         lambda w: w(["on_iwant"], {"on_iwant": own}), {"on_iwant": [own.__qualname__]}),
+        ("a replaced name whose layer holds the document's function",
+         lambda w: w(["on_iwant"], {"on_iwant": layer}), {"on_iwant": [layer.__qualname__, "doc"]}),
+        ("two layers over the document's function",
+         lambda w: w(["on_iwant"], {"on_iwant": outer}), {"on_iwant": [outer.__qualname__, inner_q, "doc"]}),
+        ("nothing replaced", lambda w: w([], {"on_iwant": doc}), {}),
+        ("nothing replaced, a listed wrapper bound (the stated limit: no observer's chain)",
+         lambda w: w([], {"message_id": make_wrapper(doc_mid)}), {}),
+        ("a layer holding two functions of its name",
+         lambda w: w(["on_iwant"], {"on_iwant": two}), "ValueError: a layer of on_iwant holds 2 functions of that name"),
+        ("two nodes alike but in their chains: two entries", grouped, [[1], [2]]),
+    ]
+    bad = 0
+    for what, f, want in cases:
+        got = run(node_chains, f)
+        ok = got == want
+        bad += not ok
+        print(f"chains self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+
+    def omits(replaced, ns):    # walks as node_chains does, and writes no replaced name's chain
+        node_chains(replaced, ns)
+        return {}
+
+    def no_doc(replaced, ns):   # the document's function by its qualified name, never `doc`
+        return {n: [getattr(f, "__qualname__", None) or type(f).__name__ for f in layers_of(n, ns.get(n))]
+                for n in sorted(replaced)}
+    for name, writer, must in (("leaves out every replaced name's chain", omits, [0, 1, 2, 6]),
+                               ("never writes doc", no_doc, [1, 2])):
+        fails = [k for k, (what, f, want) in enumerate(cases) if run(writer, f) != want]
+        ok = fails == must
+        bad += not ok
+        print(f"chains self-test, the control (a writer that {name}): cases {fails} fail, "
+              f"{'as they must' if ok else f'must be {must}  <-- FAIL'}")
+    return bad
+
+
 def self_test_v2():
-    bad = v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test()
+    bad = v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -985,7 +1107,8 @@ class Tracer3(Tracer):
         self.out_path = str(out)
         self.out.write(self.content_line)
         self.counts = Counter()
-        self.nodes = []                 # (node, its constants, its replaced names), as each is installed (the nodes line)
+        self.nodes = []                 # (node, its constants, its replaced names, its types, its chains), as each is
+        #                                 installed (the nodes line; types and chains None under protocol.md)
         self.nodes_written = False
         self.bound = []                 # (node, namespace, {traced name: the tracer's wrapper of it there}), for the
         #                                   names' second check (final_check)
@@ -1059,20 +1182,11 @@ class Tracer3(Tracer):
 
     def write_nodes(self):
         """The nodes line: every node the tracer was installed at, by what the replay needs of it: its
-        constants, and the traced names its namespace has replaced (a question there).
-        One entry per distinct pair, in the order of its first node, with the nodes that have it. Written once,
-        before the first record; a trace with no record has it before its trailer."""
+        constants, and the traced names its namespace has replaced (a question there); under v2 its types and
+        chains too. One entry per distinct tuple (`group_nodes`), in the order of its first node, with the nodes that
+        have it. Written once, before the first record; a trace with no record has it before its trailer."""
         self.final_check()
-        entries = []
-        for nid, consts, replaced, types in self.nodes:
-            for e in entries:
-                if e["consts"] == consts and e["replaced"] == replaced and e.get("types") == types:
-                    e["n"].append(nid)
-                    break
-            else:
-                entries.append({"n": [nid], "consts": consts, "replaced": replaced}
-                               | ({} if types is None else {"types": types}))
-        self.write({"nodes": entries})
+        self.write({"nodes": group_nodes(self.nodes)})
         self.nodes_written = True
 
     def close(self):
@@ -2035,7 +2149,13 @@ class Tracer3(Tracer):
         if self.nodes_written:
             raise SystemExit(f"trace3: node {nd.id} is installed after the trace's first record: its line cannot be "
                              f"written before its records")
-        self.nodes.append((int(nd.id), consts, sorted(replaced), types))
+        chains = None
+        if self.doc_v2:     # INTERIM: the replaced names' chains alone (node_chains); step 3's R3 replaces it
+            try:
+                chains = node_chains(replaced, ns)
+            except ValueError as e:
+                raise SystemExit(f"trace3: node {nd.id}: {e}")
+        self.nodes.append((int(nd.id), consts, sorted(replaced), types, chains))
         self.WAIT = ns["WAIT"]                                               # next_to_send's "in line" (§7.2)
         if self.doc_message_id is None:     # the document's function, from the toy's wrapper's closure (own_code
             mid_fn = ns["message_id"]       #   found it there, or found the name to be the document's own)

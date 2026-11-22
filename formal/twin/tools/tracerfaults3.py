@@ -501,6 +501,21 @@ def close_keyerror_v2():
     T.Tracer3.close = close
 
 
+def chains_omit_v2():
+    """Under v2, a plant for the replay: the nodes line's chains walked as trace3.py's interim writer walks them, and
+    written without any replaced name's chain. The trace is written to the end; the twin's reader must refuse it
+    ("nodes: chains: a replaced name with no chain")."""
+    _nc = T.node_chains
+
+    @functools.wraps(_nc)
+    def node_chains(replaced, ns):
+        _nc(replaced, ns)
+        PLANTED[0] += len(replaced)
+        return {}
+
+    T.node_chains = node_chains
+
+
 def hdr_read_v2(raw):
     """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
     g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
@@ -858,8 +873,8 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
-          "--hdr-read-v2-raw")
-HAND5 = ["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
+          "--hdr-read-v2-raw", "--chains-omit-v2")
+HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
 
@@ -906,9 +921,12 @@ def main(argv):
             close_keyerror_v2()
         elif fault.startswith("--hdr-read-v2"):
             hdr_read_v2(raw=fault.endswith("-raw"))
+        elif fault == "--chains-omit-v2":
+            chains_omit_v2()
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
-        args = HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault == "--bare-replaced-v2" else HAND5
+        args = (HAND5_OWN if fault.startswith("--suppressed-entry-v2") or fault in ("--bare-replaced-v2", "--chains-omit-v2")
+                else HAND5)
         try:                            # the arguments as check.sh's v2/hand5 and v2/hand5-own have them
             T.main([rest[0], rest[1], *args, "--doc", "v2", "--digest"])
         finally:
