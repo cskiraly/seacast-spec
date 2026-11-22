@@ -504,6 +504,7 @@ NOASK_V2 = tuple(n for n in manifest_v2.REPLACEABLE if n not in ASKED_V2 and n n
 # cost measure alone, writes none, and shows in no trace
 ORDER_PLACES_V2 = ("fill", "serve_standing", "check_completion", "known_in_scope", "known_across", "reconsider",
                    "origin_written", "offer_at_publish", "origin_acked")
+JOIN_FIELDS_V2 = frozenset(("object_type", "interest", "custody_count", "duty", "colours"))     # protocol-v2.md's Join
 # Under v2, the questions an object type answers (its functions, wrapped per node on the type: type_enc_v2; its
 # parameters' three are Tracer3.TYPE_FUNCTIONS, param_enc_v2), and the manifest's questions whose rows an adapter
 # writes (the gossip history's, the mesh's, `interest`'s miss)
@@ -2735,8 +2736,12 @@ class Tracer3(Tracer):
 
     def rel_v2(self, m):
         """A relation message: ["join", T, interest, custody_count, duty, colours], ["graft", T, family, colour,
-        direction, answer] or ["prune", T, family, colour, direction]."""
+        direction, answer] or ["prune", T, family, colour, direction]. A plain Container of exactly a JOIN's fields
+        is a JOIN: the toy's custody and row settings store each peer's JOIN in `join_recv` so (node.py's
+        set_column_relations)."""
         kind = type(m).__name__
+        if kind == "Container" and frozenset(vars(m)) == JOIN_FIELDS_V2:
+            kind = "Join"
         if kind == "Join":
             return ["join", self.type_word(m.object_type), m.interest, self.nat(m.custody_count), m.duty,
                     self.nat(m.colours)]
