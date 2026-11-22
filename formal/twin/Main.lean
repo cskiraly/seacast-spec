@@ -1,10 +1,14 @@
 import SpecTwin.Replay
 import SpecTwin.Strict
 import SpecTwin.Header
+import SpecTwin.V2.FormsRows
 
 /-! `replay [--only fn=NAME|table=NAME] [--content FILE] [TRACE]`: replay a trace of `trace3.py` (JSON lines; stdin
 when no file is named, so that a gzipped trace goes through `zcat`) through the twin, and print what matched,
 what did not, and how often each branch of the twin ran.
+
+`replay --forms FILE`: the rows of v2's questions in FILE, each read and refused by the twin's readers, and the
+checker's controls (`V2/FormsRows.lean`).
 
 A trace's first line is its content line: what it was made from, each document by the sha256 of its code and each
 file of the toy and the tools by the sha256 of its bytes (`tools/content.py`). `--content FILE` gives the line the
@@ -67,6 +71,10 @@ structure Tally where
 def sorted (m : Std.HashMap String Nat) : List (String × Nat) := sortBy (·.1 < ·.1) m.toList
 
 def main (args : List String) : IO UInt32 := do
+  -- `--forms FILE`: the rows of v2's questions, read and refused, and the checker's controls; no trace is read
+  if let "--forms" :: rest := args then
+    let [f] := rest | throw (IO.userError "usage: replay --forms FILE")
+    return ← SpecTwin.V2.FormsRows.formsMain f
   -- `--only fn=NAME` or `--only table=NAME`: a mutant's replay. Only the records whose line says, at its end,
   -- that the call reached that function, or touched that table, are read (and, for a replaceable name, the
   -- records that ask it on the tape: `asks` below); the others are counted and skipped
