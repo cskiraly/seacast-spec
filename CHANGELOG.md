@@ -32,6 +32,9 @@ and the README is rewritten. Text only; no rule changes since v0.10.12.
 - `README.md`: rewritten: what SEACAST is, why, what to read, where it stands, running it and
   background, with the two protocols' names and files; release numbers are the repository's, not
   either protocol's; the announcement post cited by its current title.
+- `formal/twin/record/`: this release carries v0.10.12's record. `RECORD.md` now says that this
+  release's `toy/` and `formal/twin/` are those of `f72cb4d`, apart from the record and the files
+  whose names end in `.md`. `FILES.sha256` holds `RECORD.md`'s new hash.
 
 ## v0.10.12 — 2026-11-22
 
