@@ -895,6 +895,9 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     # piece D's stops: v2/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
     hand5-v2) echo "$HAND5 --doc v2" ;;
     hand5-off) echo "$HAND5 --doc v2 --source-offers off" ;;
+    # piece E's carried 7: a custody cell whose churn makes keep_floor open a link, at node a, inside whose question
+    # node c's on_open sends a JOIN and a relation
+    custody-floor-churn1) echo "--nodes 30 --degree 8 --msgs 1 --setting custody --blobs 4 --seed 7 --doc v2 --upkeep on --keep-floor on --churn 1" ;;
   esac
 }
 chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.py's), one a line
@@ -1322,6 +1325,93 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   [ "$okr" = 1 ] || s7="with both checks removed, not as it must be"
   echo "  the stops: $s5; $s6; $s7"
 }
+carried() {             # piece E: R7's tracer-wide depth on a real cell (carried 7) and its plant (r); a replaced name
+  #                       entered outside every record on a real cell (carried 9) and its plants (s) and (t); local
+  local c= why s= e1= e2= e3= ok3=0 n3=
+  local ls='s/^tracerfaults3: suppressed-filter-v2, planted 2 times; node s: ([0-9]+); entry 1: returned; supp after the return: 0; bare s held: 2; entry 2: raised; supp after the raise: 0$/\1/p'
+  local lt='s/^tracerfaults3: suppressed-filter-v2-off, planted 2 times; records inside: 2; node s: ([0-9]+); entry 1: returned; supp after the return: 0; bare s held: 0; entry 2: raised; supp after the raise: 0$/\1/p'
+  local st t
+  mkdir -p "$OUT/chains"; : > "$OUT/c-carried.txt"
+  # shellcheck disable=SC2046
+  par small custody-floor-churn1 chains "" $(chain_args custody-floor-churn1)
+  par chain_plant r per-node-depth-v2 custody-floor-churn1
+  par chain_plant s suppressed-filter-v2 hand5-peer
+  par chain_plant t suppressed-filter-v2-off hand5-peer
+  par_end || true       # each run's status is read below
+  # E1: node a's keep_floor opens a link inside its question, where node c's on_open runs: no record there, its
+  # send_join and send_relation counted bare at node c, once each, and nothing else; the digest both ways, the replay
+  # clean. (E1's "c's join_sent read by c's next record" has no fixture in this cell: carried.)
+  c=$(sed -n -E 's/^\{"([0-9]+) send_join": 1, "([0-9]+) send_relation": 1\}$/\1 \2/p' "$OUT/chains/custody-floor-churn1.jsonl.gz.bare.json" 2> /dev/null)
+  if ! has -E ': the same$' "$OUT/chains/custody-floor-churn1.digest" 2> /dev/null; then
+    echo "E1 carried 7, on custody-floor-churn1: not traced, or its digest not the untraced run's  <-- NOT" >> "$OUT/c-carried.txt"; c=
+  elif [ -z "$c" ] || [ "${c% *}" != "${c#* }" ]; then
+    echo "E1 carried 7, on custody-floor-churn1: its bare counts are not one node's send_join 1 and send_relation 1: $(cat "$OUT/chains/custody-floor-churn1.jsonl.gz.bare.json" 2> /dev/null)  <-- NOT" >> "$OUT/c-carried.txt"; c=
+  elif ! why=$(replay_clean chains/custody-floor-churn1); then
+    echo "E1 carried 7, on custody-floor-churn1: its replay: $why  <-- NOT" >> "$OUT/c-carried.txt"; c=
+  else
+    c=${c% *}
+    echo "E1 carried 7, on custody-floor-churn1: as it must: the digest both ways, $(grep -m 1 '^replay: ' "$OUT/chains/custody-floor-churn1.replay"); bare calls at node $c alone, send_join 1 and send_relation 1" >> "$OUT/c-carried.txt"
+    e1="node $c's send_join and send_relation inside another node's question counted bare, once each, the trace replayed clean"
+  fi
+  # (r): a depth state per install (the planted fault): node c's send_join becomes a record of its own inside the
+  # question, the bare counts empty, the body E1's with exactly that record inserted. The replay accepts it (each
+  # record checked on the Python's reads): R7 is the tracer's rule, read here by the body and the counts (the limit)
+  if [ -z "$c" ]; then
+    echo "(r) per-node depth, on custody-floor-churn1: not read, for E1 is not as it must be  <-- NOT" >> "$OUT/c-carried.txt"
+  elif [ "$(cat "$OUT/chains/plant-r.rc" 2> /dev/null)" != 0 ] || ! has -x "tracerfaults3: per-node-depth-v2, planted 30 times" "$OUT/chains/plant-r.err"; then
+    echo "(r) per-node depth, on custody-floor-churn1: not planted at each of the 30 installs, or the run did not end with 0  <-- NOT" >> "$OUT/c-carried.txt"
+  elif [ "$(cat "$OUT/chains/plant-r.jsonl.gz.bare.json" 2> /dev/null)" != "{}" ]; then
+    echo "(r) per-node depth, on custody-floor-churn1: its .bare.json is not {}  <-- NOT" >> "$OUT/c-carried.txt"
+  elif ! why=$(extra_records "$OUT/chains/custody-floor-churn1.jsonl.gz" "$OUT/chains/plant-r.jsonl.gz" "$c" send_join 1); then
+    echo "(r) per-node depth, on custody-floor-churn1: the body not E1's and 1 record of send_join at node $c: $why  <-- NOT" >> "$OUT/c-carried.txt"
+  elif ! why=$(replay_clean chains/plant-r); then
+    echo "(r) per-node depth, on custody-floor-churn1: its replay: $why (the stated limit no longer holds)  <-- NOT" >> "$OUT/c-carried.txt"
+  else
+    echo "(r) per-node depth, on custody-floor-churn1: as it must: .bare.json {}; the body E1's and 1 record of send_join at node $c, its trailer counting it; $(grep -m 1 '^replay: ' "$OUT/chains/plant-r.replay")" >> "$OUT/c-carried.txt"
+    e2="per-node depth (r): that send_join a record, the counts empty, the body E1's with it alone inserted"
+  fi
+  # E3: hand5-peer (chain_cases' trace), each node's filter_entry replaced and entered outside every record: node 2's
+  # held inside it counted bare, once. (s): node s's replaced filter_entry entered from Node._write, calling node s's
+  # held, returning and then raising: no record inside, the two counted, the state restored on both, the body
+  # hand5-peer's. (t): the suppression cleared for that call (the planted fault): two records of held at node s. Each
+  # plant's nodes line is hand5-peer's but for its layer, first in the chain of filter_entry (one entry, every node)
+  st='["suppressed_filter_v2.<locals>.install.<locals>.filter_entry", "Node._peer_promise.<locals>.filter_entry", "doc"]'
+  if ! $PY -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("2 held") == 1 else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" 2> /dev/null; then
+    echo "E3 carried 9, on hand5-peer: its bare counts lack \"2 held\": 1  <-- NOT" >> "$OUT/c-carried.txt"
+  else echo "E3 carried 9, on hand5-peer: as it must: \"2 held\": 1 among its bare counts, the trace written to its end" >> "$OUT/c-carried.txt"; ok3=1; fi
+  for t in s t; do
+    s=$(sed -n -E "$([ "$t" = s ] && echo "$ls" || echo "$lt")" "$OUT/chains/plant-$t.err" 2> /dev/null)
+    if [ -z "$s" ] || [ "$(cat "$OUT/chains/plant-$t.rc" 2> /dev/null)" != 0 ]; then
+      echo "($t) on hand5-peer: its line is not as written, or the run did not end with 0  <-- NOT" >> "$OUT/c-carried.txt"; continue
+    fi
+    # the plant's bare counts: hand5-peer's, with (s)'s two calls of held at node s, (t)'s none
+    if ! $PY -c 'import json, sys
+a, b = json.load(open(sys.argv[1])), json.load(open(sys.argv[2]))
+k, more = sys.argv[3] + " held", int(sys.argv[4])
+if more:
+    a[k] = a.get(k, 0) + more
+sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/chains/plant-$t.jsonl.gz.bare.json" "$s" "$([ "$t" = s ] && echo 2 || echo 0)" 2> /dev/null; then
+      echo "($t) on hand5-peer: its bare counts are not hand5-peer's with $([ "$t" = s ] && echo "2 more" || echo "no more") held at node $s  <-- NOT" >> "$OUT/c-carried.txt"; continue
+    fi
+    # k 0 names N, as the step-1 plants do: with k 0, extra_records counts the named function in the trailer, at 0
+    if [ "$t" = s ]; then why=$(extra_records "$OUT/chains/hand5-peer.jsonl.gz" "$OUT/chains/plant-s.jsonl.gz" "$s" N 0 "$s" filter_entry "$st")
+    else why=$(extra_records "$OUT/chains/hand5-peer.jsonl.gz" "$OUT/chains/plant-t.jsonl.gz" "$s" held 2 "$s" filter_entry "$st"); fi
+    if [ "$why" != ok ]; then
+      echo "($t) on hand5-peer: the body not hand5-peer's$([ "$t" = t ] && echo " and 2 records of held at node $s"): $why  <-- NOT" >> "$OUT/c-carried.txt"
+    elif ! why=$(replay_clean "chains/plant-$t"); then
+      echo "($t) on hand5-peer: its replay: $why  <-- NOT" >> "$OUT/c-carried.txt"
+    else
+      echo "($t) on hand5-peer: as it must: $(grep -m 1 -E '^tracerfaults3: ' "$OUT/chains/plant-$t.err" | cut -c16-200); $(grep -m 1 '^replay: ' "$OUT/chains/plant-$t.replay")" >> "$OUT/c-carried.txt"
+      ok3=$((ok3 + 1)); n3=$s
+    fi
+  done
+  if grep -q '<-- NOT' "$OUT/c-carried.txt"; then no "the carried cases (c-carried.txt)"; fi
+  [ -n "$e1" ] || e1="carried 7 not as it must be"
+  if [ -n "$e2" ]; then e2="$e2, the replay accepting it (the stated limit: R7 is the tracer's rule)"; else e2="(r) not as it must be"; fi
+  if [ "$ok3" = 3 ]; then e3="node 2's held inside hand5-peer's replaced filter_entry counted bare; (s) at node $n3, the state restored on return and on raise; (t), the suppression cleared, two records of held inside"
+  else e3="carried 9, (s) or (t) not as it must be"; fi
+  echo "  the carried cases: $e1; $e2; $e3"
+}
 s_tracercontrols() {
   local f want bad
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
@@ -1603,6 +1693,10 @@ EOF_ERC
   # --source-offers off: at the entry (D3), at the exit with the entry check removed (q), and with both removed, the
   # trace written to its end, a stated limit (c-stops.txt)
   stops
+  # the carried cases (piece E): R7's tracer-wide depth on custody-floor-churn1, where node c's calls inside another
+  # node's question run bare, and its planted fault (r), a depth per node, whose record the replay accepts (a stated
+  # limit); a replaced name entered outside every record on hand5-peer, and its plants (s) and (t) (c-carried.txt)
+  carried
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
