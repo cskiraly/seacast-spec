@@ -1527,6 +1527,25 @@ EOF_RA
   [ "$ok5" = 1 ] || s5="S1-C5 not as it must be"
   echo "  F's three: $s8a; $s8b; $s5"
 }
+h4_plant() {            # H4's plant (n): trace3.py's LAYERS without the silent node's layer of forward, on hand5-own's
+  local f=$OUT/c-h4     #   arguments: the scan's lists name it, and the tracer stops at the silent node's install
+  rm -f "$f".*
+  (cd "$TOY" && $PY "$T/tracerfaults3.py" --layer-missing-v2 . "$f.jsonl.gz" > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
+  if [ "$(cat "$f.rc")" = 0 ] || ! has -x -F "tracerfaults3: layer-missing-v2, planted 1 time" "$f.err"; then
+    no "H4's plant (n): not planted once, or the tracer wrote its trace to its end (c-h4.err)"
+    echo "  H4's plant (n): not as it must be"
+  elif [ "$(grep -c '^tracerfaults3: scan: .*NOT' "$f.err")" != 1 ] \
+      || ! has -x -F "tracerfaults3: scan: layer forward Node._faults.<locals>.forward@1103: changing, NOT so in LAYERS" "$f.err" \
+      || ! has -x -F "tracerfaults3: scan: 1 differences from trace3.py's lists" "$f.err"; then
+    no "H4's plant (n): the scan's lists do not name the layer left out, alone (c-h4.err)"
+    echo "  H4's plant (n): not as it must be"
+  elif ! has -x -F "trace3: node 3: forward: a layer in none of the tracer's lists: Node._faults.<locals>.forward (node.py:1103)" "$f.err"; then
+    no "H4's plant (n): the tracer stopped without the words it must give (c-h4.err)"
+    echo "  H4's plant (n): not as it must be"
+  else
+    echo "  H4's plant (n): the silent node's layer of forward left out of LAYERS: the scan names it, the one difference, and the tracer stops at node 3's install, with its words"
+  fi
+}
 s_tracercontrols() {
   local f want bad
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
@@ -1815,6 +1834,9 @@ EOF_ERC
   # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-v2) and reader (families_v2.py
   # on churn1, signed and plain); S1-C5's line on v2/hand5 (c-fcases.txt)
   f_cases
+  # H4's plant (n): one of LAYERS' changing layers left out, which the scan names and at whose install the tracer
+  # stops (c-h4.err)
+  h4_plant
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
