@@ -1,14 +1,13 @@
 # The record of the Lean twin
 
-This file describes the record of the Lean twin that the spec carries from version 0.10.12. It says what
+This file describes the record of the Lean twin that the spec carries from version 0.11.1. It says what
 ran, what the runs show, and what they do not show. The other files in this directory, but for `FILES.sha256`,
 are the outputs of the runs: the manifest of the traces, the reports of the replays, the matrix of mutants, and
 the reports of the controls, with the log of the script that started the quick check. Each is as the runs wrote
 it, but for one substitution in four files, which the end of this file names. `FILES.sha256` gives the SHA-256
 hash of every other file in this directory, this file included. `FILES.sha256` was made when the record was
-frozen and made again when this file was corrected at version 0.11.0. The traces themselves are not kept,
-because they take about 50 GB uncompressed (`manifest/sizes.txt`). `record.sh` makes them again, and the hashes
-in the manifest tell whether a new run made the same traces.
+frozen. The traces themselves are not kept, because they take about 50 GB uncompressed (`manifest/sizes.txt`).
+`record.sh` makes them again, and the hashes in the manifest tell whether a new run made the same traces.
 
 This file uses the terms of the twin's README (`../README.md`). The toy (`toy/`) runs the Python in the code
 blocks of the documents directly. The tracer runs the toy and writes a trace: one record for each top-level call,
@@ -25,16 +24,17 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 
 ## What ran
 
-- **One commit supplied everything.** Every run below started from a fresh clone of the spec at commit `f72cb4d`,
-  with nothing added to it. That commit is in the published history of the spec, before the commit that adds this
-  record. It holds the two documents (`protocol.md` and `protocol-v2.md`), the toy, the twin in `formal/twin`, and
-  the twin's tools. Its toy is the same as this release's, apart from the files whose names end in `.md`. Its
-  documents differ from this release's only outside their code.
+- **The record's run and the quick check started from one commit.** Each started from a fresh clone of the spec at
+  commit `9f33f60`, with nothing added to it. That commit is in the published history of the spec, before the
+  commit that adds this record. It holds the two documents (`protocol.md` and `protocol-v2.md`), the toy, the twin
+  in `formal/twin`, and the twin's tools. Its toy is the same as this release's, apart from the files whose names
+  end in `.md`. Its documents differ from this release's only outside their code. The matrix was not run again: it
+  is v0.10.12's, carried into this record, as "How the matrix is tied to this record" says.
 - **The content line and the list of the sources of the twin tie the record to what ran**
   (`manifest/content.line`, the first line of every trace, and `manifest/twin-sources.txt`; the content line is
   described below). Both are made from the files of a tree, and a reader can make both on any tree:
   `tools/content.py` makes the content line, and the build step of `check.sh` writes the list of the sources of
-  the twin, each with its SHA-256 hash. This release holds the same `toy/` and `formal/twin/` as `f72cb4d`, file
+  the twin, each with its SHA-256 hash. This release holds the same `toy/` and `formal/twin/` as `9f33f60`, file
   for file, apart from `formal/twin/record/` and the files whose names end in `.md`. The content line leaves out
   the files in `toy/` and `formal/twin/tools/` whose names end in `.md`. Run on the tree of this release,
   `tools/content.py` gives the line in `manifest/content.line`. The sources of the twin there, by path and hash,
@@ -44,12 +44,12 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
   `quick-check/run.log`. The clone of the record's run, and the clone, Lean and Python of each part of the matrix,
   are in the logs of the script that started each run, which are not among these files.
 - **The toolchain** was Lean 4.35.0 (commit `eb6cafb7290e8bd5f2937522d8d804f58f02bafc`). The record ran under
-  Python 3.13.5.
+  Python 3.12.3 (the manifest's `python` line).
 - **The platform** was x86-64 Linux.
 - **The record's run was one run of `record.sh`,** with all its steps. `record.sh` runs `check.sh --record`, which
   traces and replays every cell of `toy/check.py` under both documents, and adds the controls that only the record
   runs. The run passed: the last line of its output is "check.sh: PASS (the record's run)" (`controls/check.txt`).
-- **The quick check passed too.** `check.sh` alone passed in a run of its own from a fresh clone of `f72cb4d`
+- **The quick check passed too.** `check.sh` alone passed in a run of its own from a fresh clone of `9f33f60`
   (`quick-check/check.txt`, and `quick-check/run.log`, the log of the script that started that run).
 
 ## What it shows
@@ -69,8 +69,8 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
   directories named `__pycache__`, are not in the line. Every other file under the toy and the tools is in it,
   committed or not, and a link among them is refused. So a change to a document outside its code, or to a README,
   leaves the content line as it was, and a change to the code changes it. The manifest also gives the SHA-256 of
-  the bytes of each document, in its `documents` line. Those hashes are of the documents at `f72cb4d`. If a
-  document of this release differs from its counterpart at `f72cb4d` only outside its code, the SHA-256 of its
+  the bytes of each document, in its `documents` line. Those hashes are of the documents at `9f33f60`. If a
+  document of this release differs from its counterpart at `9f33f60` only outside its code, the SHA-256 of its
   bytes is not the one in the `documents` line, and the SHA-256 of its code is still the one in the content line.
   The `documents` line is for information: `tools/against.py`, which compares a new run with this record, reports
   a difference in it and decides nothing by it.
@@ -140,17 +140,37 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 
 ## How the matrix is tied to this record
 
-The matrix ran in five parts, each from a fresh clone of `f72cb4d`, and the outputs of the five were merged into
-one (`matrix/PARTS`). The parts ran under the same Lean as the record, and under Python 3.13.5 (parts 1, 2 and 5)
-and 3.12.3 (parts 3 and 4); the logs that show the clones and the toolchains are not among these files. Four facts
-in these files tie the matrix to this record:
-- It has the content line of this record (`matrix/content.line` and `manifest/content.line`).
-- Its 39 traces have the same hashes as in the manifest, of the body and of the whole trace
-  (`matrix/traces.sha256` and `matrix/directed.sha256`).
+**The matrix is v0.10.12's, carried into this record unchanged.** It ran in five parts, each from a fresh clone of
+`f72cb4d`, the commit that v0.10.12's record ran from, and the outputs of the five were merged into one
+(`matrix/PARTS`). The parts ran under the same Lean as the record, and under Python 3.13.5 (parts 1, 2 and 5) and
+3.12.3 (parts 3 and 4); the logs that show the clones and the toolchains are not among these files.
+
+Between `f72cb4d` and `9f33f60`, code changed in files that the content line names. In `protocol-v2.md`, the cap
+on a block's second-phase sample asks in flight had been a field of each type's parameters; it became a setting of
+the node, which `ask_sample` and `resample` read. When an ask's wait ends after its group has expired, `resample`
+no longer returns at once: it makes no new ask for that sample, and it still tries the block's held samples while
+room is left. The list of the node's state now declares `want_p`, which the code already used. Comments beside
+these lines changed too. In the toy, `node.py` puts the cap in the node's namespace, and `run.py` refuses a cap
+below 1. `xcheck.py` now compares the window in bytes under `protocol-v2.md`. Two files were added,
+`sample_cap_known.py` and `xcheck_window_known.py`. The twin, its tools and the replay did not change. The traces
+of this record have the same bodies as v0.10.12's. For each of the manifest's 55 traces, `tools/against.py` finds
+the same body hash in v0.10.12's manifest, and the body hashes in `manifest/hashes.txt` are those of v0.10.12's
+record for all 58 traces, the 55 and the three small traces that are not in the manifest. So the content line
+moved, and the trace bodies, the replay and the mutants did not. Three facts in these files tie the matrix to this
+record:
+- Its 39 traces have the same bodies as in the manifest (`matrix/traces.sha256` and `matrix/directed.sha256`, the
+  hash of each body). Their hashes of the whole trace differ from the manifest's, because a trace starts with its
+  content line: the matrix's traces start with v0.10.12's content line (`matrix/content.line`), and the traces of
+  this record with its own (`manifest/content.line`).
 - Its replay has the same SHA-256 as the replay of this record (`matrix/replay.sha256`).
 - Its 569 mutants have the same names as the mutants of this record, in the same order (`matrix/mutants.sha256`;
   the manifest's `mutants` line is the SHA-256 of those names, one to a line, with no line end after the last).
   Its sources of the twin are the same files (`matrix/twin-sources.txt` and `manifest/twin-sources.txt`).
+
+A mutant's verdict depends on the trace bodies, the replay and the mutant's own build. Of a trace's first line,
+the replay checks only that it parses as a content line and is, byte for byte, the content line that the run gives
+it (`--content`). So a matrix run from `9f33f60` would replay the same mutants on the same bodies with the same
+replay, and give the same verdicts.
 
 ## What it does not show
 
