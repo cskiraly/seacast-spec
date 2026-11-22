@@ -13,7 +13,7 @@ parts"). This file keeps its earlier name, `protocol-v2.md`, and the toy runs it
 *This document began as draft 1, of 2026-10-07. It is a sibling of [`protocol.md`](protocol.md),
 which defines SEACAST on gossipsub; SEACAST contains that protocol as its tier 4 setting, with the
 differences that §6.1 lists. That document was draft v0.3 when this was written and has been
-v0.11.0 since 2026-11-22, with the same section numbers. Below, `protocol.md` means that document
+v0.11.1 since 2026-11-22, with the same section numbers. Below, `protocol.md` means that document
 as it is now, and "v0.3" means draft v0.3 itself, for its own rules.*
 
 *Each later version of `protocol.md` is carried into this document in the same way; §5 maps what

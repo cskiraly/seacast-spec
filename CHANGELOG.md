@@ -13,7 +13,57 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## v0.11.0 — 2026-11-22
+## v0.11.1 — 2026-11-22
+
+SEACAST's second sampling phase has one cap per block on its asks in flight, a setting of the
+node, and the toy's cross-check (`--xcheck`) counts the window in bytes under `protocol-v2.md`.
+
+### Rules
+- `protocol-v2.md` §4.10: `SAMPLE_OUTSTANDING`, the cap on second-phase sample asks in flight per
+  block, is now a setting of the node, not a parameter of each object type. The asks are counted
+  across the block's sampled types, as before. When a second-phase ask's wait ends and its group
+  has expired, the block's held samples are now tried while room is left; in v0.11.0 they stayed
+  held.
+
+### Added
+- `toy/sample_cap_known.py`, a known answer for §4.10's second phase in two cases. In the first, a
+  block holds two sampled types, and the refill stops at the node's cap. In the second, the group of
+  the ask whose wait ends has expired, and a held sample is asked. Both fail on v0.11.0's document.
+- `toy/xcheck_window_known.py`, a known answer for `--xcheck`'s window invariant. It runs the push
+  cell under either document. It passes when the run succeeds, prints at least three xcheck lines,
+  and every xcheck line has `inv_window=0` and a `peak` no larger than `w`. The check failed under
+  `protocol-v2.md` before `toy/xcheck.py` was fixed.
+
+### Changed
+- `protocol-v2.md` §1.1, §3, §6.3: `TypeParams` (§1.1) no longer has `SAMPLE_OUTSTANDING`. §6.3
+  gives `SAMPLE_RETRY2`, a parameter of the object type, and `SAMPLE_OUTSTANDING`, a setting of the
+  node, a row each; `SAMPLE_OUTSTANDING`'s bound is at least 1, and it was 4 in every measurement.
+  In §3, the labels of `samples_in_flight` and `held_samples` say that each spans the block's types.
+- `protocol-v2-decisions.md`: `[D12]` records that since 2026-11-22, one setting of the node caps a
+  block's second-phase asks in flight across the block's sampled types, and its row in the index
+  names the node's `SAMPLE_OUTSTANDING`.
+- `protocol-v2-figures.md` §6.3: in the 500-node cells, `SAMPLE_OUTSTANDING` was 4, a parameter of
+  the column type. The samplers sampled only columns, so the 4 capped each sampler's second-phase
+  asks in flight per block, as the node's setting does now.
+- `toy/node.py`, `toy/run.py`: the toy reads `SAMPLE_OUTSTANDING` as a setting of the node, and
+  `--sample-outstanding` refuses a value below 1.
+- `toy/README.md`: entries for the two new known answers. It now says that `--xcheck`'s recorder
+  runs under both documents, that a chunk delivered to its publisher counts as a duplicate, and
+  that a sampler asks a peer of high custody directly only in the second phase. Its invariants
+  read as in `toy/xcheck.py`'s docstring.
+- `formal/twin/record/`: the twin's record is made again from `9f33f60`, and v0.10.12's matrix is
+  carried.
+
+### Fixed
+- `protocol-v2.md` §3: `want_p`, a `DECLARED` peer's interest taken from its WANTs, is declared with
+  the node's other tables; the document's code already read and wrote it.
+- `toy/xcheck.py`: under `protocol-v2.md`, the recorder also takes the peak of the room in flight at
+  `acquire_room`, and the window invariant compares it, in bytes, with `W_BYTES`. Before, it
+  compared bytes with `W` in slots, and in the push cell every honest node counted as over its
+  window. Its docstring now says in which lawful cases `budget`, `window` and `late` are above
+  zero, and that `budget` counts the copies of a rebuilt chunk that repair pushes.
+
+## v0.11.0 — 2026-11-22 (`bc4fc5e`)
 
 The two protocols get their names, `protocol-v2.md` SEACAST and `protocol.md` SEACAST on gossipsub,
 and the README is rewritten. Text only; no rule changes since v0.10.12.

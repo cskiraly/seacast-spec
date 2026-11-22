@@ -442,3 +442,7 @@ carried later than its version.
   and a new opening paragraph name it SEACAST on gossipsub, and §5.1 and §9 cite this document and
   the announcement post by their current names. This draft is named SEACAST; there is nothing to
   carry.
+- v0.11.1 (2026-11-22): `protocol.md` is the same but for its version line, so there is nothing to
+  carry. In this draft, one setting of the node caps a block's second-phase asks in flight across
+  the block's sampled types, and the block's held samples are tried while room is left even when
+  the group of the ask whose wait ended has expired (§4.10). §3 declares `want_p`.
