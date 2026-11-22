@@ -658,7 +658,7 @@ s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2
   $PY "$T/trace3.py" --self-test-v2 > "$OUT/v2-self-test.txt" 2>&1 || no "the tracer's self-test of v2's kept names (v2-self-test.txt)"
   if [ -z "$CELLS" ]; then echo "  no v2 cell (a rehearsal)"; echo ok > "$OUT/cells-v2.txt"; return; fi
   local c
-  for c in $CELLS; do rm -f "$OUT/v2/$c.jsonl.gz.bare.json"; done     # no count left from an earlier run counts
+  for c in $CELLS; do rm -f "$OUT/v2/$c.jsonl.gz.bare.json" "$OUT/v2/$c.jsonl.gz.calls.json"; done     # no count left from an earlier run counts
   # shellcheck disable=SC2086
   $PY "$T/cells3.py" "$TOY" "$OUT/v2" -j "$J" --doc v2 --replay "$REPLAY" $CELLS > "$OUT/cells-v2.txt" 2>&1 || no "a v2 cell (cells-v2.txt)"
   has -x ok "$OUT/cells-v2.txt" || no "no verdict on the v2 cells"
@@ -667,7 +667,7 @@ s_v2cells() {            # every cell under protocol-v2.md: its digest golden-v2
 }
 small() {               # $1: a name; $2: its directory; $3: the tracer's environment setting, or ""; the rest: run.py's arguments
   local name=$1 dir=$2 setting=$3 got plain; shift 3
-  rm -f "$OUT/$dir/$name.jsonl.gz" "$OUT/$dir/$name.jsonl.gz.bare.json" "$OUT/$dir/$name.replay"
+  rm -f "$OUT/$dir/$name.jsonl.gz" "$OUT/$dir/$name.jsonl.gz.bare.json" "$OUT/$dir/$name.jsonl.gz.calls.json" "$OUT/$dir/$name.replay"
   (cd "$TOY" && env $setting $PY "$T/trace3.py" . "$OUT/$dir/$name.jsonl.gz" "$@" --digest > "$OUT/$dir/$name.out" 2> "$OUT/$dir/$name.err") || return 1
   replay_of "$dir/$name"
   (cd "$TOY" && $PYPLAIN run.py "$@" --digest > "$OUT/$dir/$name.plain" 2>&1)
