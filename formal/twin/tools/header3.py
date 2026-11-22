@@ -10,9 +10,11 @@ this one is made against the tree itself. cells3.py asks it of each trace it has
 
 What the replay does not check of the header, the second line: the tracer's name, and that the functions traced
 (`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc v2,
-the block's names that are protocol.md's all the way down (trace3.v2_kept), computed here from TOYDIR's documents;
-and that it claims the whole state exactly where it is a directed set's. Its tables (`own`, `foreign`) are
-trace3.py's, or for a trace run with --doc v2 protocol-v2.md's manifest's (`want`). A trace that passes is printed
+the block's names that are protocol.md's all the way down (trace3.v2_kept), computed here from TOYDIR's documents,
+or §6.1's twelve; and that it claims the whole state exactly where it is a directed set's. Its tables (`own`,
+`foreign`) are trace3.py's, or for a trace run with --doc v2 protocol-v2.md's manifest's (`want`). Its envelope
+is the one both readers hold it to: no member twice, nothing beside the header, no member trace3.py does not write,
+the arguments a list of words, and a document word the toy takes (`v03` or `v2`). A trace that passes is printed
 with its kind.
 
 Exit code 0 when every trace passes; otherwise each trace's reasons are printed.
@@ -51,32 +53,56 @@ def v2_kind(toy):
 
 
 def kind_of(toy, traced, args):
-    """The name of a traced list's kind, or None. A trace run with --doc v2 has one kind, v2's kept, and a trace run
-    without it never has that one: the block's list under --doc v2 does not pass."""
+    """The name of a traced list's kind, or None. A trace run with --doc v2 has two kinds, v2's kept and §6.1's
+    twelve (TRACE3_ONLY=sec61, whose traced names trace3.py does not hold to the manifest's KEPT), and a trace run
+    without it never has v2's kept: the block's list under --doc v2 does not pass."""
     t = tuple(traced) if isinstance(traced, list) else None
     if trace3.doc_of(args or []) == "v2":           # the words of the trace's arguments: see trace3.doc_of
+        if t is not None and t == tuple(sorted(trace3.SEC61)):
+            return f"§6.1's {len(trace3.SEC61)} alone, under --doc v2"
         return f"v2's kept, {len(t)} functions" if t is not None and t == v2_kind(toy) else None
     return KINDS.get(t)
 
 
+# the header's members, as trace3.py writes them (row_reads under --doc v2 alone), and the document words the toy's
+# parser takes (run.py's --doc)
+MEMBERS = ("format", "whole", "own", "foreign", "row_reads", "traced", "tracer", "args")
+DOCS = ("v03", "v2")
+
+
 def head_lines(trace):
-    """A trace's first line as text, and its header (the second line), or the reason it has none. Read as bytes,
-    so that a line end is compared as it was written: a text reader would turn a CRLF into an LF."""
+    """A trace's first line as text, its header (the second line) or the reason it has none, and what is wrong with
+    the second line's envelope: a member twice at any depth (a JSON reader keeps one of the two, and another might
+    keep the other), and a member beside the header. Read as bytes, so that a line end is compared as it was
+    written: a text reader would turn a CRLF into an LF."""
     trace = Path(trace)
+    twice = []
+
+    def pairs(kv):
+        seen = set()
+        for k, _ in kv:
+            if k in seen and k not in twice:
+                twice.append(k)
+            seen.add(k)
+        return dict(kv)
     try:
         with (gzip.open(trace, "rb") if trace.suffix == ".gz" else open(trace, "rb")) as f:
             line1 = f.readline().decode("utf-8", "replace")
-            second = json.loads(f.readline().decode("utf-8"))   # UTF-8, as the tracer writes it: bytes given
-            #                                                     to json.loads would have their encoding guessed
+            second = json.loads(f.readline().decode("utf-8"), object_pairs_hook=pairs)   # UTF-8, as the tracer
+            #                                   writes it: bytes given to json.loads would have their encoding guessed
     except (OSError, ValueError) as e:
-        return None, None, f"its first two lines cannot be read: {e}"
+        return None, None, f"its first two lines cannot be read: {e}", []
     h = second.get("header") if isinstance(second, dict) else None
-    return (line1, h, None) if isinstance(h, dict) else (line1, None, "no header on the second line")
+    if not isinstance(h, dict):
+        return line1, None, "no header on the second line", []
+    env = [f"the second line holds a member twice: {k}" for k in twice]
+    env += [f"the second line holds more than its header: {k}" for k in second if k != "header"]
+    return line1, h, None, env
 
 
 def header(trace):
     """A trace's header, or the reason it has none."""
-    _, h, no = head_lines(trace)
+    _, h, no, _ = head_lines(trace)
     return h, no
 
 
@@ -95,15 +121,25 @@ def content_why(toy, line1):
 
 def check(toy, trace):
     """The reasons a trace's header is not as it must be: none when it is."""
-    line1, h, no = head_lines(trace)
+    line1, h, no, env = head_lines(trace)
     if h is None:
         return [no]
-    why = content_why(toy, line1)
+    why = content_why(toy, line1) + env
+    why += [f"header: a member trace3.py does not write: {k}" for k in h if k not in MEMBERS]
+    # the arguments: a list of words, read as the empty list where they are not (the reason given), and a document
+    # word, where they name one, that the toy's parser takes
+    args = h.get("args", [])
+    if not (isinstance(args, list) and all(isinstance(a, str) for a in args)):
+        why.append(f"args: not a list of words: {json.dumps(args)[:60]}")
+        args = []
+    doc = trace3.doc_of(args)
+    if doc is not None and doc not in DOCS:
+        why.append(f"args: a document trace3.py does not write: {doc}")
     traced = h.get("traced")
-    if kind_of(toy, traced, h.get("args")) is None:
-        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept, "
-                   "sorted")
-    v2 = trace3.doc_of(h.get("args") or []) == "v2"
+    if kind_of(toy, traced, args) is None:
+        why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc v2 v2's kept or "
+                   "§6.1's alone, sorted")
+    v2 = doc == "v2"
     for name, v in want(v2).items():
         got = h.get(name)
         if got == v:
@@ -111,7 +147,7 @@ def check(toy, trace):
         why.append(f"{name}: {got!r}, must be {v!r}")
     # the directed records hold the whole state, a cell's do not (directed42.py's, §4.2's; directed4b.py's, its
     # deferral path's)
-    whole = h.get("args", [None])[:1] in (["directed3"], ["directed44"], ["directed42"], ["directed4b"], ["directed7"],
+    whole = args[:1] in (["directed3"], ["directed44"], ["directed42"], ["directed4b"], ["directed7"],
                                              ["directed1"], ["directed6o"], ["directed64"], ["directed64h"], ["directed46"], ["directed43"], ["directed41"], ["directed46d"], ["directed3v"], ["directed52"], ["directed53"], ["directed54"], ["directed71"], ["directed51"])   # among them §1's (directed1.py),
     #                                              drop_offer's (directed6o.py), §6.4's (directed64.py, directed64h.py), §4.6's (directed46.py), §4.3's (directed43.py), §4.1's (directed41.py), §4.6's decode's (directed46d.py), §3's (directed3v.py)
     if h.get("whole") is not whole:

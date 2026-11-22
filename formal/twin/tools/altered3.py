@@ -729,9 +729,12 @@ def queue_controls(hand, work, head):
 
 def v2_header_controls(v2trace, work):
     """header3.py on a cell's header under --doc v2, each with the outcome written before it first ran: it passes as
-    v2's kept, and is refused with on_ihave among its traced (on_ihave calls gated, which v2 redefines), with gated
-    among them (v2 redefines it), with --doc v2 gone from its args (v2's kept is a kind only for a trace run so), and
-    with protocol.md's own tables as its own (a v2 trace's are the manifest's, protocol.md's and v2's). No replay."""
+    v2's kept, and as §6.1's twelve alone (TRACE3_ONLY=sec61 under --doc v2); it is refused with on_ihave among its
+    traced (on_ihave calls gated, which v2 redefines), with gated among them (v2 redefines it), with the whole block,
+    with v2's kept less a name, with --doc v2 gone from its args (v2's kept is a kind only for a trace run so, and the
+    tables and row_reads are a v2 trace's), and with protocol.md's own tables as its own (a v2 trace's are the
+    manifest's, protocol.md's and v2's); and its envelope's cases, as the hand cell's in header3_controls. Each
+    refusal is for the reasons named, in their order, each by the words it starts with. No replay."""
     toy = layout.toy()
     hdr = load(v2trace)[0]
     h = hdr["header"]
@@ -744,22 +747,39 @@ def v2_header_controls(v2trace, work):
 
     args = list(h["args"])
     k = args.index("--doc")
-    hcases = {  # name -> (the header line, whether it must pass, the words of its one reason where it must not)
+    # the reasons of a v2 trace read as protocol.md's: its traced, its tables where they differ, its row_reads
+    lost = (["traced: ", "own: "] + (["foreign: "] if list(header3.trace3.FOREIGN) != list(header3.manifest_v2.FOREIGN)
+                                     else []) + ["row_reads: "])
+    text = dump(hdr)
+    hcases = {  # name -> (the header line, whether it must pass, the words its reasons start with where it must not)
         "a v2 cell's header, v2's kept": (hdr, True, None),
-        "with on_ihave among its traced": (variant(traced=sorted(h["traced"] + ["on_ihave"])), False, None),
-        "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False, None),
-        "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False, None),
-        "with §6.1's twelve alone as its traced": (
-            variant(traced=sorted(header3.trace3.SEC61)), False, None),
-        "v2's kept, from a trace not run with --doc v2": (variant(args=args[:k] + args[k + 2:]), False, None),
-        "with protocol.md's own as its own": (variant(own=list(header3.trace3.OWN)), False, "own: "),
+        "with §6.1's twelve alone as its traced": (variant(traced=sorted(header3.trace3.SEC61)), True, None),
+        "with on_ihave among its traced": (variant(traced=sorted(h["traced"] + ["on_ihave"])), False, ["traced: "]),
+        "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False, ["traced: "]),
+        "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False, ["traced: "]),
+        "with v2's kept less its first name as its traced": (variant(traced=h["traced"][1:]), False, ["traced: "]),
+        "v2's kept, from a trace not run with --doc v2": (variant(args=args[:k] + args[k + 2:]), False, lost),
+        "with protocol.md's own as its own": (variant(own=list(header3.trace3.OWN)), False, ["own: "]),
+        # the envelope
+        "with format twice": (text.replace('"format":7', '"format":3,"format":7', 1), False,
+                              ["the second line holds a member twice: format"]),
+        "with a member beside the header": (text[:-1] + ',"zz":1}', False,
+                                            ["the second line holds more than its header: zz"]),
+        "with a header member trace3.py does not write": (variant(zz=1), False,
+                                                          ["header: a member trace3.py does not write: zz"]),
+        "with args null": (variant(args=None), False, ["args: not a list of words"] + lost),
+        "with args [42]": (variant(args=[42]), False, ["args: not a list of words"] + lost),
+        "with --doc v3 for --doc v2": (variant(args=args[:k + 1] + ["v3"] + args[k + 2:]), False,
+                                       ["args: a document trace3.py does not write: v3"] + lost),
     }
+    assert text.count('"format":7') == 1, "the v2 header's format is not written once as 7"
     bad = 0
     for name, (hl, must, words) in hcases.items():
         f = work / f"v2-header3-{re.sub(r'[^A-Za-z0-9_.]+', '-', name)}.jsonl"
         write(f, [hl])
         why = header3.check(toy, f)
-        ok = (not why) == must and (must or words is None or (len(why) == 1 and why[0].startswith(words)))
+        ok = (not why) == must and (must or (len(why) == len(words) and
+                                             all(w.startswith(p) for w, p in zip(why, words))))
         bad += not ok
         print(f"v2, header3, {name}: {'passes' if not why else 'refused: ' + '; '.join(why)[:160]}, "
               f"must {'pass' if must else 'be refused'}{'' if ok else '  <-- FAIL'}")
@@ -3090,7 +3110,9 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
     line of another tool, another document or another file of the toy, one with a file more, no content line,
     format 6, a cell that claims the whole state and a list of functions traced that is neither must be refused,
     each for its reason; the directed traces' headers pass, and are refused where they do not claim the whole
-    state."""
+    state. The envelope on the hand cell's header: a member twice, a member beside the header, a member trace3.py
+    does not write, args that are not a list of words and a document word the toy does not take, each refused for
+    its reason; --doc v03 passes."""
     toy = layout.toy()
 
     def variant(**change):
@@ -3122,6 +3144,31 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
         "another table among the foreign": (variant(foreign=["queue"]), False, "foreign: ['queue']"),
         "traced, neither the block nor §6.1 alone": (variant(traced=["may_ask"]), False, "traced: ['may_ask']"),
     }
+    # the envelope, on the hand cell's header (the whole block), each refused for its one reason; the document word
+    # v03, which the toy's parser takes, passes
+    hand_text = dump(hand_hdr)
+    assert hand_text.count('"format":7') == 1, "the hand cell's format is not written once as 7"
+    hv = copy.deepcopy(hand_hdr)
+    hv["header"]["zz"] = 1
+    hargs = list(hand_hdr["header"]["args"])
+
+    def hand_args(a):
+        out = copy.deepcopy(hand_hdr)
+        out["header"]["args"] = a
+        return out
+    cases.update({
+        "the hand cell's header with format twice": (hand_text.replace('"format":7', '"format":3,"format":7', 1), False,
+                                                     "the second line holds a member twice: format"),
+        "the hand cell's header with a member beside it": (hand_text[:-1] + ',"zz":1}', False,
+                                                           "the second line holds more than its header: zz"),
+        "the hand cell's header with a member trace3.py does not write": (
+            hv, False, "header: a member trace3.py does not write: zz"),
+        "the hand cell's header with args null": (hand_args(None), False, "args: not a list of words"),
+        "the hand cell's header with args [42]": (hand_args([42]), False, "args: not a list of words"),
+        "the hand cell's header with --doc v3": (hand_args(hargs + ["--doc", "v3"]), False,
+                                                 "args: a document trace3.py does not write: v3"),
+        "the hand cell's header with --doc v03": (hand_args(hargs + ["--doc", "v03"]), True, None),
+    })
     for tag, path in (("§6.1's", directed), ("§4.4's", directed44)):
         dh = load(path)[0]
         nw = copy.deepcopy(dh)
