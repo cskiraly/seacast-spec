@@ -4,10 +4,11 @@ This file describes the record of the Lean twin that the spec carries from versi
 ran, what the runs show, and what they do not show. The other files in this directory, but for `FILES.sha256`,
 are the outputs of the runs: the manifest of the traces, the reports of the replays, the matrix of mutants, and
 the reports of the controls, with the log of the script that started the quick check. Each is as the runs wrote
-it, but for one substitution in four files, which the end of this file names. `FILES.sha256` was made when the
-record was frozen, and it gives the SHA-256 hash of every other file in this directory, this file included. The
-traces themselves are not kept, because they take about 50 GB uncompressed (`manifest/sizes.txt`). `record.sh`
-makes them again, and the hashes in the manifest tell whether a new run made the same traces.
+it, but for one substitution in four files, which the end of this file names. `FILES.sha256` gives the SHA-256
+hash of every other file in this directory, this file included. `FILES.sha256` was made when the record was
+frozen and made again when this file was corrected at version 0.11.0. The traces themselves are not kept,
+because they take about 50 GB uncompressed (`manifest/sizes.txt`). `record.sh` makes them again, and the hashes
+in the manifest tell whether a new run made the same traces.
 
 This file uses the terms of the twin's README (`../README.md`). The toy (`toy/`) runs the Python in the code
 blocks of the documents directly. The tracer runs the toy and writes a trace: one record for each top-level call,
@@ -27,16 +28,17 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
 - **One commit supplied everything.** Every run below started from a fresh clone of the spec at commit `f72cb4d`,
   with nothing added to it. That commit is in the published history of the spec, before the commit that adds this
   record. It holds the two documents (`protocol.md` and `protocol-v2.md`), the toy, the twin in `formal/twin`, and
-  the twin's tools. Its toy is this release's, and its documents differ from this release's only outside their
-  code.
+  the twin's tools. Its toy is the same as this release's, apart from the files whose names end in `.md`. Its
+  documents differ from this release's only outside their code.
 - **The content line and the list of the sources of the twin tie the record to what ran**
   (`manifest/content.line`, the first line of every trace, and `manifest/twin-sources.txt`; the content line is
   described below). Both are made from the files of a tree, and a reader can make both on any tree:
   `tools/content.py` makes the content line, and the build step of `check.sh` writes the list of the sources of
   the twin, each with its SHA-256 hash. This release holds the same `toy/` and `formal/twin/` as `f72cb4d`, file
-  for file, apart from `formal/twin/record/`. Run on the tree of this release, `tools/content.py` gives the line
-  in `manifest/content.line`. The sources of the twin there, by path and hash, are those that
-  `manifest/twin-sources.txt` lists.
+  for file, apart from `formal/twin/record/` and the files whose names end in `.md`. The content line leaves out
+  the files in `toy/` and `formal/twin/tools/` whose names end in `.md`. Run on the tree of this release,
+  `tools/content.py` gives the line in `manifest/content.line`. The sources of the twin there, by path and hash,
+  are those that `manifest/twin-sources.txt` lists.
 - **These files show the clone and the toolchain of some of the runs.** The record's Lean is in
   `controls/check.txt` and its Python in the manifest. The quick check's clone, Lean and Python are in
   `quick-check/run.log`. The clone of the record's run, and the clone, Lean and Python of each part of the matrix,
