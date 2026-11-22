@@ -519,7 +519,8 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
     the walk reaches the document's function of that name (protocol.md's or protocol-v2.md's). It is None where the
     name is bound to the document's function itself, or to the node's own helper alone: such a name has no key in
     `chains`. Each layer above `doc` must be listed in `lists` (LAYERS) for this name, by its qualified name and its
-    first line in node.py. The name is replaced where any layer is changing, and only a REPLACEABLE name may be. A
+    first line: the toy's in node.py, and a fixture's that the fixture lists before the install. The name is replaced
+    where any layer is changing, and only a REPLACEABLE name may be. A
     walk that does not reach `doc` ends in a changing layer, or is the node's own helper alone. In a trace of the
     whole state, a REPLACEABLE_WHOLE name bound to a function outside node.py (a directed set's level 1) is changing.
     Anything else raises ChainStop, naming the layer."""
@@ -539,11 +540,10 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
         c = getattr(f, "__code__", None)
         if c is None:
             raise ChainStop(f"{name}: a layer that is no Python function: {layer_where(f)}")
-        in_toy = Path(c.co_filename).name == "node.py"
-        if whole and name in REPLACEABLE_WHOLE and not in_toy:
+        if whole and name in REPLACEABLE_WHOLE and Path(c.co_filename).name != "node.py":
             kinds.append(CHANGING)
             continue
-        listed = lists.get((getattr(f, "__qualname__", None), c.co_firstlineno)) if in_toy else None
+        listed = lists.get((getattr(f, "__qualname__", None), c.co_firstlineno))
         if listed is None:
             raise ChainStop(f"{name}: a layer in none of the tracer's lists: {layer_where(f)}")
         if listed[0] != name:
