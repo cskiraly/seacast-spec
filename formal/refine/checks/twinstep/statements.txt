@@ -5,8 +5,8 @@ statement Refine.Answers.mk.inj : ∀ {expired : SpecTwin.Group → Bool} {conne
   {validHave : SpecTwin.Group → SpecTwin.Bits → Bool} {seen accepted : SpecTwin.Key → Bool} {live : Nat → Bool}
   {validateChunkNode : SpecTwin.ChunkF → SpecTwin.Verdict} {queueOrder : List SpecTwin.Peer → List SpecTwin.Peer}
   {meshAnd : SpecTwin.Peer → List SpecTwin.Peer} {installedBlock : Nat → SpecTwin.Root → Option SpecTwin.Block}
-  {admitted reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool} {bidGroup : SpecTwin.Root → Option SpecTwin.Group}
-  {pendingOrder : List SpecTwin.Root → List SpecTwin.Root}
+  {admitted : SpecTwin.Peer → SpecTwin.Admit → Bool} {reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool}
+  {bidGroup : SpecTwin.Root → Option SpecTwin.Group} {pendingOrder : List SpecTwin.Root → List SpecTwin.Root}
   {tieSlotOrder : List (SpecTwin.Root × SpecTwin.Peer) → List (SpecTwin.Root × SpecTwin.Peer)}
   {tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root}
   {tiedPeersOrder : SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer}
@@ -25,8 +25,7 @@ statement Refine.Answers.mk.inj : ∀ {expired : SpecTwin.Group → Bool} {conne
   {resolve : SpecTwin.Key → Option SpecTwin.Key} {chunkOf : SpecTwin.Key → SpecTwin.ChunkF}
   {handleGraftPrune : SpecTwin.Peer → Nat} {onIwantNode : SpecTwin.Peer → List SpecTwin.Key → List SpecTwin.ChunkF}
   {decodeAndReencode : SpecTwin.Group → SpecTwin.Descriptor → Option (List (Nat × SpecTwin.ChunkF))}
-  {payloadOf : List (Nat × SpecTwin.ChunkF) → Option SpecTwin.Blob} {chunkAt : SpecTwin.Group → Nat → SpecTwin.ChunkF},
-  ⋯
+  {payloadOf : List (Nat × SpecTwin.ChunkF) → Option SpecTwin.Blob}, ⋯
 statement Refine.Answers.mk.injEq : ∀ (expired : SpecTwin.Group → Bool) (connectedTopicPeers : List SpecTwin.Peer)
   (ownOrder : List SpecTwin.Peer → SpecTwin.Key → List SpecTwin.Peer) (listed : SpecTwin.Peer → Nat)
   (enqueue : SpecTwin.Peer → SpecTwin.Msg → Bool → Bool) (knownId : SpecTwin.Group → Nat → Option SpecTwin.Key)
@@ -34,8 +33,8 @@ statement Refine.Answers.mk.injEq : ∀ (expired : SpecTwin.Group → Bool) (con
   (validHave : SpecTwin.Group → SpecTwin.Bits → Bool) (seen accepted : SpecTwin.Key → Bool) (live : Nat → Bool)
   (validateChunkNode : SpecTwin.ChunkF → SpecTwin.Verdict) (queueOrder : List SpecTwin.Peer → List SpecTwin.Peer)
   (meshAnd : SpecTwin.Peer → List SpecTwin.Peer) (installedBlock : Nat → SpecTwin.Root → Option SpecTwin.Block)
-  (admitted reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool) (bidGroup : SpecTwin.Root → Option SpecTwin.Group)
-  (pendingOrder : List SpecTwin.Root → List SpecTwin.Root)
+  (admitted : SpecTwin.Peer → SpecTwin.Admit → Bool) (reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool)
+  (bidGroup : SpecTwin.Root → Option SpecTwin.Group) (pendingOrder : List SpecTwin.Root → List SpecTwin.Root)
   (tieSlotOrder : List (SpecTwin.Root × SpecTwin.Peer) → List (SpecTwin.Root × SpecTwin.Peer))
   (tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root)
   (tiedPeersOrder : SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer)
@@ -54,8 +53,7 @@ statement Refine.Answers.mk.injEq : ∀ (expired : SpecTwin.Group → Bool) (con
   (resolve : SpecTwin.Key → Option SpecTwin.Key) (chunkOf : SpecTwin.Key → SpecTwin.ChunkF)
   (handleGraftPrune : SpecTwin.Peer → Nat) (onIwantNode : SpecTwin.Peer → List SpecTwin.Key → List SpecTwin.ChunkF)
   (decodeAndReencode : SpecTwin.Group → SpecTwin.Descriptor → Option (List (Nat × SpecTwin.ChunkF)))
-  (payloadOf : List (Nat × SpecTwin.ChunkF) → Option SpecTwin.Blob) (chunkAt : SpecTwin.Group → Nat → SpecTwin.ChunkF),
-  ⋯
+  (payloadOf : List (Nat × SpecTwin.ChunkF) → Option SpecTwin.Blob), ⋯
 statement Refine.Answers.mk.sizeOf_spec : ∀ (expired : SpecTwin.Group → Bool) (connectedTopicPeers : List SpecTwin.Peer)
   (ownOrder : List SpecTwin.Peer → SpecTwin.Key → List SpecTwin.Peer) (listed : SpecTwin.Peer → Nat)
   (enqueue : SpecTwin.Peer → SpecTwin.Msg → Bool → Bool) (knownId : SpecTwin.Group → Nat → Option SpecTwin.Key)
@@ -63,8 +61,8 @@ statement Refine.Answers.mk.sizeOf_spec : ∀ (expired : SpecTwin.Group → Bool
   (validHave : SpecTwin.Group → SpecTwin.Bits → Bool) (seen accepted : SpecTwin.Key → Bool) (live : Nat → Bool)
   (validateChunkNode : SpecTwin.ChunkF → SpecTwin.Verdict) (queueOrder : List SpecTwin.Peer → List SpecTwin.Peer)
   (meshAnd : SpecTwin.Peer → List SpecTwin.Peer) (installedBlock : Nat → SpecTwin.Root → Option SpecTwin.Block)
-  (admitted reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool) (bidGroup : SpecTwin.Root → Option SpecTwin.Group)
-  (pendingOrder : List SpecTwin.Root → List SpecTwin.Root)
+  (admitted : SpecTwin.Peer → SpecTwin.Admit → Bool) (reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool)
+  (bidGroup : SpecTwin.Root → Option SpecTwin.Group) (pendingOrder : List SpecTwin.Root → List SpecTwin.Root)
   (tieSlotOrder : List (SpecTwin.Root × SpecTwin.Peer) → List (SpecTwin.Root × SpecTwin.Peer))
   (tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root)
   (tiedPeersOrder : SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer)
@@ -83,8 +81,7 @@ statement Refine.Answers.mk.sizeOf_spec : ∀ (expired : SpecTwin.Group → Bool
   (resolve : SpecTwin.Key → Option SpecTwin.Key) (chunkOf : SpecTwin.Key → SpecTwin.ChunkF)
   (handleGraftPrune : SpecTwin.Peer → Nat) (onIwantNode : SpecTwin.Peer → List SpecTwin.Key → List SpecTwin.ChunkF)
   (decodeAndReencode : SpecTwin.Group → SpecTwin.Descriptor → Option (List (Nat × SpecTwin.ChunkF)))
-  (payloadOf : List (Nat × SpecTwin.ChunkF) → Option SpecTwin.Blob) (chunkAt : SpecTwin.Group → Nat → SpecTwin.ChunkF),
-  ⋯
+  (payloadOf : List (Nat × SpecTwin.ChunkF) → Option SpecTwin.Blob), ⋯
 statement Refine.alpha_parked_is_parked : ∀ (kind ord : Type) (n₀ : SpecTwin.Peer) (bg : Refine.MState kind ord)
   (p : SpecTwin.Peer) (a : SpecTwin.Key) (ctx : SpecTwin.Ctx) (ans : Refine.Answers) (st : SpecTwin.State),
   Refine.parkedAns p a ctx ans st = (Refine.alpha kind ord n₀ a.chunk ctx.now bg st).parked n₀ p
@@ -304,7 +301,7 @@ axiom's statement Refine.promiseDue_refines_applies._native.native_decide.ax_1_4
   true
 definition Refine.Answers.accepted : Refine.Answers → SpecTwin.Key → Bool :=
 fun self => self.11
-definition Refine.Answers.admitted : Refine.Answers → SpecTwin.Peer → SpecTwin.ChunkF → Bool :=
+definition Refine.Answers.admitted : Refine.Answers → SpecTwin.Peer → SpecTwin.Admit → Bool :=
 fun self => self.17
 definition Refine.Answers.authenticable : Refine.Answers → SpecTwin.Group → Bool :=
 fun self => self.7
@@ -329,77 +326,73 @@ definition Refine.Answers.casesOn : {motive : Refine.Answers → Sort u} →
                               (queueOrder : List SpecTwin.Peer → List SpecTwin.Peer) →
                                 (meshAnd : SpecTwin.Peer → List SpecTwin.Peer) →
                                   (installedBlock : Nat → SpecTwin.Root → Option SpecTwin.Block) →
-                                    (admitted reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool) →
-                                      (bidGroup : SpecTwin.Root → Option SpecTwin.Group) →
-                                        (pendingOrder : List SpecTwin.Root → List SpecTwin.Root) →
-                                          (tieSlotOrder :
-                                              List (SpecTwin.Root × SpecTwin.Peer) →
-                                                List (SpecTwin.Root × SpecTwin.Peer)) →
-                                            (tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root) →
-                                              (tiedPeersOrder :
-                                                  SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer) →
-                                                (tiedGroupsOrder :
-                                                    SpecTwin.Root →
-                                                      SpecTwin.Peer → List SpecTwin.Group → List SpecTwin.Group) →
-                                                  (hasRoom : SpecTwin.Peer → Bool) →
-                                                    (popOwedAnswer : SpecTwin.Peer → SpecTwin.ChunkF) →
-                                                      (tiebreak : SpecTwin.ChunkF → SpecTwin.Peer → Nat) →
-                                                        (peerIdBytes : SpecTwin.Peer → String) →
-                                                          (chunksGroups : List SpecTwin.Group) →
-                                                            (chunkIndices : SpecTwin.Group → List Nat) →
-                                                              (owedOrder :
-                                                                  SpecTwin.Peer →
-                                                                    List SpecTwin.Group → List SpecTwin.Group) →
-                                                                (sha256 : SpecTwin.Hex → SpecTwin.Hex) →
-                                                                  (serialize : SpecTwin.Descriptor → SpecTwin.Hex) →
-                                                                    (snappyBlockEncode :
-                                                                        SpecTwin.Blob → SpecTwin.Blob) →
-                                                                      (padEach rsParity :
-                                                                          List SpecTwin.Blob →
-                                                                            Nat → List SpecTwin.Blob) →
-                                                                        (merkleRoot :
-                                                                            List SpecTwin.Blob → SpecTwin.Hex) →
-                                                                          (merkleProof :
-                                                                              List SpecTwin.Blob →
-                                                                                Nat → List SpecTwin.Hex) →
-                                                                            (contentId :
-                                                                                SpecTwin.ChunkF → SpecTwin.Hex) →
-                                                                              (connected : SpecTwin.Peer → Bool) →
-                                                                                (groupBits :
-                                                                                    List SpecTwin.Key →
-                                                                                      List
-                                                                                        (SpecTwin.Group ×
-                                                                                          SpecTwin.Bits)) →
-                                                                                  (heldBackOrder :
-                                                                                      List SpecTwin.Chunk →
-                                                                                        List SpecTwin.Chunk) →
-                                                                                    (gossipIds : List SpecTwin.Key) →
-                                                                                      (topicPeers :
-                                                                                          List SpecTwin.Peer) →
-                                                                                        (meshHas gossipEligible :
-                                                                                            SpecTwin.Peer → Bool) →
-                                                                                          (sample :
-                                                                                              List SpecTwin.Peer →
-                                                                                                Nat →
+                                    (admitted : SpecTwin.Peer → SpecTwin.Admit → Bool) →
+                                      (reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool) →
+                                        (bidGroup : SpecTwin.Root → Option SpecTwin.Group) →
+                                          (pendingOrder : List SpecTwin.Root → List SpecTwin.Root) →
+                                            (tieSlotOrder :
+                                                List (SpecTwin.Root × SpecTwin.Peer) →
+                                                  List (SpecTwin.Root × SpecTwin.Peer)) →
+                                              (tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root) →
+                                                (tiedPeersOrder :
+                                                    SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer) →
+                                                  (tiedGroupsOrder :
+                                                      SpecTwin.Root →
+                                                        SpecTwin.Peer → List SpecTwin.Group → List SpecTwin.Group) →
+                                                    (hasRoom : SpecTwin.Peer → Bool) →
+                                                      (popOwedAnswer : SpecTwin.Peer → SpecTwin.ChunkF) →
+                                                        (tiebreak : SpecTwin.ChunkF → SpecTwin.Peer → Nat) →
+                                                          (peerIdBytes : SpecTwin.Peer → String) →
+                                                            (chunksGroups : List SpecTwin.Group) →
+                                                              (chunkIndices : SpecTwin.Group → List Nat) →
+                                                                (owedOrder :
+                                                                    SpecTwin.Peer →
+                                                                      List SpecTwin.Group → List SpecTwin.Group) →
+                                                                  (sha256 : SpecTwin.Hex → SpecTwin.Hex) →
+                                                                    (serialize : SpecTwin.Descriptor → SpecTwin.Hex) →
+                                                                      (snappyBlockEncode :
+                                                                          SpecTwin.Blob → SpecTwin.Blob) →
+                                                                        (padEach rsParity :
+                                                                            List SpecTwin.Blob →
+                                                                              Nat → List SpecTwin.Blob) →
+                                                                          (merkleRoot :
+                                                                              List SpecTwin.Blob → SpecTwin.Hex) →
+                                                                            (merkleProof :
+                                                                                List SpecTwin.Blob →
+                                                                                  Nat → List SpecTwin.Hex) →
+                                                                              (contentId :
+                                                                                  SpecTwin.ChunkF → SpecTwin.Hex) →
+                                                                                (connected : SpecTwin.Peer → Bool) →
+                                                                                  (groupBits :
+                                                                                      List SpecTwin.Key →
+                                                                                        List
+                                                                                          (SpecTwin.Group ×
+                                                                                            SpecTwin.Bits)) →
+                                                                                    (heldBackOrder :
+                                                                                        List SpecTwin.Chunk →
+                                                                                          List SpecTwin.Chunk) →
+                                                                                      (gossipIds : List SpecTwin.Key) →
+                                                                                        (topicPeers :
+                                                                                            List SpecTwin.Peer) →
+                                                                                          (meshHas gossipEligible :
+                                                                                              SpecTwin.Peer → Bool) →
+                                                                                            (sample :
+                                                                                                List SpecTwin.Peer →
+                                                                                                  Nat →
+                                                                                                    List
+                                                                                                      SpecTwin.Peer) →
+                                                                                              (meshList :
                                                                                                   List SpecTwin.Peer) →
-                                                                                            (meshList :
-                                                                                                List SpecTwin.Peer) →
-                                                                                              (resolve :
-                                                                                                  SpecTwin.Key →
-                                                                                                    Option
-                                                                                                      SpecTwin.Key) →
-                                                                                                (chunkOf :
+                                                                                                (resolve :
                                                                                                     SpecTwin.Key →
-                                                                                                      SpecTwin.ChunkF) →
-                                                                                                  (handleGraftPrune :
-                                                                                                      SpecTwin.Peer →
-                                                                                                        Nat) →
-                                                                                                    (onIwantNode :
+                                                                                                      Option
+                                                                                                        SpecTwin.Key) →
+                                                                                                  (chunkOf :
+                                                                                                      SpecTwin.Key →
+                                                                                                        SpecTwin.ChunkF) →
+                                                                                                    (handleGraftPrune :
                                                                                                         SpecTwin.Peer →
-                                                                                                          List
-                                                                                                              SpecTwin.Key →
-                                                                                                            List
-                                                                                                              SpecTwin.ChunkF) →
+                                                                                                          Nat) →
                                                                                                       ⋯) →
       motive t :=
 fun {motive} t mk =>
@@ -488,89 +481,88 @@ definition Refine.Answers.mk.noConfusion : {P : Sort u} →
                           {queueOrder : List SpecTwin.Peer → List SpecTwin.Peer} →
                             {meshAnd : SpecTwin.Peer → List SpecTwin.Peer} →
                               {installedBlock : Nat → SpecTwin.Root → Option SpecTwin.Block} →
-                                {admitted reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool} →
-                                  {bidGroup : SpecTwin.Root → Option SpecTwin.Group} →
-                                    {pendingOrder : List SpecTwin.Root → List SpecTwin.Root} →
-                                      {tieSlotOrder :
-                                          List (SpecTwin.Root × SpecTwin.Peer) → List (SpecTwin.Root × SpecTwin.Peer)} →
-                                        {tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root} →
-                                          {tiedPeersOrder : SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer} →
-                                            {tiedGroupsOrder :
-                                                SpecTwin.Root →
-                                                  SpecTwin.Peer → List SpecTwin.Group → List SpecTwin.Group} →
-                                              {hasRoom : SpecTwin.Peer → Bool} →
-                                                {popOwedAnswer : SpecTwin.Peer → SpecTwin.ChunkF} →
-                                                  {tiebreak : SpecTwin.ChunkF → SpecTwin.Peer → Nat} →
-                                                    {peerIdBytes : SpecTwin.Peer → String} →
-                                                      {chunksGroups : List SpecTwin.Group} →
-                                                        {chunkIndices : SpecTwin.Group → List Nat} →
-                                                          {owedOrder :
-                                                              SpecTwin.Peer →
-                                                                List SpecTwin.Group → List SpecTwin.Group} →
-                                                            {sha256 : SpecTwin.Hex → SpecTwin.Hex} →
-                                                              {serialize : SpecTwin.Descriptor → SpecTwin.Hex} →
-                                                                {snappyBlockEncode : SpecTwin.Blob → SpecTwin.Blob} →
-                                                                  {padEach rsParity :
-                                                                      List SpecTwin.Blob → Nat → List SpecTwin.Blob} →
-                                                                    {merkleRoot : List SpecTwin.Blob → SpecTwin.Hex} →
-                                                                      {merkleProof :
-                                                                          List SpecTwin.Blob →
-                                                                            Nat → List SpecTwin.Hex} →
-                                                                        {contentId : SpecTwin.ChunkF → SpecTwin.Hex} →
-                                                                          {connected : SpecTwin.Peer → Bool} →
-                                                                            {groupBits :
-                                                                                List SpecTwin.Key →
-                                                                                  List
-                                                                                    (SpecTwin.Group × SpecTwin.Bits)} →
-                                                                              {heldBackOrder :
-                                                                                  List SpecTwin.Chunk →
-                                                                                    List SpecTwin.Chunk} →
-                                                                                {gossipIds : List SpecTwin.Key} →
-                                                                                  {topicPeers : List SpecTwin.Peer} →
-                                                                                    {meshHas gossipEligible :
-                                                                                        SpecTwin.Peer → Bool} →
-                                                                                      {sample :
-                                                                                          List SpecTwin.Peer →
-                                                                                            Nat → List SpecTwin.Peer} →
-                                                                                        {meshList :
-                                                                                            List SpecTwin.Peer} →
-                                                                                          {resolve :
-                                                                                              SpecTwin.Key →
-                                                                                                Option SpecTwin.Key} →
-                                                                                            {chunkOf :
+                                {admitted : SpecTwin.Peer → SpecTwin.Admit → Bool} →
+                                  {reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool} →
+                                    {bidGroup : SpecTwin.Root → Option SpecTwin.Group} →
+                                      {pendingOrder : List SpecTwin.Root → List SpecTwin.Root} →
+                                        {tieSlotOrder :
+                                            List (SpecTwin.Root × SpecTwin.Peer) →
+                                              List (SpecTwin.Root × SpecTwin.Peer)} →
+                                          {tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root} →
+                                            {tiedPeersOrder : SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer} →
+                                              {tiedGroupsOrder :
+                                                  SpecTwin.Root →
+                                                    SpecTwin.Peer → List SpecTwin.Group → List SpecTwin.Group} →
+                                                {hasRoom : SpecTwin.Peer → Bool} →
+                                                  {popOwedAnswer : SpecTwin.Peer → SpecTwin.ChunkF} →
+                                                    {tiebreak : SpecTwin.ChunkF → SpecTwin.Peer → Nat} →
+                                                      {peerIdBytes : SpecTwin.Peer → String} →
+                                                        {chunksGroups : List SpecTwin.Group} →
+                                                          {chunkIndices : SpecTwin.Group → List Nat} →
+                                                            {owedOrder :
+                                                                SpecTwin.Peer →
+                                                                  List SpecTwin.Group → List SpecTwin.Group} →
+                                                              {sha256 : SpecTwin.Hex → SpecTwin.Hex} →
+                                                                {serialize : SpecTwin.Descriptor → SpecTwin.Hex} →
+                                                                  {snappyBlockEncode : SpecTwin.Blob → SpecTwin.Blob} →
+                                                                    {padEach rsParity :
+                                                                        List SpecTwin.Blob → Nat → List SpecTwin.Blob} →
+                                                                      {merkleRoot : List SpecTwin.Blob → SpecTwin.Hex} →
+                                                                        {merkleProof :
+                                                                            List SpecTwin.Blob →
+                                                                              Nat → List SpecTwin.Hex} →
+                                                                          {contentId : SpecTwin.ChunkF → SpecTwin.Hex} →
+                                                                            {connected : SpecTwin.Peer → Bool} →
+                                                                              {groupBits :
+                                                                                  List SpecTwin.Key →
+                                                                                    List
+                                                                                      (SpecTwin.Group ×
+                                                                                        SpecTwin.Bits)} →
+                                                                                {heldBackOrder :
+                                                                                    List SpecTwin.Chunk →
+                                                                                      List SpecTwin.Chunk} →
+                                                                                  {gossipIds : List SpecTwin.Key} →
+                                                                                    {topicPeers : List SpecTwin.Peer} →
+                                                                                      {meshHas gossipEligible :
+                                                                                          SpecTwin.Peer → Bool} →
+                                                                                        {sample :
+                                                                                            List SpecTwin.Peer →
+                                                                                              Nat →
+                                                                                                List SpecTwin.Peer} →
+                                                                                          {meshList :
+                                                                                              List SpecTwin.Peer} →
+                                                                                            {resolve :
                                                                                                 SpecTwin.Key →
-                                                                                                  SpecTwin.ChunkF} →
-                                                                                              {handleGraftPrune :
-                                                                                                  SpecTwin.Peer → Nat} →
-                                                                                                {onIwantNode :
+                                                                                                  Option SpecTwin.Key} →
+                                                                                              {chunkOf :
+                                                                                                  SpecTwin.Key →
+                                                                                                    SpecTwin.ChunkF} →
+                                                                                                {handleGraftPrune :
                                                                                                     SpecTwin.Peer →
-                                                                                                      List
-                                                                                                          SpecTwin.Key →
+                                                                                                      Nat} →
+                                                                                                  {onIwantNode :
+                                                                                                      SpecTwin.Peer →
                                                                                                         List
-                                                                                                          SpecTwin.ChunkF} →
-                                                                                                  {decodeAndReencode :
-                                                                                                      SpecTwin.Group →
-                                                                                                        SpecTwin.Descriptor →
-                                                                                                          Option
-                                                                                                            (List
-                                                                                                              (Nat ×
-                                                                                                                SpecTwin.ChunkF))} →
-                                                                                                    {payloadOf :
-                                                                                                        List
-                                                                                                            (Nat ×
-                                                                                                              SpecTwin.ChunkF) →
-                                                                                                          Option
-                                                                                                            SpecTwin.Blob} →
+                                                                                                            SpecTwin.Key →
+                                                                                                          List
+                                                                                                            SpecTwin.ChunkF} →
+                                                                                                    {decodeAndReencode :
+                                                                                                        SpecTwin.Group →
+                                                                                                          SpecTwin.Descriptor →
+                                                                                                            Option
+                                                                                                              (List
+                                                                                                                (Nat ×
+                                                                                                                  SpecTwin.ChunkF))} →
                                                                                                       ⋯ :=
 fun {P} {expired} {connectedTopicPeers} {ownOrder} {listed} {enqueue} {knownId} {authenticable} {shuffled} {validHave}
-    {seen accepted} {live} {validateChunkNode} {queueOrder} {meshAnd} {installedBlock} {admitted reserve} {bidGroup}
+    {seen accepted} {live} {validateChunkNode} {queueOrder} {meshAnd} {installedBlock} {admitted} {reserve} {bidGroup}
     {pendingOrder} {tieSlotOrder} {tiedRootsOrder} {tiedPeersOrder} {tiedGroupsOrder} {hasRoom} {popOwedAnswer}
     {tiebreak} {peerIdBytes} {chunksGroups} {chunkIndices} {owedOrder} {sha256} {serialize} {snappyBlockEncode}
     {padEach rsParity} {merkleRoot} {merkleProof} {contentId} {connected} {groupBits} {heldBackOrder} {gossipIds}
     {topicPeers} {meshHas gossipEligible} {sample} {meshList} {resolve} {chunkOf} {handleGraftPrune} {onIwantNode}
     {decodeAndReencode} {payloadOf} {chunkAt} {blockRoot} {shuffledNats} {writing} {verifyMerkleProof} {expired'}
     {connectedTopicPeers'} {ownOrder'} {listed'} {enqueue'} {knownId'} {authenticable'} {shuffled'} {validHave'}
-    {seen' accepted'} {live'} {validateChunkNode'} {queueOrder'} {meshAnd'} {installedBlock'} {admitted' reserve'}
+    {seen' accepted'} {live'} {validateChunkNode'} {queueOrder'} {meshAnd'} {installedBlock'} {admitted'} {reserve'}
     {bidGroup'} {pendingOrder'} {tieSlotOrder'} {tiedRootsOrder'} {tiedPeersOrder'} {tiedGroupsOrder'} {hasRoom'}
     {popOwedAnswer'} {tiebreak'} {peerIdBytes'} {chunksGroups'} {chunkIndices'} {owedOrder'} {sha256'} {serialize'}
     {snappyBlockEncode'} {padEach' rsParity'} {merkleRoot'} {merkleProof'} {contentId'} {connected'} {groupBits'}
@@ -694,77 +686,73 @@ definition Refine.Answers.recOn : {motive : Refine.Answers → Sort u} →
                               (queueOrder : List SpecTwin.Peer → List SpecTwin.Peer) →
                                 (meshAnd : SpecTwin.Peer → List SpecTwin.Peer) →
                                   (installedBlock : Nat → SpecTwin.Root → Option SpecTwin.Block) →
-                                    (admitted reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool) →
-                                      (bidGroup : SpecTwin.Root → Option SpecTwin.Group) →
-                                        (pendingOrder : List SpecTwin.Root → List SpecTwin.Root) →
-                                          (tieSlotOrder :
-                                              List (SpecTwin.Root × SpecTwin.Peer) →
-                                                List (SpecTwin.Root × SpecTwin.Peer)) →
-                                            (tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root) →
-                                              (tiedPeersOrder :
-                                                  SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer) →
-                                                (tiedGroupsOrder :
-                                                    SpecTwin.Root →
-                                                      SpecTwin.Peer → List SpecTwin.Group → List SpecTwin.Group) →
-                                                  (hasRoom : SpecTwin.Peer → Bool) →
-                                                    (popOwedAnswer : SpecTwin.Peer → SpecTwin.ChunkF) →
-                                                      (tiebreak : SpecTwin.ChunkF → SpecTwin.Peer → Nat) →
-                                                        (peerIdBytes : SpecTwin.Peer → String) →
-                                                          (chunksGroups : List SpecTwin.Group) →
-                                                            (chunkIndices : SpecTwin.Group → List Nat) →
-                                                              (owedOrder :
-                                                                  SpecTwin.Peer →
-                                                                    List SpecTwin.Group → List SpecTwin.Group) →
-                                                                (sha256 : SpecTwin.Hex → SpecTwin.Hex) →
-                                                                  (serialize : SpecTwin.Descriptor → SpecTwin.Hex) →
-                                                                    (snappyBlockEncode :
-                                                                        SpecTwin.Blob → SpecTwin.Blob) →
-                                                                      (padEach rsParity :
-                                                                          List SpecTwin.Blob →
-                                                                            Nat → List SpecTwin.Blob) →
-                                                                        (merkleRoot :
-                                                                            List SpecTwin.Blob → SpecTwin.Hex) →
-                                                                          (merkleProof :
-                                                                              List SpecTwin.Blob →
-                                                                                Nat → List SpecTwin.Hex) →
-                                                                            (contentId :
-                                                                                SpecTwin.ChunkF → SpecTwin.Hex) →
-                                                                              (connected : SpecTwin.Peer → Bool) →
-                                                                                (groupBits :
-                                                                                    List SpecTwin.Key →
-                                                                                      List
-                                                                                        (SpecTwin.Group ×
-                                                                                          SpecTwin.Bits)) →
-                                                                                  (heldBackOrder :
-                                                                                      List SpecTwin.Chunk →
-                                                                                        List SpecTwin.Chunk) →
-                                                                                    (gossipIds : List SpecTwin.Key) →
-                                                                                      (topicPeers :
-                                                                                          List SpecTwin.Peer) →
-                                                                                        (meshHas gossipEligible :
-                                                                                            SpecTwin.Peer → Bool) →
-                                                                                          (sample :
-                                                                                              List SpecTwin.Peer →
-                                                                                                Nat →
+                                    (admitted : SpecTwin.Peer → SpecTwin.Admit → Bool) →
+                                      (reserve : SpecTwin.Peer → SpecTwin.ChunkF → Bool) →
+                                        (bidGroup : SpecTwin.Root → Option SpecTwin.Group) →
+                                          (pendingOrder : List SpecTwin.Root → List SpecTwin.Root) →
+                                            (tieSlotOrder :
+                                                List (SpecTwin.Root × SpecTwin.Peer) →
+                                                  List (SpecTwin.Root × SpecTwin.Peer)) →
+                                              (tiedRootsOrder : List SpecTwin.Root → List SpecTwin.Root) →
+                                                (tiedPeersOrder :
+                                                    SpecTwin.Root → List SpecTwin.Peer → List SpecTwin.Peer) →
+                                                  (tiedGroupsOrder :
+                                                      SpecTwin.Root →
+                                                        SpecTwin.Peer → List SpecTwin.Group → List SpecTwin.Group) →
+                                                    (hasRoom : SpecTwin.Peer → Bool) →
+                                                      (popOwedAnswer : SpecTwin.Peer → SpecTwin.ChunkF) →
+                                                        (tiebreak : SpecTwin.ChunkF → SpecTwin.Peer → Nat) →
+                                                          (peerIdBytes : SpecTwin.Peer → String) →
+                                                            (chunksGroups : List SpecTwin.Group) →
+                                                              (chunkIndices : SpecTwin.Group → List Nat) →
+                                                                (owedOrder :
+                                                                    SpecTwin.Peer →
+                                                                      List SpecTwin.Group → List SpecTwin.Group) →
+                                                                  (sha256 : SpecTwin.Hex → SpecTwin.Hex) →
+                                                                    (serialize : SpecTwin.Descriptor → SpecTwin.Hex) →
+                                                                      (snappyBlockEncode :
+                                                                          SpecTwin.Blob → SpecTwin.Blob) →
+                                                                        (padEach rsParity :
+                                                                            List SpecTwin.Blob →
+                                                                              Nat → List SpecTwin.Blob) →
+                                                                          (merkleRoot :
+                                                                              List SpecTwin.Blob → SpecTwin.Hex) →
+                                                                            (merkleProof :
+                                                                                List SpecTwin.Blob →
+                                                                                  Nat → List SpecTwin.Hex) →
+                                                                              (contentId :
+                                                                                  SpecTwin.ChunkF → SpecTwin.Hex) →
+                                                                                (connected : SpecTwin.Peer → Bool) →
+                                                                                  (groupBits :
+                                                                                      List SpecTwin.Key →
+                                                                                        List
+                                                                                          (SpecTwin.Group ×
+                                                                                            SpecTwin.Bits)) →
+                                                                                    (heldBackOrder :
+                                                                                        List SpecTwin.Chunk →
+                                                                                          List SpecTwin.Chunk) →
+                                                                                      (gossipIds : List SpecTwin.Key) →
+                                                                                        (topicPeers :
+                                                                                            List SpecTwin.Peer) →
+                                                                                          (meshHas gossipEligible :
+                                                                                              SpecTwin.Peer → Bool) →
+                                                                                            (sample :
+                                                                                                List SpecTwin.Peer →
+                                                                                                  Nat →
+                                                                                                    List
+                                                                                                      SpecTwin.Peer) →
+                                                                                              (meshList :
                                                                                                   List SpecTwin.Peer) →
-                                                                                            (meshList :
-                                                                                                List SpecTwin.Peer) →
-                                                                                              (resolve :
-                                                                                                  SpecTwin.Key →
-                                                                                                    Option
-                                                                                                      SpecTwin.Key) →
-                                                                                                (chunkOf :
+                                                                                                (resolve :
                                                                                                     SpecTwin.Key →
-                                                                                                      SpecTwin.ChunkF) →
-                                                                                                  (handleGraftPrune :
-                                                                                                      SpecTwin.Peer →
-                                                                                                        Nat) →
-                                                                                                    (onIwantNode :
+                                                                                                      Option
+                                                                                                        SpecTwin.Key) →
+                                                                                                  (chunkOf :
+                                                                                                      SpecTwin.Key →
+                                                                                                        SpecTwin.ChunkF) →
+                                                                                                    (handleGraftPrune :
                                                                                                         SpecTwin.Peer →
-                                                                                                          List
-                                                                                                              SpecTwin.Key →
-                                                                                                            List
-                                                                                                              SpecTwin.ChunkF) →
+                                                                                                          Nat) →
                                                                                                       ⋯) →
       motive t :=
 fun {motive} t mk => Refine.Answers.rec mk t
