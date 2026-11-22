@@ -92,6 +92,8 @@ import content                          # noqa: E402
 import footprint as F                   # noqa: E402
 import schema                           # noqa: E402: gen/schema.py, the twin's tables, which its Lean is made from too
 import schema_v2                        # noqa: E402: gen/schema_v2.py, v2's (its DIRECTIONS)
+import manifest_v2                      # noqa: E402: gen/manifest_v2.py, protocol-v2.md's manifest, which the replay
+#                                         reads a v2 trace by
 from trace61 import CONSTS, SEC61, Tracer, fbits   # noqa: E402
 
 OWN = tuple(t.name for t in schema.TABLES)
@@ -240,6 +242,29 @@ def sec3_check(names, v2=OWN_V2, undeclared=UNDECLARED_V2):
     out = [f"{n}: in §3, in no list" for n in names if n not in known]
     out += [f"{n}: in schema_v2.py, not in §3" for n in v2 if n not in names and n not in undeclared]
     out += [f"{n}: named as not in §3, and §3 declares it" for n in undeclared if n in names]
+    return out
+
+
+def manifest_check(traced, m=manifest_v2, own=OWN + OWN_V2, foreign=FOREIGN, node_own=None):
+    """Under --doc v2, the tracer's own lists against protocol-v2.md's manifest (gen/manifest_v2.py), which the
+    replay reads the trace by: the traced names (v2_kept over the two documents, without §7.1's) are KEPT and
+    NODE_OWN's keys; NODE_OWN is the tracer's; the header's `own` is OWN, in its order, and `foreign` is FOREIGN.
+    What differs, as one line each, naming the names. `traced` None (§6.1's twelve alone, TRACE3_ONLY=sec61): the
+    traced names are not compared."""
+    node_own = NODE_OWN if node_own is None else node_own
+    out = []
+    want = set(m.KEPT) | set(m.NODE_OWN)
+    if traced is not None and set(traced) != want:
+        out.append(f"traced, not in the manifest's KEPT or NODE_OWN: {sorted(set(traced) - want)}; in them, not "
+                   f"traced: {sorted(want - set(traced))}")
+    if dict(m.NODE_OWN) != dict(node_own):
+        out.append(f"NODE_OWN is {dict(node_own)!r} here, {dict(m.NODE_OWN)!r} in the manifest")
+    if list(m.OWN) != list(own):
+        diff = next((i for i, (a, b) in enumerate(zip(m.OWN, own)) if a != b), min(len(m.OWN), len(own)))
+        out.append(f"own: {len(own)} tables here, {len(m.OWN)} in the manifest, the first difference at position "
+                   f"{diff + 1}")
+    if list(m.FOREIGN) != list(foreign):
+        out.append(f"foreign is {list(foreign)} here, {list(m.FOREIGN)} in the manifest")
     return out
 
 
@@ -884,8 +909,60 @@ def views_self_test():
     return bad
 
 
+def manifest_self_test():
+    """manifest_check (step 2's known answer 4): on the toy as it is, the tracer's lists are the manifest's; each
+    planted difference in a copy of the manifest is named. The control: each case run again with a check that finds
+    nothing must fail exactly the planted ones."""
+    import types
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import node as N                    # noqa: E402: the toy beside this repository's documents
+    traced = tuple(n for n in v2_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+    m = manifest_v2
+
+    def copy(**kw):
+        d = {k: getattr(m, k) for k in ("KEPT", "NODE_OWN", "OWN", "FOREIGN")}
+        d.update(kw)
+        return types.SimpleNamespace(**d)
+    own2 = list(m.OWN)
+    own2[0], own2[1] = own2[1], own2[0]
+    cases = [
+        ("the toy as it is, the manifest as it is", lambda chk: chk(traced), []),
+        ("§6.1's twelve alone (traced not compared)", lambda chk: chk(None), []),
+        ("a KEPT name dropped from the manifest (retry_offer)", lambda chk: chk(traced, copy(
+            KEPT=[n for n in m.KEPT if n != "retry_offer"])),
+         ["traced, not in the manifest's KEPT or NODE_OWN: ['retry_offer']; in them, not traced: []"]),
+        ("a name in the manifest's KEPT that is not traced (window_release)", lambda chk: chk(traced, copy(
+            KEPT=list(m.KEPT) + ["window_release"])),
+         ["traced, not in the manifest's KEPT or NODE_OWN: []; in them, not traced: ['window_release']"]),
+        ("NODE_OWN's helper under another qualified name", lambda chk: chk(traced, copy(
+            NODE_OWN={"held": "Node._planted.<locals>.held"})),
+         [f"NODE_OWN is {dict(NODE_OWN)!r} here, {{'held': 'Node._planted.<locals>.held'}} in the manifest"]),
+        ("the manifest's OWN with its first two tables swapped", lambda chk: chk(traced, copy(OWN=own2)),
+         [f"own: {len(OWN) + len(OWN_V2)} tables here, {len(own2)} in the manifest, the first difference at "
+          f"position 1"]),
+        ("the manifest's FOREIGN without chunks", lambda chk: chk(traced, copy(FOREIGN=["known_id"])),
+         [f"foreign is {list(FOREIGN)} here, ['known_id'] in the manifest"]),
+    ]
+    bad = 0
+    for what, f, want in cases:
+        got = f(manifest_check)
+        ok = got == want
+        bad += not ok
+        print(f"manifest self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    # the control: a check that finds nothing passes the cases that expect nothing, and fails each planted one
+    fails = [what for what, f, want in cases if f(lambda *a, **k: []) != want]
+    planted = [what for what, f, want in cases if want]
+    ok = fails == planted
+    bad += not ok
+    print(f"manifest self-test, the control (a check that finds nothing): {len(fails)} cases fail, the "
+          f"{len(planted)} planted ones: {'ok' if ok else f'got {fails!r}  <-- FAIL'}")
+    print(f"manifest self-test: {len(traced)} traced names, the manifest's KEPT {len(m.KEPT)} and NODE_OWN "
+          f"{len(m.NODE_OWN)}; own {len(m.OWN)}, foreign {len(m.FOREIGN)}")
+    return bad
+
+
 def self_test_v2():
-    bad = v2_kept_self_test() + forms_self_test() + views_self_test()
+    bad = v2_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test()
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -968,8 +1045,13 @@ class Tracer3(Tracer):
             off = sec3_check(sec3_names(Path(N.DOC2).read_text()))
             if off:
                 raise SystemExit("trace3: protocol-v2.md's §3 and the tables' lists differ: " + "; ".join(off))
-        hd = {"format": 7, "whole": whole, "own": list(OWN) + (list(OWN_V2) if self.doc_v2 else []),
-              "foreign": list(FOREIGN)}
+            off = manifest_check(None if self.only61 else self.traced)  # the lists the replay reads a v2 trace by
+            if off:
+                raise SystemExit("trace3: the tracer's lists and protocol-v2.md's manifest differ: " + "; ".join(off))
+        # under v2 the header's tables are the manifest's, which manifest_check has just held to the tracer's own
+        hd = {"format": 7, "whole": whole,
+              "own": list(manifest_v2.OWN) if self.doc_v2 else list(OWN),
+              "foreign": list(manifest_v2.FOREIGN) if self.doc_v2 else list(FOREIGN)}
         if self.doc_v2:
             hd["row_reads"] = list(ROW_READS_V2)
         hd.update({"traced": sorted(self.traced), "tracer": "trace3.py", "args": argv})
