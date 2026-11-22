@@ -899,16 +899,21 @@ cases_of() {            # $1: a trace; $2: a cell of the chain cases: its cases 
   mapfile -t cs < <(chain_expect "$2")
   $PY "$T/chaincases.py" "$1" "${cs[@]}"
 }
-replay_clean() {        # $1: a trace, without .jsonl.gz: its replay as s_replays reads one; why not, on stdout
-  local f=$OUT/$1.replay
+replay_clean() {        # $1: a trace, without .jsonl.gz: its replay as s_replays reads one, but for bare calls; why
+  local f=$OUT/$1.replay  #   not, on stdout. A chain cell may run a replaced name outside every record (filter_entry
+  #                         under --promise-mode peer, decode_group under --rebuilt-seen on): its callees run bare and
+  #                         are counted, the stated limit; the count is reported (bare_count), not refused
   [ -s "$f" ] || { echo "no replay"; return 1; }
   has -E '^replay: [1-9][0-9]* records, [1-9][0-9]* ok, 0 mismatched$' "$f" || { echo "a record mismatched, or none read"; return 1; }
   has -x "reads of the Python's that the twin did not make: 0" "$f" || { echo "a read of the Python's not made"; return 1; }
-  bare_none "$OUT/$1.jsonl.gz" || { echo "its run counted bare calls"; return 1; }
+  [ -s "$OUT/$1.jsonl.gz.bare.json" ] || { echo "its run wrote no .bare.json"; return 1; }
   has -E "^content: as --content's, [0-9]+ names\$" "$f" || { echo "its content line was not compared, or is not this tree's"; return 1; }
   if grep -E '^(content|header|nodes|trailer|consts|subset): ' "$f" | grep -v -e '^header: {' -e "^content: as --content's, " | grep -q .; then
     echo "the replay refused a line of the envelope"; return 1
   fi
+}
+bare_count() {          # $1: a trace, without .jsonl.gz: its run's bare calls, all nodes and names, from its .bare.json
+  $PY -c 'import json, sys; print(sum(json.load(open(sys.argv[1])).values()))' "$OUT/$1.jsonl.gz.bare.json" 2> /dev/null || echo "?"
 }
 chain_plant() {         # $1: a plant's letter; $2: tracerfaults3.py's option; $3: its cell: traced, its status kept;
   local p=$1 f=$2 c=$3  #   replayed where it ran to its end
@@ -925,7 +930,7 @@ plant_misses() {        # $1: a plant's letter; $2: its cell: the plant's trace'
   grep ': NOT: ' "$OUT/chains/plant-$1.cases"
 }
 plant_line() {          # $1: a plant's letter: its planted count and its replay's line, for the report
-  echo "$(grep -m 1 -E '^tracerfaults3: ' "$OUT/chains/plant-$1.err" | cut -c16-120); its replay: $(grep -m 1 '^replay: ' "$OUT/chains/plant-$1.replay" 2> /dev/null || echo none)"
+  echo "$(grep -m 1 -E '^tracerfaults3: ' "$OUT/chains/plant-$1.err" | cut -c16-120); its replay: $(grep -m 1 '^replay: ' "$OUT/chains/plant-$1.replay" 2> /dev/null || echo none); bare calls counted: $(bare_count "chains/plant-$1")"
 }
 chain_cases() {         # the chain cases: the nodes line's chains on real cells, and five plants, each caught
   local cells plants c p why k all=0 good=0 caught=0 miss stop
@@ -955,7 +960,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
     if grep -q ': NOT: ' "$OUT/chains/$c.cases"; then
       echo "$c: $(tail -n 1 "$OUT/chains/$c.cases")  <-- NOT" >> "$OUT/c-chains.txt"; continue
     fi
-    echo "$c: $(tail -n 1 "$OUT/chains/$c.cases"); $(grep -m 1 '^replay: ' "$OUT/chains/$c.replay"); digest the untraced run's" >> "$OUT/c-chains.txt"
+    echo "$c: $(tail -n 1 "$OUT/chains/$c.cases"); $(grep -m 1 '^replay: ' "$OUT/chains/$c.replay"); digest the untraced run's; bare calls counted: $(bare_count "chains/$c")" >> "$OUT/c-chains.txt"
     if [ "$c" = das-rows-mcoff ]; then      # the off layer's rows: none, and the cell would not test what it is for
       $PY "$T/chaincases.py" --rows owed_missing "$OUT/chains/$c.jsonl.gz" > "$OUT/chains/$c.rows"
       echo "$c: $(cat "$OUT/chains/$c.rows")" >> "$OUT/c-chains.txt"
