@@ -986,6 +986,7 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
     | .ok v => return (.ok (rs.twin, ← if r.raises.isSome then pure true else ok v), rs)
     | .error e => return (.error e, rs)
   let retNat (j : Json) : Except String Nat := j.getNat?
+  let form := f                         -- the record's document: the arms below bind `f` to a chunk
   let (res, rs) ← match r.fn, r.args with
     | "may_ask", #[a, p] => do exec (mayAsk (← key a) (← nat p)) fun v => return v == (← r.ret.getBool?)
     | "retry_offer", #[a] => do exec (retryOffer (← key a)) fun _ => return r.ret == .null
@@ -1024,7 +1025,7 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
     -- may call any of the six alone
     | "defer", #[p, f] => do exec (defer deferDepth (← nat p) (← chunkF f)) fun _ => return r.ret == .null
     | "tie", #[p, f] => do exec (tie (← nat p) (← chunkF f)) fun _ => return r.ret == .null
-    | "tie_room", #[p, f] => do exec (tieRoom (← nat p) (← chunkF f)) fun v => return v == (← r.ret.getBool?)
+    | "tie_room", #[p, f] => do exec (tieRoom (← nat p) (← chunkIn form f)) fun v => return v == (← r.ret.getBool?)
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) fun _ => return r.ret == .null
     | "drop_tie", #[p, .str g', b] => do
       exec (dropTie (← nat p) (← group g') (← nat b)) fun _ => return r.ret == .null
@@ -1049,7 +1050,7 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
     | "projected", #[p, .str g'] => do exec (projected (← nat p) (← group g')) fun v => return v == (← r.ret.getBool?)
     | "rarest", #[p] => do exec (rarestOf (← nat p)) fun v => return v == (← retNat r.ret)   -- v2's choose calls it
     -- §1's seven. K and N take what the caller read of `desc`: a descriptor, or null
-    | "message_id", #[f] => do exec (messageId (← chunkF f)) fun v => return v == (← mid r.ret)   -- §2
+    | "message_id", #[f] => do exec (messageId (← chunkIn form f)) fun v => return v == (← mid r.ret)   -- §2
     -- §6.4's paced gossip
     | "on_pace_tick", #[] => do exec onPaceTick fun _ => return r.ret == .null
     | "on_heartbeat", #[] => do exec onHeartbeat fun _ => return r.ret == .null
@@ -1113,7 +1114,7 @@ def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : Li
       exec (publish (← blockOf b) (← descriptor d) (← (← arr sh).mapM shardOf)) fun _ => return r.ret == .null
     | "guard_fails", #[p, .str g'] => do exec (guardFails (← nat p) (← group g')) fun v => return v == (← r.ret.getBool?)
     | "choose_push", #[c, cands, budget, src] => do
-      exec (choosePush (← chunkF c) (← (← arr cands).mapM nat) (← nat budget) (← src.getBool?)) fun v =>
+      exec (choosePush (← chunkIn form c) (← (← arr cands).mapM nat) (← nat budget) (← src.getBool?)) fun v =>
         return v == (← (← arr r.ret).mapM retNat)
     | "group_id", #[d] => do exec (groupId (← descriptor d)) fun v => return Json.str v == r.ret
     -- (`SpecTwin.groupKey` is §1's function; `groupKey` alone is this namespace's reader of a group's key)

@@ -242,11 +242,32 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
     | _ => throw s!"shuffledPairs: not a list of pairs: {ans.compress}"
   | _ => throw s!"no wrong answer for the form {form}"
 
+/-- The labels of v2's question forms, one row each, in the order of `tools/forms-v2-examples.tsv` (spec 287d575):
+the checker's own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). -/
+def labels : List String :=
+  ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
+   "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
+   "links", "linkCover", "coverCandidates", "floorCandidates", "floorLinks", "highCustody", "families",
+   "familiesWithDuty", "wantsFamily", "dutyFor", "routeNext", "blockOf", "groupOf", "nodeId", "interestSatisfied",
+   "mergeWaiting", "deferredOffers", "openGroupSource", "openLink", "openSamplingLink", "choicePeer", "choiceOfSet",
+   "choiceNat", "choiceCover", "validHaveV2", "sampleCovers", "shuffledPairs"]
+
+/-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
+def sendKind : String → Option (String × List String)
+  | "send (a HAVE)" => some ("HAVE", ["have"])
+  | "send (a WANT)" => some ("WANT", ["want"])
+  | "send (a relation)" => some ("relation", ["join", "graft", "prune"])
+  | _ => none
+
 /-- A row read, and then refused with a wrong form of its answer: the answer as read and written back, and the
-refusal's message. -/
+refusal's message. A `send` row's message must carry its label's wire tag first. -/
 def checkRow (name : String) (row : Json) : Except String (String × String) := do
   let form := formOf name
   let #[.str q, .arr args, ans] ← row.getArr? | throw s!"not a row [name, args, answer]: {row.compress}"
+  if let some (kind, tags) := sendKind name then
+    let m := args[1]?.getD Json.null
+    let .ok (.str tag) := m.getArrVal? 0 | throw s!"{name}: the message has no wire tag: {m.compress}"
+    if !tags.contains tag then throw s!"{name}: the message is not a {kind}: {tag}"
   let ask ← askOf form args
   let v ← onTape [row] ask
   if v != ans then throw s!"the answer read back as {v.compress}, not the row's {ans.compress}"
@@ -278,9 +299,11 @@ def controls (rows : Array (String × Json)) : List (String × String × Except 
      do onTape [hcRow] (← askOf "linkCover" (argsOf hcRow))),
    ("3, typeOf's row twice", "the tape is not used up", do onTape [toRow, toRow] (← askOf "typeOf" (argsOf toRow)))]
 
-/-- `replay --forms FILE`. Each line of FILE is a form's name, a tab and its row as compact JSON. Each row is read
-and refused (`checkRow`), and then the three controls are run on the same rows. One line is printed for each,
-and a last line with the counts. The exit code is 1 on any miss, and on a file that is not there. -/
+/-- `replay --forms FILE`. Each line of FILE is a form's name, a tab and its row as compact JSON. Before any row is
+read, the names must be the checker's `labels`, each once: a file with another name, a name twice or a label with
+no row is refused with one line and exit 1. Then each row is read and refused (`checkRow`), and the three controls
+are run on the same rows. One line is printed for each, and a last line with the counts. The exit code is 1 on any
+miss, and on a file that is not there. -/
 def formsMain (file : String) : IO UInt32 := do
   if !(← System.FilePath.pathExists file) then
     IO.println s!"replay: --forms {file}: no such file"
@@ -294,6 +317,20 @@ def formsMain (file : String) : IO UInt32 := do
       | .ok j => rows := rows.push (name, j)
       | .error e => IO.println s!"{name}\tFAIL\tthe row is not JSON: {e}"; failed := failed + 1
     | _ => IO.println s!"FAIL\tnot a line of a name, a tab and a row: {l}"; failed := failed + 1
+  -- the labels, before any row is read: each of the checker's once, and no other
+  let names := rows.toList.map (·.1)
+  let mut seen : List String := []
+  for n in names do
+    if !labels.contains n then
+      IO.println s!"forms: not one of the {labels.length} labels: {n}"
+      return 1
+    if seen.contains n then
+      IO.println s!"forms: a label twice: {n}"
+      return 1
+    seen := n :: seen
+  if let some n := labels.find? (!names.contains ·) then
+    IO.println s!"forms: no row for {n}"
+    return 1
   for (name, j) in rows do
     match checkRow name j with
     | .ok (v, e) => IO.println s!"{name}\tread ok\t{v}\trefused\t{e}"

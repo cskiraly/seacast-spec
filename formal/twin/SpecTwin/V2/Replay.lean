@@ -252,11 +252,12 @@ def timersV2 : List String := ["reconsider", "ask_sample", "resample"]
 /-- A read of `chunks[g][i]` under v2: the chunk held there, which need not name that place. A rebuilt row's
 chunks are column chunks, which `decode_group` stores under the row's places, and `fill` stores a received chunk
 under each axis's place the same way; the chunk keeps its own coordinates and id. Its own id must still agree
-with its own coordinates (`chunkF`). A missing chunk is outside the domain, as under `protocol.md`. -/
+with its own coordinates, and the store holds it narrow (`chunkN`). A missing chunk is outside the domain, as under
+`protocol.md`. -/
 def chunksReadV2 (path v : Json) : Except String Entry := do
   let #[g, i] ← path.getArr? | throw s!"not a place of chunks: {path.compress}"
   if v == .null then throw s!"chunks: no chunk there, where the Python raises: {path.compress}"
-  return .readChunkAt (← Replay.groupKey g) (← nat i) (← chunkF v)
+  return .readChunkAt (← Replay.groupKey g) (← nat i) (← chunkN v)
 
 /-- The entries of a v2 record that `protocol.md`'s reader does not take, or reads otherwise. -/
 def entryV2 (j : Json) : Option (Except String Entry) :=
@@ -331,7 +332,7 @@ instance : NodeV2 R where
   verify T f h := askCall "verify" [Json.str T, chunkJson f, optJson descriptorJson h] verdict
   decode T g h := askCall "decode" [Json.str T, Json.str g, optJson descriptorJson h] fun j => do
     if j == .null then return none
-    let l ← pairs "index and chunk" nat chunkF j
+    let l ← pairs "index and chunk" nat chunkN j       -- the rebuilt chunks, narrow
     nodup "decode" (l.map (·.1))
     return some l
   headerOf T f := askCall "header_of" [Json.str T, chunkJson f] (optOf descriptor)
@@ -523,8 +524,9 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "join_push", #[p, t, f, k] => do exec (joinPush (← nat p) (← typeId t) (← intOf f) (← nat k)) none_
     | "source_pool", #[t, g, k] => do exec (sourcePool (← typeId t) (← Replay.groupKey g) (← nat k)) (retIs r.ret peers)
     | "unpush", #[p, g, i] => do exec (unpush (← nat p) (← Replay.groupKey g) (← nat i)) none_
-    | "candidates_for_source", #[f] => do exec (candidatesForSource (← chunkF f)) (retIs r.ret peers)
-    | "origin_written", #[f] => do exec (originWritten (← chunkF f)) none_
+    -- a chunk argument is narrow but in on_validated, defer and on_chunk, where a chunk arrives or waits (`chunkN`)
+    | "candidates_for_source", #[f] => do exec (candidatesForSource (← chunkN f)) (retIs r.ret peers)
+    | "origin_written", #[f] => do exec (originWritten (← chunkN f)) none_
     | "offer_at_publish", #[g, d] => do exec (offerAtPublish (← Replay.groupKey g) (← descriptor d)) none_
     | "origin_acked", #[g, i] => do exec (originAcked (← Replay.groupKey g) (← nat i)) none_
     | "send_gossip", #[q, ids] => do exec (sendGossip (← nat q) (← (← arr ids).mapM mid)) none_
@@ -540,7 +542,7 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "probe_waits", #[a, p] => do exec (probeWaits (← askV2Of a) (← nat p)) (retIs r.ret boolOf)
     | "probe_settled", #[a] => do exec (probeSettled (← askV2Of a)) (retIs r.ret boolOf)
     | "probe_of_claim", #[p, a] => do exec (probeOfClaim (← nat p) (← optOf askV2Of a)) (retIs r.ret boolOf)
-    | "serve_probe", #[p, g, f] => do exec (serveProbe (← nat p) (← Replay.groupKey g) (← chunkF f)) none_
+    | "serve_probe", #[p, g, f] => do exec (serveProbe (← nat p) (← Replay.groupKey g) (← chunkN f)) none_
     | "serve_standing", #[g, i] => do exec (serveStanding (← Replay.groupKey g) (← nat i)) none_
     | "serve_waiting_probe", #[g, i] => do exec (serveWaitingProbe (← Replay.groupKey g) (← nat i)) none_
     | "known_in_scope", #[g] => do exec (knownInScope (← Replay.groupKey g)) (retIs r.ret nat)
@@ -550,9 +552,9 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "owed_missing", #[g] => do exec (owedMissing (← Replay.groupKey g)) (retIs r.ret boolOf)
     -- fill, §4.6's completion, decoding and claims, filter_entry
     | "push_rebuilt_as_source", #[g, items] => do
-      exec (pushRebuiltAsSource (← Replay.groupKey g) (← pairs "index and chunk" nat chunkF items)) none_
+      exec (pushRebuiltAsSource (← Replay.groupKey g) (← pairs "index and chunk" nat chunkN items)) none_
     | "push_rebuilt", #[g, new] => do exec (pushRebuilt (← Replay.groupKey g) (← natList new)) none_
-    | "fill", #[g, i, f, p] => do exec (fill (← Replay.groupKey g) (← nat i) (← chunkF f) (← optOf nat p)) none_
+    | "fill", #[g, i, f, p] => do exec (fill (← Replay.groupKey g) (← nat i) (← chunkN f) (← optOf nat p)) none_
     | "arm", #[g, t] => do exec (arm (← Replay.groupKey g) (← floatOf t)) none_
     | "check_completion", #[g] => do exec (checkCompletion (← Replay.groupKey g)) none_
     | "defer_on_claim", #[g] => do exec (deferOnClaim (← Replay.groupKey g)) none_
@@ -562,8 +564,8 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "note_claim", #[p, g] => do exec (noteClaim (← nat p) (← Replay.groupKey g)) none_
     | "filter_entry", #[p, e] => do exec (filterEntry (← nat p) (← qentry e .v2)) (retIs r.ret (optOf (qentry · .v2)))
     -- forward, §4.2's chunk, §4.3's holding and offer
-    | "forward", #[f, p] => do exec (forward (← chunkF f) (← nat p) none) none_
-    | "forward", #[f, p, axes] => do exec (forward (← chunkF f) (← nat p) (← optOf giList axes)) none_
+    | "forward", #[f, p] => do exec (forward (← chunkN f) (← nat p) none) none_
+    | "forward", #[f, p, axes] => do exec (forward (← chunkN f) (← nat p) (← optOf giList axes)) none_
     | "on_validated", #[p, f, v] => do exec (onValidated (← nat p) (← chunkF f) (← verdict v)) none_
     | "defer", #[p, f] => do exec (defer (← nat p) (← chunkF f)) none_
     | "on_chunk", #[p, f] => do exec (onChunk (← nat p) (← chunkF f)) none_
@@ -583,7 +585,7 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "on_pace_tick", #[] => do exec onPaceTick none_
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_
     | "respond", #[p, asks, answers, prunes] => do
-      exec (V2.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkF) (← nat prunes)) none_
+      exec (V2.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkN) (← nat prunes)) none_
     | f, _ => throw s!"not a function of the twin under protocol-v2.md, or not its arguments: {f}"
   judge traced r res rs
 
