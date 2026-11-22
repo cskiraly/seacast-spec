@@ -45,7 +45,7 @@ CLOSURE_ALIASES = {
     "hdr": "desc, a view, under the name protocol-v2.md's code gives it",
     "chunk_id": "message_id, a traced function, under the name protocol-v2.md's code gives it (chunk_id = message_id)"}
 # the nodes entry's constants under v2, as trace3.py's install writes them: trace61's four, the client's three limits,
-# MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and v2's three
+# MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and v2's five
 NODES_LINE_V2 = (
     "IWANT_WINDOW", "RETRY_SLACK", "PROMISE", "PARK_TTL",
     "MAX_IHAVE_MESSAGES", "MAX_IHAVE_LENGTH", "MAX_PENDING_GROUPS", "MAX_PLAIN_CHUNKS",
@@ -53,7 +53,7 @@ NODES_LINE_V2 = (
     "UNIT", "MAX_CHUNKS", "MAX_SEGMENT_SIZE", "HEARTBEAT", "GOSSIP_FACTOR",
     "D_LAZY", "PACED", "HAVE_TTL", "GOSSIP_RETRANSMISSION", "DESCRIPTOR_IN_CHUNK", "PUSH_TTL", "R", "R_NODE",
     "GUARD_GRACE", "UPLINK", "STRIPE_UPLINK", "W", "WINDOW_TIMEOUT", "SOURCE_OFFERS",
-    "ANSWERS_FIRST", "MERGE_HOLDINGS", "ASK_UPLINK")
+    "ANSWERS_FIRST", "MERGE_HOLDINGS", "ASK_UPLINK", "SAMPLE_OUTSTANDING", "SERVE_BUDGET")
 # the toy's enumerations (node.py's namespace and _v2): each label a string equal to its name, but the two bitmaps,
 # given as ("Bits", their int)
 ENUMS_V2 = dict({k: k for k in (

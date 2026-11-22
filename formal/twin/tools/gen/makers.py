@@ -2,7 +2,7 @@
 """The makers of a `Tables` value in the replay as built: Lean's own account (TablesMakers.lean), and its controls.
 
     python3 makers.py --check TWINDIR             TWINDIR is a built twin (its .lake holds the replay's modules)
-    python3 makers.py --control TWINDIR WORKDIR   ten copies of TWINDIR's sources, each with one declaration planted
+    python3 makers.py --control TWINDIR WORKDIR   eleven copies of TWINDIR's sources, each with one declaration planted
 
 gen.py --check holds the hand-written files to one instance of `Tables`, by their text. A text rule sees the
 spellings it names. TablesMakers.lean asks the built modules which constants make a `Tables` value, however they
@@ -10,7 +10,8 @@ are written, and fails unless the list is the replay's one instance; this script
 
 The controls: each plants one declaration that makes a `Tables` value at the end of a hand-written file, in a
 spelling the text rule passes (a qualified name, an abbreviation, no type written, a `let` inside a function, a
-structure update, an axiom, an `opaque` constant's body, a module of the twin's under one of the toolchain's names), builds
+structure update, an axiom, an `opaque` constant's body, a module of the twin's under one of the toolchain's names;
+and one that makes a `TablesWhole`, the parent class of the whole-table scans, by a structure update), builds
 the copy from nothing, and runs the check on it: the check must fail and list
 the planted constant, with how it is made. Each line also says what gen.py's text check finds in that copy (it
 must be nothing: that is why this check exists). A plant that does not build fails its control.
@@ -51,6 +52,11 @@ PLANTS = [  # (what, the file it is appended to, the text, the line the check mu
      f"\ndef SpecTwin.Replay.weaker : SpecTwin.Tables {R} :=\n"
      f"  {{ (inferInstance : SpecTwin.Tables {R}) with setTried := fun _ _ _ => pure () }}\n",
      "SpecTwin.Replay.weaker (SpecTwin.Replay): a Tables value; mentions [SpecTwin.Tables.mk]"),
+    # Tables extends TablesWhole: one made by hand, which instance resolution would take before the one a Tables holds
+    ("a TablesWhole instance with one scan changed, by a structure update", "SpecTwin/Replay.lean",
+     f"\n@[instance] def SpecTwin.Replay.wholeOver : SpecTwin.TablesWhole {R} :=\n"
+     f"  {{ (inferInstance : SpecTwin.TablesWhole {R}) with allTried := fun _ => pure [] }}\n",
+     "SpecTwin.Replay.wholeOver (SpecTwin.Replay): a TablesWhole value; mentions [SpecTwin.TablesWhole.mk]"),
     ("an axiom of one", "SpecTwin/Sec44.lean",
      f"\naxiom SpecTwin.given : SpecTwin.Tables ({ST})\n",
      "SpecTwin.given (SpecTwin.Sec44): a Tables value; mentions []"),

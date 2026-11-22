@@ -30,7 +30,7 @@ the documents do not define. The tripwire below is the first three files' alone:
 words that other files may declare.
 
 A tripwire beside it, a heuristic and no proof. It looks in the twin's other files for a declaration of one of
-the 16 names in NAMES, which these files declare (a `def drop` in another namespace, say), and says whether it
+the 18 names in NAMES, which these files declare (a `def drop` in another namespace, say), and says whether it
 found one: "no matching declaration found" is all it can say. It reads declarations by a pattern over the start
 of each line (DECL), after an attribute, a doc comment on the same line, and the modifiers it lists. So it does
 not find (the first two have controls that show it, as limits):
@@ -38,7 +38,7 @@ not find (the first two have controls that show it, as limits):
 - a declaration by a keyword the pattern does not list (`axiom`, a macro of the file's own);
 - a declaration that follows another command on its line, or whose name is on a line after its keyword;
 - a name brought in under another one (`export`, `open ... renaming`).
-It can also take declaration-shaped text inside a comment for a declaration. And it looks for those 16 names
+It can also take declaration-shaped text inside a comment for a declaration. And it looks for those 18 names
 alone: a hand-written function of another name, called from Replay.lean where a generated one was called,
 passes the comparison and the tripwire both. How the hand-written files use the generated ones (Replay.lean's
 calls, Main.lean) is known by reading them and by the replay's behaviour, not by this check.
@@ -50,7 +50,11 @@ the file must read REPLAY_INSTANCE, a blank line and the next section's first li
 kept in a comment, a second instance, or a line that goes on with its body are each a difference. Any other line
 of a hand-written file that declares something of type `Tables` (`: Tables`, as a `def` made an instance by an
 attribute) is a difference too. An instance that overrode one operation would change the replay's answers
-without changing a generated file. Not seen by these rules, which read text: a header that names `Tables` only
+without changing a generated file. `TablesWhole`, the class of the levels no code reads as a whole, which
+`Tables` extends (Lean compiles at most 255 fields in one constructor, FIELD_CAP, and `validate` refuses a schema
+that would pass it in either class), is read by the same two rules: an instance header that names it, or a line
+of type `TablesWhole`, by hand, is a difference; the replay's gives its levels through `Tables`' parent
+projection. Not seen by these rules, which read text: a header that names `Tables` only
 on a line after its keyword and has no `: Tables` on any line; and every other spelling of the type or of the
 value (`SpecTwin.Tables`, a parenthesised type, an abbreviation, a definition with no type written, a structure
 update, a `let` inside a function). Another check, which reads no text, covers what goes through the generated
@@ -230,6 +234,21 @@ def validate():
             why = "a row's operations are of a table that keeps its rows, one set per row level, at a level it has"
         if why:
             raise SystemExit(f"gen.py: the schema's {t.name}: {why}")
+    used, later = class_fields()
+    for cls, n in (("Tables", fields(used) + 1), ("TablesWhole", fields(later))):   # Tables: its parent's field too
+        if n > FIELD_CAP:
+            raise SystemExit(f"gen.py: the schema gives the class {cls} {n} fields, past {FIELD_CAP}, the most Lean "
+                             f"compiles in one constructor (\"constructor … has too many fields\"): split the class")
+
+
+# the most fields one constructor may have: Lean v4.35.0 compiles a class of 255 and refuses one of 256
+# ("constructor … has too many fields")
+FIELD_CAP = 255
+
+
+def fields(lines):
+    """The fields among a class's lines: each a declaration, after its doc comment."""
+    return sum(1 for line in lines if not line.lstrip().startswith(("/--", "--")))
 
 
 def elem_type(t, keys):
@@ -268,6 +287,19 @@ def class_fields():
             decl = f"  {s.name} : " + "".join(f"{ty_} → " for _, ty_ in t.keys[:depth(s)]) + ty
             (out if s.used else later).extend([f"  /-- {s.doc} -/", decl])
     return out, later
+
+
+def exports(later):
+    """`export TablesWhole (…)` of the later fields' names, in lines of at most WIDTH columns."""
+    names = [line.split(" : ")[0].strip() for line in later if not line.lstrip().startswith(("/--", "--"))]
+    lines, cur = [], "export TablesWhole ("
+    for n in names:
+        if len(cur) + len(n) + 2 > WIDTH:
+            lines.append(cur)
+            cur = "  " + n
+        else:
+            cur += ("" if cur.endswith("(") else " ") + n
+    return lines + [cur + ")"]
 
 
 def fit(head, note, change):
@@ -793,14 +825,20 @@ def tables_file():
         "",
         "namespace SpecTwin",
         "",
-        "/-- §6.1's own state (§8.1), as its code uses it. A missing entry reads as empty, and reading allocates nothing. -/",
-        "class Tables (m : Type → Type) where",
-        *used,
-        "  -- The levels §6.1's code never reads as a whole. They are here so that a twin that does, a mutant, can be",
-        "  -- written, and is then seen to.",
+        "/-- The levels §6.1's code never reads as a whole. They are here so that a twin that does, a mutant, can be",
+        "written, and is then seen to. A class of their own, which `Tables` extends: Lean compiles at most 255 fields in",
+        "one constructor, and the two together have more. -/",
+        "class TablesWhole (m : Type → Type) where",
         *later,
         "",
+        "/-- §6.1's own state (§8.1), as its code uses it. A missing entry reads as empty, and reading allocates nothing. -/",
+        "class Tables (m : Type → Type) extends TablesWhole m where",
+        *used,
+        "",
         "namespace Tables",
+        "",
+        "-- the levels of `TablesWhole` under `Tables`' names too, so that `open Tables` finds them",
+        *exports(later),
         "",
         "/-- The interface over the twin's `State`, with a note of each access. -/",
         "@[instance_reducible]",
@@ -922,16 +960,17 @@ FILES = {"SpecTwin/State.lean": state_file, "SpecTwin/Tables.lean": tables_file,
          "SpecTwin/ReplayTables.lean": replay_tables_file, "SpecTwin/V2/Manifest.lean": manifest_file}
 # the names the first three files declare, which no other file of the twin may declare (the tripwire). `lift` and
 # `instReaderT` are left out: `Node61` has a `lift` of its own, by hand.
-NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "v2Tables", "Tables", "ofState",
+NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "v2Tables", "Tables", "TablesWhole", "ofState",
          "cell", "val", "level", "valueAt", "put", "drop", "entries", "under", "covers")
 DECL = re.compile(r"^\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?"
                   r"(?:(?:private|protected|partial|noncomputable|unsafe|nonrec|public|scoped|local)\s+)*"
                   r"(?:def|abbrev|structure|inductive|class|theorem|opaque|instance)\s+([A-Za-z_][\w.'?!]*)", re.M)
-# an instance header that names `Tables` on its own line, after the attribute and modifiers it may have
+# an instance header that names `Tables` or `TablesWhole` on its own line, after the attribute and modifiers it may
+# have; the class it names, the last on the line, is group 1
 INST_TABLES = re.compile(r"^[ \t]*(?:@\[[^\]]*\][ \t]*)?(?:(?:private|protected|noncomputable|nonrec|public|scoped|local)[ \t]+)*"
-                         r"instance\b[^\n]*\bTables\b[^\n]*", re.M)
-# a line of a hand-written file that declares something of type `Tables` (an instance by `def`, say)
-TABLES_TYPE = re.compile(r":\s*Tables\b")
+                         r"instance\b[^\n]*\b(Tables(?:Whole)?)\b[^\n]*", re.M)
+# a line of a hand-written file that declares something of type `Tables` or `TablesWhole` (an instance by `def`, say)
+TABLES_TYPE = re.compile(r":\s*(Tables(?:Whole)?)\b")
 # what must follow the replay's instance: a blank line, and the first line of the next section of Replay.lean
 REPLAY_AFTER = "\n/-! ## The twin's state, entry by entry\n"
 # the one instance of `Tables` written by hand, the replay's, as its text must be (Replay.lean)
@@ -1044,15 +1083,17 @@ def compare(twin):
             name = m.group(1).split(".")[-1]
             if name in NAMES:
                 trips.append((f, m.group(1)))
-        here = [m.group(0).strip() for m in INST_TABLES.finditer(text)]
-        heads += [(f, h, m.start()) for h, m in zip(here, INST_TABLES.finditer(text))]
+        found = list(INST_TABLES.finditer(text))
+        here = [m.group(0).strip() for m in found]
+        heads += [(f, m.group(0).strip(), m.start(), m.group(1)) for m in found]
         for line in text.split("\n"):
-            if TABLES_TYPE.search(line) and line.strip() not in here:
-                insts.append(f"{f}: a declaration of type Tables by hand: {line.strip()}")
-    allowed = [(f, h, at) for f, h, at in heads if (f, h) == ("SpecTwin/Replay.lean", "instance : Tables R :=")]
-    for f, h, _ in heads:
+            t = TABLES_TYPE.search(line)
+            if t and line.strip() not in here:
+                insts.append(f"{f}: a declaration of type {t.group(1)} by hand: {line.strip()}")
+    allowed = [(f, h, at) for f, h, at, _ in heads if (f, h) == ("SpecTwin/Replay.lean", "instance : Tables R :=")]
+    for f, h, _, cls in heads:
         if (f, h) != ("SpecTwin/Replay.lean", "instance : Tables R :="):
-            insts.append(f"{f}: an instance of Tables by hand: {h}")
+            insts.append(f"{f}: an instance of {cls} by hand: {h}")
     if len(allowed) > 1:
         insts.append("SpecTwin/Replay.lean: more than one instance : Tables R")
     replay = Path(twin, "SpecTwin/Replay.lean")
@@ -1206,6 +1247,8 @@ def controls(twin, work):
     refused("a level given as many keys as its table has", lambda ts: ts.append(tied(
         scans=[Scan("allTiedG", "tiedG", "every `tied[r][p][g]`", depth=3)])), "as many outer keys as the table has")
     refused("a key of a type no parser reads", lambda ts: ts[0].keys.__setitem__(0, ("a", "Slot")), "no parser")
+    refused("40 copies of asked_at more, three operations the code uses each: Tables past Lean's cap",
+            lambda ts: ts.extend(copy.deepcopy(ts[0]) for _ in range(40)), "fields, past 255")
 
     def files(what, edit, must):
         nonlocal ok
@@ -1286,6 +1329,15 @@ def controls(twin, work):
     files("a def of type Tables, made an instance by an attribute, in Sec61.lean",
           append("SpecTwin/Sec61.lean", "\n@[instance] def mine {ρ : Type} : Tables (ReaderT ρ Id) := sorry\n"),
           ["SpecTwin/Sec61.lean: a declaration of type Tables by hand: @[instance] def mine {ρ : Type} : Tables (ReaderT ρ Id) := sorry"])
+    # TablesWhole, the class Tables extends: declared by hand (the tripwire), and an instance of it by hand
+    files("a second TablesWhole declared by hand in a new file",
+          lambda d: (d / "SpecTwin/Other.lean").write_text(
+              "namespace Other\nclass TablesWhole (m : Type → Type) where\n  n : m Nat\nend Other\n"),
+          ["SpecTwin/Other.lean declares TablesWhole"])
+    files("an instance of TablesWhole by hand, in Sec61.lean",
+          append("SpecTwin/Sec61.lean", "\ninstance (priority := high) {ρ : Type} : TablesWhole (ReaderT ρ Id) := sorry\n"),
+          ["SpecTwin/Sec61.lean: an instance of TablesWhole by hand: "
+           "instance (priority := high) {ρ : Type} : TablesWhole (ReaderT ρ Id) := sorry"])
     # two limits, as the docstring says: the tripwire does not find these, and the check says nothing of them
     files("(a limit) drop in guillemets, declared by hand in a namespace of its own",
           append("SpecTwin/Replay.lean", "\nnamespace SpecTwin.Replay.Mine\ndef «drop» (s : State) (_ : Cell) : State := s\nend SpecTwin.Replay.Mine\n"),

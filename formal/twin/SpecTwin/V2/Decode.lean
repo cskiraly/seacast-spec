@@ -5,7 +5,7 @@ import SpecTwin.Sec72
 
 /-! # protocol-v2.md's filling, completion, decoding and claims: §4.2's `fill`, §4.6, §4.11's `filter_entry`
 
-The twin of `fill` (§4.2, v0.10.11's text: v0.10.12 changes it, and it is transcribed again from that text);
+The twin of `fill` (§4.2, v0.11.1's text);
 §4.6's `push_rebuilt_as_source`, `push_rebuilt`, `arm`, `check_completion`, `defer_on_claim`, `reconsider`,
 `decode_group`, `claims_close` and `note_claim`; and `filter_entry`, `protocol.md` §7.2's with the probe's
 lines. Each comes after every function it calls (`V2/Relations.lean`'s rule).
@@ -118,7 +118,9 @@ def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
     branch "fill: expired"
     return
   if (← tOf? g).isNone then                                   -- `if g not in T_of:`
+    NodeV2.releaseWantedGroups                                --   §4.5: a place that ran out goes before it opens
     openGroup g f                                             --   hdr[g], T_of[g], interest[g], known_at[g]
+    dropWantsBeyond g                                         --   §4.5: its count is known now
     v1 (dropBeyond g)                                         --   what named an index it has not goes
   if (← state? g) == some .invalid then                       -- a dropped group (§4.6)
     branch "fill: invalid"

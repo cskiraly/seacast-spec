@@ -17,6 +17,7 @@ import SpecTwin.V2.DispatchKnown
 import SpecTwin.V2.FuelKnown
 import SpecTwin.V2.FormsRows
 import SpecTwin.V2.NarrowKnown
+import SpecTwin.V2.SyncKnown
 
 /-! # The twin of protocol-v2.md: its modules
 

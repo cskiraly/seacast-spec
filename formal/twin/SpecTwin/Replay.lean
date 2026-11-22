@@ -77,7 +77,7 @@ inductive Entry where
   -- §4.2's deferral path: its questions, and the orders of the twin's levels the Python iterates,
   -- each a list of keys in the Python's order
   | installedBlock (slot : Nat) (root : Root) (r : Option Block)  -- the block as level 1 reads it, or nothing
-  | admitted (p : Peer) (x : Admit) (r : Bool)            -- of a chunk, a HAVE or an offered id
+  | admitted (p : Peer) (x : Admit) (r : Bool)            -- of a chunk, a HAVE, a holding or an offered id
   | reserve (p : Peer) (f : ChunkF) (r : Bool)
   | release (p : Peer) (f : ChunkF)
   | bidGroup (root : Root) (g : Option Group)

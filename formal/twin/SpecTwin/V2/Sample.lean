@@ -8,9 +8,10 @@ and `sample`. Each comes after every function it calls (`V2/Relations.lean`'s ru
 
 - **No recursion between `ask_sample` and `resample`:** `ask_sample` reaches `resample`, and itself again, only
   through timers (`afterV2`); `resample` calls `ask_sample` directly.
-- **`resample`'s loop** runs on fuel `n·(n+1)+1`, `n` the length of `held_samples[b]` at its first guard, where
-  the Python first reads the list: at most `n` removals, and fewer than `n` re-appends between two. Running out is
-  a crash of the twin's own name.
+- **`resample`'s loop** runs on fuel `n+1`, `n` the length of `held_samples[b]` at its first guard, where the
+  Python first reads the list. Under one cap, the node's, the guard and `ask_sample`'s held-back test read the same
+  number, and nothing changes `samples_in_flight` between them, so a sample the loop pops is never held again: at
+  most `n` removals and one exit test. Running out is a crash of the twin's own name.
 - **`ask_sample`'s `order`** is built whole before `next` tests it, as the Python builds the list: `via`'s
   route and `ROUTE_HOPS` are asked, and `high` computed, whichever list is the first that is not empty.
 - **A queue as an argument:** `choose` and `pick` take the peer and read its normal lane, as
@@ -104,9 +105,10 @@ def askSample (g : Group) (i : Nat) (first : Bool) : M2 m Unit := do
   if ← expired g then
     branch "ask_sample: expired"
     return
-  -- `not first and samples_in_flight[b] >= T.params.SAMPLE_OUTSTANDING`: LiteDAS's cap
+  -- `not first and samples_in_flight[b] >= SAMPLE_OUTSTANDING`: LiteDAS's cap, the node's per block, across the
+  -- block's types
   if !first then
-    if (← samplesInFlight b) ≥ ((← param T "SAMPLE_OUTSTANDING" (·.SAMPLE_OUTSTANDING) : Nat) : Int) then
+    if (← samplesInFlight b) ≥ ((← read).c2.SAMPLE_OUTSTANDING : Int) then
       setHeldSamples b ((← heldSamplesOf b) ++ [(g, i)])      -- `held_samples[b].append((g, i))`
       branch "ask_sample: held back"
       return
@@ -153,23 +155,23 @@ def askSample (g : Group) (i : Nat) (first : Bool) : M2 m Unit := do
 /-- `resample(g, i, q, first)` (§4.10): the wait ran out -/
 def resample (g : Group) (i : Nat) (q : Peer) (first : Bool) : M2 m Unit := do
   enter "resample"
-  let T ← NodeV2.typeOfGroup g                                -- `T, b = type_of_group(g), block_of(g)`
-  let b ← NodeV2.blockOf g
+  let b ← NodeV2.blockOf g                                    -- `b = block_of(g)`
   if !first then setSamplesInFlight b ((← samplesInFlight b) - 1)
-  if ← expired g then                                         -- past its lifetime: no state is made again for it
+  -- `if not expired(g) and not mine[g].has(i):` once g is past its lifetime, no state is made again for it
+  if ← expired g then
     branch "resample: expired"
-    return
-  if !(← mineBits g).has i then
+  else if !(← mineBits g).has i then
     setPark q g ((← read).base.now + (← read).base.c.PARK_TTL)   -- `park[q][g] = now + PARK_TTL`
     askSample g i false                                       -- the second phase: another peer, a short wait
-  -- `while held_samples[b] and samples_in_flight[b] < T.params.SAMPLE_OUTSTANDING:`
+  -- `while held_samples[b] and samples_in_flight[b] < SAMPLE_OUTSTANDING:` the room left goes to the held samples,
+  -- even if g has expired
   let n := (← heldSamplesOf b).length                         -- read at the first guard
-  for _ in List.range (n * (n + 1) + 1) do
+  for _ in List.range (n + 1) do
     let held ← heldSamplesOf b
     if held.isEmpty then
       branch "resample: none held"
       return
-    if (← samplesInFlight b) ≥ ((← param T "SAMPLE_OUTSTANDING" (·.SAMPLE_OUTSTANDING) : Nat) : Int) then
+    if (← samplesInFlight b) ≥ ((← read).c2.SAMPLE_OUTSTANDING : Int) then
       branch "resample: the cap reached"
       return
     match held with
@@ -177,7 +179,7 @@ def resample (g : Group) (i : Nat) (q : Peer) (first : Bool) : M2 m Unit := do
       setHeldSamples b rest                                   -- `held_samples[b].pop(0)`
       askSample g2 i2 false
     | [] => pure ()
-  crash "twin: resample ran out of fuel (n·(n+1)+1 turns for the n samples held at the first guard)"
+  crash "twin: resample ran out of fuel (n+1 turns for the n samples held at the first guard)"
 
 /-- `sample(g, bits)` (§4.10): at block arrival, the application's draw, never narrowed to what our links serve;
 ours from now on (§1.5) -/

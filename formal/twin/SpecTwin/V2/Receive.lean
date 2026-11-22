@@ -189,17 +189,30 @@ def onHolding (p : Peer) (h : Have) : M2 m Unit := do
     penalise p
     branch "on_holding: not a valid holding"
     return
+  -- `admitted(p, h)`: a group beyond p's unknown groups (protocol.md §8.2): ignored
+  if !(← admitted p (.holding g h.bits h.claimAll h.complete)) then
+    branch "on_holding: not admitted"
+    return
   let e := (← peerHasEntry? p g).getD {}                      -- created at p's first holding for the group
   let newly : Bits := Bits.minus h.bits e.bits                -- `h.bits & ~e.bits`
   -- `e.bits |= h.bits; e.ttl = HAVE_TTL; e.claim_all = e.claim_all or h.claim_all; e.complete = e.complete or
   -- h.complete`
   setPeerHas p g { bits := e.bits ||| h.bits, ttl := (← read).base.c.HAVE_TTL,
                    claimAll := e.claimAll || h.claimAll, complete := e.complete || h.complete }
-  if h.claimAll then noteClaimCall p g                        -- (R5) it may defer a decode duty of ours
+  -- `if h.claim_all and joined(p, type_of_group(h.group)):` (R5) it may defer a decode duty of ours; not on a link
+  -- that has not joined the type (§2)
+  if h.claimAll then
+    if ← joined p (← NodeV2.typeOfGroup g) then
+      noteClaimCall p g
+    else
+      branch "on_holding: a claim on a link not joined"
   for i in newly.toList do
     setHolders g i ((← holdersOf g i).insert p)               -- [c9] distinct live holders
     V2Later.windowRelease p g i                               -- [c14] a slot to p frees when p holds i
     if ← planned g then originAcked g i                       -- [c3, P4] a copy of i exists elsewhere (§4.7)
+  -- `for i in h.bits & ~newly:` [c14] a bit p held already: a copy written to it since frees its slot
+  for i in (Bits.minus h.bits newly).toList do
+    V2Later.windowRelease p g i
   branch (if newly == 0 then "on_holding: nothing new" else "on_holding: new indices")
 
 /-- `on_offer(p, h)` (§4.3): `protocol.md` §4.4's `on_ihave` over one group's bitmap; the asks -/
@@ -212,6 +225,10 @@ def onOffer (p : Peer) (h : Have) : M2 m (List Key) := do
   if !(← NodeV2.validHaveV2 h) then                           -- held to a holding's limits: ignored, and counted
     penalise p
     branch "on_offer: not a valid holding"
+    return []
+  -- `admitted(p, h)`: a group beyond p's unknown groups (protocol.md §8.2): ignored
+  if !(← admitted p (.holding g h.bits h.claimAll h.complete)) then
+    branch "on_offer: not admitted"
     return []
   -- `now - known_at[g] < type_of_group(g).params.START_DELAY`: [D8] (R7) a secondary axis waits
   let since := (← read).base.now - (← knownAt? g).getD 0.0

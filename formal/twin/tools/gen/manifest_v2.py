@@ -7,7 +7,8 @@ header and nodes line against them. The tracer's own lists under --doc v2 are to
 The lists:
 - COVERED: protocol-v2.md's functions the twin transcribes, each a record of its own. The 66 that the cycle's 71
   call, main's `fill` and `serve_standing`, then `on_pace_tick` and `on_block_installed`, which protocol-v2.md
-  redefines and the twin serves in their v2 forms.
+  redefines and the twin serves in their v2 forms, then `joined` and `drop_wants_beyond`, which v0.11.1 adds on
+  `on_holding`'s path and `fill`'s.
 - KEPT: protocol.md's functions that a record under protocol-v2.md may name: those protocol.md keeps all the way down
   under v2 (trace3.py's `v2_kept` over the toy's two documents), less §7.1's window and less NODE_OWN's names.
   `gen.py --check` computes the rule and compares.
@@ -54,7 +55,8 @@ COVERED = [
     "decode_group", "claims_close", "note_claim", "filter_entry",
     "forward", "on_validated", "defer", "on_chunk", "on_holding", "on_offer",
     "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
-    "on_pace_tick", "on_block_installed"]
+    "on_pace_tick", "on_block_installed",
+    "joined", "drop_wants_beyond"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
@@ -99,9 +101,9 @@ QUESTIONS = [
     "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
     "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room", "high_custody",
     "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id", "open_group",
-    "open_link", "open_sampling_link", "payload_of", "penalise", "release", "reserve", "route_next",
-    "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
-    "valid_have", "wake", "wants_family",
+    "open_link", "open_sampling_link", "payload_of", "penalise", "release", "release_wanted_groups", "reserve",
+    "route_next", "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of",
+    "type_of_group", "valid_have", "wake", "wants_family",
     # the callables of a type's parameters (`T.params`)
     "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
     # the object type's functions, which covered functions call on a type
