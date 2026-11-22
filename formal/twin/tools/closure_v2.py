@@ -143,10 +143,12 @@ def _annotation_ids(fn):
 class Reading:
     """The two documents' top-level functions, protocol-v2.md's over protocol.md's of the same name, each with its
     symtable, and each function's global loads (`loads`), read once. `annotations=False` reads annotations as loads:
-    the self-test's control."""
+    the self-test's control. `drop` names globals whose loads the reading leaves out: the self-test's planted miss,
+    which the comparison with symtable must find."""
 
-    def __init__(self, p_src, v2_src, annotations=True):
+    def __init__(self, p_src, v2_src, annotations=True, drop=()):
         self.skip_annotations = annotations
+        self.drop = frozenset(drop)
         self.defs = {}
         for src in (p_src, v2_src):
             tree = ast.parse(src)
@@ -195,7 +197,8 @@ class Reading:
 
         def visit(node, chain):
             if isinstance(node, ast.Name):
-                if isinstance(node.ctx, ast.Load) and id(node) not in ann and not any(node.id in b for b in chain):
+                if (isinstance(node.ctx, ast.Load) and id(node) not in ann and node.id not in self.drop
+                        and not any(node.id in b for b in chain)):
                     out.append((node, parents.get(id(node))))
                 return
             if isinstance(node, ast.Lambda):
@@ -232,7 +235,10 @@ class Reading:
             sym |= {s.get_name() for s in t.get_symbols() if s.is_global() and s.is_referenced()}
             todo += t.get_children()
         mine = {n.id for n, _ in out}
-        annotated = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name)} - mine
+        # the names read in annotations (the arguments', the return's, an annotated assignment's): symtable may count
+        # them as global and referenced, where the reading skips them; every other global of symtable's is read
+        anns = _annotation_ids(fn)
+        annotated = {n.id for n in ast.walk(fn) if isinstance(n, ast.Name) and id(n) in anns} - mine
         if not mine <= sym or not (sym - mine) <= annotated:
             return [], [f"{name}: the scopes' reading and symtable differ: read as global, not by symtable: "
                         f"{sorted(mine - sym)}; global in symtable, not read: {sorted((sym - mine) - annotated)}"]
@@ -290,8 +296,10 @@ def _context_kind(n, up, par):
     if isinstance(up, ast.Attribute) and up.value is n:
         top = par.get(id(up))
         return f".{up.attr}()" if isinstance(top, ast.Call) and top.func is up else f".{up.attr}"
-    if isinstance(up, ast.Compare) and any(c is n for c in up.comparators) and any(
-            isinstance(o, (ast.In, ast.NotIn)) for o in up.ops):
+    # a membership test: the comparator of its own `in` or `not in`, and the last one (a comparator before the last
+    # is also the left side of the next comparison: `p in mesh == x` compares mesh as a value too)
+    if (isinstance(up, ast.Compare) and up.comparators and up.comparators[-1] is n
+            and isinstance(up.ops[-1], (ast.In, ast.NotIn))):
         return "in"
     if isinstance(up, (ast.For, ast.comprehension)) and up.iter is n:
         return "iterated"
@@ -586,23 +594,38 @@ def self_test(N, m, schema_values, type_functions):
         ("a covered function with a global statement", "closure",
          synth("def c():\n    global FOO\n    FOO = 1\n    return FOO\n", ["c"]),
          ["c: a Global at line 2"]),
+        ("a reading that misses c's load of FOO (planted): the comparison with symtable finds it", "closure-miss",
+         synth("def c():\n    return FOO + 1\n", ["c"]),
+         ["c: the scopes' reading and symtable differ: read as global, not by symtable: []; global in symtable, "
+          "not read: ['FOO']"]),
+        ("1 in s == mesh: mesh compared with ==, not tested for a member", "context",
+         synth("def c(s):\n    return 1 in s == mesh\n", ["c"]),
+         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
+        ("p in mesh == x: mesh the left side of == too", "context",
+         synth("def c(p, x):\n    return p in mesh == x\n", ["c"]),
+         ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_V2 nor CONTEXT_REASONS_V2"]),
     ]
 
-    def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT")):
+    def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False):
+        """A case's findings. `stub`: every check replaced by one that finds nothing, the case's input made as it
+        is otherwise (the control of the planted cases)."""
+        none = lambda *a, **k: ([], [])       # noqa: E731
         if kind in ("enum", "consts", "attrs"):
-            return {"enum": enum_check, "consts": consts_keys_check,
-                    "attrs": lambda t: type_attrs_check("payload", t)}[kind](arg)
+            f = {"enum": enum_check, "consts": consts_keys_check,
+                 "attrs": lambda t: type_attrs_check("payload", t)}[kind]
+            return [] if stub else f(arg)
         src, mm = arg
-        rd = real[ann] if src is None else Reading("", src, annotations=ann)
-        if kind == "closure":
-            return closure_check(rd, mm, schema_values, type_functions)[0]
+        rd = (real[ann] if src is None else
+              Reading("", src, annotations=ann, drop=("FOO",) if kind == "closure-miss" else ()))
+        if kind in ("closure", "closure-miss"):
+            return (none if stub else closure_check)(rd, mm, schema_values, type_functions)[0]
         if kind == "closure-tf":
-            return closure_check(rd, mm, schema_values, tf_without_repair)[0]
+            return (none if stub else closure_check)(rd, mm, schema_values, tf_without_repair)[0]
         if kind == "calls":
-            return call_closure_check(rd, mm, visit=visit)[0]
+            return (none if stub else call_closure_check)(rd, mm, visit=visit)[0]
         if kind == "types":
-            return type_call_check(rd, mm)[0]
-        return context_check(rd, mm, over=over)[0]
+            return (none if stub else type_call_check)(rd, mm)[0]
+        return (none if stub else context_check)(rd, mm, over=over)[0]
 
     bad = 0
     for what, kind, arg, want in cases:
@@ -619,7 +642,7 @@ def self_test(N, m, schema_values, type_functions):
               f"{', as they must' if ok else f': {fails}, must be {must}  <-- FAIL'}")
 
     planted = [w for w, _, _, want in cases if want]
-    control("a check that finds nothing", [w for w, _, _, want in cases if [] != want], planted)
+    control("a check that finds nothing", [w for w, k, a, want in cases if run(k, a, stub=True) != want], planted)
     control("a reading that does not skip annotations",
             [w for w, k, a, want in cases if run(k, a, ann=False) != want], [cases[1][0]])
     control("a call closure over COVERED alone",
