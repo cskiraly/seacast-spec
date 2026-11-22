@@ -1101,6 +1101,34 @@ def forms_self_test():
     bad += not ok
     print(f"forms self-test, the control (protocol.md's encoders in v2's place): "
           f"{f'fails exactly the {len(failed)} v2 cases, ok' if ok else f'fails {failed}  <-- FAIL'}")
+    # S1-8b, the writer's half: the −1 family in a GRAFT, a PRUNE and counted's need, written ["-", 1]; the planted
+    # writer, whose integer writes the int as it is, must fail exactly these three
+    import records_v2                   # noqa: E402: this directory's (it imports this module, loaded by now)
+    fam_cases = [
+        ("a GRAFT with the −1 family",
+         lambda tr: tr.rel_msg(Wm.Container(object_type="column", family=-1, colour=0, direction="IN", answer=False)),
+         ["graft", "column", ["-", 1], 0, "IN", False]),
+        ("a PRUNE with the −1 family",
+         lambda tr: tr.rel_msg(Wm.Container(object_type="column", family=-1, colour=0, direction="IN")),
+         ["prune", "column", ["-", 1], 0, "IN"]),
+        ("counted's need with the −1 family", lambda tr: records_v2.need_pairs(tr, {-1: 2, 3: 0}),
+         [[["-", 1], 2], [3, 0]]),
+    ]
+    for what, f, want in fam_cases:
+        got = run(f, True)
+        ok = got == want
+        bad += not ok
+        print(f"forms self-test, S1-8b, {what}, under v2: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
+    _integer = Tracer3.__dict__["integer"]
+    Tracer3.integer = staticmethod(lambda i: i)     # the planted writer: the plain int
+    try:
+        failed = [what for what, f, want in fam_cases if run(f, True) != want]
+    finally:
+        Tracer3.integer = _integer
+    ok = failed == [w for w, _, _ in fam_cases]
+    bad += not ok
+    print(f"forms self-test, S1-8b's planted writer (the plain int): "
+          f"{f'refuses exactly the {len(failed)} cases, ok' if ok else f'refuses {failed}  <-- FAIL'}")
     # the nodes line's type parameters (types_v2)
     tr = tracer(True)
 
