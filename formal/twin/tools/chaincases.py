@@ -3,7 +3,7 @@
 
     python3 chaincases.py TRACE CASE [CASE ...]
     python3 chaincases.py --cut NAME TRACE OUT
-    python3 chaincases.py --rows NAME TRACE
+    python3 chaincases.py --rows NAME TRACE [FN]
 
 A CASE is `NODE:NAME:replaced|kept:CHAIN`: at node NODE, NAME is in its entry's `replaced` (replaced) or not
 (kept), and its `chains` value is CHAIN, the layers' qualified names joined by commas, outermost first, ending in
@@ -16,7 +16,7 @@ without a nodes line or a case it cannot read.
 in every entry whose chains hold NAME; nothing else changed. It says how many entries; exit 2 where none.
 
 `--rows`: the rows of the question NAME on the records' tapes, by the answer they hold (a row is [NAME, its
-arguments, its answer]).
+arguments, its answer]); with FN, on the tapes of the records whose `reached` holds FN alone.
 """
 import gzip
 import json
@@ -124,24 +124,30 @@ def cut(name, trace, out):
     return 0
 
 
-def rows(name, trace):
-    answers = Counter()
+def rows(name, trace, fn=None):
+    answers, recs = Counter(), 0
     with gzip.open(trace, "rt", encoding="utf-8") as f:
         for line in f:
             if not line.startswith('{"n"'):
                 continue
-            for row in json.loads(line).get("tape") or ():
+            d = json.loads(line)
+            if fn is not None and fn not in (d.get("reached") or ()):
+                continue
+            recs += 1
+            for row in d.get("tape") or ():
                 if row and row[0] == name:
                     answers[json.dumps(row[-1])] += 1
-    print(f"chaincases: {name} on the tapes: {sum(answers.values())} rows"
-          + ("" if not answers else " (" + ", ".join(f"{a}: {k}" for a, k in sorted(answers.items())) + ")"))
+    on = "the tapes" if fn is None else f"the tapes of the {recs} records that reach {fn}"
+    print(f"chaincases: {name} on {on}: {sum(answers.values())} rows"
+          + ("" if not answers else " (" + ", ".join(f"{a}: {k}" for a, k in sorted(answers.items())[:4])
+                                      + (", …" if len(answers) > 4 else "") + ")"))
     return 0
 
 
 def main(argv):
     if len(argv) == 4 and argv[0] == "--cut":
         return cut(*argv[1:])
-    if len(argv) == 3 and argv[0] == "--rows":
+    if len(argv) in (3, 4) and argv[0] == "--rows":
         return rows(*argv[1:])
     if len(argv) < 2 or argv[0].startswith("--"):
         print("usage: " + "; ".join(x.strip() for x in __doc__.strip().splitlines()[2:5]))

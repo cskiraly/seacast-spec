@@ -648,6 +648,42 @@ def chains_bindings_v2(toy):
     T.node_chains = node_chains
 
 
+def draws_rewrap_off_v2():
+    """Under v2, K13's plant: the swapped draws' re-wrap off (`REWRAP[0]` false). Inside a swapped draw's layer the
+    document then calls the toy's draw as the layer bound it, and the record's tape lacks the draw. Nothing in the
+    tracer asks whether a swapped draw reached the tape: the trace is written to its end, and the replay must refuse
+    it at the first record whose draw is missing. Counted once for each call of `rewrap_draws` that skips a draw the
+    toy has bound."""
+    T.REWRAP[0] = False
+    _rd = T.rewrap_draws
+
+    @functools.wraps(_rd)
+    def rewrap_draws(ns, slots, rewrap):
+        PLANTED[0] += sum(1 for d in T.DRAWS if d in slots and ns.get(d) is not slots[d]
+                          and not getattr(ns.get(d), "_trace3_rewrap", False))
+        return _rd(ns, slots, rewrap)
+
+    T.rewrap_draws = rewrap_draws
+
+
+def draws_unrestored_v2():
+    """Under v2, K13's plant: a swapped draw's layer that does not put the slot back. At every node, a layer of this
+    tool's own over `keep_floor` (holding the toy's, and listed in LAYERS as a swapped draw), bound before the
+    install: it binds `sample_without_replacement` to a draw of its own, calls the layer it holds, and leaves the slot
+    so. The check of every installed slot at the record's exit must stop it, final_check's words following at the
+    close."""
+    def plant(ns):
+        inner = ns["keep_floor"]
+
+        def keep_floor(T_):
+            ns["sample_without_replacement"] = lambda xs, k: list(xs)[:k]     # never called: the toy's layer binds
+            return inner(T_)                                                #   its own over it for the document
+        T.LAYERS[T.layer_key(keep_floor)] = ("keep_floor", T.SWAPPED_DRAW)
+        ns["keep_floor"] = keep_floor
+
+    before_install_v2(plant)
+
+
 CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-owed-observer-v2",
                 "--chain-owed-changing-v2")
 
@@ -999,7 +1035,8 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
-          "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS
+          "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS + (
+          "--draws-rewrap-off-v2", "--draws-unrestored-v2")   # K13's two: the first must not stop it, the second must
 HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -1059,6 +1096,10 @@ def main(argv):
             layer_classed_v2(OWED_MISSING, T.OBSERVER)
         elif fault == "--chain-owed-changing-v2":
             layer_classed_v2(OWED_MISSING, T.CHANGING)
+        elif fault == "--draws-rewrap-off-v2":
+            draws_rewrap_off_v2()
+        elif fault == "--draws-unrestored-v2":
+            draws_unrestored_v2()
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
         if fault in CHAIN_PLANTS:       # the cell's own arguments, after OUT, --doc v2 among them

@@ -75,8 +75,10 @@
 #             aside, that node's chain the plant's), and the controls of the checks' own helpers; and a nodes
 #             line without a replaced name's chain, which the replay must refuse with its words; and the chain
 #             cases: the nodes line's chains on three cells against written cases (chaincases.py), each cell traced
-#             and replayed, and five plants, each caught. With --chains-local: one cell and three plants, the two
-#             DAS cells and their plants skipped, which its line says; the check is then a part, not a pass
+#             and replayed, and five plants, each caught; and the swapped draws: each layer's draws on the tape of
+#             a cell that enters it, and two plants on hand5 (the re-wrap off, which the replay must refuse; the
+#             swap left unrestored, which must stop the tracer). With --no-das: the two DAS cells and the plants on
+#             them skipped, which each line says; the check is then a part, not a pass
 #   seeds     the same bytes whatever Python's hash seed, which is random in every process of an isolated Python:
 #             every directed set made again twice, two cells once (46 traces)
 #   sizes     sizes.txt: each of the record's traces as the tracer wrote it: bytes, lines, the longest line; and
@@ -132,7 +134,7 @@ CELLS_GIVEN=
 AGAINST=
 STEPS=
 V2STEPS=
-CHAINS_LOCAL=
+NODAS=
 while [ $# -gt 0 ]; do
   case "$1" in
     --toy) TOY=$2; shift ;;
@@ -146,8 +148,8 @@ while [ $# -gt 0 ]; do
     --cells) FEWCELLS=yes; CELLS_GIVEN=$2; shift ;;
     --against) AGAINST=$2; shift ;;
     --v2steps) V2STEPS=1 ;;
-    --chains-local) CHAINS_LOCAL=1 ;;
-    *) echo "usage: check.sh [--record | --matrix K/N [--rehearsal \"M1 M2 ...\"] | --v2steps] [--toy DIR] [--out DIR] [-j N] [--steps a,b,...] [--chains-local]"; exit 2 ;;
+    --no-das) NODAS=1 ;;
+    *) echo "usage: check.sh [--record | --matrix K/N [--rehearsal \"M1 M2 ...\"] | --v2steps] [--toy DIR] [--out DIR] [-j N] [--steps a,b,...] [--no-das]"; exit 2 ;;
   esac
   shift
 done
@@ -878,8 +880,8 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
   case $1 in
     hand5-peer) echo "$HAND5 --doc v2 --promise-mode peer" ;;
     das-hoardcol-w16) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16" ;;
-    das-rows-mcoff) echo "$DAS30 --member-check off" ;;
-  esac
+    das-samplers-mcoff) echo "$DAS30 --samplers 20 --member-check off" ;;  # das-samplers' delivery (its digest):
+  esac                  #   its one record that reaches owed_missing, and defer_on_claim's swapped draw
 }
 chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.py's), one a line
   local n
@@ -888,10 +890,12 @@ chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.p
       '*:close_promises:kept:Node._peer_promise.<locals>.close_promises,Node._override.<locals>.close_promises,doc' \
       '*:filter_entry:replaced:Node._peer_promise.<locals>.filter_entry,doc' \
       '*:owed_missing:kept:Node._member_check.<locals>.owed_missing,doc' ;;
-    das-hoardcol-w16)   # the hoarders, each a case; and node 1, honest, on the document's own push_rebuilt
+    das-hoardcol-w16)   # the hoarders, each a case; and node 1, honest, on the document's own push_rebuilt, and
+      #                   its two observers over defer_on_claim, outermost first (the walk's order, not the bindings')
       for n in 7 8 11 16 23 24; do echo "$n:push_rebuilt:replaced:Node._hoard_column.<locals>.push_rebuilt,doc"; done
-      echo '1:push_rebuilt:kept:-' ;;
-    das-rows-mcoff) echo '*:owed_missing:replaced:Node._member_check.<locals>.owed_missing,doc' ;;
+      echo '1:push_rebuilt:kept:-'
+      echo '1:defer_on_claim:kept:Node._hoard_column.<locals>.defer_on_claim,Node._v2.<locals>.defer_on_claim,doc' ;;
+    das-samplers-mcoff) echo '*:owed_missing:replaced:Node._member_check.<locals>.owed_missing,doc' ;;
   esac
 }
 cases_of() {            # $1: a trace; $2: a cell of the chain cases: its cases on that trace; the status chaincases.py's
@@ -934,8 +938,8 @@ plant_line() {          # $1: a plant's letter: its planted count and its replay
 }
 chain_cases() {         # the chain cases: the nodes line's chains on real cells, and five plants, each caught
   local cells plants c p why k all=0 good=0 caught=0 miss stop
-  if [ -n "$CHAINS_LOCAL" ]; then cells="hand5-peer"; plants="a b e"
-  else cells="hand5-peer das-hoardcol-w16 das-rows-mcoff"; plants="a b c d e"; fi
+  if [ -n "$NODAS" ]; then cells="hand5-peer"; plants="a b e"
+  else cells="hand5-peer das-hoardcol-w16 das-samplers-mcoff"; plants="a b c d e"; fi
   mkdir -p "$OUT/chains"; : > "$OUT/c-chains.txt"
   # shellcheck disable=SC2046
   for c in $cells; do par small "$c" chains "" $(chain_args "$c"); done
@@ -943,7 +947,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
     case $p in
       b) par chain_plant b chain-filter-observer-v2 hand5-peer ;;
       c) par chain_plant c chain-bindings-v2 das-hoardcol-w16 ;;
-      d) par chain_plant d chain-owed-observer-v2 das-rows-mcoff ;;
+      d) par chain_plant d chain-owed-observer-v2 das-samplers-mcoff ;;
       e) par chain_plant e chain-owed-changing-v2 hand5-peer ;;
     esac
   done
@@ -961,9 +965,9 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
       echo "$c: $(tail -n 1 "$OUT/chains/$c.cases")  <-- NOT" >> "$OUT/c-chains.txt"; continue
     fi
     echo "$c: $(tail -n 1 "$OUT/chains/$c.cases"); $(grep -m 1 '^replay: ' "$OUT/chains/$c.replay"); digest the untraced run's; bare calls counted: $(bare_count "chains/$c")" >> "$OUT/c-chains.txt"
-    if [ "$c" = das-rows-mcoff ]; then      # the off layer's rows: none, and the cell would not test what it is for
+    if [ "$c" = das-samplers-mcoff ]; then  # the off layer's rows: none, and the cell would not test what it is for
       $PY "$T/chaincases.py" --rows owed_missing "$OUT/chains/$c.jsonl.gz" > "$OUT/chains/$c.rows"
-      echo "$c: $(cat "$OUT/chains/$c.rows")" >> "$OUT/c-chains.txt"
+      echo "$c: $(cut -c13- "$OUT/chains/$c.rows")" >> "$OUT/c-chains.txt"
       has -E 'on the tapes: [1-9][0-9]* rows' "$OUT/chains/$c.rows" || echo "$c: no owed_missing row on its tapes  <-- NOT" >> "$OUT/c-chains.txt"
     fi
   done
@@ -995,9 +999,10 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
     case $p in
       b) miss=$(plant_misses b hand5-peer); k=1
          want='^\*:filter_entry:replaced:[^ ]*: NOT: filter_entry is not in replaced at every node \([0-9]+\)$' ;;
-      c) miss=$(plant_misses c das-hoardcol-w16); k=6     # each hoarder's chain: the lambda, before the layer
-         want='^(7|8|11|16|23|24):push_rebuilt:replaced:[^ ]*: NOT: its chain is \[([^]]*, )?"Node\._v2\.<locals>\.<lambda>", ([^]]*, )?"Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\], not \["Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\]$' ;;
-      d) miss=$(plant_misses d das-rows-mcoff); k=1
+      c) miss=$(plant_misses c das-hoardcol-w16); k=7     # each hoarder's chain: the lambda, before the layer; and
+         #                                                   node 1's two observers in binding order, inner first
+         want='^((7|8|11|16|23|24):push_rebuilt:replaced:[^ ]*: NOT: its chain is \[([^]]*, )?"Node\._v2\.<locals>\.<lambda>", ([^]]*, )?"Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\], not \["Node\._hoard_column\.<locals>\.push_rebuilt", "doc"\]|1:defer_on_claim:kept:[^ ]*: NOT: its chain is \["Node\._v2\.<locals>\.defer_on_claim", "Node\._hoard_column\.<locals>\.defer_on_claim", "doc"\], not \["Node\._hoard_column\.<locals>\.defer_on_claim", "Node\._v2\.<locals>\.defer_on_claim", "doc"\])$' ;;
+      d) miss=$(plant_misses d das-samplers-mcoff); k=1
          want='^\*:owed_missing:replaced:[^ ]*: NOT: owed_missing is not in replaced at every node \([0-9]+\)$' ;;
       e) miss=$(plant_misses e hand5-peer); k=1
          want='^\*:owed_missing:kept:[^ ]*: NOT: owed_missing is in replaced at every node \([0-9]+\)$' ;;
@@ -1017,9 +1022,60 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
   fi
   local plants_said="$caught plants each caught"
   [ "$caught" = "$nplants" ] || plants_said="$caught of $nplants plants caught"
-  if [ -n "$CHAINS_LOCAL" ]; then
-    echo "  the chain cases: $good of $all on hand5-peer, and $plants_said (--chains-local: the DAS cells das-hoardcol-w16 and das-rows-mcoff, and plants (c) and (d) on them, skipped)"
+  if [ -n "$NODAS" ]; then
+    echo "  the chain cases: $good of $all on hand5-peer, and $plants_said (--no-das: the DAS cells das-hoardcol-w16 and das-samplers-mcoff, and plants (c) and (d) on them, skipped)"
   else echo "  the chain cases: $good of $all on three cells, and $plants_said"; fi
+}
+swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell that enters its layer, and two plants
+  local hand nd why stop also n=0
+  : > "$OUT/c-draws.txt"
+  # keep_floor's: v2/hand5 (small's trace), the records that reach keep_floor
+  $PY "$T/chaincases.py" --rows sample_without_replacement "$OUT/v2/hand5.jsonl.gz" keep_floor > "$OUT/c-draws-hand5.rows"
+  hand=$(sed -n -E 's/.*reach keep_floor: ([0-9]+) rows.*/\1/p' "$OUT/c-draws-hand5.rows")
+  if [ "${hand:-0}" -ge 1 ]; then echo "v2/hand5: $(cut -c13- "$OUT/c-draws-hand5.rows")" >> "$OUT/c-draws.txt"
+  else echo "v2/hand5: no keep_floor draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
+  # defer_on_claim@1707's: das-samplers-mcoff (the chain cases' trace), the records that reach defer_on_claim
+  if [ -z "$NODAS" ]; then
+    if [ -f "$OUT/chains/das-samplers-mcoff.replay" ] && replay_clean chains/das-samplers-mcoff > /dev/null; then
+      $PY "$T/chaincases.py" --rows choice "$OUT/chains/das-samplers-mcoff.jsonl.gz" defer_on_claim > "$OUT/c-draws-samplers.rows"
+      nd=$(sed -n -E 's/.*reach defer_on_claim: ([0-9]+) rows.*/\1/p' "$OUT/c-draws-samplers.rows")
+      if [ "${nd:-0}" -ge 1 ]; then echo "das-samplers-mcoff: $(cut -c13- "$OUT/c-draws-samplers.rows")" >> "$OUT/c-draws.txt"
+      else echo "das-samplers-mcoff: no defer_on_claim draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
+    else echo "das-samplers-mcoff: not traced, or its replay not clean (the chain cases')  <-- NOT" >> "$OUT/c-draws.txt"; fi
+  fi
+  # (f) the re-wrap off: the trace written to its end, every keep_floor record without its draw, which the replay
+  # must refuse there and nowhere else, with its words, the first at node 1's keep_floor
+  rm -f "$OUT/c-draws-f".*
+  if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-rewrap-off-v2 . "$OUT/c-draws-f.jsonl.gz" > "$OUT/c-draws-f.out" 2> "$OUT/c-draws-f.err"); then
+    echo "(f) the re-wrap off: the run did not end with 0  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! has -E "^tracerfaults3: draws-rewrap-off-v2, planted $hand times\$" "$OUT/c-draws-f.err"; then
+    echo "(f) the re-wrap off: not planted once for each of hand5's $hand keep_floor draws  <-- NOT" >> "$OUT/c-draws.txt"
+  elif replay_of c-draws-f; then
+    echo "(f) the re-wrap off: the replay passed it  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! has -E "^replay: [0-9]+ records, [0-9]+ ok, $hand mismatched\$" "$OUT/c-draws-f.replay"; then
+    echo "(f) the re-wrap off: the replay mismatched otherwise than at hand5's $hand keep_floor records: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay")  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! has -F "tape: sample_without_replacement[[],0] asked, the tape is over logged" "$OUT/c-draws-f.replay"; then
+    echo "(f) the re-wrap off: the replay refused it otherwise than by its words  <-- NOT" >> "$OUT/c-draws.txt"
+  else
+    echo "(f) the re-wrap off: caught: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay"); $(grep -m 1 -F 'tape: sample_without_replacement[[],0] asked, the tape is over logged' "$OUT/c-draws-f.replay" | cut -c1-160)" >> "$OUT/c-draws.txt"
+    n=$((n + 1))
+  fi
+  # (g) the swap left unrestored: the record's exit check must stop the tracer, final_check's words after the stop
+  rm -f "$OUT/c-draws-g".*
+  stop="^trace3: node 1: sample_without_replacement is bound to draws_unrestored_v2\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\) at the exit of keep_floor's record, not to the tracer's own binding"
+  also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node 1: sample_without_replacement was bound again after the tracer was installed, which under v2 must be the namespace's last binding: draws_unrestored_v2\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\)$"
+  if (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-unrestored-v2 . "$OUT/c-draws-g.jsonl.gz" > "$OUT/c-draws-g.out" 2> "$OUT/c-draws-g.err"); then
+    echo "(g) the swap unrestored: the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-draws.txt"
+  elif has -E "^tracerfaults3: draws-unrestored-v2, planted [1-9][0-9]* times?\$" "$OUT/c-draws-g.err" && has -E "$stop" "$OUT/c-draws-g.err" && has -E "$also" "$OUT/c-draws-g.err"; then
+    echo "(g) the swap unrestored: caught: $(grep -m 1 -E "$stop" "$OUT/c-draws-g.err" | cut -c1-200)" >> "$OUT/c-draws.txt"
+    n=$((n + 1))
+  else echo "(g) the swap unrestored: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-draws.txt"; fi
+  if grep -q '<-- NOT' "$OUT/c-draws.txt"; then no "the swapped draws (c-draws.txt)"; fi
+  local said="2 plants each caught"
+  [ "$n" = 2 ] || said="$n of 2 plants caught"
+  if [ -n "$NODAS" ]; then
+    echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5, and $said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
+  else echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5 and ${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
 }
 s_tracercontrols() {
   local f want bad
@@ -1284,9 +1340,14 @@ EOF_ERC
   # (a) hand5-peer's trace with close_promises' chain cut to its bound layer, which the replay must refuse with its
   # words; (b) filter_entry's peer layer classed as an observer and (e) owed_missing's member-check layer as changing,
   # on hand5-peer; (c) the chains taken from the slots' bindings, on das-hoardcol-w16 (a hoarder's chain then holds
-  # --fault hoard's lambda); (d) owed_missing's layer as an observer, on das-rows-mcoff (--member-check off). Each of
-  # (b)-(e) must make its cell's cases fail on what it changed and on nothing else (c-chains.txt)
+  # --fault hoard's lambda, and an honest node's two observers come inner first); (d) owed_missing's layer as an
+  # observer, on das-samplers-mcoff (--member-check off). Each of (b)-(e) must make its cell's cases fail on what it
+  # changed and on nothing else (c-chains.txt)
   chain_cases
+  # the swapped draws (K13): keep_floor's on v2/hand5 and defer_on_claim's on das-samplers-mcoff, each on its records'
+  # tapes; (f) the re-wrap off, which the replay must refuse at each keep_floor record; (g) the swap left unrestored,
+  # which the record's exit check must stop (c-draws.txt)
+  swapped_draws
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool
@@ -1431,8 +1492,8 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
   fi
   date '+end %F %T %Z'
   if [ -n "$fail" ]; then echo "check.sh: FAIL ($(echo $fail | tr ' ' '\n' | awk '!seen[$0]++' | tr '\n' ' ' | sed 's/ $//'))"
-  elif [ "$STEPS" != "$ALL" ]; then echo "check.sh: these steps passed ($STEPS): a part, not a pass$([ -z "$CHAINS_LOCAL" ] || echo "; --chains-local")"
-  elif [ -n "$CHAINS_LOCAL" ]; then echo "check.sh: these steps passed ($STEPS): --chains-local, the chain cases' DAS cells skipped: a part, not a pass"
+  elif [ "$STEPS" != "$ALL" ]; then echo "check.sh: these steps passed ($STEPS): a part, not a pass$([ -z "$NODAS" ] || echo "; --no-das")"
+  elif [ -n "$NODAS" ]; then echo "check.sh: these steps passed ($STEPS): --no-das, tracercontrols' DAS cells skipped: a part, not a pass"
   elif [ -n "$REHEARSAL" ]; then echo "check.sh: these steps passed ($STEPS): a rehearsal of the matrix's step, not a part"
   elif [ -n "$SAMPLE" ]; then echo "check.sh: these steps passed ($STEPS): part $PART of a draft's sample ($SAMPLE), not a matrix"
   elif [ -n "$PART" ]; then echo "check.sh: PASS (part $PART of the matrix)"
@@ -1442,4 +1503,4 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
   else echo "check.sh: PASS"; fi
 } 2>&1 | tee "$LOG"
 case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with v2cells, schemacontrols, viewcontrols and tracercontrols)") true ;; *) false ;; esac \
-  || { { [ "$STEPS" != "$ALL" ] || [ -n "$REHEARSAL" ] || [ -n "$SAMPLE" ] || [ -n "$FEWCELLS" ] || [ -n "$CHAINS_LOCAL" ]; } && tail -n 1 "$LOG" | grep -q '^check.sh: these steps passed'; }
+  || { { [ "$STEPS" != "$ALL" ] || [ -n "$REHEARSAL" ] || [ -n "$SAMPLE" ] || [ -n "$FEWCELLS" ] || [ -n "$NODAS" ]; } && tail -n 1 "$LOG" | grep -q '^check.sh: these steps passed'; }
