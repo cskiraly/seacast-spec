@@ -1546,6 +1546,55 @@ h4_plant() {            # H4's plant (n): trace3.py's LAYERS without the silent 
     echo "  H4's plant (n): the silent node's layer of forward left out of LAYERS: the scan names it, the one difference, and the tracer stops at node 3's install, with its words"
   fi
 }
+timers_one() {             # $1: clean, or a plant's numeral; $2: tracerfaults3.py's option: das-samplers-mcoff traced with
+  local f=$OUT/timers/$1   #   it (clean: the chain cases' trace), then timers_v2.py on the trace; a plant's trace removed
+  rm -f "$f".*
+  if [ "$1" = clean ]; then
+    (cd "$T" && $PY timers_v2.py "$OUT/chains/das-samplers-mcoff.jsonl.gz") > "$f.timers" 2>&1; echo $? > "$f.trc"
+    return 0
+  fi
+  # shellcheck disable=SC2046
+  (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$2" . "$f.jsonl.gz" $(chain_args das-samplers-mcoff) > "$f.out" 2> "$f.err")
+  echo $? > "$f.rc"
+  (cd "$T" && $PY timers_v2.py "$f.jsonl.gz") > "$f.timers" 2>&1; echo $? > "$f.trc"
+  rm -f "$f.jsonl.gz" "$f.jsonl.gz.bare.json"
+  return 0
+}
+timers_check() {        # the timers of deferred_offers: timers_v2.py holds on das-samplers-mcoff's trace, and refuses
+  #                       each of its three plants by the checks the plant breaks and by no other (c-timers.txt)
+  local p opt want got counts bad=
+  if [ -n "$NODAS" ]; then echo "  deferred_offers' timers: --no-das: das-samplers-mcoff and the three plants on it skipped"; return 0; fi
+  rm -rf "$OUT/timers"; mkdir -p "$OUT/timers"
+  par timers_one clean
+  par timers_one i timers-note-dropped-v2
+  par timers_one ii timers-delay-no-eps-v2
+  par timers_one iii timers-note-per-index-v2
+  par_end || true       # each one's status is read below
+  : > "$OUT/c-timers.txt"
+  for p in clean i ii iii; do
+    { echo "== $p"; [ -f "$OUT/timers/$p.err" ] && grep -E '^tracerfaults3: ' "$OUT/timers/$p.err"; cat "$OUT/timers/$p.timers"; } >> "$OUT/c-timers.txt"
+  done
+  counts=$(sed -n 's/^timers_v2: the timers of deferred_offers hold on .*: \([0-9]*\) notes, \([0-9]*\) own afters, \([0-9]*\) retry_offer records .*/\1 notes, \2 own afters, \3 records/p' "$OUT/timers/clean.timers")
+  [ "$(cat "$OUT/timers/clean.trc")" = 0 ] && [ -n "$counts" ] || bad="$bad clean"
+  for p in i ii iii; do
+    case $p in
+      i) opt=timers-note-dropped-v2; want="K1 K4" ;;
+      ii) opt=timers-delay-no-eps-v2; want="K2" ;;
+      iii) opt=timers-note-per-index-v2; want="K1" ;;
+    esac
+    got=$(grep -o -E '^timers_v2: K[1-4] FAILS' "$OUT/timers/$p.timers" | cut -c12-13 | tr '\n' ' ' | sed 's/ $//')
+    if [ "$(cat "$OUT/timers/$p.rc")" != 0 ] || ! has -E "^tracerfaults3: $opt, planted [1-9][0-9]* times?" "$OUT/timers/$p.err" \
+        || [ "$(cat "$OUT/timers/$p.trc")" != 1 ] || [ "$got" != "$want" ] || ! has '^timers_v2: the timers of deferred_offers FAIL on ' "$OUT/timers/$p.timers"; then
+      bad="$bad ($p)"
+    fi
+  done
+  if [ -n "$bad" ]; then
+    no "deferred_offers' timers: not as they must be:$bad (c-timers.txt)"
+    echo "  deferred_offers' timers: not as they must be:$bad"
+  else
+    echo "  deferred_offers' timers: holds on das-samplers-mcoff ($counts); plants (i), (ii) and (iii) each refused by their checks"
+  fi
+}
 calls_one() {           # $1: a trace under OUT, without .jsonl.gz: calls_v2.py's lines for it, in reached/
   local g=$OUT/reached/${1//\//__}
   $PY "$T/calls_v2.py" "$OUT" "$1" > "$g.txt" 2> "$g.err"; echo $? > "$g.rc"
@@ -1891,6 +1940,9 @@ EOF_ERC
   # H4's plant (n): one of LAYERS' changing layers left out, which the scan names and at whose install the tracer
   # stops (c-h4.err)
   h4_plant
+  # the timers of deferred_offers: timers_v2.py on das-samplers-mcoff's trace, and its three plants, each refused by
+  # the checks it breaks (c-timers.txt)
+  timers_check
   # piece (b): each v2 trace's reached names and its IWANTs by records and by calls, with the calls file's controls,
   # last, so that every v2 trace of the run is made (c-reached.txt)
   calls_summary
