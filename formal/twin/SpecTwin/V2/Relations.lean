@@ -13,7 +13,7 @@ sections call each other both ways (`protocol.md`'s twin does the same, README.m
 
 - **A type is its id:** `T.params.X` is `param`, read from the context, and `T.id` is `T`.
 - **A missing key of a dict that raises** is a crash named `KeyError`, with the key: `join_recv[p][T]` raises on
-  the type, and `need[fam]` in `counted` on the family.
+  the type, named with its kind (`type T`), and `need[fam]` in `counted` on the family, an integer, bare.
 - **Two loops with a bound:** `queue_owed_relations`' fuel is the list's length at the first guard,
   plus one; `keep_coverage`'s is the sum of the positive needs at the first guard, plus one. Running out of fuel
   is a crash of the twin's own name.
@@ -118,7 +118,7 @@ def queueOwedRelations (p : Peer) : M2 m Unit := do
 def interestOfPeer (p : Peer) (g : Group) : M2 m IBits := do
   enter "interest_of_peer"
   let T ← NodeV2.typeOfGroup g
-  let some j ← joinRecv? p T | crash s!"KeyError: {T} (interest_of_peer: join_recv[p][T])"
+  let some j ← joinRecv? p T | crash s!"KeyError: type {T} (interest_of_peer: join_recv[p][T])"
   match j.interest with
   | .all =>
     branch "interest_of_peer: ALL"
@@ -146,7 +146,7 @@ def wantsFromMe (p : Peer) (g : Group) : M2 m IBits := do
 def serves (q : Peer) (g : Group) (i : Nat) : M2 m Bool := do
   enter "serves"
   let T ← NodeV2.typeOfGroup g
-  let some j ← joinRecv? q T | crash s!"KeyError: {T} (serves: join_recv[q][T])"
+  let some j ← joinRecv? q T | crash s!"KeyError: type {T} (serves: join_recv[q][T])"
   if j.interest == .declared then
     branch "serves: DECLARED"
     return false

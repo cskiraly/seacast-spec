@@ -22,8 +22,8 @@ The twin of `forward` (§4.4), `on_validated`, `defer` and `on_chunk` (§4.2), a
   `gossip_history.put`; `valid_have(h)` and `deferred_offers(p, h)` are `NodeV2`'s, with the whole holding.
 - **`window_release`** is cut at every node this cycle: `on_holding` calls it through `V2Later`.
 - **`T.project(f)`** is asked each time the Python calls it: three times in `on_validated`.
-- **`forward`'s axes** are an `Option`: none projects the chunk's own, and an empty list forwards on none (design
-  §7). -/
+- **`forward`'s axes** are an `Option`: none projects the chunk's own, and an empty list forwards on none. The
+  Python's `None` and `[]` are two values there, and the twin keeps them apart. -/
 
 namespace SpecTwin.V2
 

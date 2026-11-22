@@ -144,6 +144,9 @@ def r6raise (out : List (String × String)) : String :=
 #guard failsWith "footprint, writes: the twin writes an entry the Python neither read nor wrote: "
   (r6 s!"[{probeOk}]" "[]" "[\"probe\", \"probe_ok\"]")
 #guard passes (r6raise [("raises", "\"KeyError\""), ("raises_key", s!"[\"group\", {gq}]")])
+-- the same key's text with the other kind: the twin raised on the group
+#guard failsWith "the Python raises KeyError on type "
+  (r6raise [("raises", "\"KeyError\""), ("raises_key", s!"[\"type\", {gq}]")])
 #guard failsWith "crash: KeyError" (r6raise (ret "null"))
 
 /-! ## Rows read on the way down: `tie(7, f)` under a view that logs them

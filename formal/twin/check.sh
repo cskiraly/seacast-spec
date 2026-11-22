@@ -19,7 +19,9 @@
 # here is given the line of this tree, made once at the start and once more at the end, which must be the same.
 #
 # The steps, and what each must show:
-#   build     a copy of the twin's sources, built from nothing with `lake build replay`; twin-sources.txt: each
+#   build     a copy of the twin's sources, built from nothing with `lake build replay SpecTwin.V2` (SpecTwin.V2 for
+#             the guard modules, V2/*Known.lean, whose #guards hold only where they are built; a copy of one with a
+#             false #guard fails Lean, its control); twin-sources.txt: each
 #             source file of the twin, this script and record.sh by sha256 (a link among them is refused; a
 #             file whose name ends in .md, prose, is left out of the list); the copy, listed the same way, is
 #             that list, and at the end of the run the sources and the copy still are
@@ -243,11 +245,27 @@ import layout
 shutil.copytree(sys.argv[1], sys.argv[2], ignore=shutil.ignore_patterns(*layout.NOT_SOURCES, "out"))
 EOF
   echo "  $(lean --version 2>&1 | head -n 1)"
-  (cd "$OUT/twin" && lake build replay) > "$OUT/build.txt" 2>&1 || { grep -v '^✔' "$OUT/build.txt" | head -n 40; no "the build failed"; return; }
+  # SpecTwin.V2 too: it alone imports the guard modules (V2/*Known.lean), whose #guards hold only where they are built
+  (cd "$OUT/twin" && lake build replay SpecTwin.V2) > "$OUT/build.txt" 2>&1 || { grep -v '^✔' "$OUT/build.txt" | head -n 40; no "the build failed"; return; }
   [ -x "$REPLAY" ] || { no "the build left no replay"; return; }
   twin_list "$OUT/twin" 2> /dev/null | cmp -s - "$OUT/twin-sources.txt" || { no "the copy that was built is not the twin's sources as listed"; return; }
   echo "  the twin's sources: $(wc -l < "$OUT/twin-sources.txt") files, the list's sha256 $(sha256sum < "$OUT/twin-sources.txt" | cut -c1-64) (twin-sources.txt)"
   echo "  the replay: sha256 $(sha256sum < "$REPLAY" | cut -c1-64)"
+  local k g=()
+  for k in "$OUT"/twin/SpecTwin/V2/*Known.lean; do
+    k=$(basename "$k" .lean)
+    grep -q -E "Built SpecTwin\.V2\.$k( |\$)" "$OUT/build.txt" || { no "the guard module $k was not built (build.txt)"; return; }
+    g+=("$k")
+  done
+  [ ${#g[@]} -gt 0 ] || { no "no guard module under SpecTwin/V2"; return; }
+  echo "  the guards: ${#g[@]} modules of SpecTwin.V2 built, each #guard held (${g[*]})"
+  # its control: a copy of a guard module with a false #guard, given to Lean beside the built copy, fails
+  mkdir -p "$OUT/guard-control"
+  { cat "$OUT/twin/SpecTwin/V2/FuelKnown.lean"; printf '\n#guard false\n'; } > "$OUT/guard-control/FuelKnown.lean"
+  if ! (cd "$OUT/twin" && lake env lean "$OUT/guard-control/FuelKnown.lean") > "$OUT/guard-control/lean.txt" 2>&1 \
+     && grep -q -F 'did not evaluate to `true`' "$OUT/guard-control/lean.txt"; then
+    echo "  control, a false #guard in a guard module: it fails, as it must"
+  else no "control, a false #guard in a guard module: NOT failed (guard-control/lean.txt)"; fi
 }
 s_selftests() {         # each tool's own cases: exit code 0, its own closing line, and (altered3.py's, which closes with no verdict) no case marked `<-- must be`
   local t n=0
@@ -416,6 +434,9 @@ def asks(files):                              # each name an askCall reads, with
     return out
 asked = asks(sorted(twin.rglob("*.lean")))
 entries = set(CASE.findall(body(twin / "Replay.lean", "entry"))) | set(CASE.findall(body(twin / "V2" / "Replay.lean", "entryV2")))
+# The reverse direction reads the names asked under V2/ and by v2's tape reader. A kept function asks through
+# Replay.lean's instance, shared with protocol.md's functions, so its questions are not told apart here; gen.py's
+# manifest_questions holds them, over the Python's closure of the covered and kept functions.
 asked_v2 = asks(sorted((twin / "V2").glob("*.lean")))
 calls_v2 = body(twin / "V2" / "Replay.lean", "callNamesV2").split(":=", 1)[1].split("\n\n")[0]
 for n in re.findall(r'"([A-Za-z_0-9]+)"', calls_v2) + sorted(CASE.findall(body(twin / "V2" / "Replay.lean", "entryV2"))):

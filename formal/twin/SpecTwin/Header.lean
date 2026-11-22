@@ -91,13 +91,14 @@ def nodesLine (j : Json) : Except String (List (Nat × Consts × List String)) :
 
 /-! ## The header, by its document -/
 
-/-- The header's document, from its arguments as the tracer reads them (`docOf`, as `rowReadsOf` reads them): none,
-or `v03`, is `protocol.md`; `v2` is `protocol-v2.md`. The toy's parser takes those two words alone. -/
-def headerForm (hd : Json) : Except String Form :=
-  match docOf ((hd.getObjValAs? (List String) "args").toOption.getD []) with
-  | none | some "v03" => .ok .v1
-  | some "v2" => .ok .v2
-  | some d => .error s!"header: a document this replay does not read: {d}"
+/-- The header's document, from its arguments (`argsOf`, a list of strings where present) as the tracer reads them
+(`docOf`, as `rowReadsOf` reads them): none, or `v03`, is `protocol.md`; `v2` is `protocol-v2.md`. The toy's parser
+takes those two words alone. -/
+def headerForm (hd : Json) : Except String Form := do
+  match docOf (← argsOf hd) with
+  | none | some "v03" => return .v1
+  | some "v2" => return .v2
+  | some d => throw s!"header: a document this replay does not read: {d}"
 
 /-- The tables a header names under each document: its own, then the other sections' it reads. Under `protocol.md`
 the twin's own tables as the schema names them (`ownTables`, generated) and the two it reads (`unwanted` is the

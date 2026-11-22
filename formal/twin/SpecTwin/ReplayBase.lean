@@ -319,10 +319,14 @@ inductive Form where
   | v2
   deriving BEq, Repr, Inhabited
 
-/-- An ask with its flags: `[key, standing, hops, probe]`. -/
+/-- An ask with its flags: `[key, standing, hops, probe]`. A structured id carries no flags, since the Python's is
+bytes, so its ask is `[id, false, 0, false]` and any other is refused. -/
 def askV2Of (j : Json) : Except String AskV2 := do
   let #[k, s, h, p] ← j.getArr? | throw s!"not an ask with its flags: {j.compress}"
-  return { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
+  let a : AskV2 := { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
+  if let .id .. := a.key then
+    if a.standing || a.hops != 0 || a.probe then throw s!"an ask of a structured id has no flags: {j.compress}"
+  return a
 
 /-- An entry of an IDONTWANT under protocol-v2.md: an id, as an IHAVE's entry is, or a holding,
 `["holding", group, bits, claim_all, complete]`. A bitmap without its claims is refused. -/

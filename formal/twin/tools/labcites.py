@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
 """The twin's files may not cite the notes they were developed beside: this repository faces the public, and a
-section number of another document reads as one of the specification's. Every line that holds one of PATTERNS is
-printed, with a count; the exit status is 1 where there is any, 0 where there is none. A citation is rewritten as a
-statement in place.
+section number of another document reads as one of the specification's. Every line that holds one of PATTERNS, or
+where one stands across the break to the next line, is printed, with a count; the exit status is 1 where there is
+any, 0 where there is none. A citation is rewritten as a statement in place.
 
 A path is a directory or a file. A directory's files are read but those under `.lake/` and `__pycache__/`, each
 line printed by the file's path under the directory; a file is read itself, printed by the path as given.
 
     python3 labcites.py [PATH ...]     each PATH, or formal/twin; asks git nothing
     python3 labcites.py --self-test    a clean tree, files and a directory given together, and a tree with a
-                                       planted citation of each pattern per file kind
+                                       planted citation of each pattern per file kind and one that wraps a line
 """
 import sys
 import tempfile
@@ -23,13 +23,25 @@ PATTERNS = ("design" + " §", "notes" + "/")
 SKIP = (".lake", "__pycache__")
 
 
+LEAD = " \t-#*/"                              # leading spaces and comment marks, left out of a line read after the last
+
+
 def lines_of(p, name):
-    """(name, line number, line) of each line of the file p holding a pattern; none where p is not text."""
+    """(name, line number, line) of each line of the file p holding a pattern, or where a pattern stands across the
+    break to the next line: this line's text without its end spaces, one space, then the next line's without its
+    leading spaces and comment marks. None where p is not text."""
     try:
         text = p.read_text(encoding="utf-8")
     except (UnicodeDecodeError, OSError):
         return []
-    return [(name, n, line) for n, line in enumerate(text.splitlines(), 1) if any(x in line for x in PATTERNS)]
+    lines = text.splitlines()
+    out = []
+    for n, line in enumerate(lines, 1):
+        after = lines[n].lstrip(LEAD) if n < len(lines) else ""
+        joined = line.rstrip() + " " + after
+        if any(x in line or (x in joined and x not in after) for x in PATTERNS):
+            out.append((name, n, line))
+    return out
 
 
 def found_in(paths):
@@ -71,11 +83,14 @@ def self_test():
         for t in (clean, planted):
             (t / "A").mkdir(parents=True)
             (t / "A" / "x.lean").write_text("-- the receive path (protocol-v2.md §4.2)\ndef x := 1\n")
+            (t / "A" / "v.lean").write_text("-- the twin's design\n-- of the receive path\ndef v := 1\n")
             (t / "t.py").write_text("# the notes of a function\nprint(1)\n")
             (t / ".lake").mkdir()
             (t / ".lake" / "skip.lean").write_text(f"-- {D}1 and {N}x, under .lake\n")
         (planted / "A" / "x.lean").write_text(
             f"-- see {D}6\ndef x := 1\n-- ({N}a/b.md)\n")
+        (planted / "A" / "w.lean").write_text(        # a citation that wraps: "design" ends a line, its section starts the next
+            f"/-- an empty list forwards on none ({D[:-2]}\n  {D[-1]}7). -/\ndef w := 1\n")
         (planted / "t.py").write_text(f"# {N}c.md\nprint(1)  # {D}4.4\n")
         md = Path(d) / "README.md"
         md.write_text(f"# The twin\nIts rules ({D}9).\n")
@@ -84,7 +99,8 @@ def self_test():
                 ("clean", (clean,), []),
                 ("files and a directory", given,
                  [(given[0], 1), (given[0], 2), (given[2], 2)]),
-                ("planted", (planted,), [("A/x.lean", 1), ("A/x.lean", 3), ("t.py", 1), ("t.py", 2)])):
+                ("planted", (planted,),
+                 [("A/w.lean", 1), ("A/x.lean", 1), ("A/x.lean", 3), ("t.py", 1), ("t.py", 2)])):
             got = [(rel, n) for rel, n, _ in hits(*paths)]
             good = got == want
             ok &= good

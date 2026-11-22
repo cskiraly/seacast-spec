@@ -54,6 +54,8 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
 #guard formIs (headerForm (Json.mkObj (args ["--doc=v2"]))) .v2
 #guard formIs (headerForm (Json.mkObj (args ["--doc", "v2"]))) .v2
 #guard failsWith "header: a document this replay does not read: v3" (headerForm (Json.mkObj (args ["--doc", "v3"])))
+#guard failsWith "header: args is not a list of strings: null" (headerForm (Json.mkObj [("args", Json.null)]))
+#guard failsWith "header: args is not a list of strings: [42]" (headerForm (Json.mkObj [("args", Json.arr #[jn 42])]))
 #guard (readHeader (hdV2 traced43 [("args", strs ["--doc", "v3"])]) none).failures.head?
   == some "header: a document this replay does not read: v3"
 

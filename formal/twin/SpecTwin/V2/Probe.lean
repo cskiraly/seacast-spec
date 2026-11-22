@@ -12,8 +12,8 @@ v0.10.11's text: v0.10.12 changes it, and it is transcribed again from that text
   index is itself, with its flags; a structured id gives its group and index with none, as the toy's
   `GroupIndex` carries none. Every `Key` has a group and an index, so it is never none here; `probe_waits`,
   `probe_settled` and `probe_of_claim` test it all the same, as the Python does, with no read where it is none.
-- **The plain dicts raise:** `probe[g]` and `probed[g]` crash as `KeyError` on the group where the
-  Python loads them; `.get` reads none; `g in probe_ok` is the entry's presence, whose value can be a present
+- **The plain dicts raise:** `probe[g]` and `probed[g]` crash as `KeyError` on the group, named with its
+  kind (`group G`), where the Python loads them; `.get` reads none; `g in probe_ok` is the entry's presence, whose value can be a present
   `None` (`some none`).
 - **The order of a proxied set** is asked at each iteration: `serve_standing`'s popped set, empty
   or not, and `suppression_scope`'s in `known_in_scope` and `known_across`. `probe_waiting[g].items()` is a
@@ -55,7 +55,7 @@ settled, the probe's ask is gated again -/
 def settleProbe (g : Group) (verdict : Option Bool) : M2 m Unit := do
   enter "settle_probe"
   setProbeOk g verdict                                        -- `probe_ok[g] = verdict`
-  let some i ← probe? g | crash s!"KeyError: {g} (settle_probe: probe[g])"
+  let some i ← probe? g | crash s!"KeyError: group {g} (settle_probe: probe[g])"
   setProbeAsk (.want g i) false                               -- `probe_asks.discard(Ask(g, probe[g]))`: a write
   branch "settle_probe: the probe's exemption discarded"      --   with no read, as the tracer's view of a set logs it
 
@@ -93,7 +93,7 @@ def probePromise (g : Group) (i : Nat) : M2 m (Option ((Key × Peer) × Float)) 
   if !(← deferred? g) then return none
   if (← probe? g) != some i then return none
   if (← probeOk? g).isSome then return none
-  let some q ← probed? g | crash s!"KeyError: {g} (probe_promise: probed[g])"
+  let some q ← probed? g | crash s!"KeyError: group {g} (probe_promise: probed[g])"
   -- `return (k, promises[k]) if k in promises else None`
   match ← promise? (.want g i) q with
   | some t => return some ((.want g i, q), t)

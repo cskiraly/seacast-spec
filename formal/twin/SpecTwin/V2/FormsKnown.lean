@@ -63,6 +63,13 @@ def ph (v : String) (f : Form) : Except String (Option Val) := valIn "peer_has" 
   (.iwantV2 false [{ key := .want gk 3, standing := true, hops := 2, probe := false }])
 #guard readsAs (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], true]" .v2) (.iwantV2 true [{ key := .want gk 3 }])
 #guard readsAs (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 0, false]], false]" .v2) (.iwantV2 false [{ key := sidKey }])
+-- an ask by structured id carries no flags: the Python's id is bytes, which the tracer writes as [id, false, 0, false]
+#guard refusedWith "an ask of a structured id has no flags: "
+  (ctlIn s!"[\"iwant\", [[\"{sid}\", true, 0, false]], false]" .v2)
+#guard refusedWith "an ask of a structured id has no flags: "
+  (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 1, false]], false]" .v2)
+#guard refusedWith "an ask of a structured id has no flags: "
+  (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 0, true]], false]" .v2)
 #guard refusedWith "under protocol-v2.md an IWANT is [\"iwant\", asks, want]: " (ctlIn s!"[\"iwant\", [[{gq}, 3]]]" .v2)
 #guard refusedWith "not an ask with its flags: " (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0]], false]" .v2)
 #guard refusedWith "not a bool: " (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], 0]" .v2)
@@ -167,6 +174,7 @@ def bitsOf (x : Option Float) : Option Nat := x.map (·.toBits.toNat)
 #guard refusedWith "types: payload: ANNOUNCE_EXTRA: " (typesIn (payload "\"ANNOUNCE_EXTRA\": \"all_joined\""))
 #guard refusedWith "types: payload: EVIDENCE: " (typesIn (payload "\"EVIDENCE\": \"row\""))
 #guard refusedWith "types: payload: REPAIR_SAMPLE: " (typesIn (payload "\"REPAIR_SAMPLE\": [[8]]"))
+#guard refusedWith "types: payload: REPAIR_SAMPLE: " (typesIn (payload "\"REPAIR_SAMPLE\": []"))
 #guard refusedWith "types: payload: not a type parameter: W_BYTES" (typesIn (payload "\"W_BYTES\": 1"))
 #guard refusedWith "types: no payload type" (typesIn "{\"row\": {\"M\": 4}}")
 

@@ -462,6 +462,19 @@ def lineTail (line : String) : Option (List String × List String) :=
     | _ => none
   | _ => none
 
+/-- A header's arguments, `args`: the words of the tracer's command line, a list of strings, or none where the
+header has no such member. Any other value is refused. -/
+def argsOf (hd : Json) : Except String (List String) :=
+  match hd.getObjVal? "args" with
+  | .error _ => .ok []
+  | .ok j =>
+    let bad := s!"header: args is not a list of strings: {j.compress}"
+    match j.getArr? with
+    | .error _ => .error bad
+    | .ok a => a.toList.mapM fun x => match x with
+      | .str s => .ok s
+      | _ => .error bad
+
 /-- The document a trace's arguments name, read from the words as the tracer reads them: `--doc D` or `--doc=D`,
 the first of them; none for protocol.md. -/
 def docOf : List String → Option String
@@ -477,7 +490,7 @@ def rowTables : List String := ["owed", "planned", "queue", "tied"]
 name `--doc v2`), and it lists exactly `rowTables`, in that order. -/
 def rowReadsOf (hd : Json) : Except String (List String) := do
   let .ok j := hd.getObjVal? "row_reads" | return []
-  if docOf ((hd.getObjValAs? (List String) "args").toOption.getD []) != some "v2" then
+  if docOf (← argsOf hd) != some "v2" then
     throw "header: row_reads in a trace of protocol.md"
   if j != .arr (rowTables.map Json.str).toArray then
     throw s!"header: row_reads is not {(Json.arr (rowTables.map Json.str).toArray).compress}: {j.compress}"

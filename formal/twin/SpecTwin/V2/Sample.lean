@@ -8,8 +8,9 @@ and `sample`. Each comes after every function it calls (`V2/Relations.lean`'s ru
 
 - **No recursion between `ask_sample` and `resample`:** `ask_sample` reaches `resample`, and itself again, only
   through timers (`afterV2`); `resample` calls `ask_sample` directly.
-- **`resample`'s loop** runs on fuel `n·(n+1)+1`, `n` the length of `held_samples[b]` at its first guard (design
-  §7); running out is a crash of the twin's own name.
+- **`resample`'s loop** runs on fuel `n·(n+1)+1`, `n` the length of `held_samples[b]` at its first guard, where
+  the Python first reads the list: at most `n` removals, and fewer than `n` re-appends between two. Running out is
+  a crash of the twin's own name.
 - **`ask_sample`'s `order`** is built whole before `next` tests it, as the Python builds the list: `via`'s
   route and `ROUTE_HOPS` are asked, and `high` computed, whichever list is the first that is not empty.
 - **A queue as an argument:** `choose` and `pick` take the peer and read its normal lane, as
@@ -122,7 +123,7 @@ def askSample (g : Group) (i : Nat) (first : Bool) : M2 m Unit := do
   let fam ← NodeV2.family T g
   let toward ← fresh.filterM fun q => do
     if ← serves q g i then return false
-    let some j ← joinRecv? q T | crash s!"KeyError: {T} (ask_sample: join_recv[q][T])"
+    let some j ← joinRecv? q T | crash s!"KeyError: type {T} (ask_sample: join_recv[q][T])"
     return j.duty == .forward
   let via ← NodeV2.routeNext T fam toward
   -- `[q for q in fresh if serves(q, g, i) and high_custody(q, T)]`

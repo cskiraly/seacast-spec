@@ -18,7 +18,7 @@ and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes a
   the order `links(T)` gives them, and each caller asks the order it iterates them in, once per iteration, with
   the place named for the caller.
 - **`planned` and `origin` are plain dicts** in the toy, so `planned[g][i]` and `origin[g]` raise `KeyError` on
-  a missing key, as they crash here. `planned[g][i]` is read once per peer of the pool, as the comprehension
+  a missing key, as they crash here, a group named with its kind (`group G`) and an index bare. `planned[g][i]` is read once per peer of the pool, as the comprehension
   reads it: not at all where the pool is empty. It is read as v2's view logs it, the view that the header's
   `row_reads` names: the row `planned[g]` first (`planned`), so that a missing row raises before any leaf is read,
   then the leaf (`plannedTargets?`, which goes through the row again). A view that logs no read of a row the
@@ -253,7 +253,7 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
   if (← read).base.c.SOURCE_OFFERS_PUBLISH then               -- `if SOURCE_OFFERS == PUBLISH: return`
     branch "origin_acked: at PUBLISH, nothing"
     return
-  let some b ← origin g | crash s!"KeyError: {g} (origin_acked: origin[g])"
+  let some b ← origin g | crash s!"KeyError: group {g} (origin_acked: origin[g])"
   if b.has i then                                             -- `if origin[g].has(i): return`
     branch "origin_acked: acknowledged before"
     return
@@ -266,7 +266,7 @@ def originAcked (g : Group) (i : Nat) : M2 m Unit := do
   -- `[q for q in source_pool(T, g, c) if q not in planned[g][i]]`: planned[g][i] read once per peer
   let ps ← (← sourcePool T g c).filterM fun q => do
     if !(← planned g) then                                    -- the row, then the leaf, as v2's view logs them
-      return (← crash s!"KeyError: {g} (origin_acked: planned[g])")
+      return (← crash s!"KeyError: group {g} (origin_acked: planned[g])")
     match ← plannedTargets? g i with
     | some ts => return !ts.contains q
     | none => return (← crash s!"KeyError: {i} (origin_acked: planned[g][i])")

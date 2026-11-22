@@ -133,6 +133,12 @@ def coverOf (j : Json) : Except String Cover := do
 def inParam {α} (t : TypeId) (name : String) (x : Except String α) : Except String α :=
   x.mapError (s!"types: {t}: {name}: " ++ ·)
 
+/-- `REPAIR_SAMPLE`'s steps, `[[S, L], ...]`: one step or more, as the tracer writes them. -/
+def repairSteps (j : Json) : Except String (List (Nat × Nat)) := do
+  let l ← pairs "repair step" nat nat j
+  if l.isEmpty then throw "no repair step: an empty list"
+  return l
+
 /-- A type parameter's float: its 64-bit word, finite, where `inf` lets the word of +∞ through, as a limit's
 none. -/
 def paramFloat (inf : Bool) (j : Json) : Except String Float := do
@@ -149,7 +155,7 @@ def announceWidthOf : Json → Except String AnnounceWidth
 /-- One type's parameters in a nodes entry's `types` map, `{NAME: value, ...}` (`TypeParams`). A natural number is
 not negative, and `M` is not 0. A boolean is JSON's. A float is its 64-bit word and finite, and `SERVE_LIMIT` and
 `FORWARD_LIMIT` may be +∞. `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"` and `"NONE"`. `EVIDENCE` is present
-only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`. A parameter the type does not have is left out, and
+only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`, one step or more. A parameter the type does not have is left out, and
 its read is the toy's `AttributeError`; a missing member and `null` differ. -/
 def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
   let .ok kvs := j.getObj? | throw s!"types: {t}: not a map of parameters: {j.compress}"
@@ -190,7 +196,7 @@ def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
       if v != .null then throw s!"types: {t}: EVIDENCE: present only as null in this version: {v.compress}"
       p := { p with EVIDENCE := some none }
     | "REPAIR_SAMPLE" =>
-      p := { p with REPAIR_SAMPLE := some (← inParam t name (optOf (pairs "repair step" nat nat) v)) }
+      p := { p with REPAIR_SAMPLE := some (← inParam t name (optOf repairSteps v)) }
     | _ => throw s!"types: {t}: not a type parameter: {name}"
   return p
 
@@ -280,12 +286,12 @@ def entryV2 (j : Json) : Option (Except String Entry) :=
       | _, _ => none
   | _ => none
 
-/-- A `KeyError`'s key under v2: a group `["group", g]`, a type `["type", tid]`, or an integer in
-the signed form; as the twin's crash names it. -/
+/-- A `KeyError`'s key under v2, as the twin's crash names it, with its kind: a group `["group", g]` is
+`group G`, a type `["type", tid]` is `type T`, and an integer in the signed form is bare. -/
 def raisesKeyV2 (j : Json) : Except String String :=
   match j with
-  | .arr #[.str "group", g] => Replay.groupKey g
-  | .arr #[.str "type", t] => typeId t
+  | .arr #[.str "group", g] => do return s!"group {← Replay.groupKey g}"
+  | .arr #[.str "type", t] => do return s!"type {← typeId t}"
   | j => do return toString (← intOf j)
 
 /-- How a record of a trace under protocol-v2.md is read. -/

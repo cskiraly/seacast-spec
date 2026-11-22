@@ -87,8 +87,10 @@ CUT = ["window_release"]
 
 OWN = [t.name for t in schema.TABLES] + [t.name for t in schema_v2.TABLES_V2]
 
-# open: a third name can come only from the closure rule (every global a covered function loads); a table found in
-# neither list is kept by the twin as state or joins this one
+# closed for COVERED: closure_v2.py classes every global a covered function loads at each v2 trace's start, and a
+# table in neither OWN nor this list stops the tracer. KEPT is outside that rule, since the twin runs it as its own
+# Lean; its functions load 11 globals the rule's classes would not take (HaveBitmap, IWANT, PRUNE,
+# SegmentDescriptor, Shard, ceil, content_id, inf, is_have_bitmap, uint32_le, uint64_le).
 FOREIGN = ["known_id", "chunks"]
 
 QUESTIONS = [

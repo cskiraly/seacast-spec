@@ -216,7 +216,7 @@ def deferOnClaim (g : Group) : M2 m Unit := do
   let w : Want := { group := g, bits := (0 : Bits).set i, standing := false, hops := 0, probe := true }
   if !(← NodeV2.send q (.want w) false) then                  -- marked: answered whatever we hold
     settleProbe g none                                        -- refused by a full queue, never written: no verdict
-    let some d ← dutyAt? g | crash s!"KeyError: {g} (defer_on_claim: duty_at[g])"
+    let some d ← dutyAt? g | crash s!"KeyError: group {g} (defer_on_claim: duty_at[g])"
     arm g (pyMax now d)                                       -- `arm(g, max(now, duty_at[g]))`
     branch "defer_on_claim: refused"
     return
@@ -243,7 +243,7 @@ def reconsider (g : Group) (at_ : Float) : M2 m Unit := do
     if (← probeOk? g).isNone then
       if ← probeSent? g then
         settleProbe g (some false)
-        let some q ← probed? g | crash s!"KeyError: {g} (reconsider: probed[g])"
+        let some q ← probed? g | crash s!"KeyError: group {g} (reconsider: probed[g])"
         penalise q
         branch "reconsider: the probe failed"
       else
@@ -257,7 +257,7 @@ def reconsider (g : Group) (at_ : Float) : M2 m Unit := do
   -- `deferred[g] and received[g].has(probe[g]) and wants_family(T, T.family(g)) and not owed_missing(g)`
   let claimHeld ← if !(← deferred? g) then pure false else do
     let r ← receivedBits g
-    let some pi ← probe? g | crash s!"KeyError: {g} (reconsider: probe[g])"
+    let some pi ← probe? g | crash s!"KeyError: group {g} (reconsider: probe[g])"
     if !r.has pi then pure false else do
       if !(← NodeV2.wantsFamily T (← NodeV2.family T g)) then pure false else do
         pure !(← owedMissingCall g)
