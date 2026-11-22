@@ -68,7 +68,7 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
   == ["header: the tables are not this twin's (own, foreign)"]
 #guard fails (header Manifest.own Manifest.foreign traced43 [])
   == ["header: the tables are not this twin's (own, foreign)"]
-#guard Manifest.own.length == 72 && Manifest.own.take 36 == ownTables
+#guard Manifest.own.length == 75 && Manifest.own.take 36 == ownTables      -- v2's 39 since v0.11.1's three
 
 -- B3, traced under v2
 #guard fails (hdV2 (sortBy (· < ·) ("announce" :: traced43))) == []
@@ -106,11 +106,14 @@ def consts31 : List (String × Json) :=
     else if k == "SOURCE_OFFERS" then (k, Json.str "ACK")
     else (k, jn 1)
 
-def v2Three : List (String × Json) := [("ANSWERS_FIRST", Json.bool false), ("ASK_UPLINK", word0), ("MERGE_HOLDINGS", Json.bool false)]
+/-- v2's five: `SAMPLE_OUTSTANDING` 4, as the toy's, and `SERVE_BUDGET` null, no limit. -/
+def v2Five : List (String × Json) :=
+  [("ANSWERS_FIRST", Json.bool false), ("ASK_UPLINK", word0), ("MERGE_HOLDINGS", Json.bool false),
+   ("SAMPLE_OUTSTANDING", jn 4), ("SERVE_BUDGET", Json.null)]
 
-/-- The 34 with these members put in their place (a member given as `none` left out). -/
-def consts34 (change : List (String × Option Json) := []) : Json :=
-  Json.mkObj ((consts31 ++ v2Three).filterMap fun (k, v) =>
+/-- The 36 with these members put in their place (a member given as `none` left out). -/
+def consts36 (change : List (String × Option Json) := []) : Json :=
+  Json.mkObj ((consts31 ++ v2Five).filterMap fun (k, v) =>
     match change.lookup k with
     | some (some w) => some (k, w)
     | some none => none
@@ -121,7 +124,7 @@ def payload : Json := Json.mkObj [("payload", Json.mkObj [])]
 /-- C1's entry, with these members put in its place (a member given as `none` left out). -/
 def entry (change : List (String × Option Json) := []) : Json :=
   let base : List (String × Json) :=
-    [("n", Json.arr #[jn 0, jn 1]), ("consts", consts34), ("replaced", strs []), ("types", payload),
+    [("n", Json.arr #[jn 0, jn 1]), ("consts", consts36), ("replaced", strs []), ("types", payload),
      ("chains", Json.mkObj [])]
   Json.mkObj (base.filterMap fun (k, v) =>
     match change.lookup k with
@@ -143,21 +146,50 @@ def chains (l : List (String × List String)) : Json := Json.mkObj (l.map fun (k
   | .error _ => false)
 
 -- C2, the constants under v2
-#guard failsWith "nodes: consts: no ANSWERS_FIRST" (line2 (entry [("consts", some (consts34 [("ANSWERS_FIRST", none)]))]))
+#guard failsWith "nodes: consts: no ANSWERS_FIRST" (line2 (entry [("consts", some (consts36 [("ANSWERS_FIRST", none)]))]))
 #guard failsWith "nodes: consts: ASK_UPLINK is a finite float, not negative: "            -- −1.0
-  (line2 (entry [("consts", some (consts34 [("ASK_UPLINK", some (jn 13830554455654793216))]))]))
+  (line2 (entry [("consts", some (consts36 [("ASK_UPLINK", some (jn 13830554455654793216))]))]))
 #guard failsWith "nodes: consts: ASK_UPLINK is a finite float, not negative: "            -- +∞
-  (line2 (entry [("consts", some (consts34 [("ASK_UPLINK", some (jn 9218868437227405312))]))]))
+  (line2 (entry [("consts", some (consts36 [("ASK_UPLINK", some (jn 9218868437227405312))]))]))
 #guard failsWith "nodes: consts: ANSWERS_FIRST is true or false: "
-  (line2 (entry [("consts", some (consts34 [("ANSWERS_FIRST", some (jn 1))]))]))
-#guard (match line2 (entry [("consts", some (consts34 [("ASK_UPLINK", some (jn 4607182418800017408)),
+  (line2 (entry [("consts", some (consts36 [("ANSWERS_FIRST", some (jn 1))]))]))
+#guard (match line2 (entry [("consts", some (consts36 [("ASK_UPLINK", some (jn 4607182418800017408)),
                                                         ("MERGE_HOLDINGS", some (Json.bool true))]))]) with   -- 1.0
   | .ok ((_, cfg) :: _) => cfg.c2.ASK_UPLINK == 1.0 && cfg.c2.MERGE_HOLDINGS && !cfg.c2.ANSWERS_FIRST
   | _ => false)
 #guard failsWith "nodes: consts: not a member of it: ANSWERS_FIRST"                       -- under protocol.md
-  (nodesLine (Json.arr #[Json.mkObj [("n", Json.arr #[jn 0]), ("consts", consts34), ("replaced", strs [])]]))
+  (nodesLine (Json.arr #[Json.mkObj [("n", Json.arr #[jn 0]), ("consts", consts36), ("replaced", strs [])]]))
 #guard passes
   (nodesLine (Json.arr #[Json.mkObj [("n", Json.arr #[jn 0]), ("consts", Json.mkObj consts31), ("replaced", strs [])]]))
+
+-- C2b, v0.11.1's two constants: SAMPLE_OUTSTANDING a JSON integer of at least 1; SERVE_BUDGET one too, or null for
+-- no limit. Each refused value in its own guard, as the tracer could write it.
+def js (s : String) : Json := match Json.parse s with
+  | .ok j => j
+  | .error _ => Json.str s!"unparsed: {s}"
+def soIs (v : String) : Except String (List (Nat × NodeV2Cfg)) :=
+  line2 (entry [("consts", some (consts36 [("SAMPLE_OUTSTANDING", some (js v))]))])
+def sbIs (v : String) : Except String (List (Nat × NodeV2Cfg)) :=
+  line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", some (js v))]))])
+#guard failsWith "nodes: consts: no SAMPLE_OUTSTANDING" (line2 (entry [("consts", some (consts36 [("SAMPLE_OUTSTANDING", none)]))]))
+#guard failsWith "nodes: consts: no SERVE_BUDGET" (line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", none)]))]))
+#guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "0")
+#guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "4.0")
+#guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "true")
+#guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "null")
+#guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "\"4\"")
+#guard failsWith "nodes: consts: SERVE_BUDGET is null or a natural number, at least 1: " (sbIs "0")
+#guard failsWith "nodes: consts: SERVE_BUDGET is null or a natural number, at least 1: " (sbIs "2.0")
+#guard failsWith "nodes: consts: SERVE_BUDGET is null or a natural number, at least 1: " (sbIs "true")
+#guard (match soIs "1" with
+  | .ok ((_, cfg) :: _) => cfg.c2.SAMPLE_OUTSTANDING == 1 && cfg.c2.SERVE_BUDGET == none
+  | _ => false)
+#guard (match line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", some (jn 3))]))]) with
+  | .ok ((_, cfg) :: _) => cfg.c2.SAMPLE_OUTSTANDING == 4 && cfg.c2.SERVE_BUDGET == some 3
+  | _ => false)
+-- a v2 header of before the sync, whose type still carries the cap, is refused (fv-67's note 2)
+#guard failsWith "nodes: types: payload: not a type parameter: SAMPLE_OUTSTANDING"
+  (line2 (entry [("types", some (Json.mkObj [("payload", Json.mkObj [("SAMPLE_OUTSTANDING", jn 4)])]))]))
 
 -- C3, the members
 #guard failsWith "nodes: no types" (line2 (entry [("types", none)]))
@@ -216,7 +248,7 @@ def chains (l : List (String × List String)) : Json := Json.mkObj (l.map fun (k
 #guard Manifest.kept.all fun f => routeV2 f == .kept || routeV2 f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeV2 f == .kept
 #guard Manifest.covered.all fun f => routeV2 f == .v2 || routeV2 f == .form
-#guard fnsV2.length == 68
+#guard fnsV2.length == 70                                                  -- v0.11.1's joined, drop_wants_beyond
 
 -- D2, runV2 by the route: a kept name `keptV2` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused

@@ -3,10 +3,10 @@ import SpecTwin.V2.Announce
 /-! # protocol-v2.md's probe, standing answers and repair checks: §4.5, §4.6
 
 The twin of the probe's functions (R5): `gated`, `settle_probe`, `probe_answer`, `probe_promise`,
-`probe_waits`, `probe_settled`, `probe_of_claim` and `serve_probe`; §4.5's `serve_standing` and
-`serve_waiting_probe`; and §4.6's `known_in_scope`, `known_across`, `ask_custodian`, `repair_verdict` and
-`owed_missing`. Each comes after every function it calls (`V2/Relations.lean`'s rule). `serve_standing` is
-v0.10.11's text: v0.10.12 changes it, and it is transcribed again from that text.
+`probe_waits`, `probe_settled`, `probe_of_claim` and `serve_probe`; §4.5's `serve_standing`,
+`drop_wants_beyond` and `serve_waiting_probe`; and §4.6's `known_in_scope`, `known_across`, `ask_custodian`,
+`repair_verdict` and `owed_missing`. Each comes after every function it calls (`V2/Relations.lean`'s rule).
+`serve_standing` and `drop_wants_beyond` are v0.11.1's text.
 
 - **An ask with its flags** is an `AskV2`. `group_index(a)` is the twin's own: an ask by
   index is itself, with its flags; a structured id gives its group and index with none, as the toy's
@@ -155,9 +155,11 @@ private def servedOut (q : Peer) (g : Group) : M2 m Bool := do
   let lim ← param (← NodeV2.typeOfGroup g) "SERVE_LIMIT" (·.SERVE_LIMIT)
   return n.toFloat ≥ lim
 
-/-- `serve_standing(g, i)` (§4.5, main's text): the chunk a WANT waited for is here -/
+/-- `serve_standing(g, i)` (§4.5): the chunk a WANT waited for is here (§4.10) -/
 def serveStanding (g : Group) (i : Nat) : M2 m Unit := do
   enter "serve_standing"
+  -- `routed_standing[g].pop(i, None)`: the route marks go with the requests (§4.5); a present set is deleted
+  if (← routedStanding? g i).isSome then eraseRoutedStanding g i
   -- `standing[g].pop(i, ())`: a present set is deleted, a missing one left; its order asked, empty or not
   let popped ← standing? g i
   if popped.isSome then eraseStanding g i
@@ -169,9 +171,38 @@ def serveStanding (g : Group) (i : Nat) : M2 m Unit := do
     if ← servedOut q g then
       branch "serve_standing: past the limit"
       continue
+    -- `counted = not offered_to[q][g].has(i)`: the budget counts it, unless it asked on our offer (§4.5)
+    let counted := !(← offeredToBits q g).has i
+    if counted then
+      -- `served_hb[q] >= SERVE_BUDGET`, read whatever the budget; none is no limit (the toy's `math.inf`)
+      let n ← servedHbCount q
+      if (← read).c2.SERVE_BUDGET.any (n ≥ ·) then
+        branch "serve_standing: over the budget"                --   dropped, without penalty
+        continue
+      setServedHb q ((← servedHbCount q) + 1)                 -- `served_hb[q] += 1`
     setServed q g ((← servedCount q g) + 1)                   -- `served[q][g] += 1`
     answer "serve_standing" q g i
     branch "serve_standing: answered"
+
+/-- `drop_wants_beyond(g)` (§4.5): the count now known, what was kept before it loses the indices past it:
+standing requests and their route marks, and a DECLARED peer's interest bits. The two lists are built whole
+before their loops, as the Python builds them, and neither loop asks anything, so their orders are not asked. -/
+def dropWantsBeyond (g : Group) : M2 m Unit := do
+  enter "drop_wants_beyond"
+  let T ← NodeV2.typeOfGroup g                                -- `n = type_of_group(g).index_count(hdr[g])`
+  let n ← NodeV2.indexCount T (← desc g)
+  -- `for i in [i for i in standing[g] if i >= n]:`
+  for (i, _) in (← allStanding g).filter (·.1 ≥ n) do
+    let _ ← standing? g i                                     -- `standing[g].pop(i, None)`, there by the scan
+    eraseStanding g i
+    if (← routedStanding? g i).isSome then eraseRoutedStanding g i   -- `routed_standing[g].pop(i, None)`
+  -- `for q in [q for q in want_p if g in want_p[q]]:`
+  for (q, gs) in ← allWantPAll do
+    let some (_, b) := gs.find? (·.1 == g) | continue
+    -- `want_p[q][g] & ~bitmap({i for i in want_p[q][g] if i >= n})`: iterating a complemented one raises
+    let some bs := b.toBits? | crash "ValueError: iterating a complemented bitmap (drop_wants_beyond)"
+    setWantP q g (IBits.minus b (IBits.ofBits (bs.minus ((1 <<< n) - 1))))
+  branch "drop_wants_beyond: done"
 
 /-- `serve_waiting_probe(g, i)` (§4.5, R5): the cell a kept probe waited for is here: answered as `on_want`
 answers a probe, with its one exemption -/

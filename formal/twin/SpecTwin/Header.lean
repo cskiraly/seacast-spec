@@ -177,10 +177,13 @@ def asks (form : Form) (line f : String) : Bool :=
 /-! ## The nodes line under protocol-v2.md -/
 
 /-- v2's constants beyond `protocol.md`'s 31, which a v2 entry's `consts` holds besides. -/
-def constNamesV2 : List String := ["ANSWERS_FIRST", "ASK_UPLINK", "MERGE_HOLDINGS"]
+def constNamesV2 : List String :=
+  ["ANSWERS_FIRST", "ASK_UPLINK", "MERGE_HOLDINGS", "SAMPLE_OUTSTANDING", "SERVE_BUDGET"]
 
-/-- A v2 entry's `consts`: `protocol.md`'s 31 and v2's three, exactly. `ANSWERS_FIRST` and `MERGE_HOLDINGS` are
-JSON's booleans; `ASK_UPLINK` is a float as its 64-bit word, finite and not negative. -/
+/-- A v2 entry's `consts`: `protocol.md`'s 31 and v2's five, exactly. `ANSWERS_FIRST` and `MERGE_HOLDINGS` are
+JSON's booleans; `ASK_UPLINK` is a float as its 64-bit word, finite and not negative; `SAMPLE_OUTSTANDING` is a
+JSON integer of at least 1; `SERVE_BUDGET` is one too, or `null` for no limit (the toy's `math.inf`, written as a
+limit the client does not set is). -/
 def constsV2 (j : Json) : Except String (Consts × V2.ConstsV2) := do
   members "consts" j (constNames ++ constNamesV2) (constNames ++ constNamesV2)
   let .ok kvs := j.getObj? | throw "consts: not an object"
@@ -196,7 +199,21 @@ def constsV2 (j : Json) : Except String (Consts × V2.ConstsV2) := do
       if n < 2 ^ 64 && x.isFinite && x ≥ 0 then pure x
       else throw s!"consts: ASK_UPLINK is a finite float, not negative: {u.compress}"
     | .error _ => throw s!"consts: ASK_UPLINK is a finite float, not negative: {u.compress}"
-  return (c, { ANSWERS_FIRST := ← b "ANSWERS_FIRST", ASK_UPLINK := up, MERGE_HOLDINGS := ← b "MERGE_HOLDINGS" })
+  let so ← j.getObjVal? "SAMPLE_OUTSTANDING"
+  let sampleOutstanding : Nat ← match so.getNat? with
+    | .ok n =>
+      if n ≥ 1 then pure n
+      else throw s!"consts: SAMPLE_OUTSTANDING is a natural number, at least 1: {so.compress}"
+    | .error _ => throw s!"consts: SAMPLE_OUTSTANDING is a natural number, at least 1: {so.compress}"
+  let sb ← j.getObjVal? "SERVE_BUDGET"
+  let serveBudget : Option Nat ← match sb, sb.getNat? with
+    | .null, _ => pure none
+    | _, .ok n =>
+      if n ≥ 1 then pure (some n)
+      else throw s!"consts: SERVE_BUDGET is null or a natural number, at least 1: {sb.compress}"
+    | _, .error _ => throw s!"consts: SERVE_BUDGET is null or a natural number, at least 1: {sb.compress}"
+  return (c, { ANSWERS_FIRST := ← b "ANSWERS_FIRST", ASK_UPLINK := up, MERGE_HOLDINGS := ← b "MERGE_HOLDINGS",
+               SAMPLE_OUTSTANDING := sampleOutstanding, SERVE_BUDGET := serveBudget })
 
 /-- A v2 entry's `chains`: an object from a traced name to the layers the node runs under it, outermost first, each
 a qualified name of the toy, or `doc` for the document's own function. -/

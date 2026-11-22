@@ -19,7 +19,7 @@ def covered : List String :=
    "owed_missing", "push_rebuilt_as_source", "push_rebuilt", "fill", "arm", "check_completion", "defer_on_claim",
    "reconsider", "decode_group", "claims_close", "note_claim", "filter_entry", "forward", "on_validated", "defer",
    "on_chunk", "on_holding", "on_offer", "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
-   "on_pace_tick", "on_block_installed"]
+   "on_pace_tick", "on_block_installed", "joined", "drop_wants_beyond"]
 
 /-- `protocol.md`'s functions a record under `protocol-v2.md` may name, kept all the way down. -/
 def kept : List String :=
@@ -54,9 +54,10 @@ def own : List String :=
    "owed", "owed_answers", "sent_to", "slot_held", "pace_queue", "stop_pull", "peer_has", "holders", "serve_count",
    "origin", "planned", "pushed", "desc", "in_flight", "waiters", "sent", "unwanted", "join_recv", "join_sent",
    "push_out", "push_in", "grafted_out", "grafted_in", "owed_relations", "backoff", "T_of", "rebuilt", "interest",
-   "known_at", "standing", "claims", "reconsider_at", "deferred", "duty_at", "waited", "probe", "probed", "probe_asks",
-   "probe_sent", "probe_ok", "rsample", "rsample_step", "rsample_asked", "rsample_final", "served", "want_p",
-   "probe_served", "probe_answers", "probe_waiting", "sampled_from", "samples_in_flight", "held_samples", "forwarded"]
+   "known_at", "standing", "routed_standing", "claims", "reconsider_at", "deferred", "duty_at", "waited", "probe",
+   "probed", "probe_asks", "probe_sent", "probe_ok", "rsample", "rsample_step", "rsample_asked", "rsample_final",
+   "served", "offered_to", "want_p", "probe_served", "probe_answers", "probe_waiting", "sampled_from",
+   "samples_in_flight", "held_samples", "forwarded", "served_hb"]
 
 /-- Other sections' tables that a covered function reads, answered from the tape. -/
 def foreign : List String :=
@@ -68,11 +69,11 @@ def questions : List String :=
    "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
    "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room", "high_custody",
    "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id", "open_group",
-   "open_link", "open_sampling_link", "payload_of", "penalise", "release", "reserve", "route_next",
-   "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group", "valid_have",
-   "wake", "wants_family", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "cross", "decode", "derived_interest", "family",
-   "header_of", "index_count", "project", "threshold", "verify", "group_of", "open_group_source", "own_interest",
-   "gossip_put", "mesh_has", "gossip_remove_group"]
+   "open_link", "open_sampling_link", "payload_of", "penalise", "release", "release_wanted_groups", "reserve",
+   "route_next", "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
+   "valid_have", "wake", "wants_family", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "cross", "decode",
+   "derived_interest", "family", "header_of", "index_count", "project", "threshold", "verify", "group_of",
+   "open_group_source", "own_interest", "gossip_put", "mesh_has", "gossip_remove_group"]
 
 /-- The questions that no covered function loads, each with its reason. -/
 def questionsUnloaded : List (String × String) :=

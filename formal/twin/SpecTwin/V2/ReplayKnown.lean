@@ -25,7 +25,9 @@ def chunk3 : String := s!"[{gq}, 3, 1, \"{root}\", \"{id3}\"]"
 def c0 : Consts :=
   { IWANT_WINDOW := 0.2, RETRY_SLACK := 0.05, PROMISE := 1.0, PARK_TTL := 3.0, MAX_PLAIN_CHUNKS := 256,
     UPLINK := 10e6 }
-def c2 : ConstsV2 := { ANSWERS_FIRST := false, ASK_UPLINK := 50e6, MERGE_HOLDINGS := false }
+/-- v2's constants: a cap of 1 sample in flight per block, and no serving budget, which no record here meets -/
+def c2 : ConstsV2 :=
+  { ANSWERS_FIRST := false, ASK_UPLINK := 50e6, MERGE_HOLDINGS := false, SAMPLE_OUTSTANDING := 1, SERVE_BUDGET := none }
 /-- The type `row` has M = 4; no other type has parameters at the node. -/
 def params : TypeId → Option TypeParams := fun T => if T == "row" then some { M := some 4 } else none
 def traced : List String := fnsV2 ++ keptV2

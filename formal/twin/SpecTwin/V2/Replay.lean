@@ -175,7 +175,6 @@ def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
     | "D_OUT" => p := { p with D_OUT := some (← n) }
     | "D_OUT_FAST" => p := { p with D_OUT_FAST := some (← n) }
     | "D_OUT_MAX" => p := { p with D_OUT_MAX := some (← n) }
-    | "SAMPLE_OUTSTANDING" => p := { p with SAMPLE_OUTSTANDING := some (← n) }
     | "SAMPLE_COVER" => p := { p with SAMPLE_COVER := some (← n) }
     | "COVER_HIGH" => p := { p with COVER_HIGH := some (← n) }
     | "ROUTE_HOPS" => p := { p with ROUTE_HOPS := some (← n) }
@@ -242,9 +241,9 @@ def callNamesV2 : List String :=
    "family", "derived_interest", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "send", "links", "link_cover",
    "cover_candidates", "floor_candidates", "floor_links", "high_custody", "families", "families_with_duty",
    "wants_family", "duty_for", "route_next", "block_of", "group_of", "node_id", "interest_satisfied",
-   "merge_waiting", "deferred_offers", "open_group_source", "open_link", "open_sampling_link", "choice",
-   "own_interest", "window_release", "send_have", "serve_standing", "owed_missing", "repair_verdict", "note_claim",
-   "known_in_scope"]
+   "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
+   "open_sampling_link", "choice", "own_interest", "window_release", "send_have", "serve_standing", "owed_missing",
+   "repair_verdict", "note_claim", "known_in_scope"]
 
 /-- v2's own timers, the targets `after` names beside `protocol.md`'s four. -/
 def timersV2 : List String := ["reconsider", "ask_sample", "resample"]
@@ -376,6 +375,7 @@ instance : NodeV2 R where
   mergeWaiting p h := askCall "merge_waiting" [(p : Json), haveJson h] boolOf
   deferredOffers p h := askCall "deferred_offers" [(p : Json), haveJson h] fun j => do (← arr j).mapM key
   openGroupSource g d := askCall "open_group_source" [Json.str g, descriptorJson d] nothing
+  releaseWantedGroups := askCall "release_wanted_groups" [] nothing
   openLink r T := askCall "open_link" [coverJson r, Json.str T] nothing
   openSamplingLink r T := askCall "open_sampling_link" [coverJson r, Json.str T] nothing
   -- the draws: a member of the question's list
@@ -448,7 +448,7 @@ them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`. -/
 def keptFormsV2 : List String := ["on_pace_tick", "on_block_installed", "respond"]
 
 /-- v2's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
-the 66 and main's `fill` and `serve_standing`. -/
+the 66, main's `fill` and `serve_standing`, and v0.11.1's `joined` and `drop_wants_beyond`. -/
 def fnsV2 : List String := Manifest.covered.filter (!keptFormsV2.contains ·)
 
 /-- The functions of `protocol.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
@@ -498,6 +498,7 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
   let (res, rs) ← match r.fn, r.args with
     -- §1.4 and §4.1
     | "colour_of", #[g, i] => do exec (colourOf (← Replay.groupKey g) (← nat i)) (retIs r.ret nat)
+    | "joined", #[p, t] => do exec (joined (← nat p) (← typeId t)) (retIs r.ret boolOf)
     | "send_relation", #[p, m] => do exec (sendRelation (← nat p) (← relation m)) none_
     | "send_join", #[p, j] => do exec (sendJoin (← nat p) (← joinMsg j)) none_
     | "prune", #[q, t, f, k, d] => do
@@ -544,6 +545,7 @@ def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (
     | "probe_of_claim", #[p, a] => do exec (probeOfClaim (← nat p) (← optOf askV2Of a)) (retIs r.ret boolOf)
     | "serve_probe", #[p, g, f] => do exec (serveProbe (← nat p) (← Replay.groupKey g) (← chunkN f)) none_
     | "serve_standing", #[g, i] => do exec (serveStanding (← Replay.groupKey g) (← nat i)) none_
+    | "drop_wants_beyond", #[g] => do exec (dropWantsBeyond (← Replay.groupKey g)) none_
     | "serve_waiting_probe", #[g, i] => do exec (serveWaitingProbe (← Replay.groupKey g) (← nat i)) none_
     | "known_in_scope", #[g] => do exec (knownInScope (← Replay.groupKey g)) (retIs r.ret nat)
     | "known_across", #[g] => do exec (knownAcross (← Replay.groupKey g)) (retIs r.ret nat)

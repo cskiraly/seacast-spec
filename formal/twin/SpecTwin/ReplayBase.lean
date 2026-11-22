@@ -169,15 +169,16 @@ def chunkF (j : Json) : Except String ChunkF := do
   return { g, i, slot := ← nat slot, root := ← rootKey root, mid := k, wide }
 
 /-- What `admitted` is asked of, as its tape entry writes it, by its shape: a HAVE as an IHAVE's bitmap,
-`["bits", group, bits]`; an offered id as an ask key, a structured id or `[group, index]`; a chunk,
-`[group, index, slot, root, id]`, narrow and with its structured id, as the tracer writes it (no chunk's id is
-null there, and none is wide). -/
+`["bits", group, bits]`; a v2 holding as `["holding", group, bits, claim_all, complete]`, the last two JSON's
+booleans; an offered id as an ask key, a structured id or `[group, index]`; a chunk, `[group, index, slot, root,
+id]`, narrow and with its structured id, as the tracer writes it (no chunk's id is null there, and none is wide). -/
 def admitOf (j : Json) : Except String Admit :=
   match j with
   | .arr #[.str "bits", g, b] => return .bitmap (← groupKey g) (← nat b)
+  | .arr #[.str "holding", g, b, .bool ca, .bool c] => return .holding (← groupKey g) (← nat b) ca c
   | .str _ | .arr #[_, _] => return .offer (← key j)
   | .arr #[_, _, _, _, .str _] => return .chunk (← chunkF j)
-  | _ => throw s!"not what admitted is asked of, a chunk, a HAVE or an offered id: {j.compress}"
+  | _ => throw s!"not what admitted is asked of, a chunk, a HAVE, a holding or an offered id: {j.compress}"
 
 /-- A chunk where the document writes it narrow: `[group, index, slot, root, id]` exactly, read as `chunkF` reads
 it, and a sixth member refused. Under protocol-v2.md a chunk is wide only where it arrives or waits, as its writer

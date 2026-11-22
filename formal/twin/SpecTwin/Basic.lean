@@ -176,11 +176,14 @@ def ChunkF.narrow (f : ChunkF) : ChunkF := { f with wide := none }
 
 /-- What `admitted(p, x)` is asked of (§8): the group a chunk, a HAVE or an offered id names. The deferral path
 asks it of a chunk, `on_have` of a HAVE whose group has not expired and that `valid_have` holds (its group and
-bits), and `on_ihave` of each id an IHAVE's entry expands to that is neither held nor of an expired group. -/
+bits), and `on_ihave` of each id an IHAVE's entry expands to that is neither held nor of an expired group.
+Under protocol-v2.md, `on_holding` and `on_offer` ask it of a whole holding, after `valid_have` (its group, bits,
+claim_all and complete: v2's `Have` less its offer flag). -/
 inductive Admit where
   | chunk (f : ChunkF)
   | bitmap (g : Group) (bits : Bits)
   | offer (a : Key)
+  | holding (g : Group) (bits : Bits) (claimAll complete : Bool)
   deriving BEq, Repr
 
 /-- The argument as a tape's call has it: a chunk narrow. -/

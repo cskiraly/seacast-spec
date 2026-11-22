@@ -125,7 +125,15 @@ TABLES_V2 = [
           read=("standing?", "`standing[g][i]`, as `standing[g].pop(i, ())` reads it: the peers, or none"),
           write=("setStanding", "`standing[g][i].add(q)`"),
           erase=("eraseStanding", "`standing[g].pop(i, ())` where the entry is there"),
-          scans=[whole("standingAll", "every `standing`", note="every `standing[g][i]`")]),
+          # drop_wants_beyond's `[i for i in standing[g] if i >= n]`: one group's row, in no asked order
+          scans=[Scan("allStanding", "standing", "every `standing[g]`", row=True, used=True),
+                 whole("standingAll", "every `standing`", note="every `standing[g][i]`")]),
+    Table("routed_standing", "routedStanding", "routedStanding", [G, I], "opeerset",
+          read=("routedStanding?", "`routed_standing[g][i]`, as `routed_standing[g].pop(i, None)` reads it: the "
+                                   "peers whose standing request a routed request made, or none"),
+          write=("setRoutedStanding", "`routed_standing[g][i].add(q)`, `.discard(q)`"),
+          erase=("eraseRoutedStanding", "`routed_standing[g].pop(i, None)` where the entry is there"),
+          scans=[whole("routedStandingAll", "every `routed_standing`", note="every `routed_standing[g][i]`")]),
     Table("claims", "claims", "claims", [G], "opeerset",
           read=("claims?", "`claims[g]`: the peers whose claim_all arrived, or none where the group has no entry"),
           write=("setClaims", "`claims[g].add(q)`, `claims[g].discard(q)`: the entry stays, empty or not"),
@@ -183,10 +191,15 @@ TABLES_V2 = [
     Table("served", "served", "served", [P, G], "count",
           read=("servedCount", "`served[p][g]`: the chunks answered"), write=("setServed", "`served[p][g] += 1`"),
           scans=[whole("servedAll", "every `served`", note="every `served[p][g]`")]),
+    Table("offered_to", "offeredTo", "offeredTo", [P, G], "bits",
+          read=("offeredToBits", "`offered_to[p][g]`: what we offered p, whose asks SERVE_BUDGET does not count"),
+          write=("setOfferedTo", "`offered_to[p][g] = offered_to[p][g] | bits`"),
+          scans=[whole("offeredToAll", "every `offered_to`", note="every `offered_to[p][g]`")]),
     Table("want_p", "wantP", "wantP", [P, G], "ibits",
           read=("wantP?", "`want_p[p].get(g)`: what p asked us for, or none (`EMPTY` in the Python)"),
           write=("setWantP", "`want_p[p][g] = b`"),
-          scans=[whole("wantPAll", "every `want_p`", note="every `want_p[p][g]`")]),
+          # drop_wants_beyond's `[q for q in want_p if g in want_p[q]]`: the whole table, in no asked order
+          scans=[whole("wantPAll", "every `want_p`", used=True, note="every `want_p[p][g]`")]),
     Table("probe_served", "probeServed", "probeServed", [P, G], "bool",
           read=("probeServed", "`probe_served[p][g]`"), write=("setProbeServed", "`probe_served[p][g] = True`"),
           scans=[whole("probeServedAll", "every `probe_served`", note="every `probe_served[p][g]`")]),
@@ -214,11 +227,16 @@ TABLES_V2 = [
           read=("heldSamplesOf", "`held_samples[b]`: second-phase asks waiting for room, in order"),
           write=("setHeldSamples", "`held_samples[b]` after an append or a `pop(0)`"),
           scans=[whole("heldSamples", "every `held_samples`")]),
+    # per peer and type
+    Table("forwarded", "forwarded", "forwarded", [P, TY], "count",
+          read=("forwardedCount", "`forwarded[p][T]`: routed requests of type T from p passed on this slot"),
+          write=("setForwarded", "`forwarded[p][T] += 1`"),
+          scans=[whole("forwarded", "every `forwarded`", note="every `forwarded[p][T]`")]),
     # per peer
-    Table("forwarded", "forwarded", "forwarded", [P], "count",
-          read=("forwardedCount", "`forwarded[p]`: routed requests from p passed on this slot"),
-          write=("setForwarded", "`forwarded[p] += 1`"),
-          scans=[whole("forwarded", "every `forwarded`")]),
+    Table("served_hb", "servedHb", "servedHb", [P], "count",
+          read=("servedHbCount", "`served_hb[p]`: the answers to p this heartbeat that SERVE_BUDGET counts"),
+          write=("setServedHb", "`served_hb[p] += 1`"),
+          scans=[whole("servedHb", "every `served_hb`")]),
 ]
 
 

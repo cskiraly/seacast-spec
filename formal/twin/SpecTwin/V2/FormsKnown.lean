@@ -158,7 +158,7 @@ def bitsOf (x : Option Float) : Option Nat := x.map (·.toBits.toNat)
 #guard (payloadOf full).map (fun p =>
   p.F_LO.isNone && p.F_HI.isNone && p.D_OUT.isNone && p.D_OUT_FAST.isNone && p.D_OUT_MAX.isNone &&
   p.EAGER.isNone && p.REPAIR_BUDGET.isNone && p.DEFER_WINDOW.isNone && p.START_DELAY.isNone &&
-  p.SAMPLE_RETRY.isNone && p.SAMPLE_RETRY2.isNone && p.SAMPLE_OUTSTANDING.isNone && p.SAMPLE_COVER.isNone &&
+  p.SAMPLE_RETRY.isNone && p.SAMPLE_RETRY2.isNone && p.SAMPLE_COVER.isNone &&
   p.COVER_HIGH.isNone && p.ROUTE_HOPS.isNone) == some true
 -- a missing member and null differ
 #guard (payloadOf (payload "\"REPAIR_SAMPLE\": null")).map (·.REPAIR_SAMPLE) == some (some none)

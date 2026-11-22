@@ -59,11 +59,12 @@ def IBits.toBits? : IBits → Option Bits
   | .ofNat a => some a
   | .negSucc _ => none
 
-/-- A type's 25 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
+/-- A type's 24 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
 `REPAIR_TO`, which are questions), and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
-`REPAIR_REASK`). Each is optional: the toy gives its payload and row types no `SAMPLE_RETRY2`,
-`SAMPLE_OUTSTANDING`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT` (`toy/node.py:1231-1243`,
-`toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it crashes here. The two
+`REPAIR_REASK`). `SAMPLE_OUTSTANDING` is no type's but the node's (`ConstsV2`). Each is optional: the toy gives
+its payload and row types no `SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT`
+(`toy/node.py:1231-1243`, `toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it
+crashes here. The two
 limits that can be unbounded are floats, infinity for none. -/
 structure TypeParams where
   M : Option Nat := none
@@ -82,7 +83,6 @@ structure TypeParams where
   SERVE_LIMIT : Option Float := none
   SAMPLE_RETRY : Option Float := none
   SAMPLE_RETRY2 : Option Float := none
-  SAMPLE_OUTSTANDING : Option Nat := none
   SAMPLE_COVER : Option Nat := none
   COVER_HIGH : Option Nat := none
   ROUTE_HOPS : Option Nat := none
@@ -190,6 +190,10 @@ class NodeV2 (m : Type → Type) where
   deferredOffers : Peer → Have → m (List Key)
   /-- `open_group_source(g, d)` -/
   openGroupSource : Group → Descriptor → m Unit
+  /-- `release_wanted_groups()` (§3): defined in prose alone, by no code block, so a question whose logic the twin
+  does not check; what it writes of the twin's tables (an expired place's `standing`, `routed_standing` and
+  `want_p`) is its `cw` on the tape -/
+  releaseWantedGroups : m Unit
   /-- `open_link(r, T)` -/
   openLink : Cover → TypeId → m Unit
   /-- `open_sampling_link(r, T)` -/
@@ -285,6 +289,7 @@ abbrev lift {m n : Type → Type} [NodeV2 m] (f : ∀ {α : Type}, m α → n α
   mergeWaiting a b := f (mergeWaiting a b)
   deferredOffers a b := f (deferredOffers a b)
   openGroupSource a b := f (openGroupSource a b)
+  releaseWantedGroups := f releaseWantedGroups
   openLink a b := f (openLink a b)
   openSamplingLink a b := f (openSamplingLink a b)
   choicePeer a := f (choicePeer a)
@@ -329,6 +334,11 @@ structure ConstsV2 where
   scales (the toy's `--ask-uplink 0`) -/
   ASK_UPLINK : Float
   MERGE_HOLDINGS : Bool
+  /-- §4.10's cap on a block's second-phase sample asks in flight, across its sampled types; at least 1 -/
+  SAMPLE_OUTSTANDING : Nat
+  /-- §4.5's answers to one peer in a heartbeat, across groups, that the budget counts; none for no limit (the
+  toy's `math.inf`), else at least 1 -/
+  SERVE_BUDGET : Option Nat
   deriving Repr, Inhabited
 
 /-- What a call of v2's code reads that does not change during it: `protocol.md`'s context, v2's constants, and

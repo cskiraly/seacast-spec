@@ -23,8 +23,153 @@ of this file (`mutants3.py`, the `tables-` ones) show what that comparison sees 
 
 namespace SpecTwin
 
+/-- The levels §6.1's code never reads as a whole. They are here so that a twin that does, a mutant, can be
+written, and is then seen to. A class of their own, which `Tables` extends: Lean compiles at most 255 fields in
+one constructor, and the two together have more. -/
+class TablesWhole (m : Type → Type) where
+  /-- every `asked_at` -/
+  allAskedAt : m (List (Key × Float))
+  /-- every `tried`, under every key -/
+  allTriedAll : m (List (Key × List (Peer × Float)))
+  /-- every `tried[a]` -/
+  allTried : Key → m (List (Peer × Float))
+  /-- every offer list -/
+  allOffers : m (List (Key × List Peer))
+  /-- every `offered`, of every peer -/
+  allOfferedAll : m (List (Peer × List (Group × Bits)))
+  /-- every `offered[q]` -/
+  allOffered : Peer → m (List (Group × Bits))
+  /-- every `park`, of every peer -/
+  allParkAll : m (List (Peer × List (Group × Float)))
+  /-- every `park[p]` -/
+  allPark : Peer → m (List (Group × Float))
+  /-- every `asked_parked` -/
+  allAskedParked : m (List (Chunk × Std.HashSet Peer))
+  /-- every member of `last_resort_armed` -/
+  allLrArmed : m (List Chunk)
+  /-- every `ihave_frames` -/
+  allIhaveFrames : m (List (Peer × Nat))
+  /-- every `ihave_asked` -/
+  allIhaveAsked : m (List (Peer × Nat))
+  /-- every `received` -/
+  allReceived : m (List (Group × Bits))
+  /-- every `mine` -/
+  allMine : m (List (Group × Bits))
+  /-- every `state` -/
+  allState : m (List (Group × GroupState))
+  /-- every member of `pending_ids` -/
+  allPendingIds : m (List Key)
+  /-- every `owed` -/
+  allOwedAll : m (List (Peer × List (Group × Bits)))
+  /-- every `owed_answers` -/
+  allOwedAnswersAll : m (List (Peer × List (Group × Bits)))
+  /-- every `sent_to` -/
+  allSentToAll : m (List (Peer × List (Group × Bits)))
+  /-- every peer whose writer holds a slot -/
+  allSlotHeld : m (List Peer)
+  /-- the pace queue's one entry -/
+  allPaceQueue : m (List (PaceKey × List Job))
+  /-- every group stopped -/
+  allStopPull : m (List Group)
+  /-- every `peer_has` -/
+  allPeerHas : m (List (Peer × List (Group × HaveEntry)))
+  /-- every `holders` -/
+  allHolders : m (List (Group × List (Nat × Std.HashSet Peer)))
+  /-- every `serve_count` -/
+  allServeCount : m (List (Peer × List (Key × Nat)))
+  /-- every `origin` -/
+  allOrigin : m (List (Group × Bits))
+  /-- every `planned` -/
+  allPlannedAll : m (List (Group × List (Nat × Std.HashSet Peer)))
+  /-- every `pushed` -/
+  allPushed : m (List (Peer × List (Group × PushEntry)))
+  /-- every `desc` -/
+  allDesc : m (List (Group × Descriptor))
+  /-- the window's count's one entry -/
+  allInFlight : m (List (CountKey × Int))
+  /-- the line's one entry -/
+  allWaiters : m (List (LineKey × List Peer))
+  /-- every `sent` -/
+  allSent : m (List (SendKey × Float))
+  /-- every `unwanted` -/
+  allUnwanted : m (List (Peer × Std.HashSet Hex))
+  /-- every `join_recv` -/
+  allJoinRecvAll : m (List (Peer × List (V2.TypeId × V2.Join)))
+  /-- every `join_sent` -/
+  allJoinSentAll : m (List (Peer × List (V2.TypeId × V2.Join)))
+  /-- every `push_out` -/
+  allPushOutAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  /-- every `push_in` -/
+  allPushInAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  /-- every `grafted_out` -/
+  allGraftedOutAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  /-- every `grafted_in` -/
+  allGraftedInAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
+  /-- every `owed_relations` -/
+  allOwedRelations : m (List (Peer × List V2.Relation))
+  /-- every `backoff` -/
+  allBackoffAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × List (ColourDir × Float)))))
+  /-- every `T_of` -/
+  allTOf : m (List (Group × V2.TypeId))
+  /-- every `rebuilt` -/
+  allRebuilt : m (List (Group × Bits))
+  /-- every `interest` -/
+  allInterest : m (List (Group × V2.IBits))
+  /-- every `known_at` -/
+  allKnownAt : m (List (Group × Float))
+  /-- every `standing` -/
+  allStandingAll : m (List (Group × List (Nat × Std.HashSet Peer)))
+  /-- every `routed_standing` -/
+  allRoutedStandingAll : m (List (Group × List (Nat × Std.HashSet Peer)))
+  /-- every `reconsider_at` -/
+  allReconsiderAt : m (List (Group × Float))
+  /-- every group deferred once on a claim -/
+  allDeferred : m (List Group)
+  /-- every `duty_at` -/
+  allDutyAt : m (List (Group × Float))
+  /-- every group waited for once -/
+  allWaited : m (List Group)
+  /-- every `probe` -/
+  allProbe : m (List (Group × Nat))
+  /-- every `probed` -/
+  allProbed : m (List (Group × Nat))
+  /-- every member of `probe_asks` -/
+  allProbeAsk : m (List Key)
+  /-- every member of `probe_sent` -/
+  allProbeSent : m (List Group)
+  /-- every `probe_ok` -/
+  allProbeOk : m (List (Group × Option Bool))
+  /-- every `rsample` -/
+  allRsample : m (List (Group × List Nat))
+  /-- every `rsample_step` -/
+  allRsampleStep : m (List (Group × Nat))
+  /-- every `rsample_asked` -/
+  allRsampleAskedAll : m (List (Group × List (Nat × Std.HashSet Peer)))
+  /-- every group whose last step's re-asks were waited for -/
+  allRsampleFinal : m (List Group)
+  /-- every `served` -/
+  allServedAll : m (List (Peer × List (Group × Nat)))
+  /-- every `offered_to` -/
+  allOfferedToAll : m (List (Peer × List (Group × Bits)))
+  /-- every `probe_served` -/
+  allProbeServedAll : m (List (Peer × List (Group × Bool)))
+  /-- every `probe_answers` -/
+  allProbeAnswersAll : m (List (Peer × List (Group × Bits)))
+  /-- every `probe_waiting` -/
+  allProbeWaitingAll : m (List (Group × List (Peer × Nat)))
+  /-- every `sampled_from` -/
+  allSampledFrom : m (List (BlockId × Std.HashSet Peer))
+  /-- every `samples_in_flight` -/
+  allSamplesInFlight : m (List (BlockId × Int))
+  /-- every `held_samples` -/
+  allHeldSamples : m (List (BlockId × List GI))
+  /-- every `forwarded` -/
+  allForwarded : m (List (Peer × List (V2.TypeId × Nat)))
+  /-- every `served_hb` -/
+  allServedHb : m (List (Peer × Nat))
+
 /-- §6.1's own state (§8.1), as its code uses it. A missing entry reads as empty, and reading allocates nothing. -/
-class Tables (m : Type → Type) where
+class Tables (m : Type → Type) extends TablesWhole m where
   /-- `asked_at.get(a)` -/
   askedAt? : Key → m (Option Float)
   /-- `asked_at[a] = t` -/
@@ -289,6 +434,14 @@ class Tables (m : Type → Type) where
   setStanding : Group → Nat → Std.HashSet Peer → m Unit
   /-- `standing[g].pop(i, ())` where the entry is there -/
   eraseStanding : Group → Nat → m Unit
+  /-- every `standing[g]` -/
+  allStanding : Group → m (List (Nat × Std.HashSet Peer))
+  /-- `routed_standing[g][i]`, as `routed_standing[g].pop(i, None)` reads it: the peers whose standing request a routed request made, or none -/
+  routedStanding? : Group → Nat → m (Option (Std.HashSet Peer))
+  /-- `routed_standing[g][i].add(q)`, `.discard(q)` -/
+  setRoutedStanding : Group → Nat → Std.HashSet Peer → m Unit
+  /-- `routed_standing[g].pop(i, None)` where the entry is there -/
+  eraseRoutedStanding : Group → Nat → m Unit
   /-- `claims[g]`: the peers whose claim_all arrived, or none where the group has no entry -/
   claims? : Group → m (Option (Std.HashSet Peer))
   /-- `claims[g].add(q)`, `claims[g].discard(q)`: the entry stays, empty or not -/
@@ -353,10 +506,16 @@ class Tables (m : Type → Type) where
   servedCount : Peer → Group → m Nat
   /-- `served[p][g] += 1` -/
   setServed : Peer → Group → Nat → m Unit
+  /-- `offered_to[p][g]`: what we offered p, whose asks SERVE_BUDGET does not count -/
+  offeredToBits : Peer → Group → m Bits
+  /-- `offered_to[p][g] = offered_to[p][g] | bits` -/
+  setOfferedTo : Peer → Group → Bits → m Unit
   /-- `want_p[p].get(g)`: what p asked us for, or none (`EMPTY` in the Python) -/
   wantP? : Peer → Group → m (Option V2.IBits)
   /-- `want_p[p][g] = b` -/
   setWantP : Peer → Group → V2.IBits → m Unit
+  /-- every `want_p` -/
+  allWantPAll : m (List (Peer × List (Group × V2.IBits)))
   /-- `probe_served[p][g]` -/
   probeServed : Peer → Group → m Bool
   /-- `probe_served[p][g] = True` -/
@@ -385,150 +544,27 @@ class Tables (m : Type → Type) where
   heldSamplesOf : BlockId → m (List GI)
   /-- `held_samples[b]` after an append or a `pop(0)` -/
   setHeldSamples : BlockId → List GI → m Unit
-  /-- `forwarded[p]`: routed requests from p passed on this slot -/
-  forwardedCount : Peer → m Nat
-  /-- `forwarded[p] += 1` -/
-  setForwarded : Peer → Nat → m Unit
-  -- The levels §6.1's code never reads as a whole. They are here so that a twin that does, a mutant, can be
-  -- written, and is then seen to.
-  /-- every `asked_at` -/
-  allAskedAt : m (List (Key × Float))
-  /-- every `tried`, under every key -/
-  allTriedAll : m (List (Key × List (Peer × Float)))
-  /-- every `tried[a]` -/
-  allTried : Key → m (List (Peer × Float))
-  /-- every offer list -/
-  allOffers : m (List (Key × List Peer))
-  /-- every `offered`, of every peer -/
-  allOfferedAll : m (List (Peer × List (Group × Bits)))
-  /-- every `offered[q]` -/
-  allOffered : Peer → m (List (Group × Bits))
-  /-- every `park`, of every peer -/
-  allParkAll : m (List (Peer × List (Group × Float)))
-  /-- every `park[p]` -/
-  allPark : Peer → m (List (Group × Float))
-  /-- every `asked_parked` -/
-  allAskedParked : m (List (Chunk × Std.HashSet Peer))
-  /-- every member of `last_resort_armed` -/
-  allLrArmed : m (List Chunk)
-  /-- every `ihave_frames` -/
-  allIhaveFrames : m (List (Peer × Nat))
-  /-- every `ihave_asked` -/
-  allIhaveAsked : m (List (Peer × Nat))
-  /-- every `received` -/
-  allReceived : m (List (Group × Bits))
-  /-- every `mine` -/
-  allMine : m (List (Group × Bits))
-  /-- every `state` -/
-  allState : m (List (Group × GroupState))
-  /-- every member of `pending_ids` -/
-  allPendingIds : m (List Key)
-  /-- every `owed` -/
-  allOwedAll : m (List (Peer × List (Group × Bits)))
-  /-- every `owed_answers` -/
-  allOwedAnswersAll : m (List (Peer × List (Group × Bits)))
-  /-- every `sent_to` -/
-  allSentToAll : m (List (Peer × List (Group × Bits)))
-  /-- every peer whose writer holds a slot -/
-  allSlotHeld : m (List Peer)
-  /-- the pace queue's one entry -/
-  allPaceQueue : m (List (PaceKey × List Job))
-  /-- every group stopped -/
-  allStopPull : m (List Group)
-  /-- every `peer_has` -/
-  allPeerHas : m (List (Peer × List (Group × HaveEntry)))
-  /-- every `holders` -/
-  allHolders : m (List (Group × List (Nat × Std.HashSet Peer)))
-  /-- every `serve_count` -/
-  allServeCount : m (List (Peer × List (Key × Nat)))
-  /-- every `origin` -/
-  allOrigin : m (List (Group × Bits))
-  /-- every `planned` -/
-  allPlannedAll : m (List (Group × List (Nat × Std.HashSet Peer)))
-  /-- every `pushed` -/
-  allPushed : m (List (Peer × List (Group × PushEntry)))
-  /-- every `desc` -/
-  allDesc : m (List (Group × Descriptor))
-  /-- the window's count's one entry -/
-  allInFlight : m (List (CountKey × Int))
-  /-- the line's one entry -/
-  allWaiters : m (List (LineKey × List Peer))
-  /-- every `sent` -/
-  allSent : m (List (SendKey × Float))
-  /-- every `unwanted` -/
-  allUnwanted : m (List (Peer × Std.HashSet Hex))
-  /-- every `join_recv` -/
-  allJoinRecvAll : m (List (Peer × List (V2.TypeId × V2.Join)))
-  /-- every `join_sent` -/
-  allJoinSentAll : m (List (Peer × List (V2.TypeId × V2.Join)))
-  /-- every `push_out` -/
-  allPushOutAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
-  /-- every `push_in` -/
-  allPushInAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
-  /-- every `grafted_out` -/
-  allGraftedOutAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
-  /-- every `grafted_in` -/
-  allGraftedInAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × Std.HashSet Nat))))
-  /-- every `owed_relations` -/
-  allOwedRelations : m (List (Peer × List V2.Relation))
-  /-- every `backoff` -/
-  allBackoffAll : m (List (Peer × List (V2.TypeId × List (V2.Fam × List (ColourDir × Float)))))
-  /-- every `T_of` -/
-  allTOf : m (List (Group × V2.TypeId))
-  /-- every `rebuilt` -/
-  allRebuilt : m (List (Group × Bits))
-  /-- every `interest` -/
-  allInterest : m (List (Group × V2.IBits))
-  /-- every `known_at` -/
-  allKnownAt : m (List (Group × Float))
-  /-- every `standing` -/
-  allStandingAll : m (List (Group × List (Nat × Std.HashSet Peer)))
-  /-- every `reconsider_at` -/
-  allReconsiderAt : m (List (Group × Float))
-  /-- every group deferred once on a claim -/
-  allDeferred : m (List Group)
-  /-- every `duty_at` -/
-  allDutyAt : m (List (Group × Float))
-  /-- every group waited for once -/
-  allWaited : m (List Group)
-  /-- every `probe` -/
-  allProbe : m (List (Group × Nat))
-  /-- every `probed` -/
-  allProbed : m (List (Group × Nat))
-  /-- every member of `probe_asks` -/
-  allProbeAsk : m (List Key)
-  /-- every member of `probe_sent` -/
-  allProbeSent : m (List Group)
-  /-- every `probe_ok` -/
-  allProbeOk : m (List (Group × Option Bool))
-  /-- every `rsample` -/
-  allRsample : m (List (Group × List Nat))
-  /-- every `rsample_step` -/
-  allRsampleStep : m (List (Group × Nat))
-  /-- every `rsample_asked` -/
-  allRsampleAskedAll : m (List (Group × List (Nat × Std.HashSet Peer)))
-  /-- every group whose last step's re-asks were waited for -/
-  allRsampleFinal : m (List Group)
-  /-- every `served` -/
-  allServedAll : m (List (Peer × List (Group × Nat)))
-  /-- every `want_p` -/
-  allWantPAll : m (List (Peer × List (Group × V2.IBits)))
-  /-- every `probe_served` -/
-  allProbeServedAll : m (List (Peer × List (Group × Bool)))
-  /-- every `probe_answers` -/
-  allProbeAnswersAll : m (List (Peer × List (Group × Bits)))
-  /-- every `probe_waiting` -/
-  allProbeWaitingAll : m (List (Group × List (Peer × Nat)))
-  /-- every `sampled_from` -/
-  allSampledFrom : m (List (BlockId × Std.HashSet Peer))
-  /-- every `samples_in_flight` -/
-  allSamplesInFlight : m (List (BlockId × Int))
-  /-- every `held_samples` -/
-  allHeldSamples : m (List (BlockId × List GI))
-  /-- every `forwarded` -/
-  allForwarded : m (List (Peer × Nat))
+  /-- `forwarded[p][T]`: routed requests of type T from p passed on this slot -/
+  forwardedCount : Peer → V2.TypeId → m Nat
+  /-- `forwarded[p][T] += 1` -/
+  setForwarded : Peer → V2.TypeId → Nat → m Unit
+  /-- `served_hb[p]`: the answers to p this heartbeat that SERVE_BUDGET counts -/
+  servedHbCount : Peer → m Nat
+  /-- `served_hb[p] += 1` -/
+  setServedHb : Peer → Nat → m Unit
 
 namespace Tables
+
+-- the levels of `TablesWhole` under `Tables`' names too, so that `open Tables` finds them
+export TablesWhole (allAskedAt allTriedAll allTried allOffers allOfferedAll allOffered allParkAll allPark
+  allAskedParked allLrArmed allIhaveFrames allIhaveAsked allReceived allMine allState allPendingIds allOwedAll
+  allOwedAnswersAll allSentToAll allSlotHeld allPaceQueue allStopPull allPeerHas allHolders allServeCount allOrigin
+  allPlannedAll allPushed allDesc allInFlight allWaiters allSent allUnwanted allJoinRecvAll allJoinSentAll
+  allPushOutAll allPushInAll allGraftedOutAll allGraftedInAll allOwedRelations allBackoffAll allTOf allRebuilt
+  allInterest allKnownAt allStandingAll allRoutedStandingAll allReconsiderAt allDeferred allDutyAt allWaited allProbe
+  allProbed allProbeAsk allProbeSent allProbeOk allRsample allRsampleStep allRsampleAskedAll allRsampleFinal
+  allServedAll allOfferedToAll allProbeServedAll allProbeAnswersAll allProbeWaitingAll allSampledFrom
+  allSamplesInFlight allHeldSamples allForwarded allServedHb)
 
 /-- The interface over the twin's `State`, with a note of each access. -/
 @[instance_reducible]
@@ -829,6 +865,17 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
   eraseStanding g i := do
     note (.write (.standing g i))
     modify fun s => { s with standing := s.standing.insert g ((s.standing.getD g {}).erase i) }
+  allStanding g := do
+    let l := ((← get).standing.getD g {}).toList
+    note (.scan (.standing g) (l.map fun (i, _) => .standing g i))
+    return l
+  routedStanding? g i := do note (.read (.routedStanding g i)); return ((← get).routedStanding.getD g {}).get? i
+  setRoutedStanding g i ps := do
+    note (.write (.routedStanding g i))
+    modify fun s => { s with routedStanding := s.routedStanding.insert g ((s.routedStanding.getD g {}).insert i ps) }
+  eraseRoutedStanding g i := do
+    note (.write (.routedStanding g i))
+    modify fun s => { s with routedStanding := s.routedStanding.insert g ((s.routedStanding.getD g {}).erase i) }
   claims? g := do note (.read (.claims g)); return (← get).claims.get? g
   setClaims g ps := do note (.write (.claims g)); modify fun s => { s with claims := s.claims.insert g ps }
   allClaims := do
@@ -889,10 +936,18 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
   setServed p g n := do
     note (.write (.served p g))
     modify fun s => { s with served := s.served.insert p ((s.served.getD p {}).insert g n) }
+  offeredToBits p g := do note (.read (.offeredTo p g)); return ((← get).offeredTo.getD p {}).getD g 0
+  setOfferedTo p g b := do
+    note (.write (.offeredTo p g))
+    modify fun s => { s with offeredTo := s.offeredTo.insert p ((s.offeredTo.getD p {}).insert g b) }
   wantP? p g := do note (.read (.wantP p g)); return ((← get).wantP.getD p {}).get? g
   setWantP p g ib := do
     note (.write (.wantP p g))
     modify fun s => { s with wantP := s.wantP.insert p ((s.wantP.getD p {}).insert g ib) }
+  allWantPAll := do
+    let l := (← get).wantP.toList.map fun (p, m) => (p, m.toList)
+    note (.scan .wantPAll (l.flatMap fun (p, gs) => gs.map fun (g, _) => .wantP p g))
+    return l
   probeServed p g := do note (.read (.probeServed p g)); return ((← get).probeServed.getD p {}).getD g false
   setProbeServed p g fl := do
     note (.write (.probeServed p g))
@@ -924,8 +979,12 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
   setHeldSamples b gs := do
     note (.write (.heldSamples b))
     modify fun s => { s with heldSamples := s.heldSamples.insert b gs }
-  forwardedCount p := do note (.read (.forwarded p)); return (← get).forwarded.getD p 0
-  setForwarded p n := do note (.write (.forwarded p)); modify fun s => { s with forwarded := s.forwarded.insert p n }
+  forwardedCount p T := do note (.read (.forwarded p T)); return ((← get).forwarded.getD p {}).getD T 0
+  setForwarded p T n := do
+    note (.write (.forwarded p T))
+    modify fun s => { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).insert T n) }
+  servedHbCount p := do note (.read (.servedHb p)); return (← get).servedHb.getD p 0
+  setServedHb p n := do note (.write (.servedHb p)); modify fun s => { s with servedHb := s.servedHb.insert p n }
   allAskedAt := do
     let l := (← get).askedAt.toList
     note (.scan .askedAt (l.map fun (a, _) => .askedAt a))
@@ -1110,6 +1169,10 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     let l := (← get).standing.toList.map fun (g, m) => (g, m.toList)
     note (.scan .standingAll (l.flatMap fun (g, is) => is.map fun (i, _) => .standing g i))
     return l
+  allRoutedStandingAll := do
+    let l := (← get).routedStanding.toList.map fun (g, m) => (g, m.toList)
+    note (.scan .routedStandingAll (l.flatMap fun (g, is) => is.map fun (i, _) => .routedStanding g i))
+    return l
   allReconsiderAt := do
     let l := (← get).reconsiderAt.toList
     note (.scan .reconsiderAt (l.map fun (g, _) => .reconsiderAt g))
@@ -1166,9 +1229,9 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     let l := (← get).served.toList.map fun (p, m) => (p, m.toList)
     note (.scan .servedAll (l.flatMap fun (p, gs) => gs.map fun (g, _) => .served p g))
     return l
-  allWantPAll := do
-    let l := (← get).wantP.toList.map fun (p, m) => (p, m.toList)
-    note (.scan .wantPAll (l.flatMap fun (p, gs) => gs.map fun (g, _) => .wantP p g))
+  allOfferedToAll := do
+    let l := (← get).offeredTo.toList.map fun (p, m) => (p, m.toList)
+    note (.scan .offeredToAll (l.flatMap fun (p, gs) => gs.map fun (g, _) => .offeredTo p g))
     return l
   allProbeServedAll := do
     let l := (← get).probeServed.toList.map fun (p, m) => (p, m.toList)
@@ -1195,8 +1258,12 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     note (.scan .heldSamples (l.map fun (b, _) => .heldSamples b))
     return l
   allForwarded := do
-    let l := (← get).forwarded.toList
-    note (.scan .forwarded (l.map fun (p, _) => .forwarded p))
+    let l := (← get).forwarded.toList.map fun (p, m) => (p, m.toList)
+    note (.scan .forwarded (l.flatMap fun (p, Ts) => Ts.map fun (T, _) => .forwarded p T))
+    return l
+  allServedHb := do
+    let l := (← get).servedHb.toList
+    note (.scan .servedHb (l.map fun (p, _) => .servedHb p))
     return l
 
 /-- The interface through a monad transformer. -/
@@ -1333,6 +1400,10 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   standing? g i := f (standing? g i)
   setStanding g i ps := f (setStanding g i ps)
   eraseStanding g i := f (eraseStanding g i)
+  allStanding g := f (allStanding g)
+  routedStanding? g i := f (routedStanding? g i)
+  setRoutedStanding g i ps := f (setRoutedStanding g i ps)
+  eraseRoutedStanding g i := f (eraseRoutedStanding g i)
   claims? g := f (claims? g)
   setClaims g ps := f (setClaims g ps)
   allClaims := f allClaims
@@ -1365,8 +1436,11 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   setRsampleFinal g armed := f (setRsampleFinal g armed)
   servedCount p g := f (servedCount p g)
   setServed p g n := f (setServed p g n)
+  offeredToBits p g := f (offeredToBits p g)
+  setOfferedTo p g b := f (setOfferedTo p g b)
   wantP? p g := f (wantP? p g)
   setWantP p g ib := f (setWantP p g ib)
+  allWantPAll := f allWantPAll
   probeServed p g := f (probeServed p g)
   setProbeServed p g fl := f (setProbeServed p g fl)
   probeAnswerBits p g := f (probeAnswerBits p g)
@@ -1381,8 +1455,10 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   setSamplesInFlight b n := f (setSamplesInFlight b n)
   heldSamplesOf b := f (heldSamplesOf b)
   setHeldSamples b gs := f (setHeldSamples b gs)
-  forwardedCount p := f (forwardedCount p)
-  setForwarded p n := f (setForwarded p n)
+  forwardedCount p T := f (forwardedCount p T)
+  setForwarded p T n := f (setForwarded p T n)
+  servedHbCount p := f (servedHbCount p)
+  setServedHb p n := f (setServedHb p n)
   allAskedAt := f allAskedAt
   allTriedAll := f allTriedAll
   allTried a := f (allTried a)
@@ -1429,6 +1505,7 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   allInterest := f allInterest
   allKnownAt := f allKnownAt
   allStandingAll := f allStandingAll
+  allRoutedStandingAll := f allRoutedStandingAll
   allReconsiderAt := f allReconsiderAt
   allDeferred := f allDeferred
   allDutyAt := f allDutyAt
@@ -1443,7 +1520,7 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   allRsampleAskedAll := f allRsampleAskedAll
   allRsampleFinal := f allRsampleFinal
   allServedAll := f allServedAll
-  allWantPAll := f allWantPAll
+  allOfferedToAll := f allOfferedToAll
   allProbeServedAll := f allProbeServedAll
   allProbeAnswersAll := f allProbeAnswersAll
   allProbeWaitingAll := f allProbeWaitingAll
@@ -1451,6 +1528,7 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   allSamplesInFlight := f allSamplesInFlight
   allHeldSamples := f allHeldSamples
   allForwarded := f allForwarded
+  allServedHb := f allServedHb
 
 instance instReaderT {m : Type → Type} {ρ : Type} [Monad m] [Tables m] : Tables (ReaderT ρ m) :=
   lift (m := m) (n := ReaderT ρ m) fun x => monadLift x

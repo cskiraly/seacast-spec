@@ -76,6 +76,7 @@ def cell (table : String) (path : Json) : Except String Cell := do
   | "interest", #[g] => return .interest (← groupKey g)
   | "known_at", #[g] => return .knownAt (← groupKey g)
   | "standing", #[g, i] => return .standing (← groupKey g) (← nat i)
+  | "routed_standing", #[g, i] => return .routedStanding (← groupKey g) (← nat i)
   | "claims", #[g] => return .claims (← groupKey g)
   | "reconsider_at", #[g] => return .reconsiderAt (← groupKey g)
   | "deferred", #[g] => return .deferred (← groupKey g)
@@ -91,6 +92,7 @@ def cell (table : String) (path : Json) : Except String Cell := do
   | "rsample_asked", #[g, i] => return .rsampleAsked (← groupKey g) (← nat i)
   | "rsample_final", #[g] => return .rsampleFinal (← groupKey g)
   | "served", #[p, g] => return .served (← nat p) (← groupKey g)
+  | "offered_to", #[p, g] => return .offeredTo (← nat p) (← groupKey g)
   | "want_p", #[p, g] => return .wantP (← nat p) (← groupKey g)
   | "probe_served", #[p, g] => return .probeServed (← nat p) (← groupKey g)
   | "probe_answers", #[p, g] => return .probeAnswers (← nat p) (← groupKey g)
@@ -98,7 +100,8 @@ def cell (table : String) (path : Json) : Except String Cell := do
   | "sampled_from", #[b] => return .sampledFrom (← blockKey b)
   | "samples_in_flight", #[b] => return .samplesInFlight (← blockKey b)
   | "held_samples", #[b] => return .heldSamples (← blockKey b)
-  | "forwarded", #[p] => return .forwarded (← nat p)
+  | "forwarded", #[p, T] => return .forwarded (← nat p) (← typeId T)
+  | "served_hb", #[p] => return .servedHb (← nat p)
   | _, _ => throw s!"not an entry of §6.1's tables: {table}{path.compress}"
 
 /-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the
@@ -116,12 +119,12 @@ def val (c : Cell) (j : Json) (f : Form := .v1) : Except String (Option Val) := 
     if l.isEmpty then throw "an empty set as a value"
     if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a peer twice: {j.compress}"
     return some (.peers l)
-  | .offered .. | .received _ | .mine _ | .owedAnswers .. | .sentTo .. | .rebuilt _ | .probeAnswers .. =>
+  | .offered .. | .received _ | .mine _ | .owedAnswers .. | .sentTo .. | .rebuilt _ | .offeredTo .. | .probeAnswers .. =>
     let b ← nat j
     if b == 0 then throw "an empty bitmap as a value"
     return some (.bits b)
   | .lrArmed _ | .pendingId _ | .probeAsk _ | .probeSent _ => if j == .bool true then return some .flag else throw s!"not a set's member: {j.compress}"
-  | .ihaveFrames _ | .ihaveAsked _ | .serveCount .. | .rsampleStep _ | .served .. | .forwarded _ =>
+  | .ihaveFrames _ | .ihaveAsked _ | .serveCount .. | .rsampleStep _ | .served .. | .forwarded .. | .servedHb _ =>
     let n ← nat j
     if n == 0 then throw "a count of zero as a value"
     return some (.count n)
@@ -168,7 +171,7 @@ def val (c : Cell) (j : Json) (f : Form := .v1) : Except String (Option Val) := 
     let l ← relationList j
     if l.isEmpty then throw "an empty list of relations as a value"
     return some (.relations l)
-  | .standing .. | .claims _ =>
+  | .standing .. | .routedStanding .. | .claims _ =>
     let l ← peers j
     if !(l.zip (l.drop 1)).all (fun (x, y) => x < y) then throw s!"a set not sorted, or with a peer twice: {j.compress}"
     return some (.peers l)
@@ -244,7 +247,9 @@ def level (j : Json) : Except String Level := do
   | "rebuilt", #[] => return .rebuilt
   | "interest", #[] => return .interest
   | "known_at", #[] => return .knownAt
+  | "standing", #[g] => return .standing (← groupKey g)
   | "standing", #[] => return .standingAll
+  | "routed_standing", #[] => return .routedStandingAll
   | "claims", #[] => return .claims
   | "reconsider_at", #[] => return .reconsiderAt
   | "deferred", #[] => return .deferred
@@ -260,6 +265,7 @@ def level (j : Json) : Except String Level := do
   | "rsample_asked", #[] => return .rsampleAskedAll
   | "rsample_final", #[] => return .rsampleFinal
   | "served", #[] => return .servedAll
+  | "offered_to", #[] => return .offeredToAll
   | "want_p", #[] => return .wantPAll
   | "probe_served", #[] => return .probeServedAll
   | "probe_answers", #[] => return .probeAnswersAll
@@ -269,6 +275,7 @@ def level (j : Json) : Except String Level := do
   | "samples_in_flight", #[] => return .samplesInFlight
   | "held_samples", #[] => return .heldSamples
   | "forwarded", #[] => return .forwarded
+  | "served_hb", #[] => return .servedHb
   | _, _ => throw s!"not a level of §6.1's tables: {j.compress}"
 
 /-- An entry's value in a state: none where it is missing or empty. -/
@@ -371,6 +378,7 @@ def valueAt (s : State) : Cell → Option Val
   | .interest g => (s.interest.get? g).map (.ibits ·)
   | .knownAt g => (s.knownAt.get? g).map (.time ·.toBits)
   | .standing g i => ((s.standing.getD g {}).get? i).map (fun ps => .peers (sortBy (· < ·) ps.toList))
+  | .routedStanding g i => ((s.routedStanding.getD g {}).get? i).map (fun ps => .peers (sortBy (· < ·) ps.toList))
   | .claims g => (s.claims.get? g).map (fun ps => .peers (sortBy (· < ·) ps.toList))
   | .reconsiderAt g => (s.reconsiderAt.get? g).map (.time ·.toBits)
   | .deferred g => if s.deferred.contains g then some .flag else none
@@ -394,6 +402,9 @@ def valueAt (s : State) : Cell → Option Val
   | .served p g => match (s.served.getD p {}).getD g 0 with
     | 0 => none
     | n => some (.count n)
+  | .offeredTo p g => match (s.offeredTo.getD p {}).getD g 0 with
+    | 0 => none
+    | b => some (.bits b)
   | .wantP p g => ((s.wantP.getD p {}).get? g).map (.ibits ·)
   | .probeServed p g => if (s.probeServed.getD p {}).getD g false then some .flag else none
   | .probeAnswers p g => match (s.probeAnswers.getD p {}).getD g 0 with
@@ -409,7 +420,10 @@ def valueAt (s : State) : Cell → Option Val
   | .heldSamples b => match s.heldSamples.getD b [] with
     | [] => none
     | l => some (.gis l)
-  | .forwarded p => match s.forwarded.getD p 0 with
+  | .forwarded p T => match (s.forwarded.getD p {}).getD T 0 with
+    | 0 => none
+    | n => some (.count n)
+  | .servedHb p => match s.servedHb.getD p 0 with
     | 0 => none
     | n => some (.count n)
 
@@ -470,6 +484,7 @@ def put (s : State) (c : Cell) (v : Val) : Except String State :=
   | .interest g, .ibits b => pure { s with interest := s.interest.insert g b }
   | .knownAt g, .time t => pure { s with knownAt := s.knownAt.insert g (Float.ofBits t) }
   | .standing g i, .peers l => pure { s with standing := s.standing.insert g ((s.standing.getD g {}).insert i (l.foldl (·.insert ·) {})) }
+  | .routedStanding g i, .peers l => pure { s with routedStanding := s.routedStanding.insert g ((s.routedStanding.getD g {}).insert i (l.foldl (·.insert ·) {})) }
   | .claims g, .peers l => pure { s with claims := s.claims.insert g (l.foldl (·.insert ·) {}) }
   | .reconsiderAt g, .time t => pure { s with reconsiderAt := s.reconsiderAt.insert g (Float.ofBits t) }
   | .deferred g, .flag => pure { s with deferred := s.deferred.insert g }
@@ -485,6 +500,7 @@ def put (s : State) (c : Cell) (v : Val) : Except String State :=
   | .rsampleAsked g i, .peers l => pure { s with rsampleAsked := s.rsampleAsked.insert g ((s.rsampleAsked.getD g {}).insert i (l.foldl (·.insert ·) {})) }
   | .rsampleFinal g, .flag => pure { s with rsampleFinal := s.rsampleFinal.insert g }
   | .served p g, .count n => pure { s with served := s.served.insert p ((s.served.getD p {}).insert g n) }
+  | .offeredTo p g, .bits b => pure { s with offeredTo := s.offeredTo.insert p ((s.offeredTo.getD p {}).insert g b) }
   | .wantP p g, .ibits b => pure { s with wantP := s.wantP.insert p ((s.wantP.getD p {}).insert g b) }
   | .probeServed p g, .flag => pure { s with probeServed := s.probeServed.insert p ((s.probeServed.getD p {}).insert g true) }
   | .probeAnswers p g, .bits b => pure { s with probeAnswers := s.probeAnswers.insert p ((s.probeAnswers.getD p {}).insert g b) }
@@ -492,7 +508,8 @@ def put (s : State) (c : Cell) (v : Val) : Except String State :=
   | .sampledFrom b, .peers l => pure { s with sampledFrom := s.sampledFrom.insert b (l.foldl (·.insert ·) {}) }
   | .samplesInFlight b, .int n => pure { s with samplesInFlight := s.samplesInFlight.insert b n }
   | .heldSamples b, .gis l => pure { s with heldSamples := s.heldSamples.insert b l }
-  | .forwarded p, .count n => pure { s with forwarded := s.forwarded.insert p n }
+  | .forwarded p T, .count n => pure { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).insert T n) }
+  | .servedHb p, .count n => pure { s with servedHb := s.servedHb.insert p n }
   | c, v => throw s!"not a value of {reprStr c}: {reprStr v}"
 
 /-- A state without an entry: how a record's erasing write is applied. -/
@@ -551,6 +568,7 @@ def drop (s : State) : Cell → State
   | .interest g => { s with interest := s.interest.erase g }
   | .knownAt g => { s with knownAt := s.knownAt.erase g }
   | .standing g i => { s with standing := s.standing.insert g ((s.standing.getD g {}).erase i) }
+  | .routedStanding g i => { s with routedStanding := s.routedStanding.insert g ((s.routedStanding.getD g {}).erase i) }
   | .claims g => { s with claims := s.claims.erase g }
   | .reconsiderAt g => { s with reconsiderAt := s.reconsiderAt.erase g }
   | .deferred g => { s with deferred := s.deferred.erase g }
@@ -566,6 +584,7 @@ def drop (s : State) : Cell → State
   | .rsampleAsked g i => { s with rsampleAsked := s.rsampleAsked.insert g ((s.rsampleAsked.getD g {}).erase i) }
   | .rsampleFinal g => { s with rsampleFinal := s.rsampleFinal.erase g }
   | .served p g => { s with served := s.served.insert p ((s.served.getD p {}).erase g) }
+  | .offeredTo p g => { s with offeredTo := s.offeredTo.insert p ((s.offeredTo.getD p {}).erase g) }
   | .wantP p g => { s with wantP := s.wantP.insert p ((s.wantP.getD p {}).erase g) }
   | .probeServed p g => { s with probeServed := s.probeServed.insert p ((s.probeServed.getD p {}).erase g) }
   | .probeAnswers p g => { s with probeAnswers := s.probeAnswers.insert p ((s.probeAnswers.getD p {}).erase g) }
@@ -573,7 +592,8 @@ def drop (s : State) : Cell → State
   | .sampledFrom b => { s with sampledFrom := s.sampledFrom.erase b }
   | .samplesInFlight b => { s with samplesInFlight := s.samplesInFlight.erase b }
   | .heldSamples b => { s with heldSamples := s.heldSamples.erase b }
-  | .forwarded p => { s with forwarded := s.forwarded.erase p }
+  | .forwarded p T => { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).erase T) }
+  | .servedHb p => { s with servedHb := s.servedHb.erase p }
 
 /-- Every entry a state holds, empty ones left out: what two states are compared by. -/
 def entries (s : State) : List (Cell × Val) :=
@@ -632,6 +652,7 @@ def entries (s : State) : List (Cell × Val) :=
     ++ s.interest.toList.map (fun (g, _) => .interest g)
     ++ s.knownAt.toList.map (fun (g, _) => .knownAt g)
     ++ s.standing.toList.flatMap (fun (g, m) => m.toList.map fun (i, _) => .standing g i)
+    ++ s.routedStanding.toList.flatMap (fun (g, m) => m.toList.map fun (i, _) => .routedStanding g i)
     ++ s.claims.toList.map (fun (g, _) => .claims g)
     ++ s.reconsiderAt.toList.map (fun (g, _) => .reconsiderAt g)
     ++ s.deferred.toList.map (fun g => .deferred g)
@@ -647,6 +668,7 @@ def entries (s : State) : List (Cell × Val) :=
     ++ s.rsampleAsked.toList.flatMap (fun (g, m) => m.toList.map fun (i, _) => .rsampleAsked g i)
     ++ s.rsampleFinal.toList.map (fun g => .rsampleFinal g)
     ++ s.served.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .served p g)
+    ++ s.offeredTo.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .offeredTo p g)
     ++ s.wantP.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .wantP p g)
     ++ s.probeServed.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .probeServed p g)
     ++ s.probeAnswers.toList.flatMap (fun (p, m) => m.toList.map fun (g, _) => .probeAnswers p g)
@@ -654,7 +676,8 @@ def entries (s : State) : List (Cell × Val) :=
     ++ s.sampledFrom.toList.map (fun (b, _) => .sampledFrom b)
     ++ s.samplesInFlight.toList.map (fun (b, _) => .samplesInFlight b)
     ++ s.heldSamples.toList.map (fun (b, _) => .heldSamples b)
-    ++ s.forwarded.toList.map (fun (p, _) => .forwarded p)
+    ++ s.forwarded.toList.flatMap (fun (p, m) => m.toList.map fun (T, _) => .forwarded p T)
+    ++ s.servedHb.toList.map (fun (p, _) => .servedHb p)
   all.filterMap fun c => (valueAt s c).map fun v => (c, v)
 
 /-- Whether a level read as a whole holds an entry. -/
@@ -721,7 +744,9 @@ def under (c : Cell) (l : Level) : Bool :=
   | .rebuilt, .rebuilt _ => true
   | .interest, .interest _ => true
   | .knownAt, .knownAt _ => true
+  | .standing g, .standing g' _ => g == g'
   | .standingAll, .standing .. => true
+  | .routedStandingAll, .routedStanding .. => true
   | .claims, .claims _ => true
   | .reconsiderAt, .reconsiderAt _ => true
   | .deferred, .deferred _ => true
@@ -737,6 +762,7 @@ def under (c : Cell) (l : Level) : Bool :=
   | .rsampleAskedAll, .rsampleAsked .. => true
   | .rsampleFinal, .rsampleFinal _ => true
   | .servedAll, .served .. => true
+  | .offeredToAll, .offeredTo .. => true
   | .wantPAll, .wantP .. => true
   | .probeServedAll, .probeServed .. => true
   | .probeAnswersAll, .probeAnswers .. => true
@@ -745,7 +771,8 @@ def under (c : Cell) (l : Level) : Bool :=
   | .sampledFrom, .sampledFrom _ => true
   | .samplesInFlight, .samplesInFlight _ => true
   | .heldSamples, .heldSamples _ => true
-  | .forwarded, .forwarded _ => true
+  | .forwarded, .forwarded .. => true
+  | .servedHb, .servedHb _ => true
   | _, _ => false
 
 /-- Whether a level holds another: itself, or a table's whole against one of its rows. -/
@@ -759,6 +786,7 @@ def covers (l₁ l₂ : Level) : Bool :=
   | .tiedRoot r, .tiedPeer r' _ => r == r'
   | .owedAll, .owed _ => true
   | .owedAnswersAll, .owedAnswers _ => true
+  | .standingAll, .standing _ => true
   | .probeWaitingAll, .probeWaiting _ => true
   | _, _ => false
 

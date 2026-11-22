@@ -63,6 +63,7 @@ structure State where
   interest : Std.HashMap Group V2.IBits := {}
   knownAt : Std.HashMap Group Float := {}
   standing : Std.HashMap Group (Std.HashMap Nat (Std.HashSet Peer)) := {}
+  routedStanding : Std.HashMap Group (Std.HashMap Nat (Std.HashSet Peer)) := {}
   claims : Std.HashMap Group (Std.HashSet Peer) := {}
   reconsiderAt : Std.HashMap Group Float := {}
   deferred : Std.HashSet Group := {}
@@ -78,6 +79,7 @@ structure State where
   rsampleAsked : Std.HashMap Group (Std.HashMap Nat (Std.HashSet Peer)) := {}
   rsampleFinal : Std.HashSet Group := {}
   served : Std.HashMap Peer (Std.HashMap Group Nat) := {}
+  offeredTo : Std.HashMap Peer (Std.HashMap Group Bits) := {}
   wantP : Std.HashMap Peer (Std.HashMap Group V2.IBits) := {}
   probeServed : Std.HashMap Peer (Std.HashMap Group Bool) := {}
   probeAnswers : Std.HashMap Peer (Std.HashMap Group Bits) := {}
@@ -85,7 +87,8 @@ structure State where
   sampledFrom : Std.HashMap BlockId (Std.HashSet Peer) := {}
   samplesInFlight : Std.HashMap BlockId Int := {}
   heldSamples : Std.HashMap BlockId (List GI) := {}
-  forwarded : Std.HashMap Peer Nat := {}
+  forwarded : Std.HashMap Peer (Std.HashMap V2.TypeId Nat) := {}
+  servedHb : Std.HashMap Peer Nat := {}
 
 /-- An entry of §6.1's tables: the table and its keys, down to the level at which the code reads values (the
 schema, `tools/gen/schema.py`). A missing entry is a value too, and reading it is a read. -/
@@ -144,6 +147,7 @@ inductive Cell where
   | interest (g : Group)
   | knownAt (g : Group)
   | standing (g : Group) (i : Nat)
+  | routedStanding (g : Group) (i : Nat)
   | claims (g : Group)
   | reconsiderAt (g : Group)
   | deferred (g : Group)
@@ -159,6 +163,7 @@ inductive Cell where
   | rsampleAsked (g : Group) (i : Nat)
   | rsampleFinal (g : Group)
   | served (p : Peer) (g : Group)
+  | offeredTo (p : Peer) (g : Group)
   | wantP (p : Peer) (g : Group)
   | probeServed (p : Peer) (g : Group)
   | probeAnswers (p : Peer) (g : Group)
@@ -166,7 +171,8 @@ inductive Cell where
   | sampledFrom (b : BlockId)
   | samplesInFlight (b : BlockId)
   | heldSamples (b : BlockId)
-  | forwarded (p : Peer)
+  | forwarded (p : Peer) (T : V2.TypeId)
+  | servedHb (p : Peer)
   deriving BEq, Repr
 
 /-- A level of a table read as a whole: every entry under it. -/
@@ -226,7 +232,9 @@ inductive Level where
   | rebuilt
   | interest
   | knownAt
+  | standing (g : Group)
   | standingAll                           -- every `standing[g][i]`
+  | routedStandingAll                     -- every `routed_standing[g][i]`
   | claims
   | reconsiderAt
   | deferred
@@ -242,6 +250,7 @@ inductive Level where
   | rsampleAskedAll                       -- every `rsample_asked[g][i]`
   | rsampleFinal
   | servedAll                             -- every `served[p][g]`
+  | offeredToAll                          -- every `offered_to[p][g]`
   | wantPAll                              -- every `want_p[p][g]`
   | probeServedAll                        -- every `probe_served[p][g]`
   | probeAnswersAll                       -- every `probe_answers[p][g]`
@@ -250,7 +259,8 @@ inductive Level where
   | sampledFrom
   | samplesInFlight
   | heldSamples
-  | forwarded
+  | forwarded                             -- every `forwarded[p][T]`
+  | servedHb
   deriving BEq, Repr
 
 /-- What one access of the state touches. -/
@@ -271,9 +281,9 @@ def ownTables : List String :=
 /-- `protocol-v2.md`'s tables (`gen/schema_v2.py`), by the names its records give them, in the schema's order. -/
 def v2Tables : List String :=
   ["join_recv", "join_sent", "push_out", "push_in", "grafted_out", "grafted_in", "owed_relations", "backoff", "T_of",
-   "rebuilt", "interest", "known_at", "standing", "claims", "reconsider_at", "deferred", "duty_at", "waited", "probe",
-   "probed", "probe_asks", "probe_sent", "probe_ok", "rsample", "rsample_step", "rsample_asked", "rsample_final",
-   "served", "want_p", "probe_served", "probe_answers", "probe_waiting", "sampled_from", "samples_in_flight",
-   "held_samples", "forwarded"]
+   "rebuilt", "interest", "known_at", "standing", "routed_standing", "claims", "reconsider_at", "deferred", "duty_at",
+   "waited", "probe", "probed", "probe_asks", "probe_sent", "probe_ok", "rsample", "rsample_step", "rsample_asked",
+   "rsample_final", "served", "offered_to", "want_p", "probe_served", "probe_answers", "probe_waiting", "sampled_from",
+   "samples_in_flight", "held_samples", "forwarded", "served_hb"]
 
 end SpecTwin

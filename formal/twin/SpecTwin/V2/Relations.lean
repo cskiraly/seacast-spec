@@ -1,9 +1,9 @@
 import SpecTwin.V2.Basic
 import SpecTwin.Readers
 
-/-! # protocol-v2.md §1.4 and §4.1: colours, links and the relations' messages
+/-! # protocol-v2.md §1.4, §2 and §4.1: colours, links and the relations' messages
 
-The twin of `colour_of` (§1.4) and of §4.1's functions that the cycle covers: `send_join`, `interest_of_peer`,
+The twin of `colour_of` (§1.4), §2's `joined`, and §4.1's functions that the cycle covers: `send_join`, `interest_of_peer`,
 `wants_from_me`, `prune`, `yes`, `no`, `send_relation`, `queue_owed_relations`, `serves`, `counted`,
 `keep_coverage` and `keep_floor`. `join_push`, §4.1's too, calls §4.4's `announce`, so it is in
 `V2/Announce.lean`. `graft` comes with v0.10.12's text.
@@ -58,6 +58,11 @@ def sendRelation (p : Peer) (r : Relation) : M2 m Unit := do
     wake p
     branch "send_relation: owed"
   else branch "send_relation: sent"
+
+/-- `joined(p, T)` (§2): the link joined T: p's JOIN received, ours queued, not owed (§4.1's links) -/
+def joined (p : Peer) (T : TypeId) : M2 m Bool := do
+  enter "joined"
+  return (← NodeV2.links T).contains p                       -- `p in links(T)`
 
 /-- `send_join(p, j)` (§4.1): every JOIN of ours, once per link and type -/
 def sendJoin (p : Peer) (j : Join) : M2 m Unit := do
