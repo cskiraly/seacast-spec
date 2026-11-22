@@ -1,5 +1,6 @@
 import SpecTwin.Replay
 import SpecTwin.Strict
+import SpecTwin.Header
 
 /-! `replay [--only fn=NAME|table=NAME] [--content FILE] [TRACE]`: replay a trace of `trace3.py` (JSON lines; stdin
 when no file is named, so that a gzipped trace goes through `zcat`) through the twin, and print what matched,
@@ -10,20 +11,16 @@ file of the toy and the tools by the sha256 of its bytes (`tools/content.py`). `
 caller made over the tree it replays against, and the two must be the same bytes: a trace made from documents with
 other code, another toy or other tools fails, and so does every trace where no file is given.
 The header is the second line and the nodes line the third (each node's constants and the traced names
-its namespace has replaced). A trace also fails with a header that is not its only one, with a record of a node
-the nodes line does not name, with a line the tracer would not write (`Strict.lean`: a member given twice, which
+its namespace has replaced). The header's arguments name the document the trace was made under, and the document
+decides how the rest is read (`Header.lean`): under protocol-v2.md the header's lists are its manifest's, each
+nodes entry has v2's members, and a record is read in v2's forms and replayed by `runV2`.
+A trace also fails with a header that is not its only one, with a record of a node the nodes line does not name, with a line the tracer would not write (`Strict.lean`: a member given twice, which
 the parser would drop in silence, a number that is not a plain integer, white space), with an envelope line that
 has a member it should not, or with a trailer whose counts (the records, function by function, and the entries
 of rest) are not what was read. -/
 
 open Lean (Json)
-open SpecTwin SpecTwin.Replay
-
-/-- The members an envelope line may have, and must have: nothing else passes. -/
-def members (what : String) (j : Json) (may must : List String) : Except String Unit := do
-  let .ok kvs := j.getObj? | throw s!"{what}: not an object"
-  if let some f := kvs.keys.find? (!may.contains ·) then throw s!"{what}: not a member of it: {f}"
-  if let some f := must.find? (!kvs.keys.contains ·) then throw s!"{what}: no {f}"
+open SpecTwin SpecTwin.Replay SpecTwin.Header
 
 def headerFields : List String :=
   ["format", "whole", "own", "foreign", "traced", "tracer", "args", "row_reads"]
@@ -58,73 +55,6 @@ def contentDiff (expected got : String) : String :=
       | _, _ => s!"{n}: in the trace's alone"
     | none => "the same names and hashes, written otherwise"
 
-def constNames : List String :=
-  ["IWANT_WINDOW", "RETRY_SLACK", "PROMISE", "PARK_TTL", "MAX_IHAVE_MESSAGES", "MAX_IHAVE_LENGTH", "MAX_PENDING_GROUPS",
-   "MAX_PLAIN_CHUNKS", "CANCEL", "PROJECT", "RAREST", "FAN_IN", "UNIT", "MAX_CHUNKS", "MAX_SEGMENT_SIZE",
-   "HEARTBEAT", "GOSSIP_FACTOR", "D_LAZY", "PACED", "HAVE_TTL", "GOSSIP_RETRANSMISSION",
-   "DESCRIPTOR_IN_CHUNK", "PUSH_TTL", "R_NODE", "GUARD_GRACE", "UPLINK", "STRIPE_UPLINK",
-   "W", "WINDOW_TIMEOUT", "SOURCE_OFFERS", "R"]
-
-def consts (j : Json) : Except String Consts := do
-  members "consts" j constNames constNames
-  let f (k : String) : Except String Float := do return Float.ofBits (← bits64 (← j.getObjVal? k))
-  -- STRIPE_UPLINK alone may be +∞: where card 13 is off no uplink reaches the stripe's (the toy writes math.inf;
-  -- the cell without-b). Any other float of the line is finite, as `bits64` holds it.
-  let fOrInf (k : String) : Except String Float := do
-    let v ← j.getObjVal? k
-    if v == Json.num (0x7FF0000000000000 : Nat) then return Float.ofBits 0x7FF0000000000000 else f k
-  -- a limit the client does not set (§8.2) is written `null`
-  let limit (k : String) : Except String (Option Nat) := do
-    let v ← j.getObjVal? k
-    if v == .null then return none else return some (← v.getNat?)
-  return { IWANT_WINDOW := ← f "IWANT_WINDOW", RETRY_SLACK := ← f "RETRY_SLACK", PROMISE := ← f "PROMISE",
-           PARK_TTL := ← f "PARK_TTL", MAX_IHAVE_MESSAGES := ← limit "MAX_IHAVE_MESSAGES",
-           MAX_IHAVE_LENGTH := ← limit "MAX_IHAVE_LENGTH", MAX_PENDING_GROUPS := ← limit "MAX_PENDING_GROUPS",
-           MAX_PLAIN_CHUNKS := ← (← j.getObjVal? "MAX_PLAIN_CHUNKS").getNat?,
-           CANCEL := ← (← j.getObjVal? "CANCEL").getBool?, PROJECT := ← (← j.getObjVal? "PROJECT").getBool?,
-           RAREST := ← (← j.getObjVal? "RAREST").getBool?, FAN_IN := ← (← j.getObjVal? "FAN_IN").getNat?,
-           UNIT := ← (← j.getObjVal? "UNIT").getNat?, MAX_CHUNKS := ← (← j.getObjVal? "MAX_CHUNKS").getNat?,
-           MAX_SEGMENT_SIZE := ← (← j.getObjVal? "MAX_SEGMENT_SIZE").getNat?,
-           HEARTBEAT := ← f "HEARTBEAT", GOSSIP_FACTOR := ← f "GOSSIP_FACTOR",
-           D_LAZY := ← (← j.getObjVal? "D_LAZY").getNat?, PACED := ← (← j.getObjVal? "PACED").getBool?,
-           HAVE_TTL := ← (← j.getObjVal? "HAVE_TTL").getNat?,
-           GOSSIP_RETRANSMISSION := ← (← j.getObjVal? "GOSSIP_RETRANSMISSION").getNat?,
-           DESCRIPTOR_IN_CHUNK := ← (← j.getObjVal? "DESCRIPTOR_IN_CHUNK").getBool?,
-           PUSH_TTL := ← (← j.getObjVal? "PUSH_TTL").getNat?,
-           R_NODE := ← (← j.getObjVal? "R_NODE").getNat?, GUARD_GRACE := ← f "GUARD_GRACE",
-           UPLINK := ← f "UPLINK", STRIPE_UPLINK := ← fOrInf "STRIPE_UPLINK",
-           W := ← limit "W", WINDOW_TIMEOUT := ← f "WINDOW_TIMEOUT",
-           R := ← (← j.getObjVal? "R").getNat?,
-           SOURCE_OFFERS_PUBLISH := ← (match ← j.getObjVal? "SOURCE_OFFERS" with
-             | .str "ACK" => pure false
-             | .str "PUBLISH" => pure true
-             | v => throw s!"consts: SOURCE_OFFERS is ACK or PUBLISH: {v.compress}") }
-
-/-- The traced names a node may run as something else, where the twin then asks the node. -/
-def replaceable : List String := ["forward", "on_iwant", "push_rebuilt", "validate_chunk"]
-
-/-- The replaceable names taken in a trace of the whole state alone (a directed set): a scenario's level 1. No cell
-runs anything but the document's `validate_chunk`; a cell's nodes line that names it is refused. -/
-def replaceableWhole : List String := ["validate_chunk"]
-
-/-- The nodes line: its entries, each `{"n": [node, ...], "consts": {...}, "replaced": [name, ...]}`.
-Every node once; a replaced name is one the twin has a question for. -/
-def nodesLine (j : Json) : Except String (List (Nat × Consts × List String)) := do
-  let mut out : List (Nat × Consts × List String) := []
-  for e in (← j.getArr?) do
-    members "nodes" e ["n", "consts", "replaced"] ["n", "consts", "replaced"]
-    let cj ← e.getObjVal? "consts"
-    let c ← (consts cj).mapError ("nodes: " ++ ·)
-    let rp ← names "nodes: replaced" (← e.getObjVal? "replaced")
-    if let some f := rp.find? (!replaceable.contains ·) then
-      throw s!"nodes: a replaced function the twin has no question for: {f}"
-    let ids ← (← (← e.getObjVal? "n").getArr?).toList.mapM (·.getNat?)
-    if ids.isEmpty then throw "nodes: an entry of no node"
-    for n in ids do
-      if out.any (·.1 == n) then throw s!"nodes: a node twice: {n}"
-      out := (n, c, rp) :: out
-  return out
-
 structure Tally where
   records : Nat := 0
   ok : Nat := 0
@@ -155,15 +85,11 @@ def main (args : List String) : IO UInt32 := do
     | none => pure none
   -- A name a node may replace is asked on the tape where it is replaced, and is not among what the record
   -- reached there; the twin's code under that name still runs at such a record (the line that asks the node). So
-  -- `fn=NAME` takes those records too, for the replaceable names alone, by the tape entry's text, `["NAME",`,
-  -- anywhere in the line: the tape is not at the line's end, and the line is not parsed before it is picked.
-  -- Text that only looks like such an entry takes a record more. A pick may take too much, never too little.
-  let asks (line : String) (f : String) : Bool :=
-    replaceable.contains f && (line.splitOn s!"[\"{f}\",").length > 1
-  let picked (line : String) (tail : List String × List String) : Bool := match only? with
+  -- `fn=NAME` takes those records too, for the replaceable names of the trace's document alone (`Header.asks`).
+  let picked (form : Form) (line : String) (tail : List String × List String) : Bool := match only? with
     | none => true
     | some w => match w.splitOn "=" with
-      | ["fn", f] => tail.1.contains f || asks line f
+      | ["fn", f] => tail.1.contains f || asks form line f
       | ["table", t] => tail.2.contains t
       | _ => false
   if let some w := only? then
@@ -177,7 +103,9 @@ def main (args : List String) : IO UInt32 := do
   let mut headerOk := false
   let mut contentOk := false            -- the trace's first line is the caller's content line
   let mut headers := 0
+  let mut form : Form := .v1            -- the header's document (`Header.headerForm`)
   let mut nodes : Std.HashMap Nat (Consts × List String) := {}   -- each node's constants and replaced names
+  let mut nodesV2 : Std.HashMap Nat NodeV2Cfg := {}               -- under protocol-v2.md, each node's configuration
   let mut nodesSeen := false
   let mut whole := false                -- the header's: a trace of the whole state (a directed set)
   let mut traced? : Option (List String) := none   -- the functions the tracer traced, as the header lists them
@@ -210,7 +138,7 @@ def main (args : List String) : IO UInt32 := do
     let tail? := Replay.lineTail line
     if only?.isSome then
       if let some tail := tail? then
-        if !picked line tail then
+        if !picked form line tail then
           skipped := skipped + 1
           continue
     -- The line's text is read strictly first (`Strict.lean`), and only a line that passes is parsed: the parser
@@ -250,32 +178,14 @@ def main (args : List String) : IO UInt32 := do
         IO.println "header: not the trace's second line, or not its only header"
         headerOk := false
         continue
-      let format := (hd.getObjValAs? Nat "format").toOption
-      let tables (k : String) := (hd.getObjValAs? (List String) k).toOption
-      -- the twin's own tables, as the schema names them (`ownTables`, generated), and the other sections' it reads
-      let schema := tables "own" == some ownTables
-        && tables "foreign" == some ["known_id", "chunks"]      -- (`unwanted` is the twin's own)
-      -- the functions traced: sorted names, none twice; a record's `reached` names none but these
-      traced? := (do names "traced" (← hd.getObjVal? "traced") : Except String (List String)).toOption
-      headerOk := contentOk && format == some 7 && schema && traced?.isSome
-      if traced?.isNone then IO.println "header: traced is not a sorted list of names, none twice"
-      match rowReadsOf hd with
-      | .ok l => rowReads := l
-      | .error e =>
-        IO.println e
-        headerOk := false
-      -- a subset names a function the header lists as traced, or a table of the twin's own: else it would pick
-      -- no record, and a mutant replayed on it would pass unread
-      if let some w := only? then
-        let known := match w.splitOn "=" with
-          | ["fn", f] => (traced?.getD []).contains f
-          | ["table", tb] => ownTables.contains tb
-          | _ => false
-        if !known then
-          IO.println s!"subset: --only {w}: not a function the header lists as traced, nor a table of the twin's own"
-          headerOk := false
-      if format != some 7 then IO.println s!"header: format {format}, this replay reads format 7"
-      if !schema then IO.println "header: the tables are not this twin's (own, foreign)"
+      -- the document first, then its format, its tables, the functions traced, row_reads and the subset's word,
+      -- each against the document's lists (`Header.readHeader`); every failure printed
+      let h := readHeader hd only?
+      form := h.form
+      traced? := h.traced
+      rowReads := h.rowReads
+      for e in h.failures do IO.println e
+      headerOk := contentOk && h.failures.isEmpty
       continue
     if let .ok nj := j.getObjVal? "nodes" then
       if nodesSeen || t.records > 0 || lineNo != 3 then  -- one nodes line, the third line: a later one cannot change a
@@ -283,6 +193,13 @@ def main (args : List String) : IO UInt32 := do
         headerOk := false
         continue
       nodesSeen := true
+      if form == .v2 then                -- under protocol-v2.md: its members, and its checks, are the reader's
+        match (do members "the nodes line" j ["nodes"] ["nodes"]; nodesLineV2 nj whole (traced?.getD []) : Except String _) with
+        | .ok l => nodesV2 := l.foldl (fun m (n, cfg) => m.insert n cfg) nodesV2
+        | .error e =>
+          IO.println e
+          headerOk := false
+        continue
       match (do members "the nodes line" j ["nodes"] ["nodes"]; nodesLine nj : Except String _) with
       | .ok l =>
         nodes := l.foldl (fun m (n, c, rp) => m.insert n (c, rp)) nodes
@@ -310,7 +227,7 @@ def main (args : List String) : IO UInt32 := do
     if !nodesSeen then throw (IO.userError "a record before the nodes line")
     t := { t with records := t.records + 1 }
     let r ← match (do
-        let r ← record j
+        let r ← record j (if form == .v2 then V2.docV2 else {})   -- the values in the trace's document's forms
         -- the line must end with the two members a subset is picked by, saying what the record says
         if tail? != some (r.reached, r.tables) then throw "its line does not end with reached and tables, as the record has them"
         -- and a call reaches only functions the tracer traced
@@ -318,7 +235,8 @@ def main (args : List String) : IO UInt32 := do
           if let some f := r.reached.find? (!tr.contains ·) then
             throw s!"reached: a function the header does not list as traced: {f}"
         -- and it is a record of a node the nodes line names
-        if !nodes.contains r.n then throw s!"n: a node the nodes line does not name: {r.n}"
+        if !(if form == .v2 then nodesV2.contains r.n else nodes.contains r.n) then
+          throw s!"n: a node the nodes line does not name: {r.n}"
         pure r : Except String Record) with
       | .ok r => pure r
       | .error e =>                     -- a malformed record is a mismatch at itself
@@ -330,8 +248,14 @@ def main (args : List String) : IO UInt32 := do
     let counted := if r.raises.isSome then r.fn ++ " (raises)" else r.fn
     byFn := byFn.insert counted (byFn.getD counted 0 + 1)
     let (n, ok) := t.perFn.getD r.fn (0, 0)
-    let some (c, rp) := nodes[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
-    match run c rp (traced?.getD []) r rowReads with
+    let res : Except String (Array String × Nat) ← match form with   -- by the trace's document
+      | .v2 => do
+        let some cfg := nodesV2[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
+        pure (V2.runV2 cfg.c cfg.c2 (fun T => cfg.types.lookup T) cfg.replaced (traced?.getD []) r rowReads)
+      | .v1 => do
+        let some (c, rp) := nodes[r.n]? | throw (IO.userError "a record of no node")   -- (checked above)
+        pure (run c rp (traced?.getD []) r rowReads)
+    match res with
     | .ok (marks, fewer) =>
       t := { t with ok := t.ok + 1, perFn := t.perFn.insert r.fn (n + 1, ok + 1),
                     branches := marks.foldl (fun m b => m.insert b (m.getD b 0 + 1)) t.branches,

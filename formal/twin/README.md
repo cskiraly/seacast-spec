@@ -64,8 +64,11 @@ one to one.
   `chunk_of`. The replay answers calls to them from the trace.
 - The twin leaves out the events that `protocol.md` gives in prose: a connection closing, an announcer's offers
   ageing out, and a group expiring.
-- The twin leaves out the functions specific to `protocol-v2.md`. A trace of a cell of the toy under
-  `protocol-v2.md` replays through the functions of `protocol.md` that `protocol-v2.md` keeps.
+- The twin of `protocol-v2.md`'s functions is in `SpecTwin/V2/`, and its manifest (`SpecTwin/V2/Manifest.lean`,
+  generated from `tools/gen/manifest_v2.py`) lists them. The replay reads a trace's document from its header. A
+  trace under `protocol-v2.md` replays through those functions and through the functions of `protocol.md` that
+  `protocol-v2.md` keeps. A record of a function that `protocol-v2.md` redefines and the twin does not cover is
+  refused.
 
 ## The record
 
@@ -132,7 +135,9 @@ endings (CRLF) changes the hash of each file whose bytes it changes, but not the
 
 ## Layout
 
-- `SpecTwin/` holds the twin, and `Replay.lean`, which reads the records of a trace.
+- `SpecTwin/` holds the twin, and `Replay.lean`, which reads the records of a trace. `SpecTwin/V2/` holds the twin
+  of `protocol-v2.md`'s functions, and `Header.lean` the readers of a trace's header and nodes line, for both
+  documents.
 - `Main.lean` is the replay: the executable that a trace is piped through.
 - `tools/` holds the tracer, the mutants, the directed sets and the checks of the checks (`tools/README.md`).
 - `record/` holds the record (`record/RECORD.md`).

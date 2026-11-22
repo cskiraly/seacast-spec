@@ -32,7 +32,9 @@
 #             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
 #             (footprint_test.py)
 #   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
-#             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused
+#             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused.
+#             And v2's part: every name protocol-v2.md's manifest covers has an `enter` in SpecTwin/V2/ and a case
+#             of runV2, and runV2 has no case the manifest does not cover but respond; two controls refused
 #   mutants   every mutant's text stands in the twin once (--places), and each type-checks alone against the build
 #   screen    every cell's header and nodes line, under both documents, read by the replay; a nodes line without a
 #             constant refused
@@ -345,6 +347,43 @@ if bad or not ctl:
 print(f"{len(names)} of {len(names)} functions of protocol.md's code blocks have their twin, by name")
 EOF
   [ $? = 0 ] || no "a function of protocol.md's code blocks without its twin, or the scope's control (scope.txt)"
+  # v2's part: every name the manifest covers has an `enter` in SpecTwin/V2/ and a case of runV2, and every case of
+  # runV2 is a covered name or the one kept form that is no covered name (respond)
+  $PY - "$T/gen" "$HERE/SpecTwin" >> "$OUT/scope.txt" 2>&1 <<'EOF'
+import re, sys
+from pathlib import Path
+sys.path.insert(0, sys.argv[1])
+import manifest_v2
+twin = Path(sys.argv[2])
+covered = list(manifest_v2.COVERED)
+entered = set()
+for f in sorted((twin / "V2").glob("*.lean")):
+    entered |= set(re.findall(r'enter "([A-Za-z_0-9]+)"', f.read_text()))
+text = (twin / "V2" / "Replay.lean").read_text()
+body = text[text.index("\ndef runV2 "):]                 # runV2's cases, not the tape reader's
+cases = set(re.findall(r'^\s*\| "([A-Za-z_0-9]+)", #\[', body, re.M))
+FORM_ALONE = {"respond"}
+
+def missing(entered, cases):
+    out = [f"{n}: {'no enter' if n not in entered else 'no case of runV2'}"
+           for n in covered if n not in entered or n not in cases]
+    return out + [f"{c}: a case of runV2 the manifest does not cover" for c in sorted(cases - set(covered) - FORM_ALONE)]
+bad = missing(entered, cases)
+for b in bad:
+    print(f"v2, without its twin: {b}")
+gone = covered[0]                            # the controls: each must be refused
+ctl1 = missing(entered - {gone}, cases)
+ok1 = bool(ctl1) and ctl1[0].startswith(gone + ":")
+print(f"control, v2's twin without {gone}: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
+ctl2 = missing(entered, cases | {"on_frame"})
+ok2 = "on_frame: a case of runV2 the manifest does not cover" in ctl2
+print(f"control, runV2 with a case named on_frame: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
+if bad or not ok1 or not ok2:
+    print(f"NOT every one of protocol-v2.md's covered functions has its twin, or runV2 has a case it does not cover: {len(bad)}")
+    sys.exit(1)
+print(f"{len(covered)} of {len(covered)} of protocol-v2.md's covered functions have their twin, by name")
+EOF
+  [ $? = 0 ] || no "a covered function of protocol-v2.md without its twin, a case of runV2 not covered, or v2's scope controls (scope.txt)"
   sed 's/^/  /' "$OUT/scope.txt"
 }
 s_mutants() {

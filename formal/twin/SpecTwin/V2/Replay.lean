@@ -1,6 +1,7 @@
 import SpecTwin.Replay
 import SpecTwin.V2.Sample
 import SpecTwin.V2.Kept
+import SpecTwin.V2.Manifest
 
 /-! # Replaying a record of a trace under protocol-v2.md
 
@@ -21,9 +22,10 @@ import SpecTwin.V2.Kept
   with its two claims, and a lane's controls with v2's IWANT, holdings and relation controls. Each position has
   one codec, injective there. An IWANT that `protocol.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantV2`, is built so by its v2 form.
-- **The functions.** `runV2` runs v2's 68 functions by their Python names, hands a record of one of
-  `protocol.md`'s functions that v2 keeps (`keptV2`) to `Replay.run`, runs the three that take another form under
-  v2 (`keptFormsV2`) in their v2 forms (`V2/Kept.lean`), and refuses every other name,
+- **The functions.** `runV2` routes a record by the manifest (`routeV2`, `V2/Manifest.lean`). It runs v2's 68
+  functions by their Python names, hands a record of one of `protocol.md`'s functions that v2 keeps, or of the
+  node's own `held` (`keptV2`), to `Replay.run`, runs the three that take another form under v2 (`keptFormsV2`) in
+  their v2 forms (`V2/Kept.lean`), and refuses every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
@@ -433,38 +435,39 @@ instance : V2Later R where
 
 /-! ## One record -/
 
-/-- v2's functions this cycle covers, by their Python names: the 66 and main's `fill` and `serve_standing`. -/
-def fnsV2 : List String :=
-  ["colour_of", "send_relation", "send_join", "prune", "yes", "no", "queue_owed_relations", "interest_of_peer",
-   "wants_from_me", "serves", "counted", "keep_coverage", "keep_floor",
-   "fills", "note_push", "suppression_scope", "holding_of", "send_have", "announce", "announce_extra", "join_push",
-   "source_pool", "unpush", "candidates_for_source", "origin_written", "offer_at_publish", "origin_acked",
-   "send_gossip", "projected",
-   "gated", "settle_probe", "probe_answer", "probe_promise", "probe_waits", "probe_settled", "probe_of_claim",
-   "serve_probe", "serve_standing", "serve_waiting_probe", "known_in_scope", "known_across", "ask_custodian",
-   "repair_verdict", "owed_missing",
-   "push_rebuilt_as_source", "push_rebuilt", "fill", "arm", "check_completion", "defer_on_claim", "reconsider",
-   "decode_group", "claims_close", "note_claim", "filter_entry",
-   "forward", "on_validated", "defer", "on_chunk", "on_holding", "on_offer",
-   "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample"]
-
-/-- The functions of `protocol.md` that a record under v2 may name, which `Replay.run` serves: the 16
-the 71 call directly, the two timer targets `promise_due` and `ask_parked`, `message_id` (the alias `chunk_id`),
-`retry_offer`, the three that the v2 form of `on_block_installed` calls besides (`drop_tie`, `ledger`,
-`validate_chunk`), and every function those reach in `protocol.md`'s code, with the node's own `held`. None of
-them reaches a name v2 redefines. Computed from the extracted code (`protocol.md` at the spec's pin) by a scan of
-the names each function's body uses; a list generated per document is to replace it. -/
-def keptV2 : List String :=
-  ["K", "N", "add_offer", "announcers", "ask_parked", "choose_push", "close_promises", "committed_descriptor",
-   "drop_beyond", "drop_group", "drop_offer", "drop_tie", "group_id", "group_key", "guard_fails", "have_bits",
-   "last_resort", "least_recently_tried", "ledger", "may_ask", "message_id", "outstanding", "over_ihave_limits",
-   "owe", "parked", "promise_due", "rarest", "retry_offer", "segment_length", "tie", "tie_room", "tied_to_root",
-   "untried", "valid_descriptor", "validate_chunk", "held"]
-
 /-- The functions of `protocol.md` that a record under v2 may name and that take another form under v2: the two
 that call a name v2 redefines, and `respond`, whose IWANT a record under v2 writes in v2's form. The replay serves
-them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`, also where `keptV2` names them. -/
+them with their v2 forms (`V2/Kept.lean`), not with `Replay.run`. -/
 def keptFormsV2 : List String := ["on_pace_tick", "on_block_installed", "respond"]
+
+/-- v2's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
+the 66 and main's `fill` and `serve_standing`. -/
+def fnsV2 : List String := Manifest.covered.filter (!keptFormsV2.contains ·)
+
+/-- The functions of `protocol.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
+form): the manifest's kept names, `protocol.md`'s all the way down by both documents' code, and the node's own
+helpers (`held`). -/
+def keptV2 : List String := Manifest.kept ++ Manifest.nodeOwn.map (·.1)
+
+/-- Where a record under v2 goes, by its function's name. -/
+inductive Route where
+  /-- v2's own code, by one of `runV2`'s cases -/
+  | v2
+  /-- a kept function's v2 form (`V2/Kept.lean`) -/
+  | form
+  /-- `protocol.md`'s code, by `Replay.run` with v2's forms -/
+  | kept
+  /-- no function of the twin under v2: a name v2 redefines and this cycle does not cover, or any other -/
+  | refused
+  deriving BEq, Repr
+
+/-- The route of a record of `f` under v2: a kept form first, then v2's covered names, then the kept names and the
+node's own helpers, and every other name refused. -/
+def routeV2 (f : String) : Route :=
+  if keptFormsV2.contains f then .form
+  else if fnsV2.contains f then .v2
+  else if keptV2.contains f then .kept
+  else .refused
 
 set_option maxHeartbeats 1600000 in
 /-- What one replayed record of a trace under protocol-v2.md gives: the branches it took and how many of the
@@ -473,7 +476,10 @@ Python's reads the twin did not make, or the first difference. `params` are the 
 def runV2 (c : Consts) (c2 : ConstsV2) (params : TypeId → Option TypeParams) (replaced traced : List String)
     (r : Record) (rowReads : List String := []) : Except String (Array String × Nat) := do
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
-  if keptV2.contains r.fn && !keptFormsV2.contains r.fn then return ← run c replaced traced r rowReads .v2
+  match routeV2 r.fn with
+  | .kept => return ← run c replaced traced r rowReads .v2
+  | .refused => throw s!"not a function of the twin under protocol-v2.md: {r.fn}"
+  | _ => pure ()
   let ctx : Ctx2 := { base := { c, now := Float.ofBits r.t, replaced }, c2, params }
   let rs0 : RSt := { tape := r.tape, twin := ← load r, rowReads }
   let exec {α} (x : M2 R α) (ok : α → Except String Bool) : Except String (Except String (State × Bool) × RSt) := do
