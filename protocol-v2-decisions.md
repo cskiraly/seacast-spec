@@ -1,10 +1,10 @@
-# SEACAST's next version (draft): its decisions
+# SEACAST: its decisions
 
-This is the decision record of [`protocol-v2.md`](protocol-v2.md), the draft of SEACAST's next
-version (v2). It lists the design decisions `[D1]` to `[D12]` and the others that the draft took:
-when each was decided, what was not taken and why, and the runs behind it. It also lists the
-versions of [`protocol.md`](protocol.md) that the draft has carried. `protocol-v2.md` states the
-rules and gives their reasons; the comments in its code cite these labels where each decision bites.
+This is the decision record of SEACAST, [`protocol-v2.md`](protocol-v2.md). It lists the design
+decisions `[D1]` to `[D12]` and the others that SEACAST took: when each was decided, what was not
+taken and why, and the runs behind it. It also lists the versions of [`protocol.md`](protocol.md)
+that SEACAST has carried. `protocol-v2.md` states the rules and gives their reasons; the comments in
+its code cite these labels where each decision bites.
 
 In this file, a section number (§) without the name of a document refers to `protocol-v2.md`'s
 sections, and "this document" and "this draft" mean `protocol-v2.md`. The figures behind this record
@@ -26,14 +26,14 @@ states.
 | `[D9]` one document or a sibling (decided: a sibling) | `protocol-v2.md`; §6.1 is the merge path |
 | `[D10]` colours (decided: a parameter, with no default) | `TypeParams.M`, `F_LO`, `F_HI`, `D_OUT`, `SYMMETRIC`, §1.4, §4.1 |
 | `[D11]` join = (interest, duty); topics as rendezvous (decided: the join as written; the rendezvous gossipsub topics per family, with the ENR beside them) | §2 `Join`, §1.2, `protocol-v2-bindings.md` §0's rendezvous row |
-| `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_OUTSTANDING`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
+| `[D12]` a sampler's reach (decided: a coverage floor with `SAMPLE_COVER` set at 2, LiteDAS's second phase, routed sample requests of one step) | §1.3; §2 `Want`; §4.1 `keep_coverage`; §4.5 `route_want`; §4.10; `TypeParams.SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS`, `FORWARD_LIMIT`; the node's `SAMPLE_OUTSTANDING`; §6.3's `ROUTE_FLOOR`; §7's last paragraph |
 | the promise's length (§4.13) (decided: 400 ms the default; the per-peer promise permitted as local policy) | `protocol.md` §6.1's `PROMISE`; §6.3's `PROMISE` row |
 | a source's links in a family it does not custody (decided: it never waits for links; three layers on top of its fanout; a refused push to a fallback link owed) | §4.7 `source_pool`, `candidates_for_source`, `origin_acked`, `unpush`; §6.3's `SOURCE_FLOOR` row |
 | the probe of a claim (R5) (decided: the claimant judged by its own copy; the probe marked and answered whatever the asker holds, once per asker and group; the asker's queue keeps it; its cell drawn at random) | §2 `Want.probe`; §4.2 `on_chunk`, `fill`; §4.5 `on_want`; §4.6 `reconsider`, `defer_on_claim`, `settle_probe`, `probe_answer`, `probe_promise`, `probe_waits`, `probe_of_claim`, `serve_probe`, `filter_entry`; `protocol-v2-bindings.md` §0's WANT row |
 
 **Decided on 2026-11-13.** Six of the decisions above were chosen on that day, and each entry below
 says what was not taken:
-- **`[D1]` identity and bindings.** v2 is a protocol of its own: it is defined on its own messages
+- **`[D1]` identity and bindings.** SEACAST is its own protocol: it is defined on its own messages
   and carried by three bindings, which are defined in their own document (`protocol-v2-bindings.md`,
   since 2026-11-17). The three were the standalone binding, the binding onto the Partial Messages
   Extension of gossipsub, and the gossipsub binding. Since 2026-11-21 they are named by their
@@ -230,8 +230,12 @@ built for diversity. Its size is `SAMPLE_COVER`, a parameter of the object type 
 least 1, set at two links per family; `COVER_HIGH` is set at 1 (§6.3). Routed sample requests
 take what the floor misses, with one forwarding step by default (§4.10, `ROUTE_HOPS` 1). Both run on
 LiteDAS's two phases: one sample per peer, with peers of high custody as the second phase's
-fallback. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT` and
-`SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
+fallback. Since 2026-11-22, the second phase's asks in flight have one cap per block, counted across
+the block's sampled types. The cap is `SAMPLE_OUTSTANDING`, a setting of the node with a bound of at
+least 1; before, it was a parameter of each object type. One cap per block bounds the asks that a
+block's hunt has in flight, and a cap per type, on a count that the types share, could keep §4.10's
+refill loop from ending. The standing WANT carries the first phase (§2, §4.5), and `FORWARD_LIMIT`
+and `SERVE_LIMIT` are limits stated by their bounds (§6.3). The evidence is the toy's graphs, its
 60-node cells and its 500-node cells at ten seeds (protocol-v2-figures.md, §6.3). These are kept as
 options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routing neighbours
 (`ROUTE_FLOOR`), and the fetch outside the links (§7). The notes below are kept for later study:
@@ -299,12 +303,12 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   UDP, a fast QUIC connection or discv5.
 - *Rejected:* the draft rejects narrowing the sample to what the node's links serve (§4.10).
 
-**Decided on 2026-11-21.** Three decisions on the bindings, each given in `protocol-v2-bindings.md`:
+**Decided on 2026-11-21.** Four decisions on the bindings, each given in `protocol-v2-bindings.md`:
 - **The bindings by carrier.** The bindings document defines SEACAST's message encoding once (§1
   there), then one binding per carrier: the libp2p stream binding, the Waggle binding, the gossipsub
-  binding and the partial-messages binding (§2 to §5 there). A native QUIC binding is being drafted.
-  The gossipsub binding is v2's path on gossipsub alone; the partial-messages binding is kept beside
-  it.
+  binding and the partial-messages binding (§2 to §5 there), and the native QUIC binding as a draft
+  (§7 there). The gossipsub binding uses gossipsub's wire alone, as `protocol.md` does; the
+  partial-messages binding is kept beside it.
 - **The gossipsub binding to the byte.** Its extra fields, a holding's `claim_all` and `complete`
   and a WANT's `standing`, `hops` and `probe`, travel in version 4 of the id strings, and a WANT's
   index is a little-endian `uint32`, as `protocol.md` §2 writes it (§4 there). On that binding,
@@ -315,6 +319,13 @@ options: one cover (`SAMPLE_COVER` 1), more than one forwarding step, the routin
   same three are open on the libp2p stream, Waggle and gossipsub bindings; the partial-messages
   binding carries form (b), by the partial columns' own rule. Not taken: one form for every object
   type, since whether a block comes before its cells differs between applications.
+- **The native QUIC binding, as a draft** (§7 there). It carries SEACAST directly on QUIC, with a
+  control stream, a stream per chunk, cancel by a stream's reset, and the control stream first where
+  the implementation orders streams. It is for study, and not normative. *Open:* whether it runs
+  beside libp2p on libp2p's port, beside it on a port of its own, or alone; two studies bear on it
+  (§7.1 there), and neither chooses a model. Not taken in this version: datagrams for chunks, since
+  a cell does not fit one at the study's packet sizes unless it compresses well, and small payload
+  chunks in datagrams were slower in the toy.
 
 ## The versions of `protocol.md` carried
 
@@ -421,3 +432,17 @@ carried later than its version.
   citation of the draft's figures, now in `protocol-v2-figures.md`. This draft is restructured: its
   decisions and its figures are in files of their own, and its bindings are named by their
   carriers.
+- v0.10.12 (2026-11-22): in `protocol.md`, a HAVE or an offered id of a group beyond the peer's
+  limit of unknown groups (§8.2) is ignored before it leaves any state (`admitted` in `on_have` and
+  `on_ihave`), and §7.1 says which of `write_wait_known.py`'s five cases keep the writer's place.
+  This draft carries the first in `on_holding` and `on_offer` (§4.3), and bounds more of what a peer
+  can make a node keep or serve: asks outside what it serves, a WANT's index and group, the
+  relations on a link, the answers to one peer in a heartbeat and the routed requests it passes on.
+- v0.11.0 (2026-11-22): `protocol.md` is the same but for its version line and its names: its title
+  and a new opening paragraph name it SEACAST on gossipsub, and §5.1 and §9 cite this document and
+  the announcement post by their current names. This draft is named SEACAST; there is nothing to
+  carry.
+- v0.11.1 (2026-11-22): `protocol.md` is the same but for its version line, so there is nothing to
+  carry. In this draft, one setting of the node caps a block's second-phase asks in flight across
+  the block's sampled types, and the block's held samples are tried while room is left even when
+  the group of the ask whose wait ended has expired (§4.10). §3 declares `want_p`.

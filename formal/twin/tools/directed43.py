@@ -22,9 +22,15 @@ entry is new or carries the toy's ttl):
   wake, then the mesh asked): both calls are the twin's own, and without a window drawn here no set would tell
   `have-release-after-ack`.
 
-The scenario answers `expired`; `valid_have`, `penalise`, `window_release` and `origin_acked` are the toy's own.
-The node is node 2 of a 5-node cell built as run.py builds it (no event runs), with a window of 2 slots (W, set
-before the tracer is installed, as directed71's). A sample on which the Python raises
+- `admitted(p, h)`, which the toy answers true always: here false for a HAVE of a group beyond the peer's limit
+  of unknown groups (ignored, without penalty), each group refused on a sample with probability 0.15, drawn from
+  a stream of its own so that every other draw is as without it. The order shows: a HAVE of a refused group that
+  is expired asks neither `valid_have` nor `admitted`, and one that is not valid is penalised and asks no
+  `admitted` (`valid_have` first). The counts of the three kinds are printed.
+
+The scenario answers `expired` and `admitted`; `valid_have`, `penalise`, `window_release` and `origin_acked` are
+the toy's own. The node is node 2 of a 5-node cell built as run.py builds it (no event runs), with a window of 2
+slots (W, set before the tracer is installed, as directed71's). A sample on which the Python raises
 is written with `raises` by the tracer; the counts are printed.
 """
 import argparse
@@ -59,11 +65,15 @@ def main(argv):
     ns = nd.ns
     gone = set()
     ns["expired"] = lambda g: g in gone
+    refused, asked = set(), []          # the groups beyond p's limit of unknown groups; admitted's calls
+    ns["admitted"] = lambda p, h: asked.append(h.group) or h.group not in refused
     ns["W"] = 2                         # a window of two slots (a node's constant, read at install)
     tr.install(nd, ns)
     TTL = ns["HAVE_TTL"]
 
     rng = random.Random(a.seed)
+    rng4 = random.Random(a.seed + 3000017)      # the refused groups: apart from the main stream, so that every
+    order = Counter()                           #   other draw is as without them
     groups = [bytes([0x11 * (j + 1)]) * 32 for j in range(3)]
     raised = Counter()
     for _ in range(a.n):
@@ -75,6 +85,8 @@ def main(argv):
         n_ = counts[g]
         gone.clear()
         gone.update(gg for gg in groups if rng.random() < 0.1)
+        refused.clear()
+        refused.update([gg for gg in groups if rng4.random() < 0.15])   # a draw for each group, every sample
 
         # ---- the state, cleared, then drawn
         for name in ("asked_at", "promises", "last_resort_armed", "tried", "offered", "asked_parked", "park",
@@ -150,13 +162,18 @@ def main(argv):
             bits = have & rng.randrange(1 << n_) if have else 0
         else:
             bits = rng.randrange(1, 1 << n_)
+        asked.clear()
         try:
             ns["on_have"](p, Wm.HaveBitmap(group=g, bits=B.Bits(bits)))
         except Exception as e:              # noqa: BLE001: the tracer wrote it, with `raises`
             raised[type(e).__name__] += 1
+        if g in refused:                    # the order of on_have's three checks, as the call went
+            order["a refused group's HAVE, admitted asked and false" if asked else
+                  "a refused group's HAVE, expired: neither asked" if g in gone else
+                  "a refused group's HAVE, not valid: penalised, admitted not asked"] += 1
     tr.close()
-    print(f"directed43: {sum(tr.counts.values())} records, raised {dict(raised)}, {dict(sorted(tr.counts.items()))}",
-          file=sys.stderr)
+    print(f"directed43: {sum(tr.counts.values())} records, raised {dict(raised)}, {dict(sorted(tr.counts.items()))}; "
+          f"admitted: {dict(sorted(order.items()))}", file=sys.stderr)
 
 
 if __name__ == "__main__":

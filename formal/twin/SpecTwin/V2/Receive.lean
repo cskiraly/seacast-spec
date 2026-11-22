@@ -131,7 +131,7 @@ def defer (p : Peer) (f : ChunkF) : M2 m Unit := do
     if ← validatedHead f then validatedBody p f result        --   `on_validated(p, f, result)`, not DEFER
     branch "defer: the gate opened"
     return
-  if !(← admitted p f) then                                   -- beyond the peer's unknown groups: ignored
+  if !(← admitted p (.chunk f)) then                          -- beyond the peer's unknown groups: ignored
     branch "defer: not admitted"
     return
   v1 (tie p f)                                                -- kept or refused, its sender is tied to the root

@@ -12,9 +12,13 @@ offers on their own; and, under `protocol-v2.md`, a control-only entry of the no
 - (a) `next_to_send(p)` returns the control, and q has no run queued: the wake does not come before the write.
   v0.10.7 and v0.10.8 woke q here, and this case fails on them.
 - (b) p's writer writes the control, and its transport takes no more after it (the toy's send buffer is full): the
-  write waits, and q has a run queued. With no wake at all, q would wait though the window is empty.
+  write waits, and q has a run queued. With no wake at all, q would wait though the window is empty. The order is
+  checked too: the control reaches the transport while q has no run queued, and `write_waits(p)` is called once,
+  after it, with p's write pending; q's run is queued only then.
 - (c) as (b), with p not in line: no run is queued for q.
-- (d) as (b), with the window full: no run is queued for q, since no slot (or room) is free.
+- (d) as (b), with the window full: no run is queued for q, since no slot (or room) is free. Under
+  `protocol-v2.md`, also with the window above its cap, as one entry into an empty window can leave it.
+- (e) as (b), with no send buffer: the write completes at once, and `write_waits` is not called.
 In (a), (b) and (d), p keeps its place at the head of the line.
 The toy is not changed: the check builds the network with `run.py`'s own options and sets the node's tables.
 """
@@ -45,7 +49,7 @@ def queued(sim, node, peer):
     return any(e[2] is node and e[3] == node._write and e[4] == (peer,) for e in sim.q)
 
 
-def setup(sim, kind, in_line, full=False):
+def setup(sim, kind, in_line, full=False, above=False):
     import wire as Wm
     from bits import bitmap
     node = sim.nodes[NODE]
@@ -58,6 +62,8 @@ def setup(sim, kind, in_line, full=False):
         w.append(P)
     w.append(Q)
     ns["in_flight"] = (ns["W_BYTES"] if "W_BYTES" in ns else ns["W"]) if full else 0   # full, or empty
+    if above:                                       # protocol-v2.md: above its cap (one entry into an empty window)
+        ns["in_flight"] = ns["W_BYTES"] + 1
     if "slot_held" in ns:
         ns["slot_held"][P] = False
     q = ns["queue"][P]
@@ -93,13 +99,36 @@ def before_write(doc_v2, kind):
     return wrote, woken(sim, node), list(ns["waiters"])[:1] == [P]
 
 
-def write_waits(doc_v2, kind, in_line, full=False):
+def trace(sim, node, ns):
+    """The writer's steps for p, in order: each handoff to the transport, with whether q had a run queued then, and
+    each call of write_waits, with whether p's write was pending and q had a run queued then."""
+    log = []
+    tx, ww = sim.transmit, ns["write_waits"]
+
+    def transmit(nd, peer, e):
+        if peer == P:
+            log.append(("handoff", queued(sim, node, Q)))
+        return tx(nd, peer, e)
+
+    def write_waits(peer):
+        if peer == P:
+            log.append(("write_waits", peer in node.writer_blocked, queued(sim, node, Q)))
+        return ww(peer)
+    sim.transmit = transmit
+    ns["write_waits"] = write_waits
+    return log
+
+
+def write_waits(doc_v2, kind, in_line, full=False, above=False, buffer=True):
     sim = build(doc_v2)
-    node, ns = setup(sim, kind, in_line, full)
-    if sim.send_buffer is None:
+    node, ns = setup(sim, kind, in_line, full, above)
+    if buffer and sim.send_buffer is None:
         raise SystemExit("write_wait_known.py: the network has no send buffer, so no write can wait")
+    if not buffer:
+        sim.send_buffer = None                      # the transport takes every write at once
+    log = trace(sim, node, ns)
     node._write(P)
-    return P in node.writer_blocked, woken(sim, node), list(ns["waiters"])[:1] == [P]
+    return P in node.writer_blocked, woken(sim, node), list(ns["waiters"])[:1] == [P], log
 
 
 def main():
@@ -117,20 +146,34 @@ def main():
         print(f"(a) p in line, {kind}: next_to_send returns it {wrote}, q woken {woke}, p keeps its place {place}: "
               f"{'no wake before the write' if ok else 'not as the rule says  <-- FAIL'}")
         bad += not ok
-        waits, woke, place = write_waits(doc_v2, kind, True)
-        ok = waits and woke and place
-        print(f"(b) p in line, {kind}, the write waits {waits}: q woken {woke}, p keeps its place {place}: "
+        waits, woke, place, log = write_waits(doc_v2, kind, True)
+        order = log == [("handoff", False), ("write_waits", True, False)]
+        ok = waits and woke and place and order
+        print(f"(b) p in line, {kind}, the write waits {waits}: q woken {woke}, p keeps its place {place}, "
+              f"the handoff then write_waits with p pending {order}: "
               f"{'the next writer that can write is woken' if ok else 'not as the rule says  <-- FAIL'}")
+        if not order:
+            print(f"    p's steps: {log}")
         bad += not ok
-        waits, woke, _ = write_waits(doc_v2, kind, False)
+        waits, woke, _, _ = write_waits(doc_v2, kind, False)
         ok = waits and not woke
         print(f"(c) p not in line, {kind}, the write waits {waits}: q woken {woke}: "
               f"{'q not woken' if ok else 'a wake for a writer not in line  <-- FAIL'}")
         bad += not ok
-        waits, woke, place = write_waits(doc_v2, kind, True, full=True)
-        ok = waits and not woke and place
-        print(f"(d) p in line, the window full, {kind}, the write waits {waits}: q woken {woke}, p keeps its place "
-              f"{place}: {'q not woken' if ok else 'not as the rule says  <-- FAIL'}")
+        for above in ([False, True] if doc_v2 else [False]):
+            waits, woke, place, _ = write_waits(doc_v2, kind, True, full=True, above=above)
+            ok = waits and not woke and place
+            print(f"(d) p in line, the window {'above its cap' if above else 'full'}, {kind}, the write waits {waits}: "
+                  f"q woken {woke}, p keeps its place {place}: "
+                  f"{'q not woken' if ok else 'not as the rule says  <-- FAIL'}")
+            bad += not ok
+        waits, _, _, log = write_waits(doc_v2, kind, True, buffer=False)
+        called = any(s[0] == "write_waits" for s in log)
+        handed = ("handoff", False) in log
+        ok = handed and not waits and not called
+        print(f"(e) p in line, {kind}, no send buffer: handed over {handed}, the write waits {waits}, write_waits "
+              f"called {called}: "
+              f"{'no call for a write that completes at once' if ok else 'not as the rule says  <-- FAIL'}")
         bad += not ok
     print("ok" if not bad else "FAIL")
     return 1 if bad else 0

@@ -103,8 +103,8 @@ needs the acknowledgement to do nothing at `PUBLISH`: with `origin_acked` acting
 takes `publish` too: the draft's `SOURCE_OFFERS` (§4.7). The option's other values, `off` and
 `late`, act only on offers `publish` itself makes, so since v0.9's rule they change nothing.
 
-Forty scripts hold known answers for what a digest cannot show. Each is a check that can fail, and
-where one has a control that must come out the other way, it is named:
+The scripts below hold known answers for what a digest cannot show. Each is a check that can fail,
+and where one has a control that must come out the other way, it is named:
 - `own_order_known.py`: §6.1's reference order; its control, the rank read big-endian, must differ.
 - `ihave_id_known.py`: §4.4, an IHAVE id that is not a chunk's id; a valid id beside it must leave an
   offer. And an IHAVE bitmap of an index beyond the group's known count is ignored and penalised;
@@ -122,7 +122,8 @@ where one has a control that must come out the other way, it is named:
   `unwanted[p]` with no penalty; a bitmap beside it must still be read as a HAVE, and not be kept in
   `unwanted[p]`. The toy tells a bitmap by its type, not by the string's first bytes and length.
   With `--doc v2`, the same on the gossipsub binding (`protocol-v2-bindings.md` §4): the toy reads
-  the frame as v2's messages and keeps the stock id in `unwanted[p]`, which v2's `on_want` reads.
+  the frame as SEACAST's messages and keeps the stock id in `unwanted[p]`, which SEACAST's `on_want`
+  reads.
 - `want_promise_known.py`: `protocol-v2.md` §4.5 and §4.10, an ask sent as a `Want` starts no
   promise at its write: such an ask sent through the gossipsub binding and written by
   `filter_entry` gets none, and the control, an ask on an offer written the same way, gets v0.5's;
@@ -133,12 +134,99 @@ where one has a control that must come out the other way, it is named:
   window's line that writes control wakes the first writer in line that can write when its write
   starts to wait for the transport (`write_waits`), and not before. Two writers wait in line, p
   first, then q. For each way p's writer writes control (an urgent entry, owed offers on their own,
-  and under `protocol-v2.md` a control-only entry of the normal lane), four cases, each on a network
+  and under `protocol-v2.md` a control-only entry of the normal lane), five cases, each on a network
   built anew: (a) `next_to_send(p)` returns the control, and q gets no run; (b) p's writer writes
-  it, the write waits, and q gets a run; (c) as (b) with p not in line, and q gets no run; (d) as
-  (b) with the window full, and q gets no run. In (a), (b) and (d), p keeps its place. A run for q
-  is read from the simulator's queue of events. Case (a) fails on v0.10.7 and v0.10.8, which woke q
-  before the write.
+  it, the write waits, and q gets a run, in this order: the control reaches the transport while q
+  has no run, then `write_waits(p)` is called once, with p's write pending; (c) as (b) with p not in
+  line, and q gets no run; (d) as (b) with the window full, and under `protocol-v2.md` also above
+  its cap, and q gets no run; (e) as (b) with no send buffer, so the write completes at once, and
+  `write_waits` is not called. In (a), (b) and (d), p keeps its place. A run for q is read from the
+  simulator's queue of events. Case (a) fails on v0.10.7 and v0.10.8, which woke q before the write.
+- `xcheck_observes_known.py [--doc v2]`: `--xcheck` only observes. `check.py`'s push cell runs with
+  and without it, and both give the same digest. Under `protocol-v2.md` it fails on the toy before
+  its fix, whose wrapper of `track_in_flight` took two arguments where that document passes three.
+- `xcheck_window_known.py [--doc v2]`: `--xcheck`'s window invariant. `check.py`'s push cell runs
+  with it, and every xcheck line must show `inv_window=0` and a `peak` no larger than `w`. `peak`
+  and `w` count slots of a chunk (`W`) under `protocol.md`, and bytes (`W_BYTES`, §4.11) under
+  `protocol-v2.md`. Under `protocol-v2.md` it fails on the toy before its fix, whose recorder
+  compared the bytes in flight with `W` in slots and did not see `acquire_room`.
+- `outside_ask_known.py`: `protocol-v2.md` §4.5, an ask outside what a node serves. Once the gate is
+  open, a standing WANT for a column the node neither holds nor custodies keeps no standing request
+  and draws no penalty; a sampler's WANT for one adds no bit to its interest. The controls: a column
+  the node custodies, a routed WANT to a forwarding node (kept, and marked routed), a group the node
+  claimed whole, and an ask that came while the gate was held closed, kept and then dropped when the
+  header is validated (`on_header_validated`). A sampler's routed WANT outside the node's interest,
+  across the gate's opening, is kept standing exactly when the node passed it on, read from its own
+  sends, and adds no interest bit; refused by the next queue, it is neither kept nor counted against
+  `FORWARD_LIMIT`; sent to a node whose duty toward the sampler is `NONE`, it is read as having no
+  hops. Two honest runs, custody with samplers and the rows, publish their blocks and ignore no
+  ask; it prints how many asks they tested, and fails if none, or if the custody run met
+  no routed request. It fails on the document before the rule.
+- `sample_cap_known.py`: `protocol-v2.md` §4.10, the second phase's cap. A custody network with
+  samplers is built and one block published but not run, and one sampler's `resample` and
+  `ask_sample` are driven directly on two column groups of that block. The second group is given its
+  own copy of the column type's parameters. (a) The node's cap holds across the two groups: a freed
+  slot asks the first held sample and stops at the cap, and the other held samples keep their order.
+  (b) A slot freed by an ask whose group has expired still asks a live held sample. A refill loop
+  that runs past 100 calls is stopped. It fails on the document before the fix, which had a cap per
+  type and returned early for an expired group: (a)'s loop does not end, and (b)'s sample stays
+  held.
+- `relation_limit_known.py`: `protocol-v2.md` §6.3 and §4.1, the pairs of family and colour a link
+  may have (`MAX_RELATIONS`). With the limit set to what the link has, a GRAFT for a new column
+  family is ignored without an answer, the node's own GRAFT for one is not sent, and a PRUNE for one
+  sets no backoff, against a control PRUNE for a carried pair that does; a GRAFT for a family the
+  link carries is answered yes again; with no limit, the first is answered yes. A backoff not yet
+  run out counts toward the limit, one run out does not, and a PRUNE of the node's still owed
+  counts. The peer's next PRUNE drops a backoff that has run out, with the entry it empties, and a
+  backoff of zero stores none. The node's upkeep, offered the peer for every family, grafts no pair
+  new to the link at the limit. No penalty. It fails on the document before the limit.
+- `relation_types_known.py`: `protocol-v2.md` §2 and §4.1, object types a link has not joined, under
+  `--upkeep on`. A JOIN for a type the node does not run stores nothing and draws no JOIN back; with
+  the link's rows JOIN taken back, a GRAFT for a row family makes no relation and draws no answer, a
+  PRUNE sets no backoff even with a backoff of five seconds, and a WANT for a row cell keeps no
+  standing request; with the node's own JOIN owed to a second peer, that peer's GRAFT is ignored.
+  The controls: a PRUNE for a joined column family sets its backoff, a GRAFT for one is answered,
+  and so is one when only the other type's JOIN is owed. On a link that joined only rows, with the
+  document's own handlers: a cell that names its column group is verified, stored and acknowledged;
+  a holding frees the room of S's copy in flight, and so does the same holding again after the copy
+  is written again, its bit no longer new; a cell naming an index beyond its header's count is
+  rejected and counted against its sender, without an error, and so is one whose descriptor keeps the
+  header's root with a larger count, as level 1 reads the group's own header. On a link that joined
+  neither, a cell
+  is stored and a holding frees the room. A holding that claims a column whole is kept, but makes no
+  claimant on the rows-only link; the control, on a link that joined columns, does. No other
+  penalty. It fails on the document before the rule.
+- `serve_budget_known.py`: `protocol-v2.md` §4.5, the serving budget (`SERVE_BUDGET`). With the
+  budget set to two, of three asks for cells of distinct columns the node holds, not on its offers,
+  two are answered and the third refused; an ask on an offer the writer wrote, sent or owed, is
+  answered over the budget; a standing request's answer is dropped, and a kept probe answered; after
+  the heartbeat, asks are answered again. An id asked twice in a frame is answered and charged once;
+  with one unit left, one at the stock limit of three answers is refused without spending it, and
+  the next is answered with it; with one unit of the group's limit left, a plain ask and a probe of
+  the same id in one frame, in either order, give one answer with the probe's exemption, and spend
+  no budget. With one unit of the group's limit left, plain asks of A and B and a probe of A in one
+  frame answer A as the probe and refuse B, and A is written after the asker's holding of it; a
+  standing ask beside a probe that does not pass as one keeps its standing request. On a rows
+  network, a plain ask of a cell through its column and a probe of it through the node's row in one
+  frame, in either order, give one answer with the probe's exemption, written after the asker's
+  holding of the cell. No penalty. It fails on the document before the budget.
+- `unknown_groups_known.py`: `protocol.md` §8.2's limit of unknown groups per peer, in both
+  documents. With the node's `admitted` refusing one group, a HAVE (a holding claiming the group
+  whole) and an offer of it leave nothing in `peer_has`, `holders`, `claims`, `offered` or `offers`;
+  the controls, for a group admitted, leave their state. No penalty. It fails on the documents
+  before the rule.
+- `want_bounds_known.py`: `protocol-v2.md` §4.5, a WANT's two bounds. A standing WANT at an index
+  beyond the group's count keeps no standing request, nor one past the type's most before the count
+  is known; a routed one kept before the count is dropped with its route mark when the group opens
+  in the run (`fill`, `drop_wants_beyond`); and with the asker's limit of unknown groups set to one
+  (`MAX_PENDING_GROUPS`), a second unknown group is ignored while a known one is kept, a place frees
+  when its group resolves, its lifetime passes (and the asker's standing request goes with it, at
+  the next heartbeat or the group's opening, whichever comes first), or the connection closes,
+  which leaves no empty entry. A request another peer's WANT left for an unknown group does not
+  exempt a second peer from its limit, and each peer's place for the group goes at its lifetime
+  with that peer's request. A standing WANT kept at the source
+  before its publish is answered by the publish. No penalty. It fails on the document before the
+  bounds.
 - `second_id_known.py`: §4.2, in both documents, a copy under an id the node has not seen, at an
   index it has already received, is acknowledged and neither forwarded nor put in the gossip
   history; a copy of an index held only as rebuilt is still forwarded, and the publisher's first
@@ -177,6 +265,8 @@ where one has a control that must come out the other way, it is named:
     index is offered.
   - A sender with nothing left tied under the root loses its tie's slot; a peer still tied for
     another group keeps its slot.
+  - At the cell header, a peer tied on a link that has not joined columns is not an announcer of
+    the tied index; the control, a peer whose link joined columns, is.
   - A cell's level 1 rejects a copy whose slot is not its header's, for its column and its row; the
     copy as it came passes.
 - `close_known.py`: a connection's close under `protocol-v2.md` (`--churn`).
@@ -191,6 +281,8 @@ where one has a control that must come out the other way, it is named:
   before the alarm, before the write or after it penalise nobody, and the member rebuilds; a
   close before the write also takes the ask out of the stop-pull exemption. Controls: a silent
   connected claimant is penalised once, and a claimant's own copy leaves no penalty and no rebuild.
+  A custodian's WANT on a link that has not joined rows is ignored, and a custodian asks only
+  members whose links joined rows.
 - `late_drain_known.py`: the `late-block` cell with a leak put in by hand must fail, and so must
   the cell with a node that gets no chunk; as it is, it must pass.
 - `late_draw_known.py`: `--late-block`'s draw and its argument.
@@ -344,7 +436,7 @@ digest; with the key, the cells moved at seed 7 by −10 to +69 ms at the median
 namings: 486 ms for the descriptor's group id, the naming until then; 491 and 493 ms for the same
 construction under two other domain bytes; 498 ms for the key and 489 to 497 ms for three other
 keys. The key and another key differ by +1.1 ± 3.5 ms (mean ± standard error over the 20 seeds,
-each seed's four cells averaged). The next version's column and row groups keep their names, and
+each seed's four cells averaged). SEACAST's column and row groups keep their names, and
 its custody and row settings their digests at seed 7, with and without supernodes, samplers and
 withheld columns.
 
@@ -367,7 +459,7 @@ and degree 30 the asks the publisher receives fall to about a third and its uplo
 payload. One cost appears with it: the publisher's HAVE names a chunk about a round trip later than
 before, and a mesh peer that got the chunk from a forwarder meanwhile may push it back to the
 publisher (a few chunks a payload at that size; cancel drops the pushes still queued when the HAVE
-arrives). `golden-v2.txt` was unchanged by it: the next version kept its own source until it took
+arrives). `golden-v2.txt` was unchanged by it: SEACAST kept its own source until it took
 the rule for every object type (2026-11-11) and was recorded again.
 
 ## How it maps onto the document
@@ -446,21 +538,31 @@ are the harness's indices plus one.
 With `--topology` (or `--xcheck` alone) the toy prints, after each message, the harness's own
 `xcheck` line per population: what the nodes sent, counted at the sender's transmit after the
 writer's filter (where the harness counts at the stream write), what they received, and the
-invariants the document's rules imply, each a count that must be zero:
+invariants the document's rules imply. Each invariant is a count that must be zero, apart from the
+lawful cases that the `budget`, `window` and `late` entries name:
 
-- `budget`: a forwarding node that pushed one chunk more often than its push degree;
-- `window`: a node with more slots in flight than `W`;
+- `budget`: a forwarding node that sent one chunk unasked more often than its push degree. Like the
+  harness's line, it counts every copy sent unasked, so the copies of a rebuilt chunk that repair
+  pushes count too. Under `protocol.md`, and under `protocol-v2.md` with `REPAIR_BUDGET` off,
+  repair's pushes of rebuilt chunks go to peers short of K, each up to its shortfall, with no
+  push-degree bound on one chunk's copies, so what repair adds to the count breaks no rule;
+- `window`: a node with more room in flight than its window: `W` slots under `protocol.md`,
+  `W_BYTES` bytes under `protocol-v2.md` (§4.11 there). An empty window there takes one chunk of any
+  size, so a window smaller than a chunk can count a node that broke no rule;
 - `overlap`: an ask for a chunk decided while an earlier ask for it is open (inside `IWANT_WINDOW`, not
   yet held), timed at `may_ask`, where the harness's request ledger times its asks too;
 - `late`: a chunk sent to a mesh peer whose HAVE for it (in an IDONTWANT, the only carrier that feeds
   `peer_has`) had reached the sender earlier in the message, held or since expired, as the harness's
-  ledger reads it; `late_live` counts those the sender still held, which cancel should have dropped;
+  ledger reads it. `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
+  it is on, drops such a send, and under `protocol-v2.md` it lets a probe's exempt answer through; a
+  send that cancel would not drop complies with card 8;
 - `fault`: a chunk from a silent node, or an answer from a withholder.
 
 The recorder reads node state without creating entries and schedules nothing, so a run's events
-and digest are the same with it or without it. A duplicate is a chunk received before, as the
-harness's seen cache counts it, not one held only since the decode. It counts tier 4's events and
-runs under `--doc v03` only: under `--doc v2` its window hook takes the wrong arguments.
+and digest are the same with it or without it. A duplicate is a chunk the node received before, or
+one delivered to its publisher, as the harness's seen cache counts it, not one held only since the
+decode. The recorder counts tier 4's events. Under both documents, `xcheck_observes_known.py` and
+`xcheck_window_known.py` run it on `check.py`'s push cell.
 
 **A DAS dump** (the research harness's column proxy, 2026-11-01) runs under `--doc v2 --setting
 custody` or `rows`. Besides `net`, it has records of its own:
@@ -557,37 +659,37 @@ fixed in `protocol.md` since the window is v0.3's:
     way, copies rose by 0.03 to 0.12 (`cap-wait` 1.64 → 1.66, `dcb20` 3.20 → 3.32, `push` 2.35 →
     2.41), since chunks that had waited in the line, and were pulled meanwhile, now go out.
 
-## The next version (`--doc v2`)
+## SEACAST (`--doc v2`)
 
-*The next version is a draft, checked in this toy only (its banner). Figures below from fewer than ten
+*SEACAST is checked in this toy only (its banner). Figures below from fewer than ten
 seeds, a single seed unless stated, are toy checks of a mechanism, not measurements. Those of runs
 with a payload (tier 4, variant C) were recorded before 2026-10-23, under the descriptor's group id
 as the payload's name; under the group's key their exact values move as any renaming's do
 ("Checking a change"). Column and row groups are named as before.*
 
 [`protocol-v2.md`](../protocol-v2.md) is run on top of `protocol.md`: `extract.py` pulls both
-documents' blocks, v0.3's are executed first and the next version's after them in the same namespace, so
-the next version redefines what it changes (`on_frame`, `on_chunk`, `forward`, `announce`, the holding and
+documents' blocks, v0.3's are executed first and SEACAST's after them in the same namespace, so
+SEACAST redefines what it changes (`on_frame`, `on_chunk`, `forward`, `announce`, the holding and
 offer handlers, `on_want`, completion and repair, `publish`, the heartbeat) and keeps what it says
 carries over (the ask discipline, `choose_push`; the window and the writer as its §4.11 and §4.12 adapt them). `node.py` supplies what
-the next version leaves to the environment under its tier 4 setting (its §6.1): the payload object type
+SEACAST leaves to the environment under its tier 4 setting (its §6.1): the payload object type
 with its parameters, the join tables, the push relation behind the mesh, and the gossipsub
 binding of its messages (`protocol-v2-bindings.md` §4): a holding is an IDONTWANT bitmap, an offer
 an IHAVE bitmap, an ask a `WantIndex`. Relations are static, as the mesh is for v0.3.
 
-`check.py --doc v2` runs the fifteen cells against the next version's own recording,
+`check.py --doc v2` runs the fifteen cells against SEACAST's own recording,
 `golden-v2.txt` (`--update` records it, as for v0.3). `check.py --doc v2 --golden golden.txt`
-compares the next version against `protocol.md`'s cells instead (v0.3's until 2026-10-13, v0.4's
+compares SEACAST against `protocol.md`'s cells instead (v0.3's until 2026-10-13, v0.4's
 until 2026-10-21, v0.5's until 2026-10-25, v0.7's until 2026-10-26, v0.8's until 2026-11-12, v0.9's
 since); there a cell whose digest moved but whose numbers did not is reported as such and does not
-count, since the next version iterates the relation in peer order where v0.3 iterates the mesh set,
+count, since SEACAST iterates the relation in peer order where v0.3 iterates the mesh set,
 which reorders same-instant sends. On 2026-10-07, with v0.3's slot window, eleven cells reproduced
 v0.3's numbers exactly and `rr-stripe` differed by 3 ms at the median; with the window in bytes
 (`protocol-v2.md` §4.11) the cells differ from v0.3's by at most 7 ms at the median, 15 ms at the
 tail and 0.04 copies either way, which is the writer choosing the entry before taking room and
 control taking none, not the unit.
 
-**v0.4's P4 in the next version** (2026-10-21, `protocol-v2.md` §4.7): the source's holding names only the
+**v0.4's P4 in SEACAST** (2026-10-21, `protocol-v2.md` §4.7): the source's holding names only the
 chunks it has sent. Against v0.4's recording the twelve cells now sit within 3 ms at the median,
 16 ms at the tail and 0.03 copies, `loss-thin` aside (§4.13's ask window, at 20 Mbps); without P4
 the medians had been up to 102 ms behind. On the settings it costs a slow proposer of columns
@@ -642,9 +744,9 @@ against 80, more on seven seeds, as many on two, fewer on one (not traced). Its 
 as before, on every seed but 13, where two custodians stay short either way. Tables further down
 that predate 2026-10-21 were recorded without P4.
 
-**v0.5 in the next version** (2026-10-21, `protocol-v2.md` §5 and the functions it names in its header):
+**v0.5 in SEACAST** (2026-10-21, `protocol-v2.md` §5 and the functions it names in its header):
 a refused push or offer is offered with the next write, parked announcers are asked once more, the
-gate per object type, the promise from the write (a WANT starts none). Against the next version just
+gate per object type, the promise from the write (a WANT starts none). Against SEACAST just
 before the merge, with P4 (60 nodes, warm medians; over several seeds the median and the range):
 
 | cell | seeds | p50 | p99 | copies | (node, group) pairs short |
@@ -809,13 +911,14 @@ it, and the proposer counts where it already is a link and is never added (propo
 `--route on|off` (on) lets a sample that no link serves go as a routed request to a link with duty
 `FORWARD`, which passes it one step on (§4.5), `--route-hops` (1) steps at most; `--sample-retry2`
 (0.5 s), `--sample-outstanding` (4) and `--forward-limit` (none) are the second phase's wait per
-peer, its asks in flight per block and the forwarders' limit. A sampler asks a peer for at most one
-sample of a block, and a peer of high custody only in the second phase. The `reach` line gives the
-floor's links per sampler, by which ask each sample first arrived, the asks per sample, the routed
-requests passed on per node, the most samples of a block one peer was asked for by one sampler,
-and how many were asked of the block's source. A sample nobody delivered is missing (the document
-no longer gives one up): it is reported on a line of its own, not as a completion violation, which
-stays the custodians' invariant.
+peer, its cap on asks in flight per block and the forwarders' limit. That cap is the node's; it
+counts the asks across the block's sampled types, and it is at least 1. A sampler asks a peer for at
+most one sample of a block, and it asks a peer of high custody directly only in the second phase.
+The `reach` line gives the floor's links per sampler, by which ask each sample first arrived, the
+asks per sample, the routed requests passed on per node, the most samples of a block one peer was
+asked for by one sampler, and how many were asked of the block's source. A sample nobody delivered
+is missing (the document no longer gives one up): it is reported on a line of its own, not as a
+completion violation, which stays the custodians' invariant.
 
 Known answers (2026-10-23; 60 nodes, degree 30, 12 samplers, `--net bld`, seed 7): without samplers
 the custody and row cells' digests are those from before the change, and both `check.py` runs pass.
@@ -1386,7 +1489,7 @@ and 2.0 without, and then completes 10 ms later at the median. A rule keyed on t
 uplink, as striping's is, could save the home builder's bytes where they are scarce. It is not in
 the document; v0.9's timing of the source's offers, below, saves most of them instead.
 
-**v0.9 in the next version** (2026-11-11, `protocol-v2.md` §4.7, §4.11). What the next version
+**v0.9 in SEACAST** (2026-11-11, `protocol-v2.md` §4.7, §4.11). What SEACAST
 takes from v0.9, as written:
 - the source's holding grows at a chunk's acknowledgement, not at its write;
 - its offers wait for the acknowledgement, for every object type;

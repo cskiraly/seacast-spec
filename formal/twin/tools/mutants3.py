@@ -557,7 +557,7 @@ AEND = {        # name -> (what it changes, file, old, new)
                                   "  if (← installedBlock f.slot f.root).isSome then           -- installed in the meantime\n",
                                   "  if false then\n"),
     "defer-admitted-not-asked": ("defer: admitted not asked", SEC42,
-                                 "  if !(← admitted p f) then                                 -- a group beyond the peer's unknown groups (§8.2):\n",
+                                 "  if !(← admitted p (.chunk f)) then                        -- a group beyond the peer's unknown groups (§8.2):\n",
                                  "  if false then\n"),
     "defer-reserve-before-tie": ("defer: the reservation asked before the tie", SEC42,
                                  "  tie p f                                                   -- kept or refused, its sender is tied to the root\n"
@@ -784,9 +784,9 @@ GA5 = {         # name -> (what it changes, file, old, new)
     "defer-no-tie": ("defer: tie not called", SEC42,
                      "  tie p f                                                   -- kept or refused, its sender is tied to the root\n", ""),
     "tie-not-admitted-tied": ("tie: a copy of a group not admitted tied anyway, admitted asked", SEC42,
-                              "  if !(← admitted p f) then                                 -- `if not admitted(p, f) or not tie_room(p, f): return`\n"
+                              "  if !(← admitted p (.chunk f)) then                        -- `if not admitted(p, f) or not tie_room(p, f): return`\n"
                               "    branch \"tie: not admitted\"\n    return\n",
-                              "  let _ ← admitted p f\n"),
+                              "  let _ ← admitted p (.chunk f)\n"),
     "obi-waits-reversed": ("on_block_installed: a root's waits validated in reverse", SEC42,
                            "  for (p, f) in waits do\n    setPendingId (← messageId f) false",
                            "  for (p, f) in waits.reverse do\n    setPendingId (← messageId f) false"),

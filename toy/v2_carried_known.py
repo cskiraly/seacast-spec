@@ -18,6 +18,9 @@ On one node of a small rows run (protocol-v2.md, one block, run to its end), wit
   §8.1). Peer 4 is tied only for that column: after the header, it is no longer tied under the root and its slot
   is gone. Peer 1 is also tied for a group of the root that is not a cell group: it stays tied, with its slot
   (the control).
+- **At the cell header, a tie on a link that has not joined the group's type is no offer** (§4.2's release, §2).
+  A third peer, whose JOIN for columns is taken back, is tied for index 0 of the column; after the header, it is
+  not an announcer of it, where peer 1 (the control) is, and it is no longer tied under the root.
 - **A cell's level 1 rejects a copy whose slot is not its header's** (§1's table, as `protocol.md` §3's
   `validate_chunk` for the payload). A cell the node accepted passes again, for its column and for its row (the
   control); the same cell naming an older slot is rejected for both.
@@ -82,6 +85,10 @@ def main():
     d = ns["desc"].pop(col)                                 # the column's count not known yet when the copies tie
     ns["tie"](P, copy_of(col, 0)); ns["tie"](P, copy_of(col, n)); ns["tie"](P, copy_of(GX, 0))
     ns["tie"](R, copy_of(col, 0))
+    COL = ns["type_of"]("column")
+    X = next(q for q in sorted(nd.peers) if q not in (P, R) and COL in ns["join_recv"][q])
+    del ns["join_recv"][X][COL]                             # the link has not joined columns
+    ns["tie"](X, copy_of(col, 0))
     line(f"header, before: peer 1 tied for the column's indices 0 and {n}, and for the other group; peer 4 for 0",
          (sorted(ns["tied"][root][P][col]), sorted(ns["tied"][root][P][GX]), sorted(ns["tied"][root][R][col])),
          ([0, n], [0], [0]))
@@ -95,6 +102,8 @@ def main():
          (True, block.slot))
     line("header, after: peer 4 tied under the root, and its slot",
          (R in ns["tied"].get(root, {}), (root, R) in ns["tie_slot"]), (False, False))
+    line(f"header, after: peer {X}, its link not joined for columns: an announcer of index 0, tied under the root",
+         (announcer(X, col, 0), X in ns["tied"].get(root, {})), ((False, False), False))
 
     # a cell's level 1: a copy whose slot is not its header's is rejected
     for g, what in ((col, "column"), (row, "row")):

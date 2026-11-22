@@ -1433,7 +1433,7 @@ expand-fallback-next-index hand5-publish 1 0 {'tape': 1}
 expand-fallback-next-index hand5 1 0 {'tape': 1}
 expand-fallback-next-index hold 36041 0 {'tape': 36041}
 expand-fallback-next-index ihave-limits 43554 0 {'tape': 43554}
-expand-fallback-next-index late-block 37081 0 {'state': 7016, 'tape': 30065}
+expand-fallback-next-index late-block 37081 0 {'tape': 37081}
 expand-fallback-next-index loss-thin 39724 0 {'tape': 39724}
 expand-fallback-next-index none 36041 0 {'tape': 36041}
 expand-fallback-next-index push-deep 36100 0 {'tape': 36100}
@@ -9552,3 +9552,122 @@ write-waits-wakes-out-of-line silent 202374 1 {'reached': 200638, 'tape': 1736}
 write-waits-wakes-out-of-line withholders 246525 3 {'reached': 245023, 'tape': 1502}
 write-waits-wakes-out-of-line without-a 284072 2428 {'reached': 272655, 'tape': 11417}
 write-waits-wakes-out-of-line without-b 248810 0 {'reached': 248810}
+have-admitted-not-asked announce 119977 0 {'tape': 119977}
+have-admitted-not-asked cap-wait 117350 0 {'tape': 117350}
+have-admitted-not-asked dcb20 128817 0 {'tape': 128817}
+have-admitted-not-asked hand5-publish 56 0 {'tape': 56}
+have-admitted-not-asked hand5 56 0 {'tape': 56}
+have-admitted-not-asked hold 119999 0 {'tape': 119999}
+have-admitted-not-asked ihave-limits 121713 0 {'tape': 121713}
+have-admitted-not-asked late-block 120057 0 {'tape': 120057}
+have-admitted-not-asked loss-thin 118681 0 {'tape': 118681}
+have-admitted-not-asked none 119999 0 {'tape': 119999}
+have-admitted-not-asked push-deep 126970 0 {'tape': 126970}
+have-admitted-not-asked push 123254 0 {'tape': 123254}
+have-admitted-not-asked rr-stripe 127263 0 {'tape': 127263}
+have-admitted-not-asked silent 118991 0 {'tape': 118991}
+have-admitted-not-asked withholders 122142 0 {'tape': 122142}
+have-admitted-not-asked without-a 143169 0 {'tape': 143169}
+have-admitted-not-asked without-b 126530 0 {'tape': 126530}
+have-not-admitted-taken announce 0 0 {}
+have-not-admitted-taken cap-wait 0 0 {}
+have-not-admitted-taken dcb20 0 0 {}
+have-not-admitted-taken hand5-publish 0 0 {}
+have-not-admitted-taken hand5 0 0 {}
+have-not-admitted-taken hold 0 0 {}
+have-not-admitted-taken ihave-limits 0 0 {}
+have-not-admitted-taken late-block 0 0 {}
+have-not-admitted-taken loss-thin 0 0 {}
+have-not-admitted-taken none 0 0 {}
+have-not-admitted-taken push-deep 0 0 {}
+have-not-admitted-taken push 0 0 {}
+have-not-admitted-taken rr-stripe 0 0 {}
+have-not-admitted-taken silent 0 0 {}
+have-not-admitted-taken withholders 0 0 {}
+have-not-admitted-taken without-a 0 0 {}
+have-not-admitted-taken without-b 0 0 {}
+have-admitted-before-valid announce 119977 0 {'tape': 119977}
+have-admitted-before-valid cap-wait 117350 0 {'tape': 117350}
+have-admitted-before-valid dcb20 128817 0 {'tape': 128817}
+have-admitted-before-valid hand5-publish 56 0 {'tape': 56}
+have-admitted-before-valid hand5 56 0 {'tape': 56}
+have-admitted-before-valid hold 119999 0 {'tape': 119999}
+have-admitted-before-valid ihave-limits 121713 0 {'tape': 121713}
+have-admitted-before-valid late-block 120057 0 {'tape': 120057}
+have-admitted-before-valid loss-thin 118681 0 {'tape': 118681}
+have-admitted-before-valid none 119999 0 {'tape': 119999}
+have-admitted-before-valid push-deep 126970 0 {'tape': 126970}
+have-admitted-before-valid push 123254 0 {'tape': 123254}
+have-admitted-before-valid rr-stripe 127263 0 {'tape': 127263}
+have-admitted-before-valid silent 118991 0 {'tape': 118991}
+have-admitted-before-valid withholders 122142 0 {'tape': 122142}
+have-admitted-before-valid without-a 143169 0 {'tape': 143169}
+have-admitted-before-valid without-b 126530 0 {'tape': 126530}
+ihave-admitted-not-asked announce 35846 0 {'tape': 35846}
+ihave-admitted-not-asked cap-wait 27787 0 {'tape': 27787}
+ihave-admitted-not-asked dcb20 30222 0 {'tape': 30222}
+ihave-admitted-not-asked hand5-publish 1 0 {'tape': 1}
+ihave-admitted-not-asked hand5 1 0 {'tape': 1}
+ihave-admitted-not-asked hold 36041 0 {'tape': 36041}
+ihave-admitted-not-asked ihave-limits 43554 0 {'tape': 43554}
+ihave-admitted-not-asked late-block 37081 0 {'tape': 37081}
+ihave-admitted-not-asked loss-thin 39724 0 {'tape': 39724}
+ihave-admitted-not-asked none 36041 0 {'tape': 36041}
+ihave-admitted-not-asked push-deep 36100 0 {'tape': 36100}
+ihave-admitted-not-asked push 35944 0 {'tape': 35944}
+ihave-admitted-not-asked rr-stripe 35274 0 {'tape': 35274}
+ihave-admitted-not-asked silent 27379 0 {'tape': 27379}
+ihave-admitted-not-asked withholders 44544 0 {'tape': 44544}
+ihave-admitted-not-asked without-a 35799 0 {'tape': 35799}
+ihave-admitted-not-asked without-b 28465 0 {'tape': 28465}
+ihave-not-admitted-taken announce 0 0 {}
+ihave-not-admitted-taken cap-wait 0 0 {}
+ihave-not-admitted-taken dcb20 0 0 {}
+ihave-not-admitted-taken hand5-publish 0 0 {}
+ihave-not-admitted-taken hand5 0 0 {}
+ihave-not-admitted-taken hold 0 0 {}
+ihave-not-admitted-taken ihave-limits 0 0 {}
+ihave-not-admitted-taken late-block 0 0 {}
+ihave-not-admitted-taken loss-thin 0 0 {}
+ihave-not-admitted-taken none 0 0 {}
+ihave-not-admitted-taken push-deep 0 0 {}
+ihave-not-admitted-taken push 0 0 {}
+ihave-not-admitted-taken rr-stripe 0 0 {}
+ihave-not-admitted-taken silent 0 0 {}
+ihave-not-admitted-taken withholders 0 0 {}
+ihave-not-admitted-taken without-a 0 0 {}
+ihave-not-admitted-taken without-b 0 0 {}
+ihave-admitted-before-held announce 35846 0 {'tape': 35846}
+ihave-admitted-before-held cap-wait 27787 0 {'tape': 27787}
+ihave-admitted-before-held dcb20 30222 0 {'tape': 30222}
+ihave-admitted-before-held hand5-publish 1 0 {'tape': 1}
+ihave-admitted-before-held hand5 1 0 {'tape': 1}
+ihave-admitted-before-held hold 36041 0 {'tape': 36041}
+ihave-admitted-before-held ihave-limits 43554 0 {'tape': 43554}
+ihave-admitted-before-held late-block 37081 0 {'tape': 37081}
+ihave-admitted-before-held loss-thin 39724 0 {'tape': 39724}
+ihave-admitted-before-held none 36041 0 {'tape': 36041}
+ihave-admitted-before-held push-deep 36100 0 {'tape': 36100}
+ihave-admitted-before-held push 35944 0 {'tape': 35944}
+ihave-admitted-before-held rr-stripe 35274 0 {'tape': 35274}
+ihave-admitted-before-held silent 27379 0 {'tape': 27379}
+ihave-admitted-before-held withholders 44544 0 {'tape': 44544}
+ihave-admitted-before-held without-a 35799 0 {'tape': 35799}
+ihave-admitted-before-held without-b 28465 0 {'tape': 28465}
+ihave-offer-before-admitted announce 35744 0 {'tape': 35744}
+ihave-offer-before-admitted cap-wait 27787 0 {'tape': 27787}
+ihave-offer-before-admitted dcb20 30196 0 {'tape': 30196}
+ihave-offer-before-admitted hand5-publish 1 0 {'tape': 1}
+ihave-offer-before-admitted hand5 1 0 {'tape': 1}
+ihave-offer-before-admitted hold 36041 0 {'tape': 36041}
+ihave-offer-before-admitted ihave-limits 43554 0 {'tape': 43554}
+ihave-offer-before-admitted late-block 37080 0 {'tape': 37080}
+ihave-offer-before-admitted loss-thin 39723 0 {'tape': 39723}
+ihave-offer-before-admitted none 36041 0 {'tape': 36041}
+ihave-offer-before-admitted push-deep 36100 0 {'tape': 36100}
+ihave-offer-before-admitted push 35943 0 {'tape': 35943}
+ihave-offer-before-admitted rr-stripe 35274 0 {'tape': 35274}
+ihave-offer-before-admitted silent 27378 0 {'tape': 27378}
+ihave-offer-before-admitted withholders 44544 0 {'tape': 44544}
+ihave-offer-before-admitted without-a 35799 0 {'tape': 35799}
+ihave-offer-before-admitted without-b 28465 0 {'tape': 28465}

@@ -1,9 +1,15 @@
-# SEACAST: the protocol in pseudocode
+# SEACAST on gossipsub: the protocol in pseudocode
 
-> **DRAFT v0.10.11, 2026-11-21.** Companion to the post [*Informed Diffusion: making home builders
+> **DRAFT v0.11.1, 2026-11-22.** Companion to the post [*Informed Diffusion: making home builders
 > publish fast*](https://ethresear.ch/t/informed-diffusion-making-home-builders-publish-fast/26151). Field level on the wire; byte-exact layouts follow in a second phase. Written from
 > the research implementation (Prysm and a go-libp2p-pubsub fork) and revised after a review
 > against it; section 9 lists where the measured runs differ from what is written here.
+
+*This is SEACAST on gossipsub, the protocol that was measured and proved: the measurements ran a
+research implementation of it (§9), and the proofs are of models of its rules at v0.8 with four
+later changes ([`formal/`](formal/README.md)). SEACAST itself is defined in
+[`protocol-v2.md`](protocol-v2.md), which is checked in the toy only. SEACAST contains this
+protocol as its tier 4 setting, with the differences that `protocol-v2.md` §6.1 lists.*
 
 ## 0. How to read this
 
@@ -678,6 +684,7 @@ releases at a node.
 def on_have(p, h: HaveBitmap):
     if expired(h.group): return                       # past its active lifetime (§8.1): ignored
     if not valid_have(h): return penalise(p)          # length, and indices within N once known (§8.2)
+    if not admitted(p, h): return                     # a group beyond the peer's unknown groups (§8.2): ignored
     e = peer_has[p][h.group]                          # created at p's first HAVE for the group
     newly = h.bits & ~e.bits
     e.bits |= h.bits
@@ -689,11 +696,12 @@ def on_have(p, h: HaveBitmap):
 ```
 
 A HAVE for an expired group is ignored (§8.1), and a malformed one counts against its sender (§8.2).
-Otherwise the node adds the HAVE's bits to what it knows the peer holds (`peer_has`), whose lifetime
-each HAVE for the group refreshes (`HAVE_TTL`). For each index the peer newly holds, the node counts
-the peer as a holder (card 9), frees the window slot of any copy it sent the peer at that index
-(card 14), and, for a group it publishes, takes it as the chunk's acknowledgement (`origin_acked`,
-§5.1), which does nothing at `SOURCE_OFFERS = PUBLISH`.
+A HAVE for a group beyond the peer's limit of unknown groups (`MAX_PENDING_GROUPS`, §8.2) is
+ignored, without penalty. Otherwise the node adds the HAVE's bits to what it knows the peer holds
+(`peer_has`), whose lifetime each HAVE for the group refreshes (`HAVE_TTL`). For each index the peer
+newly holds, the node counts the peer as a holder (card 9), frees the window slot of any copy it
+sent the peer at that index (card 14), and, for a group it publishes, takes it as the chunk's
+acknowledgement (`origin_acked`, §5.1), which does nothing at `SOURCE_OFFERS = PUBLISH`.
 
 `peer_has` is the one view of what each peer holds. Cancel and projection (§7.2), the push
 candidates and budget (§5.2), whom to push to (§5.3) and what to announce read it at the moment they
@@ -710,6 +718,7 @@ def on_ihave(p, ih):                                                  # returns 
             penalise(p); continue                                     #   limits: ignored, and counted (§8.2)
         for a in expand(entry):                                       # [c7]
             if held(a) or expired(group(a)): continue
+            if not admitted(p, a): continue                           # a group beyond the peer's unknown groups (§8.2)
             add_offer(a, p)                                           # [c5] offer table (§6.1)
             if gated(a) or not authenticable(group(a)): continue      # [c6] stop-pull; the block first (§3)
             if tied_to_root(p, a): continue                           # its copy waits (§4.2)
@@ -739,13 +748,13 @@ def expand(entry):                                                    # [c7]
 ```
 
 **What an IHAVE does** (`on_ihave`). Each entry is a HAVE bitmap or a chunk's id (below). Every chunk
-an entry names (`expand`) that the node does not hold, in a group not expired, is recorded as an
-offer from the sender (§6.1). The node then asks the sender for it, unless the group's pull has
-stopped (§6.2), no installed block's bid commits the group yet (§3), the sender's copy of the chunk
-waits for its block (§4.2), the sender is parked for the group (the last resort may then be armed,
-§6.1), or an ask of the chunk to the sender is outstanding (§6.1). The asks go in random order, each
-through `may_ask`, the one ask per chunk at a time of §6.1. Over gossipsub's IHAVE limits they wait
-for the next heartbeat (below).
+an entry names (`expand`) that the node does not hold, in a group not expired and within the
+sender's limit of unknown groups (§8.2), is recorded as an offer from the sender (§6.1). The node
+then asks the sender for it, unless the group's pull has stopped (§6.2), no installed block's bid
+commits the group yet (§3), the sender's copy of the chunk waits for its block (§4.2), the sender is
+parked for the group (the last resort may then be armed, §6.1), or an ask of the chunk to the sender
+is outstanding (§6.1). The asks go in random order, each through `may_ask`, the one ask per chunk at
+a time of §6.1. Over gossipsub's IHAVE limits they wait for the next heartbeat (below).
 
 **An IHAVE bitmap tells the node who can serve, not who holds.** It feeds the offer table only:
 never `peer_has`, `holders`, cancel or the window. Nothing is asked for a group no installed block's
@@ -1146,15 +1155,15 @@ the setting trades is the source's own:
   §7.3's rule and the queue admits them, they wait behind the pushes queued before them to the same
   peer (an offer a full queue refuses is owed, and rides with the next write, §7.2); where the
   transport takes a writer's entries at once, they can leave while pushes still wait. In the toy at
-  60 nodes (degree 30, three payloads, the median of ten seeds), measured on the next version's
-  draft when it took this rule as written (`toy/README.md`, 2026-11-11), with writes that complete
+  60 nodes (degree 30, three payloads, the median of ten seeds), measured on `protocol-v2.md`
+  when it took this rule as written (`toy/README.md`, 2026-11-11), with writes that complete
   at once: against announcing at publish, a 50 Mbps builder announcing at the acknowledgement was
   asked 61 % less and uploaded 2.07 copies of the payload instead of 2.50, and a 1 Gbps builder 5.9
   instead of 10.0; the payload's median completion moved by −8 to 0 ms over four cells, and by −19
   to +6 ms over their seeds. At 500 nodes, at one seed, the source was asked 22 % less and uploaded
   3.06 copies instead of 3.24. With §7.3's rule kept, the timing changed nothing measurable at 60
   nodes (40 asks against 45, the medians within 4 ms). A fast source can gain where its peers pull
-  chunks from it while its uplink has room: the draft's 1 Gbps proposer of many column groups
+  chunks from it while its uplink has room: SEACAST's 1 Gbps proposer of many column groups
   completes 44 ms sooner at 60 nodes and 9 ms sooner at 500 when it offers at publish, and its
   50 Mbps proposer 26 ms later at 500 (`protocol-v2-figures.md`, §4.7).
 - *Its privacy.* Every chunk announced at once, by the one node that holds them all, names the
@@ -1840,11 +1849,13 @@ write starts to wait, not before the write: a write that completes at once leave
 to write, and a wake before it would change the schedule of the node's writers where nothing else
 changes. A client that cannot tell when its write starts to wait may still wake before the write.
 Its cost is that change of schedule: the woken writer takes a slot only if no writer ahead of it
-in line can write (`front`) and a slot is free. `toy/write_wait_known.py` checks four cases on each
+in line can write (`front`) and a slot is free. `toy/write_wait_known.py` checks five cases on each
 of the two paths, with p the writer that writes control and q the other writer in line: q has no
-run queued when `next_to_send` returns p's control, q has one after p's write starts to wait, and q
-has none when p is not in line or when no slot is free. Where p is in line, it keeps its place at
-the head.
+run queued when `next_to_send` returns p's control; q has one after p's write starts to wait, and
+only after the control reached the transport and `write_waits(p)` was called with the write
+pending; q has none when p is not in line or when no slot is free; and a write that completes at
+once calls no `write_waits`. In the first, the second and the fourth, p keeps its place at the
+head of the line.
 
 ### 7.2 Choosing what to send, at the moment of sending [c8, c9, c12, c14]
 
@@ -2100,8 +2111,8 @@ This document decides at the moment of sending, so it needs the backlog to be in
   `HaveBitmap`'s MAGIC and VERSION and is long enough to hold the group after them (§2). A shorter
   string, such as a stock id of 20 bytes, is not one, whatever it opens with;
 - `valid_have`, `reserve`, `release`, `admitted` and `listed`: the checks and reservations of §8.2;
-  `admitted`: a chunk's group within the peer's limits; `listed`: how many ordered offer lists an
-  announcer is in;
+  `admitted`: the group a chunk, a HAVE or an offered id names, within the peer's limit of unknown
+  groups; `listed`: how many ordered offer lists an announcer is in;
 - `Entry`: a queue entry, at most one chunk plus control; `add_ihave` adds an IHAVE to its control;
 - `enqueue`: into the bounded per-peer queue of §7; true if the queue admitted the entry;
 - `has_room`: the queue would admit one now;
@@ -2276,7 +2287,7 @@ scored peers by this promise would make it a bound.
 The measurements in the posts this document accompanies come from a research harness. This section
 lists where the harness does something this document does not specify, and what that means for the
 numbers. Figures 4 and 5 of
-[*SEACAST: fast, lean broadcast for Ethereum, with an executable spec and a formal model*](https://ethresear.ch/t/seacast-fast-lean-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)
+[*SEACAST: fast, lean, sampled broadcast for Ethereum, with an executable spec and a formal model*](https://ethresear.ch/t/seacast-fast-lean-sampled-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)
 (2026) were rerun on an implementation with v0.5's rules and the source's paced HAVE; that
 post's other figures, and the earlier posts', come from the implementation before them. Where the
 rerun does as this document does, the entry says so.

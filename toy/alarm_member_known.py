@@ -21,6 +21,10 @@ verified on claimant q, and custodian c sends the standing WANT. Then:
   at the close, not judged, it leaves probe_asks, and the member rebuilds.
 Controls: the claimant connected and silent is penalised once and the member rebuilds; the claimant's own copy
 before the wait's end leaves no penalty and no rebuild.
+With the custodian's link not joined to rows, its standing WANT is ignored (protocol-v2.md §2): no ask, no
+promise, no rebuild, and no error. The custodian's part, on custodian c lacking one cell: it asks no row member
+whose link has not joined rows, and with one member's link joined, only that member. Both fail on the toy whose
+alarm chose members by subnet alone.
 """
 import sys
 from pathlib import Path
@@ -46,7 +50,7 @@ def main():
     g = next(g for g in ns["T_of"] if sim.gtype.get(g) == "row" and sim.gsub.get(g) == nd.row_subnet)
     n = T_row.index_count(ns["hdr"][g])
     line_ok = len(ns["chunks"][g]) == n
-    j, *cells = sorted(ns["chunks"][g])[:7]                # j: the probe's cell; one lacked cell per case (the
+    j, *cells = sorted(ns["chunks"][g])[:8]                # j: the probe's cell; one lacked cell per case (the
     held = {k: ns["chunks"][g][k] for k in cells}           #   member asks the claimant once per cell)
     peers = [p for p in sorted(nd.peers) if ns["join_recv"][p][T_row].interest != "DECLARED"]
     q, c = peers[:2]                                        # q the claimant, c the custodian
@@ -176,6 +180,45 @@ def main():
          (calls, rebuilt(), a in ns["probe_asks"], nd.alarm["not judged"]), ([], True, False, 1))
     nd.peers.add(q) if isinstance(nd.peers, set) else nd.peers.append(q)
     sim.churn = False
+
+    # custodian c's link has not joined rows: the member ignores its WANT (§2), before it reads c's row JOIN
+    setup(6)
+    doc_joined = ns["joined"]
+    ns["joined"] = lambda p, T: False if p == c and T is T_row else doc_joined(p, T)
+    try:
+        alarm()
+        got_ = (the_entry() is not None, (a, q) in ns["promises"], calls, rebuilt())
+    except Exception as ex:
+        got_ = f"{type(ex).__name__}: {ex}"
+    ns["joined"] = doc_joined
+    line("custodian c's link not joined to rows: an ask queued, a promise, penalties of q, and a rebuild",
+         got_, (False, False, [], False))
+
+    # the custodian's part: it asks only members on links that joined rows
+    nc = sim.nodes[c]
+    nsc, T_rc = nc.ns, nc._types["row"]
+    root = ns["hdr"][g].block
+    col = sorted(nc.custody)[0]
+    gc = sim.gcolgroup[(root, col)]
+    b = next(b for b in range(sim.cfg["blobs"])
+             if len([x for x in nc.peers if sim.nodes[x].row_subnet == sim.gsub[sim.grow[(root, b)]]]) >= 2)
+    rg = sim.grow[(root, b)]
+    members = [x for x in sorted(nc.peers) if sim.nodes[x].row_subnet == sim.gsub[rg]]
+    nsc["received"][gc].clear(b); nsc["rebuilt"][gc].clear(b); nsc["holders"][gc][b] = set()   # c lacks cell b
+    doc_joined_c, doc_send_c = nsc["joined"], nsc["send"]
+    got_ = []
+    for joined_ones in ((), (members[-1],)):
+        nc.alarm_cells.pop((gc, b), None)
+        sent = []
+        nsc["joined"] = lambda p, T, ok=joined_ones: (p in ok) if T is T_rc else doc_joined_c(p, T)
+        nsc["send"] = lambda p, m, urgent=False: (sent.append(p), True)[1] if getattr(m, "group", None) == rg \
+            else doc_send_c(p, m, urgent)
+        nc.alarm_check(root, 0)
+        got_.append(sent)
+    nsc["joined"], nsc["send"] = doc_joined_c, doc_send_c
+    sim.q[:] = [e for e in sim.q if e[2] is not nc]
+    line(f"custodian {c} lacking cell {b} of column {col}, row members {members} among its peers: asked with none "
+         f"of their links joined to rows; with only {members[-1]}'s", got_, [[], [members[-1]]])
 
     print("ok" if not bad else "FAIL")
     return 1 if bad else 0

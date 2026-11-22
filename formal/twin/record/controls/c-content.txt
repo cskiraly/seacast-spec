@@ -36,5 +36,5 @@ content, the document given twice, --doc v2 then --doc v03 (the words read the f
 content, the document given as --do v2, which the toy's parser refuses as ambiguous: tracer rc=2, says: ambiguous option: --do could match; no trace the replay passes; must be: a tracer that stops with these words, and no trace that passes
 content, the document given as --doc=v2, the = form: traced as given as --doc v2: tracer rc=0 (--doc v2: rc=0), first line the same, the same header but its args, the same records; must be: rc=0, the same first line, header but its args, and records as --doc v2's
 content, a directed set (directed1, --n 10 --seed 1), whose arguments are no command line of the toy's: rc=0, says: directed1: 535 records; must be: rc=0, its records as many as the known answer
-the tree's content line: sha256 f6ed400910465f13f3f8f31ec803887e3a0587ca4a01f3f6eb9bcfd4d7196e4c
+the tree's content line: sha256 118018443e3b4af6dca4b313fa4492eec3365af6d8628c98892c4ddfb5c3450b
 ok: every control of the content line as it must be

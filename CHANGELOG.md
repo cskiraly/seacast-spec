@@ -13,119 +13,241 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## v0.10.11 — 2026-11-21
+## v0.11.1 — 2026-11-22
 
-The next version's draft gives a cell group's header three forms, moves its decisions and its
-figures to files of their own, names its bindings by their carriers and defines the gossipsub
-binding's extra fields to the byte; its files are rewritten in plain sentences.
+SEACAST's second sampling phase has one cap per block on its asks in flight, a setting of the
+node, and the toy's cross-check (`--xcheck`) counts the window in bytes under `protocol-v2.md`.
 
 ### Rules
-- `protocol-v2-bindings.md` §1.6: a cell group's header travels in one of three forms: from the
-  block, in every cell message, or in a header message of its own; the object type's definition
-  fixes the form, and no topic mixes two forms.
-- `protocol-v2-bindings.md` §2.3, §3: on the libp2p stream binding, and on the Waggle binding as on
-  it, form (a) leaves `CellChunk.header` empty, and form (c) needs a message kind of its own, which
-  this version does not define.
+- `protocol-v2.md` §4.10: `SAMPLE_OUTSTANDING`, the cap on second-phase sample asks in flight per
+  block, is now a setting of the node, not a parameter of each object type. The asks are counted
+  across the block's sampled types, as before. When a second-phase ask's wait ends and its group
+  has expired, the block's held samples are now tried while room is left; in v0.11.0 they stayed
+  held.
+
+### Added
+- `toy/sample_cap_known.py`, a known answer for §4.10's second phase in two cases. In the first, a
+  block holds two sampled types, and the refill stops at the node's cap. In the second, the group of
+  the ask whose wait ends has expired, and a held sample is asked. Both fail on v0.11.0's document.
+- `toy/xcheck_window_known.py`, a known answer for `--xcheck`'s window invariant. It runs the push
+  cell under either document. It passes when the run succeeds, prints at least three xcheck lines,
+  and every xcheck line has `inv_window=0` and a `peak` no larger than `w`. The check failed under
+  `protocol-v2.md` before `toy/xcheck.py` was fixed.
+
+### Changed
+- `protocol-v2.md` §1.1, §3, §6.3: `TypeParams` (§1.1) no longer has `SAMPLE_OUTSTANDING`. §6.3
+  gives `SAMPLE_RETRY2`, a parameter of the object type, and `SAMPLE_OUTSTANDING`, a setting of the
+  node, a row each; `SAMPLE_OUTSTANDING`'s bound is at least 1, and it was 4 in every measurement.
+  In §3, the labels of `samples_in_flight` and `held_samples` say that each spans the block's types.
+- `protocol-v2-decisions.md`: `[D12]` records that since 2026-11-22, one setting of the node caps a
+  block's second-phase asks in flight across the block's sampled types, and its row in the index
+  names the node's `SAMPLE_OUTSTANDING`.
+- `protocol-v2-figures.md` §6.3: in the 500-node cells, `SAMPLE_OUTSTANDING` was 4, a parameter of
+  the column type. The samplers sampled only columns, so the 4 capped each sampler's second-phase
+  asks in flight per block, as the node's setting does now.
+- `toy/node.py`, `toy/run.py`: the toy reads `SAMPLE_OUTSTANDING` as a setting of the node, and
+  `--sample-outstanding` refuses a value below 1.
+- `toy/README.md`: entries for the two new known answers. It now says that `--xcheck`'s recorder
+  runs under both documents, that a chunk delivered to its publisher counts as a duplicate, and
+  that a sampler asks a peer of high custody directly only in the second phase. Its invariants
+  read as in `toy/xcheck.py`'s docstring.
+- `formal/twin/record/`: the twin's record is made again from `9f33f60`, and v0.10.12's matrix is
+  carried.
+
+### Fixed
+- `protocol-v2.md` §3: `want_p`, a `DECLARED` peer's interest taken from its WANTs, is declared with
+  the node's other tables; the document's code already read and wrote it.
+- `toy/xcheck.py`: under `protocol-v2.md`, the recorder also takes the peak of the room in flight at
+  `acquire_room`, and the window invariant compares it, in bytes, with `W_BYTES`. Before, it
+  compared bytes with `W` in slots, and in the push cell every honest node counted as over its
+  window. Its docstring now says in which lawful cases `budget`, `window` and `late` are above
+  zero, and that `budget` counts the copies of a rebuilt chunk that repair pushes.
+
+## v0.11.0 — 2026-11-22 (`bc4fc5e`)
+
+The two protocols get their names, `protocol-v2.md` SEACAST and `protocol.md` SEACAST on gossipsub,
+and the README is rewritten. Text only; no rule changes since v0.10.12.
+
+### Changed
+- `protocol-v2.md`, `protocol.md`: their titles and openings name SEACAST and SEACAST on gossipsub;
+  `protocol.md`'s new opening paragraph says which protocol was measured and proved, and how SEACAST
+  contains it; the files keep their names, and the toy's `--doc v2` stays.
+- `protocol.md`: §5.1 cites `protocol-v2.md` by its file name where it said "the next version's
+  draft", and names SEACAST's proposer where it said "the draft's"; §9 cites the announcement post
+  by its current title.
+- `protocol-v2-bindings.md`, `protocol-v2-decisions.md`, `protocol-v2-figures.md`: titled "SEACAST:
+  its bindings", "its decisions" and "its figures"; in them, `toy/README.md` and `formal/README.md`,
+  "the next version" and "v2" as names become "SEACAST"; `formal/veil/README.md`'s title names
+  SEACAST on gossipsub.
+- `README.md`: rewritten: what SEACAST is, why, what to read, where it stands, running it and
+  background, with the two protocols' names and files; release numbers are the repository's, not
+  either protocol's; the announcement post cited by its current title.
+- `formal/twin/record/`: this release carries v0.10.12's record. `RECORD.md` now says that this
+  release's `toy/` and `formal/twin/` are those of `f72cb4d`, apart from the record and the files
+  whose names end in `.md`. `FILES.sha256` holds `RECORD.md`'s new hash.
+
+## v0.10.12 — 2026-11-22 (`c40847b`)
+
+The next version bounds more of what a peer can make a node keep or serve: asks outside what it
+serves, a WANT's index and group, the relations on a link, the answers to one peer in a heartbeat
+and the routed requests it passes on.
+
+### Rules
+- `protocol-v2.md` §4.5: once a group's gate is open, an ask outside what the node serves is ignored
+  without penalty (`outside`): an index the node does not hold, outside its interest as declared to
+  the asker, in a group it has not claimed whole, unless it is a routed request to a node whose duty
+  towards the asker is `FORWARD`. An ask that came before the gate is tested when it opens
+  (`drop_outside`). An ask for an index the asker itself claimed is penalised as before.
+- `protocol-v2.md` §4.5, §6.3: a forwarder keeps a routed request standing outside its own interest
+  only if it passed the request on, and adds no bit to a `DECLARED` asker's interest for it. A
+  request counts against `FORWARD_LIMIT` once the next peer's queue admits it; the count is per
+  object type (`forwarded`), and §6.3's floor also counts requests that converge on one link.
+- `protocol-v2.md` §4.5: a WANT's index at or past the group's count, or, before the count is known,
+  at or past the type's `MAX_INDICES`, is ignored without penalty. When the group opens, what was
+  kept before the count loses the indices past it (`drop_wants_beyond`).
+- `protocol-v2.md` §3, §4.5: a group the node has not opened takes one of the asker's
+  `MAX_PENDING_GROUPS` places for unknown groups in WANTs (`admitted_group`), counted apart from
+  HAVEs and offers and taken after the outside test. A place frees when the group resolves, when its
+  lifetime passes (with the asker's standing requests, route marks and interest bits for the group)
+  or at the close; the node frees places at each heartbeat at the latest and before a group opens.
+  An ask beyond the limit is ignored.
+- `protocol-v2.md` §2, §4.1, `protocol-v2-bindings.md` §1.1: chunks and holdings are taken on any
+  link. A JOIN for an object type the node does not run, and a GRAFT, PRUNE, offer or WANT for a
+  type the link has not joined (`joined`), are ignored without penalty. On gossipsub, a sampler
+  subscribed to none of the type's topics counts as joined at the serving end
+  (`protocol-v2-bindings.md` §6).
+- `protocol-v2.md` §4.2, §4.3, §4.6: a claim of a whole group on a link that has not joined its type
+  goes into `peer_has` with its bits and `claim_all`; the peer becomes a claimant only by such a
+  holding on a joined link. A tie on a link not joined is no offer at the header, and the custodian
+  alarm asks only row members on links that joined the row type.
+- `protocol-v2.md` §4.1, §6.3: a link has at most `MAX_RELATIONS` pairs of family and colour of a
+  type, in any state (`relation_room`). At the limit, a GRAFT for a new pair is ignored with no
+  answer, a PRUNE for one sets no backoff, and the node's own upkeep grafts none.
+- `protocol-v2.md` §4.5, §6.3: a node answers one peer at most `SERVE_BUDGET` chunks a heartbeat
+  across groups (`served_hb`), each counted in the heartbeat the node decides to give it. Answers to
+  asks on its own offers, recorded as its writer writes them (`offers_in`), and to a claim's probe
+  are not counted; an ask over the budget is refused without penalty.
+- `protocol-v2.md` §4.5: an id asked twice in one frame is counted once against the budget, the
+  stock limit and `[R6]`'s. A plain ask of an index the frame also probes in the same group is that
+  probe, if the probe would pass; a cell asked through both its types in one frame is one id,
+  charged to the ask that gives the answer.
+- `protocol-v2.md` §4.7: the source's publish answers the standing requests waiting for its chunks.
+
+### Added
+- `protocol-v2.md` §1.1: `TypeParams` gains `MAX_RELATIONS` and `MAX_INDICES`, and the repair's
+  `REPAIR_SAMPLE`, `SAMPLE_WAIT` and `REPAIR_REASK`, which §6.3 already listed.
+- `protocol-v2.md` §4.1, `protocol-v2-bindings.md` §3: two open items, whether an owed answer to a
+  repeated GRAFT is merged with a later one for the same pair, and which Waggle stream carries a
+  cell answered across its types, and its holding, where the two nodes share only the row type's
+  topic.
+- `protocol-v2.md` §6.1: two more differences from `protocol.md` that no recorded cell exercises,
+  an id asked twice in a frame and a link not joined.
+- `protocol-v2-figures.md` §4.5: the count of asks outside what a node serves, in the toy before the
+  rule.
+- `toy/outside_ask_known.py`, `toy/want_bounds_known.py`, `toy/unknown_groups_known.py` (under both
+  documents), `toy/relation_types_known.py`, `toy/relation_limit_known.py` and
+  `toy/serve_budget_known.py`: known answers for these rules; `toy/xcheck_observes_known.py`: one
+  for `--xcheck`.
+
+### Changed
+- `protocol-v2-bindings.md` §7.2, §7.3, §7.9: on the native QUIC binding, a cell's chunk stream is
+  read on a link that carries either of the cell's two types, and a stopped copy's room comes back
+  at a holding that reports its index even if the bit repeats.
+- `toy/golden-v2.txt`: `without-a` moves (p50 432 → 429 ms, p99 517 → 518 ms, 3.99 → 3.97 copies)
+  with the window's room freed at a repeated bit, under Fixed. `protocol-v2.md` §6.1 names it as
+  the difference a recorded cell shows; `protocol-v2-figures.md` §6.1 records it under "The
+  distance to the recordings, by date".
+- `toy/write_wait_known.py`: five cases. The control reaches the transport, then `write_waits` is
+  called with the write pending, then the next writer's run is queued; a write that completes at
+  once calls no `write_waits`; under `protocol-v2.md`, one case also runs with the window above its
+  cap. `protocol.md` §7.1's and `protocol-v2.md` §4.11's Rationales give the cases.
+- `toy/node.py`: `MAX_RELATIONS` and `SERVE_BUDGET` unbounded by default, `MAX_INDICES` per type,
+  the places for unknown groups in WANTs, `links(T)` per type in both upkeep modes, and `forwarded`
+  per type;
+  `toy/graft_check.py` takes `joined` and `relation_room`; `toy/alarm_member_known.py` and
+  `toy/v2_carried_known.py` cover links not joined.
+- `toy/README.md`: entries for the new known answers, and what the widened ones check.
+- `formal/twin/`: `on_have` asks `admitted` of a valid HAVE's group and bits, and `on_ihave` of an
+  offered id before it records the offer, as `protocol.md` §4.3, §4.4 now do; `admitted` takes a
+  chunk, a HAVE's group and bits, or an offered id (`Admit`).
+- `formal/twin/tools/`: `directed43.py` and `directed44.py` refuse a share of the groups, and
+  `mutants_c2.py` has seven mutants that skip a new check, ignore its answer or ask it out of order.
+- `formal/refine/`: the statements of the `twinstep`, `asking` and `carry` checks, recorded again
+  for `admitted`'s new argument.
+- `formal/twin/record/`: the twin's record made again from `f72cb4d`, its matrix run in full.
+
+### Fixed
+- `protocol.md` §4.3, §4.4: `on_have` and `on_ihave` ignore a group beyond the peer's limit of
+  unknown groups (`admitted`), as §8.2 has said since v0.4.
+- `protocol-v2.md` §4.3: `on_holding` and `on_offer` ignore such a group too; `on_holding` had no
+  check since v0.6.
+- `protocol-v2.md` §4.3: a holding that repeats a bit frees the window's room of a copy written
+  since, as card 14 says. A probe's answer, exempt from cancel since v0.10, kept its room until the
+  timeout.
+- `protocol-v2.md` §3: a group with no entry in `interest` defaults to the node's own interest in
+  it, from what it declared: every index under `ALL`, its derived interest under `DERIVED`, the
+  cells it drew under `DECLARED`, and for a supernode every row too.
+- `toy/node.py`: the cell verifier checks the cell's header against its group's and its index
+  against that header's count, not only the slot; the payload type's `derived_interest` takes
+  `protocol-v2.md` §1.1's four arguments.
+- `toy/xcheck.py`: under `--doc v2`, `--xcheck` no longer stops at the first chunk written.
+
+## v0.10.11 — 2026-11-21 (`d940022`)
+
+The next version gives a cell group's header three forms, moves its decisions and its figures to
+files of their own, names its bindings by their carriers, defines the gossipsub binding's extra
+fields to the byte and drafts a native QUIC binding; its files are rewritten in plain sentences.
+
+### Rules
+- `protocol-v2-bindings.md` §1.6: a cell group's header comes from the block, in every cell message
+  or in a header message of its own; the object type's definition fixes the form, and no topic
+  mixes two.
+- `protocol-v2-bindings.md` §2.3, §3: on the libp2p stream and Waggle bindings, form (a) leaves
+  `CellChunk.header` empty, and form (c) needs a message kind of its own, which this version does
+  not define.
 - `protocol-v2-bindings.md` §4: on the gossipsub binding, form (a) puts the header in no cell's
   message, form (b) in every copy of each cell's message, and form (c) in a header message of its
   own on each family's topic.
-- `protocol-v2-bindings.md` §4: on the gossipsub binding, a holding and a WANT carry their extra
-  fields in version 4 of the strings, whose 32-byte group is `protocol.md` §2's group key, and an
-  offer keeps version 1; an entry with a reserved bit set, a WANT of the wrong length, or a WANT
+- `protocol-v2-bindings.md` §4: on the gossipsub binding, holdings and WANTs carry their extra
+  fields in version 4 of the strings, whose 32-byte group is `protocol.md` §2's group key, and
+  offers keep version 1; an entry with a reserved bit set, a WANT of the wrong length, or a WANT
   whose `hops` is over its type's `ROUTE_HOPS` is ignored without penalty, and an IDONTWANT entry
   with a reserved bit set is not read as a holding.
 
 ### Added
-- `protocol-v2-decisions.md`: the draft's decision record, with an index of the decisions, the
-  dated record from `protocol-v2.md` §8, and the list of the versions of `protocol.md` carried,
-  from §5.
-- `protocol-v2-decisions.md`: three decisions of 2026-11-21 on the bindings: the bindings by
-  carrier, the gossipsub binding to the byte, and a cell group's header in three forms.
-- `protocol-v2-figures.md`: the figures behind `protocol-v2.md`'s reasons, by the section that
-  cites them, each with its conditions.
-- `protocol-v2.md`: a reading guide in §0, and a glossary of the document's own terms, each with
-  the section that defines it.
+- `protocol-v2-decisions.md`: the next version's decision record, with the decisions of 2026-11-21
+  and the versions of `protocol.md` carried.
+- `protocol-v2-figures.md`: the figures behind the next version's reasons, each with its conditions.
+- `protocol-v2.md`: a reading guide in §0, and a glossary of the document's own terms.
 - `protocol-v2-bindings.md` §4: the gossipsub binding's extra fields to the byte.
-- `protocol-v2-bindings.md` §1.6: "Open: a cell before its block, under form (a)".
-- `protocol-v2-bindings.md` §4: "Open: the strings for cell groups, and the versions written".
-- `protocol-v2-bindings.md` §0, `protocol-v2.md` §7: a native QUIC binding is being drafted.
+- `protocol-v2-bindings.md` §7: the native QUIC binding, a draft section, not normative, with a
+  control stream and a stream per chunk; `protocol-v2.md` §7 lists it, with its column and three
+  new rows in the capability table. `protocol-v2-bindings.md` §7.9 lists the binding's open
+  questions, among them whether it runs beside libp2p or alone, when a chunk stream waiting for a
+  JOIN is discarded, and what a receiver sends for a copy it stopped.
+- `protocol-v2-bindings.md` §1.6, §4: two open items, a cell before its block under form (a), and
+  the strings for cell groups and the versions written.
 
 ### Changed
-- `protocol-v2.md`, `protocol-v2-decisions.md`: the Rationales, §6 and the decision record keep
-  their reasons and alternatives in words and point to `protocol-v2-figures.md` for the figures;
-  `protocol-v2.md` §8 points to `protocol-v2-decisions.md`, and §5 keeps the map of functions.
-- `protocol-v2-bindings.md`: the bindings are named by their carriers, and the sections follow
-  them: SEACAST's message encoding (§1), the libp2p stream binding (§2), the Waggle binding (§3),
-  the gossipsub binding (§4) and the partial-messages binding (§5).
-- `protocol-v2.md`: it cites the bindings by their new sections and names them by their carriers;
-  §7's capability table takes the carriers as columns, and its header rule says what all three of
-  the header's forms satisfy.
-- `protocol-v2-bindings.md` §4: EVIDENCE is reserved on the gossipsub binding, which no longer
-  lists it among what it gives up.
-- `protocol-v2.md`, `protocol-v2-decisions.md`, `protocol-v2-figures.md`: each "v0.3" names what
-  it means: `protocol.md`, the gossipsub binding, or draft v0.3's own rules.
-- `protocol-v2.md`, `protocol-v2-bindings.md`, `protocol-v2-decisions.md`,
-  `protocol-v2-figures.md`: plain sentences; the prose is rewritten and points its terms to where
-  they are defined, and the code is the same.
-- `protocol-v2-figures.md` §6.1: the comparison of `ihave-limits` with `protocol.md`'s is dated,
-  since `protocol.md`'s recording moved on 2026-11-20.
-- `README.md`: the bindings document's entry names the carriers, and the decision record, the
-  figures and the glossary are named.
-- `toy/README.md`, `toy/run.py` (help text only): the bindings by their carriers; `--wire` keeps
-  its values, and the two wires model two of the header's forms.
-- `protocol.md` §5.1: the figures it cites from the draft are in `protocol-v2-figures.md`.
-- `toy/`: comments, docstrings and printed strings cite the bindings by their new sections and name
-  them by their carriers; `toy/standalone_wire_known.py` reads the bindings' types, limits and
-  sizes under their new headings.
-- `toy/node.py`, `toy/wire.py`: comments and docstrings say what the toy charges for version 4's
-  fields, and that its receive path under `protocol-v2.md` also reads the claims from a full bitmap.
-- `formal/twin/record/`: the twin's record made again, from `229631c`, for this release's content
-  line, which the toy's comments and strings and `protocol-v2.md`'s comments moved; the trace
-  bodies are v0.10.9's, and the matrix is v0.10.9's, carried on the grounds its `RECORD.md` gives.
-- `protocol-v2-decisions.md`: the versions carried gain v0.10.11.
+- `protocol-v2.md` and its bindings, decisions and figures: the titles no longer say draft, and the
+  opening notes of `protocol-v2.md` and its bindings no longer open with "DRAFT"; the bindings' note
+  names the two bindings the toy models.
+- `protocol-v2-bindings.md`: the bindings are named by their carriers (libp2p stream, Waggle,
+  gossipsub, partial messages), each in a section of its own; `protocol-v2.md` cites them so.
+- `protocol-v2-bindings.md` §4: EVIDENCE is reserved on the gossipsub binding.
+- `protocol-v2.md` and its bindings, decisions and figures: plain sentences, the code the same. In
+  `protocol-v2.md`, the decisions and the figures, each "v0.3" names what it means.
+- `formal/twin/record/`: the twin's record made again from `229631c`, v0.10.9's matrix carried.
 
 ### Fixed
-- `protocol.md` §8.1: the table names the window's line, which a writer leaves when it takes a
-  slot, finds no chunk to send, or its peer's queue closes.
-- `protocol-v2.md` §3: the lifetimes name the window's line, which a writer leaves when it takes
-  room, has nothing to send, or its connection closes (`leave_line`).
-- `protocol-v2.md` §4.2: an arrival leaves an axis that held the index as rebuilt unreceived, and
-  `on_validated` still forwards on it.
-- `protocol-v2.md` §2: a cell's header travels in one of the three forms, and on the libp2p stream
-  binding the second form carries it once per group and link.
-- `protocol-v2.md` §4.5: an ask by derived interest makes no promise with a timer, since an ask
-  marked `want`, one sent in a WANT and not on an offer, starts none, except a claim's probe
-  (`filter_entry`); the custodian answers from what it holds and keeps the ask for later only as a
-  standing request, and a claimant still decoding keeps the probe of its claim.
-- `protocol-v2.md` §4.7: merging the source's holdings moves copies by 0.01 at most.
-- `protocol-v2.md` §4.9, §5: `projected` is `protocol.md` §7.2's.
-- `protocol-v2.md` §4.11: the line-stall check counts the sends to the other peers from 600 ms
-  after the stall on, and accepts queues left empty.
-- `protocol-v2.md` §4.13: at 50 Mbps and above, the ask window is `protocol.md`'s.
-- `protocol-v2.md` §6.3, `protocol-v2-figures.md` §6.3: at a promise of 0.8 s, completion times move
-  a little: the medians by at most 3 ms, and the tails by at most 20 ms.
-- `protocol-v2-figures.md` §4.3: under custody, the busiest peer is given per cell: 244
-  offer-bearing frames and 58 asks in a heartbeat without samplers, and 248 and 49 with them.
-- `protocol-v2.md` preamble, §6.2: the toy checks the tier 4 setting against its own recorded cells
-  (`check.py --doc v2`), which §6.1 compares with `protocol.md`'s.
-- `protocol-v2-figures.md` §4.6: where the toy's records differ from the old text, the entry gives
-  the records: the probe that passed on the claimant's own copy, the seeds traced, a median's
-  range, a saving per cell, and the tails with the fast class off.
-- `protocol-v2-figures.md` §4.6: with supernodes, the 500-node medians run from 1 170 to 1 179 ms,
-  over both arms.
-- `protocol-v2.md` §4.7, `protocol-v2-figures.md` §4.7: the chunks that come back to the source are
-  counted in the three all-home payload cells (`push`, `--rebuilt none`, `sil30`), as a seed's mean
-  a message: at most 59 at one seed, and at most 17⅓ with §4.11's rule; the 1 Gbps builder's cell
-  (`dcb20`) is given apart.
-- `protocol-v2-figures.md` §4.7, §4.11: the figure on the columns that no node but the source
-  custodies gives both cells that count it, and the window's sampling cell is given as its record
-  has it.
-- `protocol-v2-figures.md`: five places said exactly, among them that the limits changed no event
-  in §4.3's cells and that C3 is C2 with hoarders in place of the liars.
-- `protocol-v2-decisions.md`: six places said exactly, among them how a slow honest peer is parked
-  and that every member passing the member check leaves the row unrepaired.
-- `protocol-v2-decisions.md` `[D6]`: where it bites names `protocol.md` §1's commitment, which
-  §1.1's `verify` checks, as the payload's leaf rule.
+- `protocol.md` §8.1: a writer leaves the window's line when it takes a slot, finds no chunk to
+  send, or its peer's queue closes; `protocol-v2.md` §3: when it takes room, has nothing to send,
+  or its connection closes.
+- `protocol-v2.md` §2, §4.2, §4.5, §4.9, §4.11, §4.13, §6.2: statements corrected, among them
+  §4.2's forwarding at an index held as rebuilt and §4.5's ask marked `want`.
+- `protocol-v2.md` §4.7, §6.3, `protocol-v2-figures.md`, `protocol-v2-decisions.md`: figures and
+  statements corrected, among them §6.3's completion times at a promise of 0.8 s and the busiest
+  peer per cell under custody.
 
 ## v0.10.10 — 2026-11-21 (`a6ca1fc`)
 

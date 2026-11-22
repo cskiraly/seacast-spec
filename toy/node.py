@@ -313,7 +313,8 @@ class Node:
                     if len(tried) >= c["ALARM_MAX"]:
                         continue                        # every member it may ask was asked
                     ms = [q for q in node.peers if q not in tried   # a member: its node id's subnet, and a row JOIN
-                          and sim.nodes[q].row_subnet == sim.gsub[rg]]   #   (none for the proposer, a sampler)
+                          and sim.nodes[q].row_subnet == sim.gsub[rg]   #   (none for the proposer, a sampler) on
+                          and ns["joined"](q, ROW)]     #   a link that joined rows, as another ignores the WANT (§2)
                     if not ms:
                         node.alarm["no member left"] += 1
                         continue
@@ -403,7 +404,8 @@ class Node:
             for a in asks:
                 gi = ns["group_index"](a)
                 if (gi is None or not gi.standing or gi.group not in sim.gsub or sim.gsub[gi.group] != node.row_subnet
-                        or ns["expired"](gi.group) or ns["join_recv"][p][ROW].interest == "DECLARED"
+                        or not ns["joined"](p, ROW)     # §2: a WANT on a link that has not joined rows: the document's
+                        or ns["expired"](gi.group) or ns["join_recv"][p][ROW].interest == "DECLARED"   # handler ignores it
                         or ns["peer_has"][p][gi.group].has(gi.index)):
                     continue
                 if ns["resolve"](a) is not None:
@@ -618,6 +620,7 @@ class Node:
             "D_LAZY": c["D_LAZY"], "GOSSIP_FACTOR": c["GOSSIP_FACTOR"],
             "GOSSIP_RETRANSMISSION": c["GOSSIP_RETRANSMISSION"],
             "MAX_PENDING_GROUPS": c.get("MAX_PENDING_GROUPS", math.inf),     # the client's (§8.2): no limit
+            "SERVE_BUDGET": c.get("SERVE_BUDGET", math.inf),     # protocol-v2.md §6.3: the client's; no limit
             "MAX_IHAVE_MESSAGES": c.get("MAX_IHAVE_MESSAGES", math.inf),     # the client's (§8.2): no limit
             "MAX_IHAVE_LENGTH": c.get("MAX_IHAVE_LENGTH", math.inf),         #   unless --ihave-limits
             "HAVE_TTL": c["HAVE_TTL"], "PUSH_TTL": c["PUSH_TTL"],
@@ -1227,13 +1230,15 @@ class Node:
         P.project = lambda f: [(f.group, f.index)]
         P.cross = lambda g, i: []
         P.family = lambda g: 0
-        P.derived_interest = lambda h, nid, j: Bits(-1)
+        P.derived_interest = lambda g, h, nid, j: Bits(-1)   # protocol-v2.md §1.1: (g, header, node id, JOIN)
         prm = Obj()                                     # §6.1: the tier 4 setting
         prm.M, prm.F_LO, prm.F_HI, prm.D_OUT, prm.D_OUT_FAST, prm.D_OUT_MAX = 1, 6, 12, 8, 8, 12
         prm.SYMMETRIC = bool(c.get("upkeep")) and c.get("symmetric", "on") == "on"   # §6.1: v0.3's mesh, kept as
         #   §4.1 keeps it under --upkeep on (--symmetric off: one-way); the recorded cells keep the mesh as built,
         #   where nodes at F_HI would otherwise be pruned at the first heartbeat
         prm.PRUNE_BACKOFF = c.get("prune_backoff", 0.0)      # §4.1 (--prune-backoff; 0: none)
+        prm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
+        prm.MAX_INDICES = 8192                          # §6.3: protocol.md's MAX_PLAIN_CHUNKS
         prm.ANNOUNCE_EXTRA, prm.START_DELAY, prm.SERVE_LIMIT, prm.EVIDENCE = "SAMPLE", 0.0, math.inf, None
         prm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
         prm.EAGER, prm.DEFER_WINDOW = True, c.get("DEFER_WINDOW", 0.5)
@@ -1258,8 +1263,13 @@ class Node:
             COL.name = COL.id = "column"
             COL.index_count = lambda h: h.count          # the blob count
             COL.threshold = lambda h: h.count            # K = N: no code within a column
-            COL.verify = lambda f, h: (REJECT if f.slot != sim.blocks[h.block].slot   # the copy's slot is its header's (§1)
-                                       else ACCEPT)      # the cell's KZG proof, assumed to check (honest chunks only, as v0.3's Merkle proof here)
+            def cell_ok(f, h):                           # level 1 here: the copy's header is its group's, whole, its index
+                gh = sim.ghdr.get(f.group)               #   within that header's count, and its slot the header's (§1); the
+                return (gh is not None and getattr(h, "__dict__", None) == vars(gh)   # cell's KZG proof, assumed to
+                        and f.index < gh.count and f.slot == sim.blocks[gh.block].slot)   # check (honest chunks only,
+                                                         #   as v0.3's Merkle proof here)
+
+            COL.verify = lambda f, h: ACCEPT if cell_ok(f, h) else REJECT
             COL.decode = lambda fr, h: dict(fr)          # the cells present, if all are; nothing rebuilt within a column
             COL.header_of = lambda f: f.descriptor       # the header rides with the chunk (P2)
             if keeps_rows:                               # (R4) a cell is index b of column c and index c of row b
@@ -1274,9 +1284,11 @@ class Node:
             cprm = Obj()
             cprm.M, cprm.F_LO, cprm.F_HI, cprm.D_OUT, cprm.D_OUT_FAST, cprm.D_OUT_MAX = 1, c["F_LO"], 12, 8, 8, 12
             cprm.SYMMETRIC, cprm.PRUNE_BACKOFF = False, c.get("prune_backoff", 0.0)   # one-way, as measured
+            cprm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
+            cprm.MAX_INDICES = c["blobs"]                # §6.3: a column has a cell per blob
             cprm.ANNOUNCE_EXTRA, cprm.START_DELAY, cprm.SERVE_LIMIT, cprm.EVIDENCE = c.get("COL_ANNOUNCE", "ALL_JOINED"), 0.0, math.inf, None   # [D5]
             cprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
-            cprm.SAMPLE_RETRY2, cprm.SAMPLE_OUTSTANDING = c.get("SAMPLE_RETRY2", 0.5), c.get("SAMPLE_OUTSTANDING", 4)   # [D12]
+            cprm.SAMPLE_RETRY2 = c.get("SAMPLE_RETRY2", 0.5)   # [D12]
             cprm.SAMPLE_COVER, cprm.FORWARD_LIMIT = c.get("SAMPLE_COVER", 0), c.get("FORWARD_LIMIT", math.inf)   # [D12]
             cprm.COVER_HIGH = c.get("COVER_HIGH", 1)     # [D12] families a peer of high custody counts for in the floor
             cprm.ROUTE_HOPS = c.get("ROUTE_HOPS", 1)     # [D12] forwarding steps of a routed sample request
@@ -1306,7 +1318,7 @@ class Node:
                 ROW.name = ROW.id = "row"
                 ROW.index_count = lambda h: h.count      # 128 cells
                 ROW.threshold = lambda h: ns["K"](h)     # 64: any half of a row rebuilds it
-                ROW.verify = COL.verify                  # the same slot check, the KZG proof assumed to check
+                ROW.verify = COL.verify                  # the same level 1 (cell_ok), the KZG proof assumed to check
                 ROW.decode = lambda fr, h: sim.rebuild_row(fr, h)   # recover_cells_and_kzg_proofs, as the source's chunks
                 ROW.header_of = lambda f: f.descriptor
                 ROW.project = COL.project                # the same chunk, the same two groups
@@ -1317,6 +1329,8 @@ class Node:
                 rprm = Obj()
                 rprm.M, rprm.F_LO, rprm.F_HI, rprm.D_OUT, rprm.D_OUT_FAST, rprm.D_OUT_MAX = 1, c["F_LO"], 12, 8, 8, 12
                 rprm.SYMMETRIC, rprm.PRUNE_BACKOFF = False, c.get("prune_backoff", 0.0)
+                rprm.MAX_RELATIONS = c.get("MAX_RELATIONS", math.inf)   # §6.3: the client's; no limit here
+                rprm.MAX_INDICES = scenario.NUMBER_OF_COLUMNS   # §6.3: a row has a cell per column
                 rprm.ANNOUNCE_EXTRA, rprm.START_DELAY, rprm.EVIDENCE = c.get("ROW_ANNOUNCE", "ALL_JOINED"), c["ROW_DELAY"], None   # [D5]
                 rprm.SERVE_LIMIT = 64                    # (R6) half a row per peer, EIP-8371
                 rprm.SAMPLE_RETRY = c.get("SAMPLE_RETRY", 2.0)
@@ -1351,16 +1365,19 @@ class Node:
 
         ns.update(PAYLOAD=P, hdr=ns["desc"], T_of={}, rebuilt=lazy(LazyBits), interest=InterestMap(),   # §8.1: a read
                   known_at=DefaultMap(0.0), served=lazy2(zero), want_p=lazy(lazy_dict),               #   creates nothing
+                  served_hb=lazy(zero), offered_to=lazy2(LazyBits),
                   join_recv=lazy(lazy_dict), join_sent=lazy(lazy_dict),
                   push_out=lazy3(LazySet), push_in=lazy3(LazySet), grafted_out=lazy3(LazySet), grafted_in=lazy3(LazySet),
                   owed_relations=lazy(LazyList), backoff=lazy3(lazy_dict), standing=lazy2(LazySet),
+                  routed_standing=lazy2(LazySet),
                   claims=lazy(LazySet), reconsider_at={}, deferred=DefaultMap(False), duty_at={}, waited=DefaultMap(False),
                   probe={}, probed={},
                   probe_asks=set(), probe_sent=set(), probe_ok={}, probe_served=lazy2(false),
                   probe_answers=lazy2(LazyBits), probe_waiting=lazy(lazy_dict), rsample=lazy(LazyList), rsample_step=DefaultMap(0),
                   rsample_asked=lazy2(LazySet), rsample_final=DefaultMap(False),
                   sampled_from=lazy(LazySet), samples_in_flight=DefaultMap(0),
-                  held_samples=lazy(LazyList), forwarded=DefaultMap(0))   # [D12] §4.10's and §4.5's
+                  held_samples=lazy(LazyList), forwarded=lazy2(zero),   # [D12] §4.10's and §4.5's
+                  SAMPLE_OUTSTANDING=c.get("SAMPLE_OUTSTANDING", 4))    # [D12] the node's cap per block, across types
         Ask = Wm.WantIndex
         chunk_id = ns["message_id"]
         spec_open_group = ns["open_group"]
@@ -1376,11 +1393,13 @@ class Node:
         def type_of(tid):
             return types[tid]
 
-        def links(T):
-            if not c.get("upkeep"):
-                return node.peers                       # every peer joins every type of the setting
-            return [q for q in node.peers if T in ns["join_recv"][q] and T in ns["join_sent"][q]   # §4.1, under
-                    and not any(isinstance(m, Join) for m in ns["owed_relations"][q])]           #   --upkeep on
+        def runs_type(tid):                             # protocol-v2.md §3's helper: a type id the node runs
+            return tid in types
+
+        def links(T):                                   # §4.1: p's JOIN for T received, ours queued, not owed; without
+            return [q for q in node.peers if T in ns["join_recv"][q] and T in ns["join_sent"][q]   #   --upkeep every
+                    and not any(isinstance(m, Join) and m.object_type == T.id   #   peer joins every type of the
+                                for m in ns["owed_relations"][q])]               #   setting, so this is every peer
 
         def joined_types():
             return list(types.values())
@@ -1396,6 +1415,55 @@ class Node:
 
         def node_id(p):
             return node.sim.peer_id(p)
+
+        def own_id():                                   # protocol-v2.md §3's helper: the node's own id
+            return node.sim.peer_id(node.id)
+
+        def cell_groups(root):                          # protocol-v2.md §3's helper: a block's column and row groups
+            return [g for g, h in node.sim.ghdr.items() if h.block == root]   # (the toy calls on_header_validated
+                                                        #   only in its known answers: a cell's header rides with it)
+
+        node.want_unknown = {}                          # per peer: the unknown groups its WANTs named, and when
+
+        def release_places(p):                          # one asker's places: one that resolved, or whose lifetime
+            seen = node.want_unknown.get(p, {})         #   would have passed, frees its place; at the lifetime, the
+            for h, t in list(seen.items()):             #   asker's standing requests, route marks and interest bits
+                if h in ns["hdr"]:                      #   for it go too, and the entries they empty (§4.5)
+                    del seen[h]
+                elif ns["now"] - t > ns.get("GROUP_TTL", math.inf):
+                    del seen[h]
+                    for tab in ("standing", "routed_standing"):
+                        rows = ns[tab].get(h)
+                        for i in list(rows or ()):
+                            rows[i].discard(p)
+                            if not rows[i]:
+                                del rows[i]
+                        if rows is not None and not rows:
+                            del ns[tab][h]
+                    if h in ns["want_p"].get(p, {}):
+                        del ns["want_p"][p][h]
+
+        def release_wanted_groups():                    # protocol-v2.md §3's helper, at each heartbeat
+            for p in list(node.want_unknown):
+                release_places(p)
+
+        def admitted_group(p, g):                       # protocol-v2.md §3's helper: a WANT's group within p's own
+            if g in ns["hdr"] or g in ns["T_of"]:       #   limit of unknown groups named in WANTs; the toy sets no
+                return True                             #   limit unless MAX_PENDING_GROUPS is given
+            release_places(p)
+            seen = node.want_unknown.setdefault(p, {})
+            if g in seen:
+                return True
+            if len(seen) >= ns["MAX_PENDING_GROUPS"]:
+                return False
+            seen[g] = ns["now"]
+            return True
+
+        def offers_in(e):                               # protocol-v2.md §3's helper: the offers an entry carries
+            if e is None or not e.control:
+                return []
+            return [(hb.group, hb.bits) for m in e.control.items if m.kind == "ihave"
+                    for hb in m.ids if isinstance(hb, Wm.HaveBitmap)]
 
         def in_pushers(T, fam, col):
             return [q for q in node.peers if col in ns["push_in"][q][T][fam]]
@@ -1773,6 +1841,7 @@ class Node:
             def serve_standing(g, i):
                 if ns["rebuilt"][g].has(i):
                     ns["standing"][g].pop(i, None)
+                    ns["routed_standing"][g].pop(i, None)
                     return
                 spec_serve_standing(g, i)
             ns["serve_standing"] = serve_standing
@@ -1895,7 +1964,7 @@ class Node:
         for name in ("join_recv", "join_sent", "push_out", "push_in", "grafted_out", "grafted_in",
                      "owed_relations", "backoff", "peer_has", "pushed", "sent_to", "served", "want_p", "forwarded",
                      "queue", "owed", "owed_answers", "unwanted", "serve_count", "ihave_frames", "ihave_asked",
-                     "probe_served", "probe_answers", "offered"):
+                     "probe_served", "probe_answers", "offered", "served_hb", "offered_to"):
             m = ns.get(name)
             if m is not None and q in m:
                 del m[q]
@@ -1921,13 +1990,23 @@ class Node:
         ns["claims_close"](q)
         if getattr(self, "alarm_close", None):      # --alarm-wait: the alarm's asks to q not yet written are settled
             self.alarm_close(q)
-        for name in ("holders", "standing"):
-            for idx in ns[name].values():
-                for s in idx.values():
-                    s.discard(q)
+        for idx in ns["holders"].values():
+            for s in idx.values():
+                s.discard(q)
+        for name in ("standing", "routed_standing"):   # protocol-v2.md §4.5: and the entries that empties
+            tab = ns[name]
+            for g in list(tab):
+                idx = tab[g]
+                for i in list(idx):
+                    idx[i].discard(q)
+                    if not idx[i]:
+                        del idx[i]
+                if not idx:
+                    del tab[g]
         if isinstance(ns.get("mesh"), set):
             ns["mesh"].discard(q)
         ns["leave_line"](q)                         # its place in the window's line, per connection (§8.1)
+        getattr(self, "want_unknown", {}).pop(q, None)   # protocol-v2.md §4.5: its WANTs' unknown groups
         sent = ns["sent"]                           # the room its chunks hold in flight: released when its queue
         for key in [k for k in sent if k[0] == q]:  #   closes (§8.1), as WINDOW_TIMEOUT releases it; but a close
             e = sent.pop(key)                       #   is not the chunk's acknowledgement, which a holding or a

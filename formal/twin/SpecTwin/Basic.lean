@@ -174,6 +174,20 @@ structure ChunkF where
 /-- The chunk as a tape's call or a lane has it: without what level 1 reads. -/
 def ChunkF.narrow (f : ChunkF) : ChunkF := { f with wide := none }
 
+/-- What `admitted(p, x)` is asked of (§8): the group a chunk, a HAVE or an offered id names. The deferral path
+asks it of a chunk, `on_have` of a HAVE whose group has not expired and that `valid_have` holds (its group and
+bits), and `on_ihave` of each id an IHAVE's entry expands to that is neither held nor of an expired group. -/
+inductive Admit where
+  | chunk (f : ChunkF)
+  | bitmap (g : Group) (bits : Bits)
+  | offer (a : Key)
+  deriving BEq, Repr
+
+/-- The argument as a tape's call has it: a chunk narrow. -/
+def Admit.narrow : Admit → Admit
+  | .chunk f => .chunk f.narrow
+  | x => x
+
 /-- A block, as level 1 reads it (§3): its slot, and what its bid commits: the group's id (design A)
 and the descriptor (design B). `installed_block` answers with it, or with nothing. -/
 structure Block where
@@ -463,8 +477,9 @@ class Node61 (m : Type → Type) where
   /-- `installed_block(slot, root)`: the block with the root, validated and applied locally, or nothing (§8). Of
   the block the twin reads what level 1 does (`Block`). -/
   installedBlock : Nat → Root → m (Option Block)
-  /-- `admitted(p, f)`: the chunk's group within the peer's limits on unknown groups (§8.2) -/
-  admitted : Peer → ChunkF → m Bool
+  /-- `admitted(p, x)`: the group a chunk, a HAVE or an offered id names, within the peer's limit of unknown groups
+  (§8.2) -/
+  admitted : Peer → Admit → m Bool
   /-- `reserve(p, f)`: a per-peer reservation in the bounded store of deferred copies (§8.2): whether there was
   room -/
   reserve : Peer → ChunkF → m Bool
@@ -621,7 +636,7 @@ abbrev lift {m n : Type → Type} [Node61 m] (f : ∀ {α : Type}, m α → n α
   chunkIndices g := f (chunkIndices g)
   start fn g := f (start fn g)
   installedBlock sl r := f (installedBlock sl r)
-  admitted p c := f (admitted p c)
+  admitted p x := f (admitted p x)
   reserve p c := f (reserve p c)
   release p c := f (release p c)
   bidGroup r := f (bidGroup r)
