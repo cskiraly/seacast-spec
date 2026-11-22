@@ -15,8 +15,8 @@ messages. The detailed notes of every release up to v0.10.8 are in
 
 ## After v0.10.12 — not yet released
 
-The two protocols get their names: `protocol-v2.md` is SEACAST, and `protocol.md` is SEACAST on
-gossipsub. Names and text only; no rule changes since v0.10.12.
+The two protocols get their names, `protocol-v2.md` SEACAST and `protocol.md` SEACAST on gossipsub,
+and the README is rewritten. Text only; no rule changes since v0.10.12.
 
 ### Changed
 - `protocol-v2.md`, `protocol.md`: their titles and openings name SEACAST and SEACAST on gossipsub;
@@ -29,6 +29,9 @@ gossipsub. Names and text only; no rule changes since v0.10.12.
   its bindings", "its decisions" and "its figures"; in them, `toy/README.md` and `formal/README.md`,
   "the next version" and "v2" as names become "SEACAST"; `formal/veil/README.md`'s title names
   SEACAST on gossipsub.
+- `README.md`: rewritten: what SEACAST is, why, what to read, where it stands, running it and
+  background, with the two protocols' names and files; release numbers are the repository's, not
+  either protocol's; the announcement post cited by its current title.
 
 ## v0.10.12 — 2026-11-22
 
