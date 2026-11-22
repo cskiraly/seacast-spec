@@ -214,9 +214,9 @@ if [ -n "$FEWCELLS" ]; then
   CELLS=$CELLS_GIVEN
 fi
 SEEDCELLS=$(for c in withholders loss-thin; do case " $CELLS " in *" $c "*) echo "$c" ;; esac; done)   # traced twice
-SMALL="traces/late16 v2/hand5 v2/hand5-own"         # the check's small traces that are not the record's
+SMALL="traces/late16 v2/hand5 v2/hand5-own v2/hand5-publish"         # the check's small traces that are not the record's
 if [ -z "$RECORD" ]; then
-  TRACES="traces/none traces/hand5 traces/hand5-sec61 traces/late16 traces/hand5-publish v2/hand5 v2/hand5-own $(for d in $DIRS; do echo "directed/$d"; done)"
+  TRACES="traces/none traces/hand5 traces/hand5-sec61 traces/late16 traces/hand5-publish v2/hand5 v2/hand5-own v2/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
 elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under protocol-v2.md
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
   TRACES="$RTRACES $SMALL"
@@ -682,10 +682,11 @@ s_small() {
     par small late16 traces "" $LATE16
     par small hand5-publish traces "" $HAND5 --source-offers publish
     par small hand5 v2 "" $HAND5 --doc v2
-    par small hand5-own v2 "" $HAND5 --rebuilt none --fault sil30 --doc v2; }
+    par small hand5-own v2 "" $HAND5 --rebuilt none --fault sil30 --doc v2
+    par small hand5-publish v2 "" $HAND5 --doc v2 --source-offers publish; }   # H7b: the source's offers at publish
   par_end || no "a small cell was not traced, or its digest is not the untraced run's"
   cat "$OUT"/traces/*.digest "$OUT"/v2/*.digest 2> /dev/null | tee "$OUT/digests.txt" | sed 's/^/  /'
-  [ "$(grep -c ': the same$' "$OUT/digests.txt")" = 6 ] || no "not six digests the same"
+  [ "$(grep -c ': the same$' "$OUT/digests.txt")" = 7 ] || no "not seven digests the same"
 }
 one_directed() {
   local d=$1 tool
@@ -891,6 +892,9 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     das-keeper-ignore) echo "$DAS30 --keeper-claims ignore" ;; # note_claim, at the supernodes
     das-hoardcol-bias) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16 --repair-bias 0.5" ;;
     #                     control (m): the bias layer restores a shuffled taken before the install, and the tracer stops
+    # piece D's stops: v2/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
+    hand5-v2) echo "$HAND5 --doc v2" ;;
+    hand5-off) echo "$HAND5 --doc v2 --source-offers off" ;;
   esac
 }
 chain_expect() {        # $1: a cell of the chain cases: its cases (chaincases.py's), one a line
@@ -1136,11 +1140,12 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
     echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5, and $said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
   else echo "  the swapped draws: ${hand:-0} keep_floor draws on v2/hand5 and ${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
 }
-stop_cell() {           # $1: a cell of chain_args: traced alone under rows/, its status kept (a cell the tracer must stop)
-  rm -f "$OUT/rows/$1".*
+stop_cell() {           # $1: a directory under $OUT; $2: a cell of chain_args: traced alone there, its status kept (a
+  local d=$1 c=$2       #   cell the tracer must stop)
+  rm -f "$OUT/$d/$c".*
   # shellcheck disable=SC2046
-  (cd "$TOY" && $PY "$T/trace3.py" . "$OUT/rows/$1.jsonl.gz" $(chain_args "$1") --digest > "$OUT/rows/$1.out" 2> "$OUT/rows/$1.err")
-  echo $? > "$OUT/rows/$1.rc"
+  (cd "$TOY" && $PY "$T/trace3.py" . "$OUT/$d/$c.jsonl.gz" $(chain_args "$c") --digest > "$OUT/$d/$c.out" 2> "$OUT/$d/$c.err")
+  echo $? > "$OUT/$d/$c.rc"
   return 0
 }
 rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's rows on its tapes, to rows/NAME.rows
@@ -1157,7 +1162,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
     { for c in das-claim das-keeper-ignore; do par small "$c" rows "" $(chain_args "$c"); done
       par chain_plant j known-replaced-v2 das-samplers-mcoff
       par chain_plant l verdict-replaced-v2 das-hoardcol-w16
-      par stop_cell das-hoardcol-bias; }
+      par stop_cell rows das-hoardcol-bias; }
     par_end || true     # each run's status and digest are read below
   fi
   fixture() {           # $1: a name: its fixture, a trace without .jsonl.gz
@@ -1242,6 +1247,80 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   if [ -n "$NODAS" ]; then
     echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said (--no-das: the six DAS names and the bias cell skipped)"
   else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:455, :491)"; fi
+}
+stops() {               # piece D: point 5's stop, plant (p), and its control; point 6's stop (D3), with its entry check
+  #                       removed (q), and with both checks removed (D5's control); every cell local
+  local n5= f5= nc= fc= rec= nq= plain got why s5 s6 s7 ok5=0 okc=0 ok3=0 okq=0 okr=0
+  local line5='s/^tracerfaults3: noask-in-record-v2, planted 1 time; node: ([0-9]+); record: ([a-z_0-9]+)$/\1 \2/p'
+  local w6="^trace3: node 1: announce is bound to Node\\._no_source_offers\\.<locals>\\.publish\\.<locals>\\.<lambda> \\(node\\.py:[0-9]+\\) at the"
+  local w6b=" of group_id's record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run\$"
+  mkdir -p "$OUT/chains"; : > "$OUT/c-stops.txt"
+  par chain_plant p noask-in-record-v2 hand5-peer
+  par chain_plant pc noask-in-record-v2 hand5-v2
+  par chain_plant q entry-check-off-v2 hand5-off
+  par chain_plant d5 bindings-checks-off-v2 hand5-off
+  par stop_cell chains hand5-off
+  par_end || true       # each run's status is read below
+  # (p) on hand5-peer, where filter_entry is replaced: the record's call of it must stop the tracer, with point 5's
+  # words, at the node and record its plant line names
+  read -r n5 f5 < <(sed -n -E "$line5" "$OUT/chains/plant-p.err" 2> /dev/null)
+  if [ -z "$n5" ] || [ "$(cat "$OUT/chains/plant-p.rc" 2> /dev/null)" = 0 ]; then
+    echo "(p) point 5, on hand5-peer: not planted once, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-stops.txt"
+  elif ! has -F -x "trace3: node $n5: filter_entry is replaced here, and $f5's record calls it: the twin has no question for filter_entry, and would run its own code there" "$OUT/chains/plant-p.err"; then
+    echo "(p) point 5, on hand5-peer: the tracer stopped without point 5's words at node $n5's $f5 record  <-- NOT" >> "$OUT/c-stops.txt"
+  else echo "(p) point 5, on hand5-peer: stopped, as it must, at node $n5's $f5 record" >> "$OUT/c-stops.txt"; ok5=1; fi
+  # (p)'s control on v2/hand5, where filter_entry is the document's: the call is the record's own, its writes ones the
+  # twin's function does not make, so the replay must refuse that record and no other
+  read -r nc fc < <(sed -n -E "$line5" "$OUT/chains/plant-pc.err" 2> /dev/null)
+  rec=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-pc.replay" 2> /dev/null)
+  if [ -z "$nc" ] || [ "$(cat "$OUT/chains/plant-pc.rc" 2> /dev/null)" != 0 ]; then
+    echo "(p)'s control, on hand5-v2: not planted once, or the run did not end with 0  <-- NOT" >> "$OUT/c-stops.txt"
+  elif [ -z "$rec" ] || ! has -x "replay: $rec records, $((rec - 1)) ok, 1 mismatched" "$OUT/chains/plant-pc.replay" \
+      || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/plant-pc.replay"; then
+    echo "(p)'s control, on hand5-v2: not refused at one record alone: $(grep -m 1 '^replay: ' "$OUT/chains/plant-pc.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-stops.txt"
+  elif [ "$(grep -c '^mismatch ' "$OUT/chains/plant-pc.replay")" != 1 ] || ! has -E "^mismatch $fc: .*: 1\$" "$OUT/chains/plant-pc.replay" \
+      || ! has -E "^example: node $nc at [^ ]+ $fc\\[" "$OUT/chains/plant-pc.replay"; then
+    echo "(p)'s control, on hand5-v2: refused otherwise than at node $nc's $fc record: $(grep -m 1 '^mismatch ' "$OUT/chains/plant-pc.replay" | cut -c1-160)  <-- NOT" >> "$OUT/c-stops.txt"
+  else
+    echo "(p)'s control, on hand5-v2: refused at node $nc's $fc record alone, as it must: $(grep -m 1 '^replay: ' "$OUT/chains/plant-pc.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-pc.replay" | cut -c1-160)" >> "$OUT/c-stops.txt"
+    okc=1
+  fi
+  # D3: hand5-off, the source's announce bound to the layer's lambda through publish: the first record inside publish
+  # must stop the tracer at its entry
+  if [ "$(cat "$OUT/chains/hand5-off.rc" 2> /dev/null)" = 0 ] || [ ! -f "$OUT/chains/hand5-off.rc" ]; then
+    echo "D3 point 6, on hand5-off: not run, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-stops.txt"
+  elif has -E "$w6 entry$w6b" "$OUT/chains/hand5-off.err"; then
+    echo "D3 point 6, on hand5-off: stopped, as it must: $(grep -m 1 -E "$w6 entry$w6b" "$OUT/chains/hand5-off.err" | cut -c1-200)" >> "$OUT/c-stops.txt"; ok3=1
+  else echo "D3 point 6, on hand5-off: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-stops.txt"; fi
+  # (q): the entry check skipped, the same record's exit check must stop it, with the same words but "exit"
+  nq=$(sed -n -E 's/^tracerfaults3: entry-check-off-v2, planted ([1-9][0-9]*) times?$/\1/p' "$OUT/chains/plant-q.err" 2> /dev/null)
+  if [ -z "$nq" ] || [ "$(cat "$OUT/chains/plant-q.rc" 2> /dev/null)" = 0 ]; then
+    echo "(q) the entry check off, on hand5-off: not planted, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-stops.txt"
+  elif has -E "$w6 exit$w6b" "$OUT/chains/plant-q.err" && ! has -E "$w6 entry$w6b" "$OUT/chains/plant-q.err"; then
+    echo "(q) the entry check off, on hand5-off: stopped at the exit, as it must ($nq entry checks skipped)" >> "$OUT/c-stops.txt"; okq=1
+  else echo "(q) the entry check off, on hand5-off: the tracer stopped without the exit's words  <-- NOT" >> "$OUT/c-stops.txt"; fi
+  # D5's control: both checks skipped, the trace runs to its end with the untraced run's digest, and replays clean
+  # shellcheck disable=SC2046
+  (cd "$TOY" && $PYPLAIN run.py $(chain_args hand5-off) --digest > "$OUT/chains/hand5-off.plain" 2>&1)
+  plain=$(digest_of "$OUT/chains/hand5-off.plain"); got=$(digest_of "$OUT/chains/plant-d5.out" 2> /dev/null)
+  if [ "$(cat "$OUT/chains/plant-d5.rc" 2> /dev/null)" != 0 ] || ! has -E '^tracerfaults3: bindings-checks-off-v2, planted [1-9][0-9]* times?$' "$OUT/chains/plant-d5.err"; then
+    echo "D5's control, on hand5-off: not planted, or the run did not end with 0  <-- NOT" >> "$OUT/c-stops.txt"
+  elif [ -z "$plain" ] || [ "$got" != "$plain" ]; then
+    echo "D5's control, on hand5-off: its digest ${got:-none} is not the untraced run's (${plain:-none})  <-- NOT" >> "$OUT/c-stops.txt"
+  elif ! why=$(replay_clean chains/plant-d5); then
+    echo "D5's control, on hand5-off: its replay: $why  <-- NOT" >> "$OUT/c-stops.txt"
+  else
+    echo "D5's control, on hand5-off: written to its end, digest $got both ways, $(grep -m 1 '^replay: ' "$OUT/chains/plant-d5.replay"); bare calls counted: $(bare_count chains/plant-d5)" >> "$OUT/c-stops.txt"; okr=1
+  fi
+  if grep -q '<-- NOT' "$OUT/c-stops.txt"; then no "the stops (c-stops.txt)"; fi
+  s5="point 5's at node $n5's $f5 record, with its words"; [ "$ok5" = 1 ] || s5="point 5's not as it must be"
+  if [ "$okc" = 1 ]; then s5="$s5, and its control refused at its planted record alone (node $nc's $fc, of $rec records)"
+  else s5="$s5, and its control not as it must be"; fi
+  s6="point 6's at node 1's group_id record, at its entry, and at its exit with the entry check removed"
+  [ "$ok3" = 1 ] && [ "$okq" = 1 ] || s6="point 6's not as it must be"
+  s7="with both checks removed, the trace written to its end with the untraced digest and replayed clean (the stated limit: the toy's source publishes columns alone, so no cell calls the lambda)"
+  [ "$okr" = 1 ] || s7="with both checks removed, not as it must be"
+  echo "  the stops: $s5; $s6; $s7"
 }
 s_tracercontrols() {
   local f want bad
@@ -1519,6 +1598,11 @@ EOF_ERC
   # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, which the record's
   # exit check must stop (c-rows.txt)
   replaced_rows
+  # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask (plant (p) on
+  # hand5-peer), and its control on v2/hand5; point 6's, a binding live across a record, on v2/hand5 under
+  # --source-offers off: at the entry (D3), at the exit with the entry check removed (q), and with both removed, the
+  # trace written to its end, a stated limit (c-stops.txt)
+  stops
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
   local d=$1 tool

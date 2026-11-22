@@ -754,6 +754,63 @@ CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-ow
                 "--known-replaced-v2", "--verdict-replaced-v2")
 
 
+def noask_in_record_v2():
+    """Under v2, piece D's plant (p), point 5: at the first table read inside a record, outside any question or
+    suppression, at a node whose queue holds an entry with a chunk, that node's own `filter_entry` is called once, with
+    the entry's peer and the entry, both read through the tracer's view (so the reads are the record's). Where the node
+    replaces `filter_entry` (hand5-peer, `--promise-mode peer`), the twin has no question for it: the tracer must stop
+    before the call runs, with point 5's words. Where it is the document's (v2/hand5, the control), the call is the
+    record's own, and its writes (`sent_to`, or the entry's chunk cleared) are ones the twin's function does not make:
+    the replay must refuse that record alone. Counted once, for the call; its node and record on the line."""
+    tracer_instance()
+    nss = {}
+    _install = T.Tracer3.install
+
+    @functools.wraps(_install)
+    def install(self, nd, ns):
+        r = _install(self, nd, ns)
+        nss[int(nd.id)] = ns
+        return r
+
+    T.Tracer3.install = install
+    _read = F.Recorder.read
+
+    @functools.wraps(_read)
+    def read(self, t, p):
+        st = TR[0].vst if TR else None
+        if not PLANTED[0] and st and st["depth"] and not st["ext"] and not st["supp"] and st["node"] in nss:
+            ns = nss[st["node"]]
+            raw = F.unwrap(ns["queue"])
+            hit = next(((q, lane, j) for q in sorted(raw) for lane in ("urgent", "normal")
+                        for j, e in enumerate(getattr(raw[q], lane)) if e.chunk is not None), None)
+            if hit is not None:
+                q, lane, j = hit
+                PLANTED[0] += 1
+                SEEN["node"], SEEN["record"] = st["node"], st["cur"]["fn"]
+                ns["filter_entry"](q, getattr(ns["queue"][q], lane)[j])
+        return _read(self, t, p)
+
+    F.Recorder.read = read
+
+
+def bindings_checks_off_v2(both):
+    """Under v2, piece D's plant (q) (`both` false) and point 6's control (`both` true): trace3's record binding check
+    (`bindings_check`) skipped at each record's entry, or at its entry and its exit. Under `--source-offers off`, the
+    layer's lambda over `announce`, live through publish, is then met at the exit of the record it is bound across (q),
+    or not at all (the control: no cell calls it). Counted once for each check skipped."""
+    _check = T.bindings_check
+
+    def bindings_check(nid, ns, slots, found, fname, at):
+        if at == "entry" or both:
+            PLANTED[0] += 1
+            return None
+        return _check(nid, ns, slots, found, fname, at)
+    T.bindings_check = bindings_check
+
+
+CELL_PLANTS_V2 = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-checks-off-v2")   # on a cell's arguments
+
+
 def hdr_read_v2(raw):
     """Under v2: at the first table read inside a record at node a (no question running), a read through `hdr` (`hdr[g]`,
     g a group node a holds a descriptor of and the record has not touched). With `hdr` re-pointed at the installed
@@ -1102,7 +1159,8 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
           "--hdr-read-v2-raw", "--chains-omit-v2") + CHAIN_PLANTS + (
-          "--draws-rewrap-off-v2", "--draws-unrestored-v2")   # K13's two: the first must not stop it, the second must
+          "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_V2   # K13's two: the first must not stop
+#                                                                              it, the second must; piece D's three
 HAND5 =["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7"]
 HAND5_OWN = HAND5 + ["--rebuilt", "none", "--fault", "sil30"]   # check.sh's v2/hand5-own
 
@@ -1170,13 +1228,17 @@ def main(argv):
             known_replaced_v2()
         elif fault == "--verdict-replaced-v2":
             verdict_replaced_v2()
+        elif fault == "--noask-in-record-v2":
+            noask_in_record_v2()
+        elif fault in ("--entry-check-off-v2", "--bindings-checks-off-v2"):
+            bindings_checks_off_v2(both=fault == "--bindings-checks-off-v2")
         elif fault == "--draws-rewrap-off-v2":
             draws_rewrap_off_v2()
         elif fault == "--draws-unrestored-v2":
             draws_unrestored_v2()
         else:
             suppressed_entry_v2(rest[0], off=fault.endswith("-off"))
-        if fault in CHAIN_PLANTS:       # the cell's own arguments, after OUT, --doc v2 among them
+        if fault in CHAIN_PLANTS + CELL_PLANTS_V2:      # the cell's own arguments, after OUT, --doc v2 among them
             args = rest[2:]
             if not any(args[j:j + 2] == ["--doc", "v2"] for j in range(len(args))):
                 print("tracerfaults3: a chain plant runs under v2: its cell's arguments need --doc v2", file=sys.stderr)
