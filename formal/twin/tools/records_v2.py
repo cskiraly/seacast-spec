@@ -18,9 +18,10 @@ how each argument and the return are read; TABLE below writes exactly that, one 
   `defer` (`defer` stores it in `pending`, whose rows are written wide). Everywhere else it is narrow (`tr.chunk`):
   the twin enqueues `forward`'s and `push_rebuilt_as_source`'s chunk and compares it with the tape's narrow one.
 
-`python3 records_v2.py ../SpecTwin/V2/Replay.lean` is the arity check (H3): for each covered name it runs args_v2
-on stub arguments and compares the array's length with runV2's case, the table's parameters with the document's
-`def`, and runs ret_v2 on a stub return. It imports no toy and builds no Tracer3: its tracer is a stand-in that has
+`python3 records_v2.py ../SpecTwin/V2/Replay.lean` is the arity check (check.sh's tables step): for each covered name
+it runs args_v2 on stub arguments and compares the array's length with runV2's case, and requires each length runV2's
+cases take to be given by some stub call; it compares the table's parameters with the document's `def`, and runs
+ret_v2 on a stub return. It imports no toy and builds no Tracer3: its tracer is a stand-in that has
 Tracer3's own encoders bound onto a stub object, with stub classes for the toy's wire and node modules.
 """
 import ast
@@ -369,7 +370,7 @@ def ret_v2(tr, fn, r):
     return TABLE[fn][2](tr, r)
 
 
-# ---- the arity check (H3)
+# ---- the arity check
 
 HELPERS = ("nat", "integer", "flag", "nothing", "chunk", "wchunk", "descriptor", "blob", "mid_of", "key", "ask_key",
            "ask_v2", "qentry", "qmsg", "qmsg_v2", "rel_msg", "offer", "holding", "ihave_entry")
@@ -502,8 +503,9 @@ def doc_params(*texts):
 
 
 def check_lines(replay_lean_path, root=ROOT):
-    """(ok, line) per covered name: args_v2's length on each stub call against runV2's case, the table's parameters
-    against the document's `def`, and ret_v2 on a stub return."""
+    """(ok, line) per covered name: args_v2's length on each stub call against runV2's case, each length the case
+    takes against the stub calls' lengths, the table's parameters against the document's `def`, and ret_v2 on a stub
+    return."""
     cases = runv2_cases(Path(replay_lean_path).read_text())
     docs = doc_params((root / "protocol-v2.md").read_text(), (root / "protocol.md").read_text())
     tr, stubs = stand_in()
@@ -525,6 +527,8 @@ def check_lines(replay_lean_path, root=ROOT):
             got.append(n)
             if want and n not in want:
                 bad.append(f"args_v2 gives {n} args, runV2's case takes {' or '.join(map(str, sorted(want)))}")
+        for n in sorted(want - set(got)):   # each count runV2 takes is given by some stub call: a case none
+            bad.append(f"runV2's case takes {n} args, which no stub call gives")    # exercises is not checked
         try:
             json.dumps(ret_v2(tr, name, r))
         except Exception as e:          # noqa: BLE001
@@ -539,7 +543,7 @@ def check_lines(replay_lean_path, root=ROOT):
 
 
 def arity_check(replay_lean_path):
-    """H3: the differences between the record writers and runV2's cases (empty when all agree)."""
+    """The differences between the record writers and runV2's cases (empty when all agree)."""
     return [line for ok, line in check_lines(replay_lean_path) if not ok]
 
 

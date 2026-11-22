@@ -1794,6 +1794,12 @@ def timers_self_test():
         body.binding = binding
         return body
 
+    def k_inf(ns, nd):                  # a timer with no finite delay: the twin's note reader would refuse its note
+        ns["after"](math.inf, docs["retry_offer"], Wm.WantIndex(g, 3))
+
+    def plain_delay(tr):                # the note's delay written as fbits writes any number, +inf's word too
+        tr.note_delay = lambda nd, delay: fbits(delay)
+
     one = ["after", fbits(0.25), "retry_offer", [[gx, 3]]]
     note_c = ["start", fbits(check_time + 0.125), "decode_group", [gx]]
     note_g = ["after", fbits(0.25), "Node._alarm.<locals>.alarm_due", [gx, 4, 9, fbits(1.5)]]
@@ -1864,6 +1870,9 @@ def timers_self_test():
          "SystemExit: trace3: node 1: an after inside a question armed 0 timers", dict(patch=keep_last), True),
         ("i, an after arming two stops", i_count(2), {},
          "SystemExit: trace3: node 1: an after inside a question armed 2 timers", dict(patch=keep_last), True),
+        ("k, an infinite delay stops", k_inf, {},
+         "SystemExit: trace3: node 1: a timer armed inside a question has the delay inf, which is no finite number",
+         dict(patch=plain_delay), True),
     ]
 
     def same(got, want):
@@ -3572,7 +3581,16 @@ class Tracer3(Tracer):
             enc = [g.hex(), self.nat(i), self.nat(q), fbits(at)]
         else:
             enc = self.timer_args(name, args)
-        return [kind, fbits(delay), name, enc]
+        return [kind, self.note_delay(nd, delay), name, enc]
+
+    @staticmethod
+    def note_delay(nd, delay):
+        """A note's delay, as its word: a finite number. The twin's note reader refuses another (fbits writes +inf's
+        word too, which the LIMITS need), so a timer armed inside a question with such a delay stops the tracer."""
+        if not math.isfinite(delay):
+            raise SystemExit(f"trace3: node {nd.id}: a timer armed inside a question has the delay {delay!r}, which is "
+                             f"no finite number: the twin's note reader refuses it")
+        return fbits(delay)
 
     def arm_timer(self, nd, kind, fn, args, kw):
         """An `after` or `start` called inside a question at the node: it runs with the simulator's `after` hooked

@@ -34,8 +34,9 @@
 #             cites the notes beside which they were developed (labcites.py), a citation planted in
 #             README.md's copy reported
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); V2/Kept.lean's copies of protocol.md's
-#             functions are their originals with the named differences alone (keptcopy.py); the views' own cases
-#             (footprint_test.py)
+#             functions are their originals with the named differences alone (keptcopy.py); the record writers'
+#             arities are runV2's cases', each count a case takes given by a stub call (records_v2.py), with two
+#             planted controls; the views' own cases (footprint_test.py)
 #   scope     every function protocol.md's code blocks define has its twin, by name: an `enter "NAME"` in SpecTwin/
 #             and a case of the replay's for NAME; counted by section; a twin with one name taken away is refused.
 #             And v2's part: every name protocol-v2.md's manifest covers has an `enter` in SpecTwin/V2/ and a case
@@ -79,7 +80,9 @@
 #             flipped by a layer the tracer lists (owed_missing's, on das-samplers): listed an observer, the replay
 #             must refuse each record it flipped; listed as changing, the control, it must replay; and the swapped
 #             draws: each layer's draws on the tape of a cell that enters it, and two plants on hand5 (the re-wrap
-#             off, which the replay must refuse; the swap left unrestored, which must stop the tracer). With
+#             off, which the replay must refuse; the swap left unrestored, which must stop the tracer); and a record
+#             writer whose arguments are not runV2's case's, on_chunk's without p, whose records the replay must
+#             refuse, each and no other. With
 #             --no-das: the DAS cells and the plants on them skipped, which each line says; the check is then a
 #             part, not a pass
 #   seeds     the same bytes whatever Python's hash seed, which is random in every process of an isolated Python:
@@ -472,6 +475,45 @@ s_tables() {
   $PY "$T/keptcopy.py" --twin "$OUT/twin" > "$OUT/keptcopy.txt" 2>&1 \
     || no "a copy of protocol.md's Lean in V2/Kept.lean differs from its original beyond the named differences (keptcopy.txt)"
   tail -n 1 "$OUT/keptcopy.txt" | sed 's/^/  /'
+  # the record writers' arities against runV2's cases (records_v2.py): each stub call's count one the case takes,
+  # each count the case takes given by a stub call; and its two controls, each a plant that must give exactly the
+  # differences written here
+  local rv=$OUT/twin/SpecTwin/V2/Replay.lean c why said
+  (cd "$T" && $PY records_v2.py "$rv") > "$OUT/arities.txt" 2>&1 \
+    || no "a record writer's arity is not runV2's case's (arities.txt)"
+  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_v2: 70 covered names, 0 difference(s)" ] \
+    || no "the arity check's last line is not 70 covered names and no difference (arities.txt)"
+  tail -n 1 "$OUT/arities.txt" | sed 's/^/  /'
+  for c in forward on_chunk; do
+    why=$(cd "$T" && $PY - "$rv" "$c" "$T" <<'EOF'
+import sys
+sys.path.insert(0, sys.argv[3])         # the tools' directory (isolated mode adds none)
+import records_v2 as R                  # noqa: E402
+rv, c = sys.argv[1], sys.argv[2]
+if c == "forward":                      # forward's stub calls cut to the first, one(f, 4): its 3 is given by none
+    stand_in = R.stand_in
+
+    def cut():
+        tr, stubs = stand_in()
+        calls, r = stubs["forward"]
+        stubs["forward"] = (calls[:1], r)
+        return tr, stubs
+    R.stand_in = cut
+    want = ["forward: runV2's case takes 3 args, which no stub call gives"]
+else:                                   # on_chunk's writer without p: a count of 1, and the case's 2 given by none
+    params, _, ret = R.TABLE["on_chunk"]
+    R.TABLE["on_chunk"] = (params, lambda tr, p, f: [tr.wchunk(f)], ret)
+    want = ["on_chunk: args_v2 gives 1 args, runV2's case takes 2",
+            "on_chunk: runV2's case takes 2 args, which no stub call gives"]
+got = R.arity_check(rv)
+print("as it must be" if got == want else f"not as written: {got}")
+EOF
+)
+    case $c in forward) said="forward's stub calls cut to the first: refused, as it must be (forward 3)" ;;
+               *) said="on_chunk's writer without p: refused, as it must be (on_chunk 1 against 2)" ;; esac
+    if [ "$why" = "as it must be" ]; then echo "  control, $said"
+    else no "control of the arity check, $c: ${why:-no answer}"; fi
+  done
   $PY "$T/footprint_test.py" > "$OUT/views.txt" 2>&1 || no "the views' own cases (views.txt)"
   tail -n 1 "$OUT/views.txt" | sed 's/^/  /'
 }
@@ -1227,6 +1269,30 @@ stop_cell() {           # $1: a directory under $OUT; $2: a cell of chain_args: 
   (cd "$TOY" && $PY "$T/trace3.py" . "$OUT/$d/$c.jsonl.gz" $(chain_args "$c") --digest > "$OUT/$d/$c.out" 2> "$OUT/$d/$c.err")
   echo $? > "$OUT/$d/$c.rc"
   return 0
+}
+arities_plant() {       # a record writer whose arguments are not runV2's case's: on_chunk's writer without p, on
+  #                       v2/hand5, traced to its end (the tracer checks no arity); the replay must refuse each
+  #                       on_chunk record, as no function of the twin with those arguments, and no other (c-arity.*,
+  #                       at the out directory's top, so that the calls summary does not read it)
+  local f=c-arity n total
+  rm -f "$OUT/$f".*
+  read -r total n < <(gzip -dc "$OUT/v2/hand5.jsonl.gz" 2> /dev/null | tail -n 1 | $PY -c 'import json, sys
+t = json.loads(sys.stdin.read())["trailer"]
+print(t["records"], t["by_fn"].get("on_chunk", 0))' 2> /dev/null)
+  if [ -z "$n" ] || [ "$n" = 0 ]; then no "the record writers' arities: no on_chunk record in v2/hand5's trailer"; return 0; fi
+  if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --on-chunk-without-p-v2 . "$OUT/$f.jsonl.gz" > "$OUT/$f.out" 2> "$OUT/$f.err"); then
+    no "the record writers' arities: the plant's run did not end with 0 ($f.err)"; return 0
+  fi
+  if ! has -x "tracerfaults3: on-chunk-without-p-v2, planted $n times" "$OUT/$f.err"; then
+    no "the record writers' arities: not planted at each of v2/hand5's $n on_chunk records ($f.err)"; return 0
+  fi
+  replay_of "$f"
+  if ! parsed_whole "$OUT/$f.replay" || ! has -x "replay: $total records, $((total - n)) ok, $n mismatched" "$OUT/$f.replay" \
+      || [ "$(grep -c '^mismatch ' "$OUT/$f.replay")" != 1 ] \
+      || ! has -x -F "mismatch on_chunk: not a function of the twin under protocol-v2.md, or not its arguments: on_chunk: $n" "$OUT/$f.replay"; then
+    no "the record writers' arities: the replay did not refuse exactly the $n on_chunk records, by their arguments ($f.replay)"; return 0
+  fi
+  echo "  the record writers' arities: on_chunk's writer without p, traced on v2/hand5 to its end, refused by the replay at its $n on_chunk records and at no other"
 }
 rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's rows on its tapes, to rows/NAME.rows
   $PY "$T/chaincases.py" --rows "$1" "$OUT/$2.jsonl.gz" > "$OUT/rows/$1.rows" 2>&1
@@ -2099,6 +2165,8 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # tapes; (f) the re-wrap off, which the replay must refuse at each keep_floor record; (g) the swap left unrestored,
   # which the record's exit check must stop (c-draws.txt)
   swapped_draws
+  # a record writer's arguments not runV2's case's: on_chunk's without p, which the replay must refuse (c-arity.*)
+  arities_plant
   # the replaced names' rows (R3-9): each of the eight names the twin asks, with rows on a fixture's tapes where a
   # node replaces it (repair_verdict's and known_in_scope's fixtures are plants (l) and (j), layers of tracerfaults3's
   # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, which the record's

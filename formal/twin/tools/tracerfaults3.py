@@ -684,6 +684,21 @@ def draws_unrestored_v2():
     before_install_v2(plant)
 
 
+def on_chunk_without_p_v2():
+    """Under v2, the plant of a record writer whose arguments are not those of runV2's case: records_v2.py's writer of
+    `on_chunk` leaves the peer out, and writes the chunk alone. The tracer checks no record's arity, so the trace is
+    written to its end, and the replay must refuse each on_chunk record, as no function of the twin with those
+    arguments. Counted once for each on_chunk record written so."""
+    import records_v2 as R              # noqa: E402: this directory's, as trace3.py imports it
+    params, _, ret = R.TABLE["on_chunk"]
+
+    def without_p(tr, p, f):
+        PLANTED[0] += 1
+        return [tr.wchunk(f)]
+
+    R.TABLE["on_chunk"] = (params, without_p, ret)
+
+
 def observer_timer_v2(off):
     """Under v2, the plant of an observer's own code that arms a timer by the simulator itself, not through the
     namespace's `after` (which iface_of stops). At every node, `completed` (the toy's: by group, the time of its
@@ -1426,7 +1441,7 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
-          "--hdr-read-v2-raw", "--observer-timer-v2-off", "--chains-omit-v2") + CHAIN_PLANTS + (
+          "--hdr-read-v2-raw", "--observer-timer-v2-off", "--on-chunk-without-p-v2", "--chains-omit-v2") + CHAIN_PLANTS + (
           "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_V2 + (  # K13's two: the first must not
           "--layer-missing-v2",         # stop it, the second must; pieces D's and E's; H4's plant (n), on hand5-own;
           "--calls-nested-off-v2", "--calls-iwants-off-v2")     # piece (b)'s (u) and (v), on hand5
@@ -1481,6 +1496,8 @@ def main(argv):
             hdr_read_v2(raw=fault.endswith("-raw"))
         elif fault.startswith("--observer-timer-v2"):
             observer_timer_v2(off=fault.endswith("-off"))
+        elif fault == "--on-chunk-without-p-v2":
+            on_chunk_without_p_v2()
         elif fault == "--chains-omit-v2":
             chains_omit_v2()
         elif fault == "--chain-filter-observer-v2":
