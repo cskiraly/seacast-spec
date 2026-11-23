@@ -29,7 +29,7 @@
 #             three controls (a copy with one wrong row fails, its control)
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names seacast.md keeps, gen/schema_seacast.py's encoders,
-#             keptcopy.py's, labcites.py's, scan_bindings.py's, timers_seacast.py's and calls_seacast.py's); and no line of the twin's sources (the
+#             keptcopy.py's, labcites.py's, scan_bindings.py's, timers_seacast.py's, calls_seacast.py's and inventory_seacast.py's); and no line of the twin's sources (the
 #             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
 #             cites the notes beside which they were developed (labcites.py), a citation planted in
 #             README.md's copy reported
@@ -211,6 +211,7 @@ HAND5="--nodes 5 --degree 4 --msgs 1 --payload 16384 --seed 7"
 DAS30="--nodes 30 --degree 8 --msgs 1 --setting rows --supernodes 10 --blobs 4 --seed 7 --doc seacast"   # the chain cases'
 LATE16="--nodes 16 --degree 8 --msgs 2 --seed 7 --late-block 30,400"
 CELLS="announce cap-wait dcb20 hold ihave-limits late-block loss-thin none push push-deep rr-stripe silent withholders without-a without-b"
+ALLCELLS=$CELLS         # every cell: the calls summary's need seacastcells is all of them, made into this OUT
 if [ -n "$FEWCELLS" ]; then
   [ -n "$RECORD" ] && [ -z "$PART" ] || { echo "check.sh: --cells goes with --record"; exit 2; }
   for c in $CELLS_GIVEN; do case " $CELLS " in *" $c "*) ;; *) echo "check.sh: no cell $c"; exit 2 ;; esac; done
@@ -436,10 +437,11 @@ labcites.py --self-test ^labcites self-test, planted: (.*), must be \1$
 scan_bindings.py --self-test ^ok: every case as it must be$
 timers_seacast.py --self-test ^timers_seacast: self-test: ([0-9]+) of \1 cases as they must be$
 calls_seacast.py --self-test ^calls_seacast: self-test: ([0-9]+) of \1 cases as they must be$
+inventory_seacast.py --self-test ^inventory_seacast: self-test: ([0-9]+) of \1 cases as they must be$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 14 ] || no "not 14 tools' self-tests passed"
-  echo "  $n of 14 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 15 ] || no "not 15 tools' self-tests passed"
+  echo "  $n of 15 tools' own cases as they must be (selftests.txt)"
   # the twin's text: its sources as the build copied them, its tools, and the prose beside them (every *.md but
   # out/'s, record/'s and .lake/'s, which the copy leaves out; tools/' own are read with tools/): none cites the
   # notes beside which it was developed
@@ -707,6 +709,7 @@ s_cells() {
   fi
 }
 s_seacastcells() {            # every cell under seacast.md: its digest golden-seacast.txt's; the records are seacast-lite.md's names
+  rm -f "$OUT/seacastcells.cells"       # the cells made into this OUT, written once they pass: the need seacastcells
   $PY "$T/trace3.py" --self-test-seacast > "$OUT/seacast-self-test.txt" 2>&1 || no "the tracer's self-test of SEACAST's kept names (seacast-self-test.txt)"
   if [ -z "$CELLS" ]; then echo "  no SEACAST cell (a rehearsal)"; echo ok > "$OUT/cells-seacast.txt"; return; fi
   local c
@@ -716,6 +719,10 @@ s_seacastcells() {            # every cell under seacast.md: its digest golden-s
   has -x ok "$OUT/cells-seacast.txt" || no "no verdict on the SEACAST cells"
   [ "$(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt")" = "$(echo $CELLS | wc -w)" ] || no "not every SEACAST cell's digest is golden-seacast.txt's"
   echo "  $(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt") of $(echo $CELLS | wc -w) SEACAST cells: digest as golden-seacast.txt, replayed (cells-seacast.txt)"
+  # shellcheck disable=SC2086
+  if has -x ok "$OUT/cells-seacast.txt" && [ "$(grep -c ', digest as golden-seacast.txt, ' "$OUT/cells-seacast.txt")" = "$(echo $CELLS | wc -w)" ]; then
+    echo $CELLS > "$OUT/seacastcells.cells"
+  fi
 }
 small() {               # $1: a name; $2: its directory; $3: the tracer's environment setting, or ""; the rest: run.py's arguments
   local name=$1 dir=$2 setting=$3 got plain; shift 3
@@ -1446,6 +1453,32 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   elif has -E "$w6 entry$w6b" "$OUT/chains/hand5-off.err"; then
     echo "D3 point 6, on hand5-off: stopped, as it must: $(grep -m 1 -E "$w6 entry$w6b" "$OUT/chains/hand5-off.err" | cut -c1-200)" >> "$OUT/c-stops.txt"; ok3=1
   else echo "D3 point 6, on hand5-off: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-stops.txt"; fi
+  # D3's trace given to the replay: its trailer says it stopped, and the replay must refuse it at that key (Main.lean's
+  # envelope: "trailer: not a member of it: stopped"), so that a stopped run is never replayed as a whole one; its
+  # control, a copy without the key, whose replay does not name the key (its exit is read, not required)
+  local rcs rcc
+  rm -f "$OUT/c-stopped.replay" "$OUT/c-stopped-control.replay" "$OUT/c-stopped-control.jsonl.gz"
+  if ! $PY -c 'import gzip, json, sys
+t = json.loads(gzip.open(sys.argv[1], "rt").read().splitlines()[-1]).get("trailer") or {}
+sys.exit(0 if "stopped" in t else 1)' "$OUT/chains/hand5-off.jsonl.gz" 2> /dev/null; then
+    echo "D3's trace, replayed: its trailer does not say it stopped  <-- NOT" >> "$OUT/c-stops.txt"
+  else
+    zcat "$OUT/chains/hand5-off.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/c-stopped.replay" 2>&1; rcs=${PIPESTATUS[1]}
+    $PY -c 'import gzip, json, sys
+lines = gzip.open(sys.argv[1], "rt").read().splitlines(True)
+t = json.loads(lines[-1]); del t["trailer"]["stopped"]
+lines[-1] = json.dumps(t, separators=(",", ":")) + "\n"
+with gzip.open(sys.argv[2], "wt") as f:
+    f.write("".join(lines))' "$OUT/chains/hand5-off.jsonl.gz" "$OUT/c-stopped-control.jsonl.gz"
+    zcat "$OUT/c-stopped-control.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/c-stopped-control.replay" 2>&1; rcc=${PIPESTATUS[1]}
+    if [ "$rcs" = 0 ] || ! has -F "trailer: not a member of it: stopped" "$OUT/c-stopped.replay"; then
+      echo "D3's trace, replayed: not refused at its trailer's stopped key (rc $rcs; c-stopped.replay)  <-- NOT" >> "$OUT/c-stops.txt"
+    elif [ ! -s "$OUT/c-stopped-control.replay" ] || has -F "trailer: not a member of it: stopped" "$OUT/c-stopped-control.replay"; then
+      echo "D3's trace, replayed: its copy without the key not replayed, or the key named there too (c-stopped-control.replay)  <-- NOT" >> "$OUT/c-stops.txt"
+    else
+      echo "D3's trace, replayed: refused at its trailer's stopped key, as it must (rc $rcs: $(grep -m 1 -F 'trailer: not a member of it: stopped' "$OUT/c-stopped.replay" | cut -c1-120)); its copy without the key: rc $rcc, the key not named" >> "$OUT/c-stops.txt"
+    fi
+  fi
   # (q): the entry check skipped, the same record's exit check must stop it, with the same words but "exit"
   nq=$(sed -n -E 's/^tracerfaults3: entry-check-off-v2, planted ([1-9][0-9]*) times?$/\1/p' "$OUT/chains/plant-q.err" 2> /dev/null)
   if [ -z "$nq" ] || [ "$(cat "$OUT/chains/plant-q.rc" 2> /dev/null)" = 0 ]; then
@@ -1755,17 +1788,42 @@ calls_plant() {         # $1: a plant's letter, $2: its fault: its trace on hand
   (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$2" . "$f.jsonl.gz" > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
   $PY "$T/calls_seacast.py" --any "$OUT" "reached/plant-$1" > "$f.txt" 2>&1; echo $? > "$f.crc"
 }
+das_paths() {           # the inventory's paths of need das, one a line, in its order
+  awk -F '\t' '!/^#/ && $3 == "das" { print $1 }' "$HERE/inventory.tsv"
+}
+das_stamp() {           # the need das: the inventory's DAS traces made since tracercontrols started (none under --no-das)
+  local p
+  [ -z "$NODAS" ] || return 0
+  for p in $(das_paths); do
+    [ "$OUT/$p.jsonl.gz" -nt "$OUT/tracercontrols.start" ] && echo "$p"
+  done > "$OUT/das.traces"
+  return 0
+}
+needs_line() {          # the needs this OUT's traces were made for: das when das.traces lists every DAS path, and
+  #                       seacastcells when seacastcells.cells lists every cell
+  local w=
+  # shellcheck disable=SC2086
+  [ -f "$OUT/das.traces" ] && [ "$(cat "$OUT/das.traces")" = "$(das_paths)" ] && w=das
+  # shellcheck disable=SC2086
+  [ "$(cat "$OUT/seacastcells.cells" 2> /dev/null)" = "$(echo $ALLCELLS)" ] && w="$w${w:+ }seacastcells"
+  echo "needs: ${w:--}"
+}
 calls_summary() {       # piece (b): each SEACAST trace's reached names, and the IWANTs respond, retry_offer and ask_parked
   #                       enqueue, by their records and by their calls, with the calls file's three controls
-  #                       (c-reached.txt, which the pull carries); plants (u) and (v), each refused by its control
-  local rel rels g n=0 s=0 bad= p ok=0 why=
+  #                       (c-reached.txt, which the pull carries); plants (u) and (v), each refused by its control; and
+  #                       every trace held to formal/twin/inventory.tsv by inventory_seacast.py, the needs line first
+  #                       (c-inventory.txt; the inventory's copy, inventory.tsv, which the pull carries too)
+  local rel rels g n=0 s=0 bad= p ok=0 why= inv=
   rm -rf "$OUT/reached"; mkdir -p "$OUT/reached"
+  rm -f "$OUT/c-inventory.txt"
+  cp "$HERE/inventory.tsv" "$OUT/inventory.tsv" && cmp -s "$HERE/inventory.tsv" "$OUT/inventory.tsv" \
+    || no "the inventory not copied whole (inventory.tsv)"
   rels=$(cd "$OUT" && for d in seacast chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
   for rel in $rels; do par calls_one "$rel"; done
   par calls_plant u calls-nested-off-v2
   par calls_plant v calls-iwants-off-v2
   par_end || true       # each one's status is read below
-  : > "$OUT/c-reached.txt"
+  needs_line > "$OUT/c-reached.txt"
   for rel in $rels; do
     g=$OUT/reached/${rel//\//__}
     cat "$g.txt" >> "$OUT/c-reached.txt"
@@ -1794,8 +1852,11 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   if [ -n "$why" ]; then
     no "the calls summary's plants:$why (reached/plant-*.txt)"
   fi
-  if [ -z "$bad" ] && [ "$ok" = 2 ]; then
-    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u) and (v) each refused by their control"
+  # every trace met as its inventory line says, by class and need (inventory_seacast.py)
+  $PY "$T/inventory_seacast.py" "$OUT/inventory.tsv" "$OUT/c-reached.txt" > "$OUT/c-inventory.txt" 2>&1 && inv=ok \
+    || no "the calls summary against the inventory (c-inventory.txt)"
+  if [ -z "$bad" ] && [ "$ok" = 2 ] && [ -n "$inv" ]; then
+    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u) and (v) each refused by their control; the inventory: $(grep -v -c '^#' "$OUT/inventory.tsv") lines, each as it must be (c-inventory.txt)"
   else
     echo "  the calls summary: not as it must be"
   fi
@@ -1804,18 +1865,20 @@ timers_all_one() {      # $1: a trace under OUT, without .jsonl.gz: timers_seaca
   local g=$OUT/timersall/${1//\//__}
   (cd "$T" && $PY timers_seacast.py "$OUT/$1.jsonl.gz") > "$g.txt" 2>&1; echo $? > "$g.rc"
 }
-timers_all() {          # deferred_offers' timers over every trace the calls summary reads (what it skips left out:
-  #                       plants, copies, a run that stopped, whose cut trace timers_seacast.py would read as if whole):
-  #                       each holds, or stops at the type's lookup (two START_DELAYs fit: a stated limit, counted
-  #                       apart), and none fails; no enqueue entry carries a timer; a start inside a question counted,
-  #                       a search; then the alarm's cell (c-timers-all.txt)
-  local rel rels g chk= total line notes w s a hb h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread
+timers_all() {          # deferred_offers' timers over exactly the inventory's must traces whose need the run had, each
+  #                       read by the calls summary (plants, copies and runs that stopped are other lines; a must
+  #                       trace the summary did not read is a NOT): each holds, or stops at the type's lookup (two
+  #                       START_DELAYs fit: a stated limit, counted apart), and none fails; no enqueue entry carries a
+  #                       timer; a start inside a question counted, a search; then the alarm's cell (c-timers-all.txt)
+  local rel rels g chk= total line notes w s a hb h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread unread=
   rm -rf "$OUT/timersall"; mkdir -p "$OUT/timersall"
-  rels=$(cd "$OUT" && for d in seacast chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
+  rels=$($PY "$T/inventory_seacast.py" --must "$OUT/inventory.tsv" "$OUT/c-reached.txt" 2> /dev/null) \
+    || no "deferred_offers' timers: the inventory's must lines not read (inventory_seacast.py --must)"
   for rel in $rels; do
-    has '^skipped: ' "$OUT/reached/${rel//\//__}.txt" 2> /dev/null && continue
+    if ! has -E "^$rel \\(format " "$OUT/reached/${rel//\//__}.txt" 2> /dev/null; then unread="$unread $rel"; continue; fi
     chk="$chk $rel"; par timers_all_one "$rel"
   done
+  [ -z "$unread" ] || no "deferred_offers' timers: must traces the calls summary did not read:$unread (c-reached.txt)"
   par_end || true       # each one's status is read below
   : > "$OUT/c-timers-all.txt"
   for rel in $chk; do
@@ -1845,7 +1908,7 @@ timers_all() {          # deferred_offers' timers over every trace the calls sum
   [ -z "$nread" ] || [ "$total" = "$nread" ] || no "deferred_offers' timers over every trace: $total checked, where the calls summary read $nread (c-timers-all.txt)"
   [ -z "$fl" ] || no "deferred_offers' timers over every trace: failed in:$fl (c-timers-all.txt)"
   [ "$ws" = 0 ] || no "deferred_offers' timers over every trace: $ws enqueue entries carry a timer (c-timers-all.txt)"
-  echo "  deferred_offers' timers over the $total traces the calls summary reads: $h hold ($hn with notes, $h0 with none), $st stopped at the type's lookup${stn:+ (in:$stn)}, $(echo $fl | wc -w) fail; enqueue entries with timers: $ws; start notes: ${sn:+in$sn}${sn:-none} (c-timers-all.txt)"
+  echo "  deferred_offers' timers over the inventory's $total must traces, each read by the calls summary: $h hold ($hn with notes, $h0 with none), $st stopped at the type's lookup${stn:+ (in:$stn)}, $(echo $fl | wc -w) fail; enqueue entries with timers: $ws; start notes: ${sn:+in$sn}${sn:-none} (c-timers-all.txt)"
   if [ -n "$NODAS" ]; then echo "  the alarm's cell: --no-das: skipped (a DAS cell)"; else alarm_cell "$as"; fi
 }
 alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's cell (--alarm-wait, rows/das-alarm), traced
@@ -1881,6 +1944,9 @@ alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's ce
 }
 s_tracercontrols() {
   local f want bad nm
+  # the need das: the DAS traces this invocation makes, written by das_stamp before the calls summary reads; none
+  # until then, whatever the flags
+  rm -f "$OUT/das.traces"; touch "$OUT/tracercontrols.start"
   # the tracer's check of its own log: an assignment that goes unlogged must stop it
   if (cd "$TOY" && $PY "$T/unlogged3.py" . "$OUT/c-unlogged.jsonl.gz" --n 20000 --seed 1 > "$OUT/c-unlogged.out" 2> "$OUT/c-unlogged.err"); then
     no "the tracer wrote a trace to its end with every twentieth assignment unlogged"
@@ -2196,10 +2262,13 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # the timers of deferred_offers: timers_seacast.py on das-samplers-mcoff's trace, and its three plants, each refused by
   # the checks it breaks (c-timers.txt)
   timers_check
+  # the need das: the inventory's DAS traces this invocation made (das.traces)
+  das_stamp
   # piece (b): each SEACAST trace's reached names and its IWANTs by records and by calls, with the calls file's controls,
-  # last, so that every SEACAST trace of the run is made (c-reached.txt)
+  # last, so that every SEACAST trace of the run is made (c-reached.txt); held to the inventory (c-inventory.txt)
   calls_summary
-  # deferred_offers' timers over every trace the calls summary reads, and the alarm's cell (c-timers-all.txt)
+  # deferred_offers' timers over the inventory's must traces, each read by the calls summary, and the alarm's cell
+  # (c-timers-all.txt)
   timers_all
 }
 again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a process of its own
