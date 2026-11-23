@@ -5,8 +5,11 @@ counted by their records and by their calls, and three controls of the calls fil
     python3 -I calls_seacast.py [--any] OUT REL        (REL: a trace under OUT, without .jsonl.gz: seacast/hand5, chains/X)
 
 It reads OUT/REL.jsonl.gz, OUT/REL.jsonl.gz.calls.json and, where there is one, the replay's report OUT/REL.replay.
-It prints four lines, or one line `skipped: REL: WHY` for a plant (plant-*), a copy (fam-*), a trace under another
-document, a trace with no trailer (a run that stopped) or one with no calls file. --any reads a plant or a copy too.
+It prints four lines, or one line `skipped: REL: CLASS: WHY`, in this order: a plant (plant-*; class plant) or a copy
+(fam-*; copy), by its name; a run that stopped (stopped): a file not readable to its end, or with no header; a trace
+under another document (doc); a run that stopped: no trailer, or a trailer that says it stopped; a trace with no
+calls file (nocalls). --any reads a plant or a copy too, and never a run that stopped. The classes are those of
+formal/twin/inventory.tsv, which inventory_seacast.py holds the summary to; doc and nocalls are in no line of it.
 
 1. `REL (format F, doc D): R records; reached: NAME n, ...`: every name in a record's `reached`, with the records
    that hold it (a record's own fn among them).
@@ -70,10 +73,10 @@ def main(argv):
     out, rel = Path(argv[0]), argv[1]
     base = rel.rsplit("/", 1)[-1]
     if not anyname and base.startswith("plant-"):
-        print(f"skipped: {rel}: a plant")
+        print(f"skipped: {rel}: plant: a plant")
         return 0
     if not anyname and base.startswith("fam-"):
-        print(f"skipped: {rel}: a copy (families_seacast.py)")
+        print(f"skipped: {rel}: copy: a copy (families_seacast.py)")
         return 0
     trace = out / f"{rel}.jsonl.gz"
     side = out / f"{rel}.jsonl.gz.calls.json"
@@ -112,20 +115,23 @@ def main(argv):
                     parked += e
         f.close()
     except (OSError, EOFError, json.JSONDecodeError) as e:      # a run that stopped may leave its file cut
-        print(f"skipped: {rel}: not readable to its end ({type(e).__name__})")
+        print(f"skipped: {rel}: stopped: not readable to its end ({type(e).__name__})")
         return 0
     if header is None:
-        print(f"skipped: {rel}: no header")
+        print(f"skipped: {rel}: stopped: no header")
         return 0
     doc = doc_of(header.get("args", []))
     if doc != "seacast":
-        print(f"skipped: {rel}: doc {doc}")
+        print(f"skipped: {rel}: doc: {doc}")
         return 0
     if trailer is None:
-        print(f"skipped: {rel}: no trailer (the run stopped)")
+        print(f"skipped: {rel}: stopped: no trailer")
+        return 0
+    if "stopped" in trailer:            # trace3.py's close after a stop: the records are a prefix of a run's
+        print(f"skipped: {rel}: stopped: {trailer['stopped']}")
         return 0
     if not side.is_file():
-        print(f"skipped: {rel}: no calls file")
+        print(f"skipped: {rel}: nocalls: no calls file")
         return 0
     cf = json.loads(side.read_text())
     calls, iw, inside = cf["calls"], cf["iwants"], cf["inside"]
@@ -200,16 +206,27 @@ def main(argv):
     return 0
 
 
-# --- the self-test: one small trace under each of eight args forms: (args, its first line's start) --------------
+# --- the self-test: one small trace under each of eight args forms (args, its first line), then the classes
 DOCS = [
     (["--doc", "seacast"], "seacast/t (format 7, doc seacast): 1 records"),
     (["--doc=seacast"], "seacast/t (format 7, doc seacast): 1 records"),
     (["--doc", "v2"], "seacast/t (format 7, doc seacast): 1 records"),
     (["--doc=v2"], "seacast/t (format 7, doc seacast): 1 records"),
-    (["--doc", "lite"], "skipped: seacast/t: doc lite"),
-    (["--doc=v03"], "skipped: seacast/t: doc lite"),
-    ([], "skipped: seacast/t: doc lite"),
-    (["--doc", "v3"], "skipped: seacast/t: doc v3"),
+    (["--doc", "lite"], "skipped: seacast/t: doc: lite"),
+    (["--doc=v03"], "skipped: seacast/t: doc: lite"),
+    ([], "skipped: seacast/t: doc: lite"),
+    (["--doc", "v3"], "skipped: seacast/t: doc: v3"),
+]
+TRAILER = {"records": 1, "by_fn": {"x": 1}, "rest": 0}
+# the classes by name and the runs that stopped: (case, REL, trailer or None, --any, the one line it must print)
+CLASSES = [
+    ("a trailer that says the run stopped", "seacast/t", dict(TRAILER, stopped="SystemExit: x"), False,
+     "skipped: seacast/t: stopped: SystemExit: x"),
+    ("the same under --any", "seacast/t", dict(TRAILER, stopped="SystemExit: x"), True,
+     "skipped: seacast/t: stopped: SystemExit: x"),
+    ("no trailer", "seacast/t", None, False, "skipped: seacast/t: stopped: no trailer"),
+    ("a plant's name", "seacast/plant-t", TRAILER, False, "skipped: seacast/plant-t: plant: a plant"),
+    ("a copy's name", "seacast/fam-t", TRAILER, False, "skipped: seacast/fam-t: copy: a copy (families_seacast.py)"),
 ]
 
 
@@ -218,30 +235,34 @@ def self_test():
     import io
     import tempfile
     good = 0
+    cases = ([(" ".join(a) or "(no --doc)", "seacast/t", a, TRAILER, False, w) for a, w in DOCS]
+             + [(n, rel, ["--doc", "seacast"], tr, an, w) for n, rel, tr, an, w in CLASSES])
     with tempfile.TemporaryDirectory() as d:
         out = Path(d)
         (out / "seacast").mkdir()
-        for args, want in DOCS:
-            with gzip.open(out / "seacast" / "t.jsonl.gz", "wt") as f:
+        for name, rel, args, trailer, anyname, want in cases:
+            with gzip.open(out / f"{rel}.jsonl.gz", "wt") as f:
                 for x in ({"content": "self-test"}, {"header": {"args": args, "format": 7}}, {"nodes": []},
-                          {"n": 0, "t": 0, "fn": "x", "reached": ["x"], "tape": []},
-                          {"trailer": {"records": 1, "by_fn": {"x": 1}, "rest": 0}}):
+                          {"n": 0, "t": 0, "fn": "x", "reached": ["x"], "tape": []}):
                     f.write(json.dumps(x) + "\n")
-            (out / "seacast" / "t.jsonl.gz.calls.json").write_text(json.dumps(
+                if trailer is not None:
+                    f.write(json.dumps({"trailer": trailer}) + "\n")
+            (out / f"{rel}.jsonl.gz.calls.json").write_text(json.dumps(
                 {"calls": {"x": {"record": 1, "in": {}, "bare": 0, "ext": 0, "observer": 0}}, "iwants": {},
                  "inside": {}}))
             buf = io.StringIO()
             with contextlib.redirect_stdout(buf):
-                rc = main([str(out), "seacast/t"])
+                rc = main((["--any"] if anyname else []) + [str(out), rel])
             lines = buf.getvalue().splitlines()
-            read = not want.startswith("skipped: ")
-            ok = (rc == 0 and bool(lines) and lines[0].startswith(want)
-                  and (len(lines) == 4 and lines[3].endswith(": hold") if read else len(lines) == 1))
+            if want.startswith("skipped: "):
+                ok = rc == 0 and lines == [want]
+            else:
+                ok = rc == 0 and len(lines) == 4 and lines[0].startswith(want) and lines[3].endswith(": hold")
             good += ok
-            print(f"calls_seacast: self-test: {' '.join(args) or '(no --doc)'}: {lines[0] if lines else 'no line'}"
+            print(f"calls_seacast: self-test: {name}: {lines[0] if lines else 'no line'}"
                   f"{'' if ok else '  <-- NOT as it must be: ' + want}")
-    print(f"calls_seacast: self-test: {good} of {len(DOCS)} cases as they must be")
-    return 0 if good == len(DOCS) else 1
+    print(f"calls_seacast: self-test: {good} of {len(cases)} cases as they must be")
+    return 0 if good == len(cases) else 1
 
 
 if __name__ == "__main__":

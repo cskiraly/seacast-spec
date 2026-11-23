@@ -509,9 +509,9 @@ def close_keyerror_seacast():
     _close = T.Tracer3.close
 
     @functools.wraps(_close)
-    def close(self):
+    def close(self, *args, **kwargs):   # the stop's reason passed on as the tracer's close takes it
         try:
-            _close(self)
+            _close(self, *args, **kwargs)
         finally:
             raise KeyError("planted at the close")
 

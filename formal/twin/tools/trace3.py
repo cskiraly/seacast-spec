@@ -2729,14 +2729,19 @@ class Tracer3(Tracer):
         self.write({"nodes": group_nodes(self.nodes)})
         self.nodes_written = True
 
-    def close(self):
+    def close(self, stopped=None):
+        """The trailer, and the files beside the trace. `stopped`: the reason a run stopped, which the trailer then
+        carries, so that no reader takes the trace for a whole run's."""
         if not self.nodes_written:
             self.write_nodes()
         else:                           # the traced names once more at the end: a name bound again after the first
             self.final_check()          #   record is seen too
         self.loaded_check()
-        self.write({"trailer": {"records": sum(self.counts.values()), "by_fn": dict(sorted(self.counts.items())),
-                                "rest": self.rest_total}})
+        trailer = {"records": sum(self.counts.values()), "by_fn": dict(sorted(self.counts.items())),
+                   "rest": self.rest_total}
+        if stopped is not None:
+            trailer["stopped"] = stopped
+        self.write({"trailer": trailer})
         self.out.close()
         if self.doc_seacast:                 # the calls run bare at another node, or inside a replaced name entered outside
             with open(self.out_path + ".bare.json", "w") as f:      # any record: a run output beside the trace
@@ -4759,9 +4764,9 @@ def main(argv):
     import run                          # noqa: E402: the toy's run.py, from TOYDIR
     try:
         run.main(rest)
-    except BaseException:               # a stop (or any error) in flight: close the trace, but a later check at the
-        try:                            #   close must not replace the first reason, which is the one raised
-            tr.close()
+    except BaseException as stop:       # a stop (or any error) in flight: close the trace, its trailer saying why, but
+        try:                            #   a later check at the close must not replace the first reason, which is the one raised
+            tr.close(stopped=(f"{type(stop).__name__}: {stop}".splitlines() or [""])[0])
         except BaseException as later:  # a stop or any other error at the close: a note (printed before the
             print(f"trace3: (at the close, after the stop) {type(later).__name__}: {later}",   # stop's own line)
                   file=sys.stderr)

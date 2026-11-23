@@ -3,9 +3,10 @@
 records they arm.
 
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
-                                      2: a trace it cannot read, or not a trace under seacast.md
-    python3 timers_seacast.py --self-test  twenty-nine small traces it writes, each with the result written for it
-                                      (twenty-three of the checks, six of the header's document)
+                                      2: a trace it cannot read, not a trace under seacast.md, or a run that stopped
+                                      (its trailer says so, or it has none)
+    python3 timers_seacast.py --self-test  thirty-one small traces it writes, each with the result written for it
+                                      (twenty-three of the checks, six of the header's document, two runs that stopped)
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -143,11 +144,13 @@ def check(path, out):
     notes = owns = whole = alone = 0
     enqueue_entries = enqueue_timed = alarm_notes = start_notes = promise_recs = 0
     other = Counter()
-    last = None
+    last = trailer = None
     try:
         for line in fh:
             r = json.loads(line)
             if "fn" not in r:
+                if "trailer" in r:
+                    trailer = r["trailer"]
                 continue
             n, tb = r["n"], r["t"]
             t = fl(tb)
@@ -249,6 +252,10 @@ def check(path, out):
                     by_note[key] += 1
     except (OSError, EOFError, ValueError, KeyError, IndexError, TypeError) as e:
         out.append(f"timers_seacast: {path}: a line it cannot read: {e!r}")
+        return 2
+    if trailer is None or "stopped" in trailer:     # a run that stopped: its records are a prefix, not a whole run's
+        why = "no trailer" if trailer is None else trailer["stopped"]
+        out.append(f"timers_seacast: {path}: a run that stopped ({why}): not read")
         return 2
     if last is None:
         out.append(f"timers_seacast: {path}: no record")
@@ -440,9 +447,15 @@ HEADERS = [
     ("h5 --doc=v03 (before v0.12.0)", ["--doc=v03"], 2),
     ("h6 no --doc", [], 2),
 ]
+# a run that stopped, u1's records: (name, its trailer's stopped, or None for no trailer, the line's reason)
+STOPS = [
+    ("s1 a trailer that says the run stopped", "SystemExit: x", "SystemExit: x"),
+    ("s2 no trailer", None, "no trailer"),
+]
 
 
-def _write(p, records, args=("--doc", "seacast")):
+def _write(p, records, args=("--doc", "seacast"), stopped=False):
+    """stopped: False for a whole run's trailer, None for no trailer, or the reason its trailer carries."""
     with gzip.open(p, "wt") as fh:
         fh.write(json.dumps({"content": "self-test"}) + "\n")
         fh.write(json.dumps({"header": {"args": list(args)}}) + "\n")
@@ -450,7 +463,9 @@ def _write(p, records, args=("--doc", "seacast")):
                                                             "payload": {"START_DELAY": 0}}}]}) + "\n")
         for r in records:
             fh.write(json.dumps(r) + "\n")
-        fh.write(json.dumps({"trailer": {"records": len(records)}}) + "\n")
+        if stopped is not None:
+            fh.write(json.dumps({"trailer": dict({"records": len(records)},
+                                                 **({} if stopped is False else {"stopped": stopped}))}) + "\n")
 
 
 def self_test():
@@ -477,7 +492,16 @@ def self_test():
             print(f"timers_seacast: self-test: {name}: exit {rc}{'' if ok else f' <-- NOT as it must be: exit {want}'}")
             if not ok:
                 print("\n".join("    " + w for w in out))
-    total = len(CASES) + len(HEADERS)
+        for name, stopped, why in STOPS:
+            _write(p, CASES[0][1], stopped=stopped)
+            out = []
+            rc = check(p, out)
+            ok = rc == 2 and out == [f"timers_seacast: {p}: a run that stopped ({why}): not read"]
+            good += ok
+            print(f"timers_seacast: self-test: {name}: exit {rc}{'' if ok else ' <-- NOT as it must be: exit 2, not read'}")
+            if not ok:
+                print("\n".join("    " + w for w in out))
+    total = len(CASES) + len(HEADERS) + len(STOPS)
     print(f"timers_seacast: self-test: {good} of {total} cases as they must be")
     return 0 if good == total else 1
 
