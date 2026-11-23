@@ -1312,7 +1312,8 @@ rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's
 replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's tapes, where a node replaces it; plant
   #                       (k), a row with an argument left out, which the replay must refuse; and control (m), the
   #                       bias cell, which the record's exit check must stop
-  local names="forward push_rebuilt" name fx n calls c d plain k=0 counts= why rec pr sum stop also mwant caught=0 stopped=0
+  local names="forward push_rebuilt" name fx n calls c d plain k=0 counts= why rec pr m nr nw sum stop also mwant caught=0 stopped=0
+  local untied=
   rm -rf "$OUT/rows"; mkdir -p "$OUT/rows"; : > "$OUT/c-rows.txt"
   if [ -z "$NODAS" ]; then
     names="forward push_rebuilt serve_standing owed_missing send_have note_claim repair_verdict known_in_scope"
@@ -1358,33 +1359,44 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
         fi ;;
     esac
     if ! why=$(replay_clean "$fx"); then echo "$name: $fx's replay: $why  <-- NOT" >> "$OUT/c-rows.txt"; continue; fi
-    if [ "${n:-0}" -ge 1 ]; then
+    # each row at a node whose group in the nodes line replaces the name; C4's three liars and C5's three keepers
+    # each with rows
+    read -r nr nw < <(sed -n -E 's/.*; nodes replacing it: ([0-9]+), with rows: ([0-9]+); rows at other nodes: [0-9]+$/\1 \2/p' "$OUT/rows/$name.rows")
+    if [ "${n:-0}" -ge 1 ] && ! has -E '; rows at other nodes: 0$' "$OUT/rows/$name.rows"; then
+      echo "$name on $fx: rows at nodes that do not replace it: $(cut -c13- "$OUT/rows/$name.rows")  <-- NOT" >> "$OUT/c-rows.txt"
+      untied=1
+    elif [ "${n:-0}" -ge 1 ] && { [ "$name" = send_have ] || [ "$name" = note_claim ]; } && { [ -z "$nr" ] || [ "$nr" != "$nw" ]; }; then
+      echo "$name on $fx: a node that replaces it has no row: $(cut -c13- "$OUT/rows/$name.rows")  <-- NOT" >> "$OUT/c-rows.txt"
+      untied=1
+    elif [ "${n:-0}" -ge 1 ]; then
       echo "$name on $fx: $(cut -c13- "$OUT/rows/$name.rows"); $(grep -m 1 '^replay: ' "$OUT/$fx.replay"); bare calls counted: $(bare_count "$fx")" >> "$OUT/c-rows.txt"
       k=$((k + 1)); counts="$counts${counts:+, }$name $n"
     else echo "$name on $fx: no row on its tapes  <-- NOT" >> "$OUT/c-rows.txt"; fi
   done
   # (k) push_rebuilt's last argument left out of each of its rows on seacast/hand5-own: the replay must refuse each such
-  # record, with C8's words (the run's: the entry unparenthesised, its fields three spaces apart), and nothing else
+  # record, with C8's words (the run's: the entry unparenthesised, its fields three spaces apart), and nothing else; the
+  # records refused are counted apart from the rows, from chaincases' own line (a record may hold two rows)
   pr=$(sed -n -E 's/^chaincases: push_rebuilt on the tapes: ([0-9]+) rows.*/\1/p' "$OUT/rows/push_rebuilt.rows")
   rec=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/seacast/hand5-own.replay" 2> /dev/null)
   mwant='^mismatch decode_group: tape: push_rebuilt\["[0-9a-f]{64}",\[[0-9,]*\]\] asked, SpecTwin\.Replay\.Entry\.call   "push_rebuilt"   "\[\\"[0-9a-f]{64}\\"\]"   "null" logged: [0-9]+$'
   if [ -z "$pr" ] || [ "$pr" = 0 ] || [ -z "$rec" ]; then
     echo "(k) the argument left out: no push_rebuilt row on seacast/hand5-own, or no replay of it  <-- NOT" >> "$OUT/c-rows.txt"
   elif ! $PY "$T/chaincases.py" --drop-arg push_rebuilt "$OUT/seacast/hand5-own.jsonl.gz" "$OUT/rows/plant-k.jsonl.gz" > "$OUT/rows/plant-k.err" 2>&1 \
-      || ! has -E "^chaincases: the last argument of push_rebuilt left out in $pr rows?, in [0-9]+ records?\$" "$OUT/rows/plant-k.err"; then
+      || ! m=$(sed -n -E "s/^chaincases: the last argument of push_rebuilt left out in $pr rows?, in ([1-9][0-9]*) records?\$/\\1/p" "$OUT/rows/plant-k.err") \
+      || [ -z "$m" ]; then
     echo "(k) the argument left out: not made, or not in each of the $pr rows  <-- NOT" >> "$OUT/c-rows.txt"
   elif replay_of rows/plant-k; then
     echo "(k) the argument left out: the replay passed it  <-- NOT" >> "$OUT/c-rows.txt"
   elif ! parsed_whole "$OUT/rows/plant-k.replay"; then
     echo "(k) the argument left out: the parser refused a line of it, not the twin  <-- NOT" >> "$OUT/c-rows.txt"
-  elif ! has -x "replay: $rec records, $((rec - pr)) ok, $pr mismatched" "$OUT/rows/plant-k.replay" \
+  elif ! has -x "replay: $rec records, $((rec - m)) ok, $m mismatched" "$OUT/rows/plant-k.replay" \
       || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/rows/plant-k.replay"; then
-    echo "(k) the argument left out: not refused at its $pr records alone: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay")  <-- NOT" >> "$OUT/c-rows.txt"
+    echo "(k) the argument left out: not refused at its $m records alone: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay")  <-- NOT" >> "$OUT/c-rows.txt"
   elif sum=$(sed -n -E 's/^mismatch .* logged: ([0-9]+)$/\1/p' "$OUT/rows/plant-k.replay" | awk '{s += $1} END {print s + 0}') \
-      && { [ "$(grep '^mismatch ' "$OUT/rows/plant-k.replay" | grep -c -v -E "$mwant")" != 0 ] || [ "$sum" != "$pr" ]; }; then
+      && { [ "$(grep '^mismatch ' "$OUT/rows/plant-k.replay" | grep -c -v -E "$mwant")" != 0 ] || [ "$sum" != "$m" ]; }; then
     echo "(k) the argument left out: refused otherwise than by its words: $(grep -m 1 '^mismatch ' "$OUT/rows/plant-k.replay" | cut -c1-160)  <-- NOT" >> "$OUT/c-rows.txt"
   else
-    echo "(k) the argument left out: caught: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay"); $(grep -m 1 '^mismatch ' "$OUT/rows/plant-k.replay" | cut -c1-160)" >> "$OUT/c-rows.txt"
+    echo "(k) the argument left out: caught: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay"); $(grep -m 1 '^mismatch ' "$OUT/rows/plant-k.replay" | cut -c1-160); $pr rows in $m records" >> "$OUT/c-rows.txt"
     caught=1
   fi
   # (m) the bias cell: --repair-bias's layer restores the shuffled it took before the install (node.py's _repair_bias),
@@ -1404,9 +1416,12 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   local said="plant (k) caught" bias="the bias cell stopped at its binding, as it must"
   [ "$caught" = 1 ] || said="plant (k) not caught"
   [ "$stopped" = 1 ] || bias="the bias cell not stopped as it must be"
+  local tied="each name's rows at nodes that replace it alone, and at each of das-claim's 3 liars and das-keeper-ignore's 3 keepers"
+  [ -n "$NODAS" ] && tied="each name's rows at nodes that replace it alone"
+  [ -z "$untied" ] || tied="a name's rows at a node that does not replace it, or a liar or keeper without rows"
   if [ -n "$NODAS" ]; then
-    echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said (--no-das: the six DAS names and the bias cell skipped)"
-  else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
+    echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $tied; $said (--no-das: the six DAS names and the bias cell skipped)"
+  else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $tied; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
 }
 stops() {               # piece D: point 5's stop, plant (p), and its control; point 6's stop (D3), with its entry check
   #                       removed (q), and with both checks removed (D5's control); every cell local
@@ -1443,7 +1458,7 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
       || ! has -E "^example: node $nc at [^ ]+ $fc\\[" "$OUT/chains/plant-pc.replay"; then
     echo "(p)'s control, on hand5-v2: refused otherwise than at node $nc's $fc record: $(grep -m 1 '^mismatch ' "$OUT/chains/plant-pc.replay" | cut -c1-160)  <-- NOT" >> "$OUT/c-stops.txt"
   else
-    echo "(p)'s control, on hand5-v2: refused at node $nc's $fc record alone, as it must: $(grep -m 1 '^replay: ' "$OUT/chains/plant-pc.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-pc.replay" | cut -c1-160)" >> "$OUT/c-stops.txt"
+    echo "(p)'s control, on hand5-v2: refused at node $nc's $fc record alone, as it must (one mismatch, there; its reason quoted, not checked): $(grep -m 1 '^replay: ' "$OUT/chains/plant-pc.replay"); $(grep -m 1 '^mismatch ' "$OUT/chains/plant-pc.replay" | cut -c1-160)" >> "$OUT/c-stops.txt"
     okc=1
   fi
   # D3: hand5-off, the source's announce bound to the layer's lambda through publish: the first record inside publish
@@ -1497,15 +1512,15 @@ with gzip.open(sys.argv[2], "wt") as f:
   elif ! why=$(replay_clean chains/plant-d5); then
     echo "D5's control, on hand5-off: its replay: $why  <-- NOT" >> "$OUT/c-stops.txt"
   else
-    echo "D5's control, on hand5-off: written to its end, digest $got both ways, $(grep -m 1 '^replay: ' "$OUT/chains/plant-d5.replay"); bare calls counted: $(bare_count chains/plant-d5)" >> "$OUT/c-stops.txt"; okr=1
+    echo "D5's control, on hand5-off: written to its end, digest $got both ways, $(grep -m 1 '^replay: ' "$OUT/chains/plant-d5.replay"); bare calls counted: $(bare_count chains/plant-d5); the lambda's calls not counted" >> "$OUT/c-stops.txt"; okr=1
   fi
   if grep -q '<-- NOT' "$OUT/c-stops.txt"; then no "the stops (c-stops.txt)"; fi
   s5="point 5's at node $n5's $f5 record, with its words"; [ "$ok5" = 1 ] || s5="point 5's not as it must be"
-  if [ "$okc" = 1 ]; then s5="$s5, and its control refused at its planted record alone (node $nc's $fc, of $rec records)"
+  if [ "$okc" = 1 ]; then s5="$s5, and its control refused at its planted record alone (node $nc's $fc, of $rec records; the reason quoted, not checked)"
   else s5="$s5, and its control not as it must be"; fi
   s6="point 6's at node 1's group_id record, at its entry, and at its exit with the entry check removed"
   [ "$ok3" = 1 ] && [ "$okq" = 1 ] || s6="point 6's not as it must be"
-  s7="with both checks removed, the trace written to its end with the untraced digest and replayed clean (the stated limit: the toy's source publishes columns alone, so no cell calls the lambda)"
+  s7="with both checks removed, the trace written to its end with the untraced digest and replayed clean (the stated limit, from the toy's code, not counted: the toy's source publishes columns alone, so no cell calls the lambda)"
   [ "$okr" = 1 ] || s7="with both checks removed, not as it must be"
   echo "  the stops: $s5; $s6; $s7"
 }
@@ -1555,7 +1570,7 @@ carried() {             # piece E: R7's tracer-wide depth on a real cell (carrie
     echo "(r) per-node depth, on custody-floor-churn1: its replay: $why (the stated limit no longer holds)  <-- NOT" >> "$OUT/c-carried.txt"
   else
     echo "(r) per-node depth, on custody-floor-churn1: as it must: .bare.json {}; the body E1's and 1 record of send_join at node $c, its trailer counting it; $(grep -m 1 '^replay: ' "$OUT/chains/plant-r.replay")" >> "$OUT/c-carried.txt"
-    e2="per-node depth (r): that send_join a record, the counts empty, the body E1's with it alone inserted"
+    e2="per-node depth (r): that send_join a record (its node and function checked, its t not), the counts empty, the body E1's with it alone inserted"
   fi
   # E3: hand5-peer (chain_cases' trace), each node's filter_entry replaced and entered outside every record: node 2's
   # held inside it counted bare, once. (s): node s's replaced filter_entry entered from Node._write, calling node s's
@@ -1604,9 +1619,10 @@ f_cases() {             # piece F: S1-8a's count (carried), S1-8b in both halves
   local ok8a=0 okw=0 oks=0 okp=0 ok5=0
   local tline="node [0-9]+'s send_relation to [0-9]+: a GRAFT of the −1 family; a counted record put in after it, at node [0-9]+; node [0-9]+'s send_relation to [0-9]+: a PRUNE of the −1 family; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
   : > "$OUT/c-fcases.txt"
-  # S1-8a: no record of churn1 (carried's trace) names backoff among its tables. Its one reader, candidates, runs in
-  # maintain_relations, and its one writer is on_prune, neither a function the twin replays: carried until one is
-  # (Seacast/Codecs.lean's #guard refuses +inf as its leaf). A count above 0 fails, for the carried status must be read again
+  # The backoff codec's case (its #guard refuses +inf as the leaf, Seacast/Codecs.lean), carried: no record of churn1
+  # (carried's trace) names backoff among its tables. seacast.md's readers of it are relation_room (called by
+  # maintain_relations, graft, on_graft and on_prune) and on_prune, its one writer; none of these is traced, so none
+  # is a function the twin replays: carried until one is. A count above 0 fails, for the carried status must be read again
   nb=$($PY - "$OUT/$churn.jsonl.gz" 2> /dev/null <<'EOF_BO'
 import gzip
 import json
@@ -1703,8 +1719,8 @@ EOF_RA
     echo "S1-C5 on seacast/hand5: as it must: origin_acked entered 8 times (6 acknowledged before, 2 the holding grows), 0 reads not made; the reads with the row absent: $rows" >> "$OUT/c-fcases.txt"; ok5=1
   fi
   if grep -q '<-- NOT' "$OUT/c-fcases.txt"; then no "F's three (c-fcases.txt)"; fi
-  s8a="S1-8a carried: no record of custody-floor-churn1 reads or writes backoff (no function the twin replays does)"
-  [ "$ok8a" = 1 ] || s8a="S1-8a not as it must be"
+  s8a="the backoff codec's case carried: no record of custody-floor-churn1 reads or writes backoff (its readers relation_room and on_prune and its writer on_prune are not traced, nor are their callers)"
+  [ "$ok8a" = 1 ] || s8a="the backoff codec's case not as it must be"
   s8b="S1-8b: the writer writes the −1 family as [\"-\", 1] in a GRAFT, a PRUNE and need, and a plain-int writer is refused; on churn1 the reader replays the three ($((r0 + 1)) records, all ok) and refuses the plain int at their 3 lines"
   [ "$okw$oks$okp" = 111 ] || s8b="S1-8b not as it must be"
   s5="S1-C5: origin_acked entered 8 times on seacast/hand5, 0 reads not made; the rows absent: $rows; cases 2 and 3 carried as unreachable"

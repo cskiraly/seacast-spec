@@ -19,7 +19,8 @@ in every entry whose chains hold NAME; nothing else changed. It says how many en
 
 `--rows`: the rows of the question NAME on the records' tapes, by the answer they hold (a row is [NAME, its
 arguments, its answer], and a fourth member, the question's log, where it touched the node's tables); with FN, on
-the tapes of the records whose `reached` holds FN alone.
+the tapes of the records whose `reached` holds FN alone. Then by the record's node, with the nodes whose group in the
+nodes line replaces NAME: how many, how many of them have rows, and the rows at any other node.
 
 `--drop-arg`: a plant for the replay (R3-9). OUT is TRACE with the last argument of each row of the question NAME on
 the records' tapes left out, and nothing else changed: a record line without such a row is written as it was read,
@@ -141,9 +142,13 @@ def cut(name, trace, out):
 
 
 def rows(name, trace, fn=None):
-    answers, recs = Counter(), 0
+    answers, recs, by, replacing = Counter(), 0, Counter(), set()
     with gzip.open(trace, "rt", encoding="utf-8") as f:
         for line in f:
+            if line.startswith('{"nodes"'):     # the nodes line: the nodes whose group replaces the name
+                replacing |= {n for g in json.loads(line)["nodes"] if name in (g.get("replaced") or ())
+                              for n in g["n"]}
+                continue
             if not line.startswith('{"n"'):
                 continue
             d = json.loads(line)
@@ -153,10 +158,14 @@ def rows(name, trace, fn=None):
             for row in d.get("tape") or ():
                 if row and row[0] == name:
                     answers[json.dumps(row[2])] += 1
+                    by[d["n"]] += 1
     on = "the tapes" if fn is None else f"the tapes of the {recs} records that reach {fn}"
     print(f"chaincases: {name} on {on}: {sum(answers.values())} rows"
           + ("" if not answers else " (" + ", ".join(f"{a}: {k}" for a, k in sorted(answers.items())[:4])
-                                      + (", …" if len(answers) > 4 else "") + ")"))
+                                      + (", …" if len(answers) > 4 else "") + ")")
+          + f"; by node {{{', '.join(f'{n}: {k}' for n, k in sorted(by.items()))}}}; nodes replacing it: "
+            f"{len(replacing)}, with rows: {len(replacing & set(by))}; rows at other nodes: "
+            f"{sum(k for n, k in by.items() if n not in replacing)}")
     return 0
 
 
