@@ -29,7 +29,7 @@
 #             three controls (a copy with one wrong row fails, its control)
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names seacast.md keeps, gen/schema_seacast.py's encoders,
-#             keptcopy.py's, labcites.py's and scan_bindings.py's); and no line of the twin's sources (the
+#             keptcopy.py's, labcites.py's, scan_bindings.py's and timers_seacast.py's); and no line of the twin's sources (the
 #             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
 #             cites the notes beside which they were developed (labcites.py), a citation planted in
 #             README.md's copy reported
@@ -434,10 +434,11 @@ gen/schema_seacast.py --self-test ^ok: every case as it must be$
 keptcopy.py --self-test ^ok: every case as it must be$
 labcites.py --self-test ^labcites self-test, planted: (.*), must be \1$
 scan_bindings.py --self-test ^ok: every case as it must be$
+timers_seacast.py --self-test ^timers_seacast: self-test: ([0-9]+) of \1 cases as they must be$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 12 ] || no "not 12 tools' self-tests passed"
-  echo "  $n of 12 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 13 ] || no "not 13 tools' self-tests passed"
+  echo "  $n of 13 tools' own cases as they must be (selftests.txt)"
   # the twin's text: its sources as the build copied them, its tools, and the prose beside them (every *.md but
   # out/'s, record/'s and .lake/'s, which the copy leaves out; tools/' own are read with tools/): none cites the
   # notes beside which it was developed
@@ -1803,7 +1804,7 @@ timers_all() {          # deferred_offers' timers over every trace the calls sum
   #                       each holds, or stops at the type's lookup (two START_DELAYs fit: a stated limit, counted
   #                       apart), and none fails; no enqueue entry carries a timer; a start inside a question counted,
   #                       a search; then the alarm's cell (c-timers-all.txt)
-  local rel rels g chk= total line notes w s a h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread
+  local rel rels g chk= total line notes w s a hb h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread
   rm -rf "$OUT/timersall"; mkdir -p "$OUT/timersall"
   rels=$(cd "$OUT" && for d in seacast chains rows; do ls "$d"/*.jsonl.gz 2> /dev/null; done | sed 's/\.jsonl\.gz$//' | LC_ALL=C sort)
   for rel in $rels; do
@@ -1818,12 +1819,13 @@ timers_all() {          # deferred_offers' timers over every trace the calls sum
     w=$(sed -n 's/^timers_seacast: enqueue: [0-9]* entries, \([0-9]*\) with timers$/\1/p' "$g.txt")
     s=$(sed -n 's/^timers_seacast: start: \([0-9]*\) notes of kind start .*/\1/p' "$g.txt")
     a=$(sed -n 's/^timers_seacast: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt")
-    if [ "$(cat "$g.rc")" = 0 ] && [ -n "$line" ] && [ -n "$w" ] && [ -n "$s" ] && [ -n "$a" ]; then
+    hb=$(sed -n 's/^timers_seacast: the timers of deferred_offers hold on .*; \([0-9]*\) retried at a heartbeat, held back)$/\1/p' "$g.txt")
+    if [ "$(cat "$g.rc")" = 0 ] && [ -n "$line" ] && [ -n "$w" ] && [ -n "$s" ] && [ -n "$a" ] && [ -n "$hb" ]; then
       h=$((h + 1)); notes=${line%% *}
       if [ "$notes" -gt 0 ]; then hn=$((hn + 1)); else h0=$((h0 + 1)); fi
       ws=$((ws + w)); as=$((as + a))
       [ "$s" = 0 ] || sn="$sn $rel ($s)"
-      echo "$rel: holds: $line; enqueue entries with timers: $w; start notes: $s; alarm_due notes: $a" >> "$OUT/c-timers-all.txt"
+      echo "$rel: holds: $line; retried at a heartbeat, held back: $hb; enqueue entries with timers: $w; start notes: $s; alarm_due notes: $a" >> "$OUT/c-timers-all.txt"
     elif [ "$(cat "$g.rc")" = 2 ] && has -E '^timers_seacast: .*: no single START_DELAY fits t - known_at .*; K2 cannot be checked$' "$g.txt"; then
       st=$((st + 1)); stn="$stn $rel"
       echo "$rel: stopped at the type's lookup, a stated limit: $(grep -m 1 'no single START_DELAY fits' "$g.txt" | cut -c1-200)" >> "$OUT/c-timers-all.txt"

@@ -4,7 +4,7 @@ records they arm.
 
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
                                       2: a trace it cannot read, or not a trace under seacast.md
-    python3 timers_seacast.py --self-test  seven small traces it writes, each with the result written for it
+    python3 timers_seacast.py --self-test  thirteen small traces it writes, each with the result written for it
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -26,7 +26,17 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
   K3, K4  a count per key (node, ask, due): the due of a note or an own after is the arming t plus its delay, added
       as floats as the simulator adds them; a record's is its t. With A the notes and own afters due at a key and R
       the retry_offer records there, K3 requires R >= A (each armed timer fires; a key past the last record is left
-      out), and K4 requires R <= A (each record was armed). No record is matched to one note in particular.
+      out), and K4 requires R <= A (each record was armed), but for the heartbeat's retries below. No record is
+      matched to one note in particular.
+      retry_offer has a second caller with no timer: seacast.md's on_heartbeat retries every offer §4.3's limits held
+      back (`for a in held_back.values(): retry_offer(a)`), then clears held_back. on_heartbeat is no record, so
+      those calls are records of their own. A record beyond the timers at its key is the heartbeat's when both hold:
+      its node has a drop_stale_waits record at its t (under seacast.md on_heartbeat alone calls drop_stale_waits,
+      after the retries, so its record follows theirs and ends the node's held_back); and its ask was written to
+      held_back at that node (a write ["held_back", PATH, ASK], on_offer's) since the node's last such record, and
+      no other record at that heartbeat took the same write. One write excuses one record at most. The limit: a
+      timer lost whose fire falls on a heartbeat, for an ask held back since the node's last heartbeat and not yet
+      retried, is taken for the heartbeat's retry.
 
 The other lines are counts of the trace's other timers: the `enqueue` entries with timers, the notes that name
 `alarm_due`, the records of `promise_due`, the notes of kind `start` (a `start` inside a question), and any other
@@ -86,6 +96,11 @@ def check(path, out):
     arm = Counter()                                             # (node, ask, due bits) -> notes and own afters
     by_note = Counter()
     recs = Counter()                                            # (node, ask, t bits) -> retry_offer records
+    heartbeats = set()                                          # (node, t bits) of a drop_stale_waits record
+    held = defaultdict(dict)                                    # node -> held_back since its last heartbeat
+    epoch = Counter()                                           # node -> its heartbeats so far
+    held_at = defaultdict(set)                                  # (node, ask, t bits) -> (heartbeat, ask) held back
+    held_writes = 0
     notes = owns = whole = alone = 0
     enqueue_entries = enqueue_timed = alarm_notes = start_notes = promise_recs = 0
     other = Counter()
@@ -99,7 +114,21 @@ def check(path, out):
             t = fl(tb)
             last = t if last is None else max(last, t)
             if r["fn"] == "retry_offer":
-                recs[(n, json.dumps(r["args"][0]), tb)] += 1
+                a = json.dumps(r["args"][0])
+                recs[(n, a, tb)] += 1
+                if a in held[n].values():                       # held back since this node's last heartbeat
+                    held_at[(n, a, tb)].add((epoch[n], a))
+            for e in r.get("writes") or []:
+                if isinstance(e, list) and len(e) == 3 and e[0] == "held_back":
+                    if e[2] is None:
+                        held[n].pop(json.dumps(e[1]), None)
+                    else:
+                        held[n][json.dumps(e[1])] = json.dumps(e[2])
+                        held_writes += 1
+            if r["fn"] == "drop_stale_waits":                   # the heartbeat, after its retries: held_back cleared
+                heartbeats.add((n, tb))
+                held[n].clear()
+                epoch[n] += 1
             if r["fn"] == "promise_due":
                 promise_recs += 1
             for e in r.get("tape") or []:
@@ -183,10 +212,21 @@ def check(path, out):
         elif recs[key] < a:
             fails["K3"].append(f"node {key[0]}: {key[1]} due at {fl(key[2])!r}: {a} armed ({by_note[key]} by a note), "
                                f"{recs[key]} record(s) there")
+    retried = 0                                                 # records the heartbeat's: beyond the timers, excused
+    taken = set()                                               # (node, heartbeat, ask): each write excuses one
     for key, r_ in recs.items():
         if arm[key] < r_:
-            fails["K4"].append(f"node {key[0]}: {r_} retry_offer record(s) for {key[1]} at {fl(key[2])!r}, {arm[key]} "
-                               f"armed there")
+            hb = 0
+            if (key[0], key[2]) in heartbeats:
+                for h_ in sorted(held_at.get(key, ())):
+                    if arm[key] + hb < r_ and (key[0],) + h_ not in taken:
+                        taken.add((key[0],) + h_)
+                        hb += 1
+            retried += hb
+            if arm[key] + hb < r_:
+                fails["K4"].append(f"node {key[0]}: {r_} retry_offer record(s) for {key[1]} at {fl(key[2])!r}, "
+                                   f"{arm[key]} armed there"
+                                   + (f", {hb} retried at a heartbeat for an ask held back" if hb else ""))
     nrec = sum(recs.values())
     multi = sum(1 for key, a in arm.items() if a > 1 and fl(key[2]) <= last)
 
@@ -201,8 +241,10 @@ def check(path, out):
     line("K2", f"{notes} notes, each delay max(0, known_at + START_DELAY - t) + 1e-6")
     line("K3", f"{notes - late_n} notes and {owns - late_o} own afters fire as retry_offer records at their due; "
                f"{late_n + late_o} due after the last record")
-    line("K4", f"{nrec} retry_offer records, each armed: as many armed as records at each key, {multi} keys with two "
-               f"or more armed")
+    line("K4", f"{nrec} retry_offer records, each armed, or retried at a heartbeat for an ask held back ({retried}): as "
+               f"many armed as records at each key, {multi} keys with two or more armed")
+    out.append(f"timers_seacast: held_back: {held_writes} writes; {retried} records retried at a heartbeat for an ask "
+               f"held back")
     out.append(f"timers_seacast: enqueue: {enqueue_entries} entries, {enqueue_timed} with timers")
     out.append(f"timers_seacast: alarm_due: {alarm_notes} notes name it; promise_due: {promise_recs} records")
     out.append(f"timers_seacast: start: {start_notes} notes of kind start (a start inside a question)")
@@ -211,11 +253,12 @@ def check(path, out):
         out.append(f"timers_seacast: the timers of deferred_offers FAIL on {path}")
         return 1
     out.append(f"timers_seacast: the timers of deferred_offers hold on {path}: {notes} notes, {owns} own afters, {nrec} "
-               f"retry_offer records ({late_n + late_o} armed past the last record)")
+               f"retry_offer records ({late_n + late_o} armed past the last record; {retried} retried at a heartbeat, "
+               f"held back)")
     return 0
 
 
-# --- the self-test: seven small traces, one node (0), one row group G, START_DELAY 1.0 --------------------------
+# --- the self-test: thirteen small traces, one node (0), one row group G, START_DELAY 1.0 -----------------------
 G = "aa" * 32
 
 
@@ -248,6 +291,18 @@ def _retry(t, i):
     return _rec(t, "retry_offer", (), [[G, i]])
 
 
+def _held(t, i):
+    """on_offer's record holding index i back: its write of held_back."""
+    r = _rec(t)
+    r["writes"] = [["held_back", [[G, i]], [G, i]]]
+    return r
+
+
+def _beat(t):
+    """The heartbeat's drop_stale_waits record, after its retries."""
+    return _rec(t, "drop_stale_waits", (), [])
+
+
 CASES = [  # (name, records, the checks that must fail)
     ("u1 one note, one record", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]), _retry(_due(0.25), 3)], set()),
     ("u2 two notes at one key, two records", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3]), _entry(0.25, 1 << 3, [3])]),
@@ -265,6 +320,12 @@ CASES = [  # (name, records, the checks that must fail)
     ("u8 a note and an own after at one key, two records", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3]),
                                                                              _own(0.25, 3)]),
                                                             _retry(_due(0.25), 3), _retry(_due(0.25), 3)], set()),
+    ("u9 a record at a heartbeat, its ask held back", [_held(0.25, 3), _retry(0.7, 3), _beat(0.7)], set()),
+    ("u10 a record at a heartbeat, no ask held back", [_rec(0.25), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+    ("u11 two records at a heartbeat for one write", [_held(0.25, 3), _retry(0.7, 3), _retry(0.7, 3), _beat(0.7)],
+     {"K4"}),
+    ("u12 a record, its ask held back, no heartbeat", [_held(0.25, 3), _retry(0.7, 3)], {"K4"}),
+    ("u13 a write an earlier heartbeat cleared", [_held(0.25, 3), _beat(0.5), _retry(0.7, 3), _beat(0.7)], {"K4"}),
 ]
 
 
