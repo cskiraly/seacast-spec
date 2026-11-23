@@ -4,7 +4,7 @@ records they arm.
 
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
                                       2: a trace it cannot read, or not a trace under seacast.md
-    python3 timers_seacast.py --self-test  fifteen small traces it writes, each with the result written for it
+    python3 timers_seacast.py --self-test  seventeen small traces it writes, each with the result written for it
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -37,12 +37,14 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       no other record at that heartbeat took the same write. One write excuses one record at most. The limit: a
       timer lost whose fire falls on a heartbeat, for an ask held back since the node's last heartbeat and not yet
       retried, is taken for the heartbeat's retry.
-      A trace whose records write held_back nowhere cannot show the second condition: the trace records neither
-      on_offer nor on_heartbeat, so held_back's writes may be in no record. There K4 takes the first condition
-      alone, with the bound the document gives: one record beyond the timers at a key at most, since held_back is
-      keyed by the ask's group and index and the heartbeat retries each of its values once. The lines say which
-      of the two a trace took ("held back" or "by the heartbeat alone"). Its limit: a lost timer whose fire falls
-      on a heartbeat of its node is taken for the heartbeat's retry, held back or not.
+      A trace that records no on_offer cannot show the second condition: on_offer is held_back's one writer (an
+      older head's tracer recorded neither it nor on_heartbeat). There K4 takes the first condition alone, with the bound
+      the document gives: at a heartbeat, one record beyond the timers for a chunk at most (its group and index,
+      whichever form the ask names it by), since held_back is keyed by the chunk and the heartbeat retries each of
+      its values once. In a trace that records on_offer, no write means nothing was held back, and the second
+      condition stands. The lines say which of the two a trace took ("held back" or "by the heartbeat alone"), and
+      count the chunks at a heartbeat with two or more records beyond their timers. The fallback's limit: a lost
+      timer whose fire falls on a heartbeat of its node is taken for the heartbeat's retry, held back or not.
 
 The other lines are counts of the trace's other timers: the `enqueue` entries with timers, the notes that name
 `alarm_due`, the records of `promise_due`, the notes of kind `start` (a `start` inside a question), and any other
@@ -78,6 +80,21 @@ def bitmap(v):
     raise ValueError(f"not a bitmap: {v!r}")
 
 
+def chunk(a):
+    """The chunk an ask names (an ask as JSON), as held_back keys it, written [group, index]: an ask [group, index],
+    or a structured id, 56 bytes as hex, whose first 32 bytes are the group and next 4 the index, little-endian (the
+    toy's parse_id). Any other ask is a chunk of its own."""
+    x = json.loads(a)
+    if isinstance(x, list) and len(x) == 2:
+        return json.dumps(x)
+    if isinstance(x, str) and len(x) == 112:
+        try:
+            return json.dumps([x[:64], int.from_bytes(bytes.fromhex(x[64:72]), "little")])
+        except ValueError:
+            pass
+    return a
+
+
 def check(path, out):
     """The checks on one trace; each line of the report goes to out (a list). Returns the exit code."""
     fails = defaultdict(list)
@@ -106,7 +123,7 @@ def check(path, out):
     held = defaultdict(dict)                                    # node -> held_back since its last heartbeat
     epoch = Counter()                                           # node -> its heartbeats so far
     held_at = defaultdict(set)                                  # (node, ask, t bits) -> (heartbeat, ask) held back
-    held_writes = 0
+    held_writes = offer_recs = 0
     notes = owns = whole = alone = 0
     enqueue_entries = enqueue_timed = alarm_notes = start_notes = promise_recs = 0
     other = Counter()
@@ -131,6 +148,8 @@ def check(path, out):
                     else:
                         held[n][json.dumps(e[1])] = json.dumps(e[2])
                         held_writes += 1
+            if r["fn"] == "on_offer":                           # held_back's one writer (seacast.md :1319)
+                offer_recs += 1
             if r["fn"] == "drop_stale_waits":                   # the heartbeat, after its retries: held_back cleared
                 heartbeats.add((n, tb))
                 held[n].clear()
@@ -220,24 +239,34 @@ def check(path, out):
                                f"{recs[key]} record(s) there")
     retried = 0                                                 # records the heartbeat's: beyond the timers, excused
     taken = set()                                               # (node, heartbeat, ask): each write excuses one
-    alone = held_writes == 0                                    # no record writes held_back: the heartbeat alone
-    how = "by the heartbeat alone" if alone else "held back"
+    beat_only = offer_recs == 0                                 # no on_offer recorded: the heartbeat alone
+    how = "by the heartbeat alone" if beat_only else "held back"
+    over = Counter()                                            # (node, chunk, t bits) -> records beyond the timers
     for key, r_ in recs.items():
         if arm[key] < r_:
-            hb = 0
-            if (key[0], key[2]) in heartbeats:
-                if alone:
-                    hb = 1                                      # the heartbeat retries each value once
-                else:
+            over[(key[0], chunk(key[1]), key[2])] += r_ - arm[key]
+    many = sum(1 for (n, c, tb), x in over.items() if x > 1 and (n, tb) in heartbeats)
+    if beat_only:
+        for (n, c, tb), x in over.items():
+            hb = 1 if (n, tb) in heartbeats else 0              # the heartbeat retries each chunk once
+            retried += hb
+            if x > hb:
+                fails["K4"].append(f"node {n}: {x} retry_offer record(s) for chunk {c} at {fl(tb)!r} beyond its "
+                                   f"timers" + (f", 1 retried at a heartbeat, {how}" if hb else ""))
+    else:
+        for key, r_ in recs.items():
+            if arm[key] < r_:
+                hb = 0
+                if (key[0], key[2]) in heartbeats:
                     for h_ in sorted(held_at.get(key, ())):
                         if arm[key] + hb < r_ and (key[0],) + h_ not in taken:
                             taken.add((key[0],) + h_)
                             hb += 1
-            retried += hb
-            if arm[key] + hb < r_:
-                fails["K4"].append(f"node {key[0]}: {r_} retry_offer record(s) for {key[1]} at {fl(key[2])!r}, "
-                                   f"{arm[key]} armed there"
-                                   + (f", {hb} retried at a heartbeat, {how}" if hb else ""))
+                retried += hb
+                if arm[key] + hb < r_:
+                    fails["K4"].append(f"node {key[0]}: {r_} retry_offer record(s) for {key[1]} at {fl(key[2])!r}, "
+                                       f"{arm[key]} armed there"
+                                       + (f", {hb} retried at a heartbeat, {how}" if hb else ""))
     nrec = sum(recs.values())
     multi = sum(1 for key, a in arm.items() if a > 1 and fl(key[2]) <= last)
 
@@ -252,15 +281,16 @@ def check(path, out):
     line("K2", f"{notes} notes, each delay max(0, known_at + START_DELAY - t) + 1e-6")
     line("K3", f"{notes - late_n} notes and {owns - late_o} own afters fire as retry_offer records at their due; "
                f"{late_n + late_o} due after the last record")
-    k4how = f"({retried}, by the heartbeat alone)" if alone else f"for an ask held back ({retried})"
+    k4how = f"({retried}, by the heartbeat alone)" if beat_only else f"for an ask held back ({retried})"
     line("K4", f"{nrec} retry_offer records, each armed, or retried at a heartbeat {k4how}: as many armed as records "
                f"at each key, {multi} keys with two or more armed")
-    if alone:
-        out.append(f"timers_seacast: held_back: 0 writes; {retried} records retried at a heartbeat, by the heartbeat "
-                   f"alone (no record writes held_back: at most one a key)")
+    if beat_only:
+        out.append(f"timers_seacast: held_back: {held_writes} writes; {retried} records retried at a heartbeat, by the "
+                   f"heartbeat alone (the trace records no on_offer: at most one a chunk); {many} chunks at a heartbeat "
+                   f"with two or more records beyond their timers")
     else:
         out.append(f"timers_seacast: held_back: {held_writes} writes; {retried} records retried at a heartbeat for an "
-                   f"ask held back")
+                   f"ask held back; {many} chunks at a heartbeat with two or more records beyond their timers")
     out.append(f"timers_seacast: enqueue: {enqueue_entries} entries, {enqueue_timed} with timers")
     out.append(f"timers_seacast: alarm_due: {alarm_notes} notes name it; promise_due: {promise_recs} records")
     out.append(f"timers_seacast: start: {start_notes} notes of kind start (a start inside a question)")
@@ -274,7 +304,7 @@ def check(path, out):
     return 0
 
 
-# --- the self-test: fifteen small traces, one node (0), one row group G, START_DELAY 1.0 ------------------------
+# --- the self-test: seventeen small traces, one node (0), one row group G, START_DELAY 1.0 ----------------------
 G = "aa" * 32
 
 
@@ -305,6 +335,11 @@ def _rec(t, fn="on_offer", tape=(), args=None):
 
 def _retry(t, i):
     return _rec(t, "retry_offer", (), [[G, i]])
+
+
+def _retry_id(t, i):
+    """A retry_offer record whose ask names chunk (G, i) by its structured id: group, index (4 bytes), 20 more."""
+    return _rec(t, "retry_offer", (), [G + i.to_bytes(4, "little").hex() + "00" * 20])
 
 
 def _held(t, i):
@@ -342,9 +377,13 @@ CASES = [  # (name, records, the checks that must fail)
      {"K4"}),
     ("u12 a record, its ask held back, no heartbeat", [_held(0.25, 3), _retry(0.7, 3)], {"K4"}),
     ("u13 a write an earlier heartbeat cleared", [_held(0.25, 3), _beat(0.5), _retry(0.7, 3), _beat(0.7)], {"K4"}),
-    ("u14 no write of held_back, a record at a heartbeat", [_rec(0.25), _retry(0.7, 3), _beat(0.7)], set()),
-    ("u15 no write of held_back, two records at a heartbeat", [_rec(0.25), _retry(0.7, 3), _retry(0.7, 3),
-                                                               _beat(0.7)], {"K4"}),
+    ("u14 no on_offer recorded, a record at a heartbeat", [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7)],
+     set()),
+    ("u15 no on_offer recorded, two records at a heartbeat", [_rec(0.25, "on_holding"), _retry(0.7, 3),
+                                                              _retry(0.7, 3), _beat(0.7)], {"K4"}),
+    ("u16 no on_offer recorded, one chunk by index and by id at a heartbeat",
+     [_rec(0.25, "on_holding"), _retry(0.7, 3), _retry_id(0.7, 3), _beat(0.7)], {"K4"}),
+    ("u17 on_offer recorded, no write, a record at a heartbeat", [_rec(0.25), _retry(0.7, 3), _beat(0.7)], {"K4"}),
 ]
 
 
