@@ -1863,14 +1863,38 @@ das_stamp() {           # the need das: the inventory's DAS traces made since tr
   done > "$OUT/das.traces"
   return 0
 }
-needs_line() {          # the needs this OUT's traces were made for: das when das.traces lists every DAS path, and
-  #                       seacastcells when seacastcells.cells lists every cell
+needs_declared() {      # the needs this invocation declares, from its flags alone, never from its outputs: das unless
+  #                       --no-das; seacastcells when the whole list of steps (ALL: --record's or --v2steps') makes the
+  #                       SEACAST cells and the cells are every cell, compared as the stamp compares them (--cells with
+  #                       fewer gives none). --steps does not change it: a run of some steps is held to the needs of
+  #                       the whole list it is a part of, and its OUT must hold what the other steps made. The needs
+  #                       line's words, or - for none
+  local w=
+  [ -n "$NODAS" ] || w=das
+  # shellcheck disable=SC2086,SC2116
+  case " $ALL " in *" seacastcells "*) [ "$(echo $CELLS)" = "$(echo $ALLCELLS)" ] && w="$w${w:+ }seacastcells" ;; esac
+  echo "${w:--}"
+}
+needs_stamped() {       # the needs this OUT's traces were made for: das when das.traces lists every DAS path, and
+  #                       seacastcells when seacastcells.cells lists every cell; the same words
   local w=
   # shellcheck disable=SC2086
   [ -f "$OUT/das.traces" ] && [ "$(cat "$OUT/das.traces")" = "$(das_paths)" ] && w=das
   # shellcheck disable=SC2086
   [ "$(cat "$OUT/seacastcells.cells" 2> /dev/null)" = "$(echo $ALLCELLS)" ] && w="$w${w:+ }seacastcells"
-  echo "needs: ${w:--}"
+  echo "${w:--}"
+}
+needs_check() {         # c-reached.txt's first line, the declared needs; a FAIL when the stamps are other needs
+  local d s
+  d=$(needs_declared); s=$(needs_stamped)
+  echo "needs: $d" > "$OUT/c-reached.txt"
+  [ "$d" = "$s" ] || no "the needs this invocation declares ($d) are not those its outputs are stamped with ($s) (das.traces, seacastcells.cells)"
+}
+inv_needs() {           # inventory_seacast.py's declaration: --needs, the declared needs joined by commas, and --partial
+  #                       when they are short of das and seacastcells
+  local d
+  d=$(needs_declared)
+  echo "--needs ${d// /,}$([ "$d" = "das seacastcells" ] || echo " --partial")"
 }
 calls_summary() {       # piece (b): each SEACAST trace's reached names, and the IWANTs respond, retry_offer and ask_parked
   #                       enqueue, by their records and by their calls, with the calls file's four controls
@@ -1891,7 +1915,7 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   par calls_plant w calls-paired-off-v2 $LATE16 --doc seacast       # the paired omission, on a cell of its own
   par calls_control
   par_end || true       # each one's status is read below
-  needs_line > "$OUT/c-reached.txt"
+  needs_check
   for rel in $rels; do
     g=$OUT/reached/${rel//\//__}
     cat "$g.txt" >> "$OUT/c-reached.txt"
@@ -1931,7 +1955,8 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   $PY "$T/calls_seacast.py" --makers "$ROOT" > "$OUT/c-iwant-makers.txt" 2>&1 && mk=ok \
     || no "the IWANT makers are not FNS's, one site each under no loop (c-iwant-makers.txt)"
   # every trace met as its inventory line says, by class and need (inventory_seacast.py)
-  $PY "$T/inventory_seacast.py" "$OUT/inventory.tsv" "$OUT/c-reached.txt" > "$OUT/c-inventory.txt" 2>&1 && inv=ok \
+  # shellcheck disable=SC2046
+  $PY "$T/inventory_seacast.py" $(inv_needs) "$OUT/inventory.tsv" "$OUT/c-reached.txt" > "$OUT/c-inventory.txt" 2>&1 && inv=ok \
     || no "the calls summary against the inventory (c-inventory.txt)"
   if [ -z "$bad" ] && [ "$ok" = 4 ] && [ -n "$mk" ] && [ -n "$inv" ]; then
     echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u), (v) and (w) each refused by their control alone, (w)'s control holding; the IWANT makers: respond, retry_offer and ask_parked, one site each under no loop (c-iwant-makers.txt); the inventory: $(grep -v -c '^#' "$OUT/inventory.tsv") lines, each as it must be (c-inventory.txt)"
@@ -1950,7 +1975,8 @@ timers_all() {          # deferred_offers' timers over exactly the inventory's m
   #                       timer; a start inside a question counted, a search; then the alarm's cell (c-timers-all.txt)
   local rel rels g chk= total line notes w s a hb h=0 hn=0 h0=0 st=0 stn= fl= ws=0 as=0 sn= nread unread=
   rm -rf "$OUT/timersall"; mkdir -p "$OUT/timersall"
-  rels=$($PY "$T/inventory_seacast.py" --must "$OUT/inventory.tsv" "$OUT/c-reached.txt" 2> /dev/null) \
+  # shellcheck disable=SC2046
+  rels=$($PY "$T/inventory_seacast.py" --must $(inv_needs) "$OUT/inventory.tsv" "$OUT/c-reached.txt" 2> /dev/null) \
     || no "deferred_offers' timers: the inventory's must lines not read (inventory_seacast.py --must)"
   for rel in $rels; do
     if ! has -E "^$rel \\(format " "$OUT/reached/${rel//\//__}.txt" 2> /dev/null; then unread="$unread $rel"; continue; fi

@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
 """The calls summary held to the inventory: every trace it can meet, by class and need (formal/twin/inventory.tsv).
 
-    python3 -I inventory_seacast.py INVENTORY C-REACHED          the check
-    python3 -I inventory_seacast.py --must INVENTORY C-REACHED   the must lines whose need the run had, a path a line
-    python3 -I inventory_seacast.py --self-test                  twenty-six small cases it writes
+    python3 -I inventory_seacast.py --needs N [--partial] INVENTORY C-REACHED          the check
+    python3 -I inventory_seacast.py --must --needs N [--partial] INVENTORY C-REACHED   the must lines whose need the
+                                                                                       run had, a path a line
+    python3 -I inventory_seacast.py --self-test                  thirty-three small cases it writes
+
+N: the needs the run was invoked for, declared by its caller (check.sh, from its flags), never read from the output:
+`-`, or das and seacastcells joined by commas, each at most once, in that order. --partial is required when N is
+short of das,seacastcells, and refused with it: a run with fewer needs is a partial one, said twice.
 
 INVENTORY: `#` lines are comments; every other line is `path TAB class TAB need TAB why`, sorted by its bytes, each
 path once. class: must, stopped, plant or copy. need: `-` (every run), das or seacastcells. C-REACHED: the calls
 summary's file, whose first line is `needs: WORDS`, the needs the run had (das and seacastcells, each at most once, in
-that order), or `needs: -`. A trace there is read when it has a line `PATH (format ...`, and skipped when it has a
-line `skipped: PATH: CLASS: WHY`; a skip line without a class has none.
+that order), or `needs: -`; WORDS must be N's, with spaces. A trace there is read when it has a line
+`PATH (format ...`, and skipped when it has a line `skipped: PATH: CLASS: WHY`; a skip line without a class has none.
 
 The check, for each path:
 - a listed path whose need the run had is present, read or skipped;
@@ -17,7 +22,8 @@ The check, for each path:
 - a must path is read, and any other skipped with its own class;
 - every path present is listed.
 Exit 0 with one line when each holds, 1 with one line `inventory: NOT: PATH: WHY` for each path that fails, 2 with
-`inventory: refused: WHY` for an inventory or a needs line not in its form.
+`inventory: refused: WHY` for an inventory, a needs line or a declaration not in its form, or a needs line that is not
+the declaration.
 """
 import re
 import sys
@@ -58,21 +64,40 @@ def read_inventory(text):
     return lines
 
 
-def read_reached(text):
-    """(the needs line's words as written, the needs had, the paths read, {path skipped: its class or None})."""
+def needs_words(words, what=""):
+    """The needs' words as a list, held to their grammar: ["-"], or das and seacastcells, each at most once, in that
+    order. `what` begins a refusal's words."""
+    if words != ["-"]:
+        for w in words:
+            if w not in WORDS:
+                raise Refused(f"{what}an unknown needs word: {w!r}")
+        if len(set(words)) != len(words):
+            raise Refused(f"{what}a needs word twice")
+        if words != [w for w in WORDS if w in words]:
+            raise Refused(f"{what}the needs words out of their order")
+    return words
+
+
+def declared(arg, partial):
+    """The declaration (--needs N, --partial) as the needs line's words with spaces."""
+    words = needs_words(arg.split(","), "the declared needs: ")
+    if words == list(WORDS) and partial:
+        raise Refused("--partial with the full needs (das,seacastcells)")
+    if words != list(WORDS) and not partial:
+        raise Refused(f"a declaration short of the full needs (needs: {' '.join(words)}) without --partial")
+    return " ".join(words)
+
+
+def read_reached(text, decl):
+    """(the needs line's words as written, the needs had, the paths read, {path skipped: its class or None}). The
+    needs line must be the declaration `decl` (the words with spaces)."""
     lines = text.splitlines()
     if not lines or not lines[0].startswith("needs: "):
         raise Refused("the calls summary's first line is not its needs line")
     said = lines[0][len("needs: "):]
-    words = said.split(" ")
-    if words != ["-"]:
-        for w in words:
-            if w not in WORDS:
-                raise Refused(f"an unknown needs word: {w!r}")
-        if len(set(words)) != len(words):
-            raise Refused("a needs word twice")
-        if words != [w for w in WORDS if w in words]:
-            raise Refused("the needs words out of their order")
+    words = needs_words(said.split(" "))
+    if said != decl:
+        raise Refused(f"the calls summary's needs line (needs: {said}) is not the declared needs (needs: {decl})")
     needs = set() if words == ["-"] else set(words)
     read, skipped = set(), {}
     for line in lines[1:]:
@@ -117,10 +142,11 @@ def check(inv, needs, read, skipped):
     return nots, absent
 
 
-def run(inv_text, reached_text, out):
+def run(inv_text, reached_text, out, needs_arg="das,seacastcells", partial=False):
     try:
+        decl = declared(needs_arg, partial)
         inv = read_inventory(inv_text)
-        said, needs, read, skipped = read_reached(reached_text)
+        said, needs, read, skipped = read_reached(reached_text, decl)
     except Refused as e:
         out.append(f"inventory: refused: {e}")
         return 2
@@ -203,15 +229,40 @@ def cases():
     out.append(("no needs line", base, reached_text(None, READ, SKIP), 2, "not its needs line"))
     out.append(("an unknown needs word", base, reached_text("needs: das cells", READ, SKIP), 2, "unknown needs word"))
     out.append(("a needs word twice", base, reached_text("needs: das das seacastcells", READ, SKIP), 2, "twice"))
+    # the declaration (--needs, --partial): the needs line must be it, and it must be in its form
+    seacast_only = reached_text("needs: seacastcells", *without(READ, SKIP, "chains/b", "chains/d"))
+    out.append(("the line needs: seacastcells under the full declaration (an edited summary)", base, seacast_only, 2,
+                "is not the declared needs", ("das,seacastcells", False)))
+    out.append(("the full line under the declaration seacastcells, --partial", base, good, 2,
+                "is not the declared needs", ("seacastcells", True)))
+    out.append(("the declaration seacastcells without --partial", base, seacast_only, 2, "without --partial",
+                ("seacastcells", False)))
+    out.append(("the full declaration with --partial", base, good, 2, "--partial with the full needs",
+                ("das,seacastcells", True)))
+    out.append(("the declaration das,das", base, good, 2, "the declared needs: a needs word twice", ("das,das", True)))
+    out.append(("the declaration seacastcells,das", base, good, 2, "the declared needs: the needs words out of their",
+                ("seacastcells,das", False)))
+    out.append(("an empty declaration", base, good, 2, "the declared needs: an unknown needs word", ("", True)))
     return out
+
+
+def as_declared(reached):
+    """A case's declaration where it gives none: its needs line's, where that line is in its form; else the full
+    needs."""
+    first = reached.split("\n", 1)[0]
+    try:
+        words = needs_words(first[len("needs: "):].split(" ")) if first.startswith("needs: ") else list(WORDS)
+    except Refused:
+        words = list(WORDS)
+    return ",".join(words), words != list(WORDS)
 
 
 def self_test():
     good = 0
     cs = cases()
-    for name, inv, reached, want, what in cs:
+    for name, inv, reached, want, what, *dec in cs:
         out = []
-        rc = run(inv, reached, out)
+        rc = run(inv, reached, out, *(dec[0] if dec else as_declared(reached)))
         if want == 1:
             ok = rc == 1 and any(w.startswith(f"inventory: NOT: {what}: ") for w in out)
         elif want == 2:
@@ -231,17 +282,20 @@ def main(argv):
     must = argv[:1] == ["--must"]
     if must:
         argv = argv[1:]
-    if len(argv) != 2:
+    partial = "--partial" in argv[2:3]
+    if len(argv) != 4 + partial or argv[0] != "--needs":
         print(__doc__.split("\n\n")[1], file=sys.stderr)
         return 2
-    with open(argv[0]) as f:
+    needs_arg, (inv_path, reached_path) = argv[1], argv[2 + partial:]
+    with open(inv_path) as f:
         inv_t = f.read()
-    with open(argv[1]) as f:
+    with open(reached_path) as f:
         reached_t = f.read()
     if must:
         try:
+            decl = declared(needs_arg, partial)
             inv = read_inventory(inv_t)
-            _, needs, _, _ = read_reached(reached_t)
+            _, needs, _, _ = read_reached(reached_t, decl)
         except Refused as e:
             print(f"inventory: refused: {e}")
             return 2
@@ -250,7 +304,7 @@ def main(argv):
                 print(p)
         return 0
     out = []
-    rc = run(inv_t, reached_t, out)
+    rc = run(inv_t, reached_t, out, needs_arg, partial)
     print("\n".join(out))
     return rc
 
