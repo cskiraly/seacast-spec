@@ -4,7 +4,7 @@ records they arm.
 
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
                                       2: a trace it cannot read, or not a trace under seacast.md
-    python3 timers_seacast.py --self-test  eighteen small traces it writes, each with the result written for it
+    python3 timers_seacast.py --self-test  twenty-three small traces it writes, each with the result written for it
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -30,23 +30,26 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       matched to one note in particular.
       retry_offer has a second caller with no timer: seacast.md's on_heartbeat retries every offer §4.3's limits held
       back (`for a in held_back.values(): retry_offer(a)`), then clears held_back. on_heartbeat is no record, so
-      those calls are records of their own. A record beyond the timers at its key is the heartbeat's when both hold:
-      its node has a drop_stale_waits record at its t (under seacast.md on_heartbeat alone calls drop_stale_waits,
-      after the retries, so its record follows theirs and ends the node's held_back); and its ask was written to
-      held_back at that node (a write ["held_back", PATH, ASK], on_offer's) since the node's last such record, and
-      no other record at that heartbeat took the same write. One write excuses one record at most, and the writes
-      of one key in an epoch are one: an excuse is the held value at the heartbeat, and held_back holds one value
-      per chunk, so a chunk with two records beyond its timers at a heartbeat fails in either branch. The limit: a
-      timer lost whose fire falls on a heartbeat, for an ask held back since the node's last heartbeat and not yet
-      retried, is taken for the heartbeat's retry.
+      those calls are records of their own. Under seacast.md on_heartbeat alone calls drop_stale_waits, after the
+      retries, so its record follows theirs at the same t and ends the node's held_back: it is the heartbeat's
+      marker, and it closes the node's epoch. A record beyond the timers at its key is the heartbeat's when both
+      hold: the node's next marker in record order (not merely one at the same t) has the record's t, so that the
+      marker closes the epoch the record is in; and its ask was written to held_back at that node (a write
+      ["held_back", PATH, ASK], on_offer's) in that epoch, and no other record of that epoch took the same write. A
+      record whose epoch no marker closes, or whose epoch's marker has another t, is not the heartbeat's. One write
+      excuses one record at most, and the writes of one key in an epoch are one: an excuse is the held value at
+      the heartbeat. And since held_back holds one value per chunk and the heartbeat retries each once, K4 fails any
+      chunk with two or more records beyond its timers at one (node, t) of a heartbeat, in either branch and
+      across epochs (two markers at one t). The limit: a timer lost whose fire falls on a heartbeat, for an ask held
+      back in the epoch that heartbeat closes and not yet retried, is taken for the heartbeat's retry.
       A trace that records no on_offer cannot show the second condition: on_offer is held_back's one writer (an
       older head's tracer recorded neither it nor on_heartbeat). There K4 takes the first condition alone, with the bound
       the document gives: at a heartbeat, one record beyond the timers for a chunk at most (its group and index,
-      whichever form the ask names it by), since held_back is keyed by the chunk and the heartbeat retries each of
-      its values once. In a trace that records on_offer, no write means nothing was held back, and the second
-      condition stands. The lines say which of the two a trace took ("held back" or "by the heartbeat alone"), and
-      count the chunks at a heartbeat with two or more records beyond their timers. The fallback's limit: a lost
-      timer whose fire falls on a heartbeat of its node is taken for the heartbeat's retry, held back or not.
+      whichever form the ask names it by). In a trace that records on_offer, no write means nothing was held back,
+      and the second condition stands. The lines say which of the two a trace took ("held back" or "by the
+      heartbeat alone"), and count the chunks at a heartbeat with two or more records beyond their timers. The
+      fallback's limit: a lost timer whose fire falls on a heartbeat, in the epoch its node's marker closes, is
+      taken for the heartbeat's retry, held back or not.
 
 The other lines are counts of the trace's other timers: the `enqueue` entries with timers, the notes that name
 `alarm_due`, the records of `promise_due`, the notes of kind `start` (a `start` inside a question), and any other
@@ -124,7 +127,12 @@ def check(path, out):
     heartbeats = set()                                          # (node, t bits) of a drop_stale_waits record
     held = defaultdict(dict)                                    # node -> held_back since its last heartbeat
     epoch = Counter()                                           # node -> its heartbeats so far
-    held_at = defaultdict(set)                                  # (node, ask, t bits) -> (heartbeat, ask) held back
+    pend = defaultdict(list)                                    # node -> its open epoch's retry_offer keys
+    pend_held = defaultdict(list)                               # node -> those whose ask was held back: (key, ask)
+    bound = Counter()                                           # (node, ask, t bits) -> records its node's next
+    #                                                             marker closed at their t (the fallback's excuses)
+    held_at = defaultdict(set)                                  # (node, ask, t bits) -> (epoch, ask) held back, of
+    #                                                             the records so closed (the held branch's excuses)
     held_writes = offer_recs = 0
     notes = owns = whole = alone = 0
     enqueue_entries = enqueue_timed = alarm_notes = start_notes = promise_recs = 0
@@ -141,8 +149,9 @@ def check(path, out):
             if r["fn"] == "retry_offer":
                 a = json.dumps(r["args"][0])
                 recs[(n, a, tb)] += 1
+                pend[n].append((n, a, tb))                      # a candidate until its node's next marker
                 if a in held[n].values():                       # held back since this node's last heartbeat
-                    held_at[(n, a, tb)].add((epoch[n], a))
+                    pend_held[n].append(((n, a, tb), a))
             for e in r.get("writes") or []:
                 if isinstance(e, list) and len(e) == 3 and e[0] == "held_back":
                     if e[2] is None:
@@ -154,6 +163,14 @@ def check(path, out):
                 offer_recs += 1
             if r["fn"] == "drop_stale_waits":                   # the heartbeat, after its retries: held_back cleared
                 heartbeats.add((n, tb))
+                for key in pend[n]:                             # it closes its node's epoch: the candidates at its
+                    if key[2] == tb:                            #   own t are its retries; the others are dropped
+                        bound[key] += 1
+                for key, a in pend_held[n]:
+                    if key[2] == tb:
+                        held_at[key].add((epoch[n], a))
+                pend[n].clear()
+                pend_held[n].clear()
                 held[n].clear()
                 epoch[n] += 1
             if r["fn"] == "promise_due":
@@ -248,22 +265,31 @@ def check(path, out):
         if arm[key] < r_:
             over[(key[0], chunk(key[1]), key[2])] += r_ - arm[key]
     many = sum(1 for (n, c, tb), x in over.items() if x > 1 and (n, tb) in heartbeats)
+    capped = set()                                              # the cap, in either branch: the heartbeat retries
+    for (n, c, tb), x in over.items():                          #   each chunk once, so two records beyond the
+        if x > 1 and (n, tb) in heartbeats:                     #   timers at one (node, t) fail, across epochs too
+            capped.add((n, c, tb))
+            fails["K4"].append(f"node {n}: {x} retry_offer records for chunk {c} at {fl(tb)!r} beyond their timers at "
+                               f"a heartbeat (at most one is the heartbeat's)")
     if beat_only:
+        exc = Counter()                                         # (node, chunk, t bits) -> records a marker closed
+        for key, r_ in recs.items():
+            if arm[key] < r_:
+                exc[(key[0], chunk(key[1]), key[2])] += min(bound[key], r_ - arm[key])
         for (n, c, tb), x in over.items():
-            hb = 1 if (n, tb) in heartbeats else 0              # the heartbeat retries each chunk once
+            hb = min(1, exc[(n, c, tb)])                        # the heartbeat retries each chunk once
             retried += hb
-            if x > hb:
+            if x > hb and (n, c, tb) not in capped:
                 fails["K4"].append(f"node {n}: {x} retry_offer record(s) for chunk {c} at {fl(tb)!r} beyond its "
                                    f"timers" + (f", 1 retried at a heartbeat, {how}" if hb else ""))
     else:
         for key, r_ in recs.items():
             if arm[key] < r_:
                 hb = 0
-                if (key[0], key[2]) in heartbeats:
-                    for h_ in sorted(held_at.get(key, ())):
-                        if arm[key] + hb < r_ and (key[0],) + h_ not in taken:
-                            taken.add((key[0],) + h_)
-                            hb += 1
+                for h_ in sorted(held_at.get(key, ())):         # only records their node's next marker closed
+                    if arm[key] + hb < r_ and (key[0],) + h_ not in taken:
+                        taken.add((key[0],) + h_)
+                        hb += 1
                 retried += hb
                 if arm[key] + hb < r_:
                     fails["K4"].append(f"node {key[0]}: {r_} retry_offer record(s) for {key[1]} at {fl(key[2])!r}, "
@@ -306,7 +332,7 @@ def check(path, out):
     return 0
 
 
-# --- the self-test: eighteen small traces, one node (0), one row group G, START_DELAY 1.0 -----------------------
+# --- the self-test: twenty-three small traces, one node (0), one row group G, START_DELAY 1.0 -----------------
 G = "aa" * 32
 
 
@@ -388,6 +414,16 @@ CASES = [  # (name, records, the checks that must fail)
     ("u17 on_offer recorded, no write, a record at a heartbeat", [_rec(0.25), _retry(0.7, 3), _beat(0.7)], {"K4"}),
     ("u18 one key written twice in an epoch, two records at its heartbeat",
      [_held(0.25, 3), _held(0.5, 3), _retry(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+    ("u19 a marker, then a hold and a record at its t (the record after the marker)",
+     [_beat(0.7), _held(0.7, 3), _retry(0.7, 3)], {"K4"}),
+    ("u20 two epochs closed at one t, a hold and a record in each",
+     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+    ("u21 as u20, the second epoch left open",
+     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 3), _retry(0.7, 3)], {"K4"}),
+    ("u22 no on_offer recorded, a marker, then a record at its t",
+     [_rec(0.25, "on_holding"), _beat(0.7), _retry(0.7, 3)], {"K4"}),
+    ("u23 no on_offer recorded, two epochs closed at one t, a record in each",
+     [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7), _retry(0.7, 3), _beat(0.7)], {"K4"}),
 ]
 
 
