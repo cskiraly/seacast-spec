@@ -1692,9 +1692,12 @@ EOF_BO
   # families_seacast.py's input: it takes only a whole run's trace, or its copy would hold a prefix as a whole run's.
   # Three copies of seacast/hand5 (the small step's): cut before its trailer; its trailer line cut to 20 characters,
   # with no newline (a trailer whose write failed); its trailer saying the run stopped. Each must be refused, with
-  # exit 1 and its words
-  rm -f "$OUT/chains/fam-cut".* "$OUT/chains/fam-cutline".* "$OUT/chains/fam-stop".*
-  $PY - "$OUT/seacast/hand5.jsonl.gz" "$OUT/chains" > "$OUT/chains/fam-copies.out" 2>&1 <<'EOF_FC'
+  # exit 1 and its words. The copies and what families_seacast.py leaves of each are under fcases/, which no reader of
+  # the run's traces scans: under chains/, the calls summary read them as traces the inventory does not list
+  local fc=$OUT/fcases
+  mkdir -p "$fc"
+  rm -f "$fc/fam-cut".* "$fc/fam-cutline".* "$fc/fam-stop".* "$fc/fam-copies.out"
+  $PY - "$OUT/seacast/hand5.jsonl.gz" "$fc" > "$fc/fam-copies.out" 2>&1 <<'EOF_FC'
 import gzip
 import json
 import sys
@@ -1715,19 +1718,19 @@ with gzip.open(src, "rt") as f, gzip.open(f"{d}/fam-cut.in.jsonl.gz", "wt", comp
 EOF_FC
   okc=1 fw=""
   for c in cut cutline stop; do
-    $PY "$T/families_seacast.py" signed "$OUT/chains/fam-$c.in.jsonl.gz" "$OUT/chains/fam-$c.jsonl.gz" > "$OUT/chains/fam-$c.out" 2>&1
+    $PY "$T/families_seacast.py" signed "$fc/fam-$c.in.jsonl.gz" "$fc/fam-$c.jsonl.gz" > "$fc/fam-$c.out" 2>&1
     rc=$?
     case $c in
       cut) tl="no trailer: a trace cut short is not a whole run's" ;;
       cutline) tl="the trailer line is cut: a trace cut short is not a whole run's" ;;
       stop) tl="the trailer says the run stopped (SystemExit: a planted stop); a stopped run's records are not a whole run's" ;;
     esac
-    if [ "$rc" != 1 ] || ! has -x -F "families_seacast: $OUT/chains/fam-$c.in.jsonl.gz: $tl" "$OUT/chains/fam-$c.out"; then okc=0; fi
+    if [ "$rc" != 1 ] || ! has -x -F "families_seacast: $fc/fam-$c.in.jsonl.gz: $tl" "$fc/fam-$c.out"; then okc=0; fi
     fw="$fw $c $rc,"
   done
   if [ "$okc" = 1 ]; then
     echo "families_seacast.py's input: as it must: it refuses seacast/hand5 cut before its trailer (\"no trailer\"), with its trailer line cut (\"the trailer line is cut\") and with a trailer that says the run stopped (\"the trailer says the run stopped\"), each with exit 1" >> "$OUT/c-fcases.txt"
-  else echo "families_seacast.py's input: its exits on seacast/hand5's copies:${fw%,}; not each 1 with its words (chains/fam-cut.out, fam-cutline.out, fam-stop.out)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
+  else echo "families_seacast.py's input: its exits on seacast/hand5's copies:${fw%,}; not each 1 with its words (fcases/fam-cut.out, fam-cutline.out, fam-stop.out)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
   # S1-C5 (cases 2 and 3 carried as unreachable from the document): seacast/hand5 (the small step's) enters origin_acked
   # 8 times, in its two branches, inside records that replay with 0 reads not made; and its non-leaf reads logged
   # with the row absent, per table (the tape's row-absent form), by the schema's key counts
