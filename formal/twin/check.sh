@@ -1727,7 +1727,7 @@ timers_check() {        # the timers of deferred_offers: timers_seacast.py holds
       ii) opt=timers-delay-no-eps-v2; want="K2" ;;
       iii) opt=timers-note-per-index-v2; want="K1" ;;
     esac
-    got=$(grep -o -E '^timers_seacast: K[1-4] FAILS' "$OUT/timers/$p.timers" | cut -c12-13 | tr '\n' ' ' | sed 's/ $//')
+    got=$(grep -o -E '^timers_seacast: K[1-4] FAILS' "$OUT/timers/$p.timers" | grep -o -E 'K[1-4]' | tr '\n' ' ' | sed 's/ $//')
     if [ "$(cat "$OUT/timers/$p.rc")" != 0 ] || ! has -E "^tracerfaults3: $opt, planted [1-9][0-9]* times?" "$OUT/timers/$p.err" \
         || [ "$(cat "$OUT/timers/$p.trc")" != 1 ] || [ "$got" != "$want" ] || ! has '^timers_seacast: the timers of deferred_offers FAIL on ' "$OUT/timers/$p.timers"; then
       bad="$bad ($p)"
