@@ -211,17 +211,21 @@ def main(argv):
     same("a README added below the tools", f"{tools}/gen/README.md", lambda p: p.write_text("About gen.\n"))
 
     # 3. what the line cannot name: the tracer stops, and leaves no trace the replay passes
-    def stops(name, do, words, **kw):
+    def stops(name, do, words, nofile=False, **kw):
+        """A run that must stop with `words` and leave no trace the replay passes; with nofile, a run the tracer
+        refuses before its output opens, which must leave no output file at all."""
         tag = re.sub(r"[^A-Za-z0-9]+", "-", name)
         t = copy_tree(toy, work / tag / "tree")
         extra = do(t)
         extra = dict(extra) if isinstance(extra, dict) else {}
         out = extra.pop("out", work / f"{tag}.jsonl.gz")
         rc, said = trace(t, out, extra.pop("py", py), **extra, **kw)
-        ok = rc != 0 and words in said and not passes(out)
+        none = not os.path.exists(out)
+        ok = rc != 0 and words in said and not passes(out) and (none or not nofile)
         say(name, ok, f"tracer rc={rc}, {'says' if words in said else 'does NOT say'}: {words}; "
-            f"{'no trace the replay passes' if not passes(out) else 'a trace the replay PASSES'}",
-            "a tracer that stops with these words, and no trace that passes")
+            f"{'no trace the replay passes' if not passes(out) else 'a trace the replay PASSES'}"
+            + (f"; {'no output file' if none else 'an output FILE'}" if nofile else ""),
+            "a tracer that stops with these words, and no trace that passes" + (", and no output file" if nofile else ""))
 
     stops("a name with a blank under the toy", lambda t: (t / "toy" / "a b.py").write_text("X = 1\n"),
           "a name with a character outside")
@@ -302,7 +306,7 @@ def main(argv):
     #    name another document; the whole block traced, so that the document decides what is traced
     stops("the document given twice, --doc seacast then --doc lite (the words read the first, the toy's parser the last)",
           lambda t: {"env": {"TRACE3_ONLY": ""}, "args": [*ARGS, "--doc", "seacast", "--doc", "lite"]},
-          "trace3: the document is given in a form whose words do not name what the toy runs")
+          "trace3: the document is given in a form whose words do not name what the toy runs", nofile=True)
     def doc_trace(tag, extra):
         t = copy_tree(toy, work / tag / "tree")
         out = work / f"{tag}.jsonl.gz"
@@ -319,7 +323,7 @@ def main(argv):
     # --do is no abbreviation the toy takes (it could match --down and --doc): the toy's parser refuses it, and the
     # tracer with it, since the tracer asks that parser
     stops("the document given as --do seacast, which the toy's parser refuses as ambiguous",
-          lambda t: {"args": [*ARGS, "--do", "seacast"]}, "ambiguous option: --do could match")
+          lambda t: {"args": [*ARGS, "--do", "seacast"]}, "ambiguous option: --do could match", nofile=True)
     for name, extra in (("--doc=seacast, the = form", ["--doc=seacast"]),):
         rc, f, b = doc_trace(re.sub(r"[^A-Za-z0-9]+", "-", name), extra)
         same = rc0 == 0 and rc == 0 and f == f0 and b0 is not None and b is not None and head_rest(b) == head_rest(b0)

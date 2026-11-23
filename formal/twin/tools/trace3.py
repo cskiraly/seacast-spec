@@ -2617,11 +2617,9 @@ class Tracer3(Tracer):
         self.N, self.Wm = N, Wm
         F.ATTR_LEVELS[N.PeerQueue] = ("urgent", "normal")    # a PeerQueue's lanes are its keys
         F.ATTR_READS[N.PeerQueue] = {"has_chunks": ("normal",)}  # next_to_send's `q.has_chunks()`
-        # the content line first: what this trace is made from (content.py)
+        # the content line first: what this trace is made from (content.py); written when the output opens, after
+        # every check here, so that a run refused here leaves no file
         self.content_line = content.line(content.content(self.toy))
-        self.out = gzip.open(out, "wt", compresslevel=1)
-        self.out_path = str(out)
-        self.out.write(self.content_line)
         self.counts = Counter()
         self.nodes = []                 # (node, its constants, its replaced names, its types, its chains), as each is
         #                                 installed (the nodes line; types and chains None under seacast-lite.md)
@@ -2717,6 +2715,9 @@ class Tracer3(Tracer):
         if self.doc_seacast:
             hd["row_reads"] = list(ROW_READS_Seacast)
         hd.update({"traced": sorted(self.traced), "tracer": "trace3.py", "args": argv})
+        self.out = gzip.open(out, "wt", compresslevel=1)
+        self.out_path = str(out)
+        self.out.write(self.content_line)
         self.write({"header": hd})
 
     def write_nodes(self):
