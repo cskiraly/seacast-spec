@@ -4,7 +4,7 @@ records they arm.
 
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
                                       2: a trace it cannot read, or not a trace under seacast.md
-    python3 timers_seacast.py --self-test  seventeen small traces it writes, each with the result written for it
+    python3 timers_seacast.py --self-test  eighteen small traces it writes, each with the result written for it
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -34,7 +34,9 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       its node has a drop_stale_waits record at its t (under seacast.md on_heartbeat alone calls drop_stale_waits,
       after the retries, so its record follows theirs and ends the node's held_back); and its ask was written to
       held_back at that node (a write ["held_back", PATH, ASK], on_offer's) since the node's last such record, and
-      no other record at that heartbeat took the same write. One write excuses one record at most. The limit: a
+      no other record at that heartbeat took the same write. One write excuses one record at most, and the writes
+      of one key in an epoch are one: an excuse is the held value at the heartbeat, and held_back holds one value
+      per chunk, so a chunk with two records beyond its timers at a heartbeat fails in either branch. The limit: a
       timer lost whose fire falls on a heartbeat, for an ask held back since the node's last heartbeat and not yet
       retried, is taken for the heartbeat's retry.
       A trace that records no on_offer cannot show the second condition: on_offer is held_back's one writer (an
@@ -304,7 +306,7 @@ def check(path, out):
     return 0
 
 
-# --- the self-test: seventeen small traces, one node (0), one row group G, START_DELAY 1.0 ----------------------
+# --- the self-test: eighteen small traces, one node (0), one row group G, START_DELAY 1.0 -----------------------
 G = "aa" * 32
 
 
@@ -384,6 +386,8 @@ CASES = [  # (name, records, the checks that must fail)
     ("u16 no on_offer recorded, one chunk by index and by id at a heartbeat",
      [_rec(0.25, "on_holding"), _retry(0.7, 3), _retry_id(0.7, 3), _beat(0.7)], {"K4"}),
     ("u17 on_offer recorded, no write, a record at a heartbeat", [_rec(0.25), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+    ("u18 one key written twice in an epoch, two records at its heartbeat",
+     [_held(0.25, 3), _held(0.5, 3), _retry(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4"}),
 ]
 
 
