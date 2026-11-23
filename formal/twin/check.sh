@@ -1432,6 +1432,12 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   local line5='s/^tracerfaults3: noask-in-record-v2, planted 1 time; node: ([0-9]+); record: ([a-z_0-9]+)$/\1 \2/p'
   local w6="^trace3: node 1: announce is bound to Node\\._no_source_offers\\.<locals>\\.publish\\.<locals>\\.<lambda> \\(node\\.py:[0-9]+\\) at the"
   local w6b=" of group_id's record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run\$"
+  # D3's records: hand5-off's trace stops at the entry of node 1's group_id record (D3's stop point) after 53 records,
+  # its trailer's by_fn build_group 1, drop_stale_waits 25, group_id 1, group_key 1, keep_floor 25, as traced at
+  # 861bca0. Its copy without the stopped key must replay these, a count the trailer under test does not give: a
+  # tracer that lost records before the stop and counted what it kept would pass on the trailer's own count. A change
+  # of the toy or the tracer that moves the records before the stop fails here, and the count is then set anew
+  local D3_RECORDS=53
   mkdir -p "$OUT/chains"; : > "$OUT/c-stops.txt"
   par chain_plant p noask-in-record-v2 hand5-peer
   par chain_plant pc noask-in-record-v2 hand5-v2
@@ -1473,7 +1479,8 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   else echo "D3 point 6, on hand5-off: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-stops.txt"; fi
   # D3's trace given to the replay: its trailer says it stopped, and the replay must refuse it at that key (Main.lean's
   # envelope: "trailer: not a member of it: stopped"), so that a stopped run is never replayed as a whole one; its
-  # control, a copy without the key, which must replay whole (whole_replay, N its trailer's records) and not name the key
+  # control, a copy without the key, which must replay whole (whole_replay, with N D3_RECORDS, which its trailer must
+  # also give) and not name the key
   local rcs rcc ncc
   rm -f "$OUT/c-stopped.replay" "$OUT/c-stopped-control.replay" "$OUT/c-stopped-control.jsonl.gz"
   if ! $PY -c 'import gzip, json, sys
@@ -1493,8 +1500,9 @@ with gzip.open(sys.argv[2], "wt") as f:
 print(json.loads(gzip.open(sys.argv[1], "rt").read().splitlines()[-1])["trailer"]["records"])' "$OUT/c-stopped-control.jsonl.gz" 2> /dev/null)
     if [ "$rcs" = 0 ] || ! has -F "trailer: not a member of it: stopped" "$OUT/c-stopped.replay"; then
       echo "D3's trace, replayed: not refused at its trailer's stopped key (rc $rcs; c-stopped.replay)  <-- NOT" >> "$OUT/c-stops.txt"
-    elif ! whole_replay "$rcc" "$ncc" "$OUT/c-stopped-control.replay" || has -F "trailer: not a member of it: stopped" "$OUT/c-stopped-control.replay"; then
-      echo "D3's trace, replayed: its copy without the key not replayed whole, or the key named there (rc $rcc, trailer $ncc; c-stopped-control.replay)  <-- NOT" >> "$OUT/c-stops.txt"
+    elif [ "$ncc" != "$D3_RECORDS" ] || ! whole_replay "$rcc" "$D3_RECORDS" "$OUT/c-stopped-control.replay" \
+        || has -F "trailer: not a member of it: stopped" "$OUT/c-stopped-control.replay"; then
+      echo "D3's trace, replayed: its copy without the key not replayed whole as D3's $D3_RECORDS records, or the key named there (rc $rcc, trailer $ncc; c-stopped-control.replay)  <-- NOT" >> "$OUT/c-stops.txt"
     else
       echo "D3's trace, replayed: refused at its trailer's stopped key, as it must (rc $rcs: $(grep -m 1 -F 'trailer: not a member of it: stopped' "$OUT/c-stopped.replay" | cut -c1-120)); its copy without the key: rc 0, \"replay: $ncc records, $ncc ok, 0 mismatched\", $ncc its trailer's records, the key not named" >> "$OUT/c-stops.txt"
     fi
