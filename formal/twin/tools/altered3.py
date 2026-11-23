@@ -3121,7 +3121,7 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
     each for its reason; the directed traces' headers pass, and are refused where they do not claim the whole
     state. The envelope on the hand cell's header: a member twice, a member beside the header, a member trace3.py
     does not write, args that are not a list of words and a document word the toy does not take, each refused for
-    its reason; --doc lite passes."""
+    its reason; --doc lite passes, and so does --doc v03, a header's word from before v0.12.0."""
     toy = layout.toy()
 
     def variant(**change):
@@ -3177,6 +3177,8 @@ def header3_controls(hdr, hand_hdr, work, directed, directed44):
         "the hand cell's header with --doc v3": (hand_args(hargs + ["--doc", "v3"]), False,
                                                  "args: a document trace3.py does not write: v3"),
         "the hand cell's header with --doc lite": (hand_args(hargs + ["--doc", "lite"]), True, None),
+        "the hand cell's header with --doc v03 (a header from before v0.12.0)": (hand_args(hargs + ["--doc", "v03"]),
+                                                                                True, None),
     })
     for tag, path in (("§6.1's", directed), ("§4.4's", directed44)):
         dh = load(path)[0]

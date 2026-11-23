@@ -14,8 +14,9 @@ the block's names that are seacast-lite.md's all the way down (trace3.seacast_ke
 or §6.1's twelve; and that it claims the whole state exactly where it is a directed set's. Its tables (`own`,
 `foreign`) are trace3.py's, or for a trace run with --doc seacast seacast.md's manifest's (`want`). Its envelope
 is the one both readers hold it to: no member twice, nothing beside the header, no member trace3.py does not write,
-the arguments a list of words, and a document word the toy takes (`v03` or `SEACAST`). A trace that passes is printed
-with its kind.
+the arguments a list of words, and a document word the toy takes (`lite` or `seacast`; a header written before
+v0.12.0 names them `v03` and `v2`, and trace3.doc_of reads those as these). A trace that passes is printed with its
+kind.
 
 Exit code 0 when every trace passes; otherwise each trace's reasons are printed.
 """
@@ -73,7 +74,7 @@ def kind_of(toy, traced, args):
 # the header's members, as trace3.py writes them (row_reads under --doc seacast alone), and the document words the toy's
 # parser takes (run.py's --doc)
 MEMBERS = ("format", "whole", "own", "foreign", "row_reads", "traced", "tracer", "args")
-DOCS = ("v03", "seacast")
+DOCS = ("lite", "seacast")
 
 
 def head_lines(trace):
