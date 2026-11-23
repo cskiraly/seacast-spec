@@ -1819,13 +1819,13 @@ timers_all() {          # deferred_offers' timers over every trace the calls sum
     w=$(sed -n 's/^timers_seacast: enqueue: [0-9]* entries, \([0-9]*\) with timers$/\1/p' "$g.txt")
     s=$(sed -n 's/^timers_seacast: start: \([0-9]*\) notes of kind start .*/\1/p' "$g.txt")
     a=$(sed -n 's/^timers_seacast: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt")
-    hb=$(sed -n 's/^timers_seacast: the timers of deferred_offers hold on .*; \([0-9]*\) retried at a heartbeat, held back)$/\1/p' "$g.txt")
+    hb=$(sed -n 's/^timers_seacast: the timers of deferred_offers hold on .*; \([0-9]*\) retried at a heartbeat, \(held back\|by the heartbeat alone\))$/\2: \1/p' "$g.txt")
     if [ "$(cat "$g.rc")" = 0 ] && [ -n "$line" ] && [ -n "$w" ] && [ -n "$s" ] && [ -n "$a" ] && [ -n "$hb" ]; then
       h=$((h + 1)); notes=${line%% *}
       if [ "$notes" -gt 0 ]; then hn=$((hn + 1)); else h0=$((h0 + 1)); fi
       ws=$((ws + w)); as=$((as + a))
       [ "$s" = 0 ] || sn="$sn $rel ($s)"
-      echo "$rel: holds: $line; retried at a heartbeat, held back: $hb; enqueue entries with timers: $w; start notes: $s; alarm_due notes: $a" >> "$OUT/c-timers-all.txt"
+      echo "$rel: holds: $line; retried at a heartbeat, $hb; enqueue entries with timers: $w; start notes: $s; alarm_due notes: $a" >> "$OUT/c-timers-all.txt"
     elif [ "$(cat "$g.rc")" = 2 ] && has -E '^timers_seacast: .*: no single START_DELAY fits t - known_at .*; K2 cannot be checked$' "$g.txt"; then
       st=$((st + 1)); stn="$stn $rel"
       echo "$rel: stopped at the type's lookup, a stated limit: $(grep -m 1 'no single START_DELAY fits' "$g.txt" | cut -c1-200)" >> "$OUT/c-timers-all.txt"
