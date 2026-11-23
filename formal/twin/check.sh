@@ -1173,7 +1173,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
          if [ -z "$ni" ] || [ "$kf" != "$ki" ] || [ "$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-h.replay")" != "$ni" ] \
              || [ "$(sed -n 's/^digest \(.\{16\}\).*/\1/p' "$OUT/chains/plant-h.out" | head -n 1)" != "$di" ]; then
            echo "(h) the flipped answer, listed an observer: not (i)'s run (records $ni, flipped $ki, digest $di): its listing reached the toy, or (i) failed  <-- NOT" >> "$OUT/c-chains.txt"
-         elif ! has -x "chaincases: owed_missing on the tapes: 0 rows" "$OUT/chains/plant-h.rows"; then
+         elif ! has -x "chaincases: owed_missing on the tapes: 0 rows; by node {}; nodes replacing it: 0, with rows: 0; rows at other nodes: 0" "$OUT/chains/plant-h.rows"; then
            echo "(h) the flipped answer, listed an observer: owed_missing on its tapes, where an observer's call is on none: $(cut -c13- "$OUT/chains/plant-h.rows" | cut -c1-120)  <-- NOT" >> "$OUT/c-chains.txt"
          elif [ "$kf" -le 20 ] && ! $PY "$T/chaincases.py" --flipped owed_missing "$OUT/chains/plant-i.jsonl.gz" "$OUT/chains/plant-h.replay" > "$OUT/chains/plant-h.flipped"; then
            echo "(h) the flipped answer, listed an observer: the records its replay names are not (i)'s with the flipped row: $(cut -c13- "$OUT/chains/plant-h.flipped" | cut -c1-200)  <-- NOT" >> "$OUT/c-chains.txt"
@@ -1187,7 +1187,7 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
          else echo "(h) the flipped answer, listed an observer: not refused at its $kf flipped record(s) alone, by rule 2's words: $(grep -m 1 '^replay: ' "$OUT/chains/plant-h.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-chains.txt"; fi ;;
       i) $PY "$T/chaincases.py" --rows owed_missing "$OUT/chains/plant-i.jsonl.gz" > "$OUT/chains/plant-i.rows"
          if ! why=$(replay_clean chains/plant-i); then echo "(i) the flipped answer, listed as changing: its replay: $why  <-- NOT" >> "$OUT/c-chains.txt"
-         elif ! has -E "on the tapes: $kf rows \\(true: $kf\\)\$" "$OUT/chains/plant-i.rows"; then
+         elif ! has -E "on the tapes: $kf rows \\(true: $kf\\); by node \\{[^}]*\\}; nodes replacing it: $nn, with rows: [1-9][0-9]*; rows at other nodes: 0\$" "$OUT/chains/plant-i.rows"; then
            echo "(i) the flipped answer, listed as changing: not its $kf flipped answers on the tapes: $(cut -c13- "$OUT/chains/plant-i.rows")  <-- NOT" >> "$OUT/c-chains.txt"
          else
            ni=$(sed -n -E 's/^replay: ([0-9]+) records.*/\1/p' "$OUT/chains/plant-i.replay"); ki=$kf
