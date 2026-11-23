@@ -154,7 +154,7 @@ def index_chunks(tr, xs):               # pairs nat chunkF: rebuilt chunks with 
 
 
 def gi_ask(tr, gi):
-    """optOf askV2Of: group_index(a)'s result. None; an ask by index with its flags (a WantIndex, a FlaggedWant:
+    """optOf askSeacastOf: group_index(a)'s result. None; an ask by index with its flags (a WantIndex, a FlaggedWant:
     tr.ask_seacast); or a structured id's group and index (the toy's GroupIndex), which the twin's groupIndex makes an
     ask by index with no flags: [[group, index], false, 0, false]."""
     if gi is None:

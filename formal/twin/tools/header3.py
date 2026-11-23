@@ -32,10 +32,10 @@ import trace3                           # noqa: E402
 import manifest_seacast                      # noqa: E402: gen/manifest_seacast.py (trace3.py puts gen/ on the path)
 
 
-def want(SEACAST):
+def want(seacast):
     """The header's fields every trace of these tools has, as trace3.py writes them: under --doc seacast the tables are
     seacast.md's manifest's (its own, seacast-lite.md's and SEACAST's, and its foreign), otherwise trace3.py's own."""
-    if SEACAST:
+    if seacast:
         return {"format": 7, "tracer": "trace3.py", "own": list(manifest_seacast.OWN),
                 "foreign": list(manifest_seacast.FOREIGN)}
     return {"format": 7, "tracer": "trace3.py", "own": list(trace3.OWN), "foreign": list(trace3.FOREIGN)}
@@ -146,8 +146,8 @@ def check(toy, trace):
     if kind_of(toy, traced, args) is None:
         why.append(f"traced: {traced!r}, must be the block's functions, §6.1's alone, or under --doc seacast SEACAST's kept "
                    "and covered or §6.1's alone, sorted")
-    SEACAST = doc == "seacast"
-    for name, v in want(SEACAST).items():
+    seacast = doc == "seacast"
+    for name, v in want(seacast).items():
         got = h.get(name)
         if got == v:
             continue
@@ -160,9 +160,9 @@ def check(toy, trace):
     if h.get("whole") is not whole:
         why.append(f"whole: {h.get('whole')!r}, must be {whole!r} for this kind of trace")
     # the rows the views read on the way down: under --doc seacast exactly trace3.ROW_READS_Seacast, and in no other trace
-    if SEACAST and h.get("row_reads") != list(trace3.ROW_READS_Seacast):
+    if seacast and h.get("row_reads") != list(trace3.ROW_READS_Seacast):
         why.append(f"row_reads: {h.get('row_reads')!r}, must be {list(trace3.ROW_READS_Seacast)!r} under --doc seacast")
-    if not SEACAST and "row_reads" in h:
+    if not seacast and "row_reads" in h:
         why.append(f"row_reads: {h['row_reads']!r} in a trace not run with --doc seacast")
     return why
 

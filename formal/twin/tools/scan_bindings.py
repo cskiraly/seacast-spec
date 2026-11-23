@@ -49,8 +49,8 @@ Each function bound has a class:
 - **value**: anything else (a table, a constant, a class, an expression); a name that holds another slot's value
   (`chunk_id = ns["message_id"]`) is marked as its alias.
 Each clause of the test can be switched off (`scan(…, off=…)`), so that the self-test shows each one doing its part.
-A binding in a method that `Node.__init__` calls only under `if self.v2` (and in what such a method calls), or inside
-such a branch of `__init__`, is marked v2-only: under seacast-lite.md it never runs.
+A binding in a method that `Node.__init__` calls only under `if self.seacast` (and in what such a method calls), or
+inside such a branch of `__init__`, is marked v2-only: under seacast-lite.md it never runs.
 """
 import ast
 import hashlib
@@ -452,7 +452,7 @@ class Scanner:
 
     @staticmethod
     def seacast_only(tree):
-        """The methods `Node.__init__` calls only under `if self.v2`, with what they call; and those branches'
+        """The methods `Node.__init__` calls only under `if self.seacast`, with what they call; and those branches'
         lines."""
         node_cls = next((c for c in tree.body if isinstance(c, ast.ClassDef) and c.name == "Node"), None)
         if node_cls is None:
@@ -1266,7 +1266,7 @@ class Node:
         d_extra, d_fallthrough, d_arms, d_plain = ns["c_extra"], ns["c_fallthrough"], ns["c_arms"], ns["c_plain"]
         d_none, d_mid = ns["c_none"], ns["message_id"]
         d_qualified, d_aliasrow, d_methodarg, d_brres = ns["c_qualified"], ns["c_aliasrow"], ns["c_methodarg"], ns["c_brres"]
-        d_finally, d_handler, d_with, d_effect, d_v2q = ns["c_finally"], ns["c_handler"], ns["c_with"], ns["c_effect"], ns["c_v2q"]
+        d_finally, d_handler, d_with, d_effect, d_seacastq = ns["c_finally"], ns["c_handler"], ns["c_with"], ns["c_effect"], ns["c_seacastq"]
         d_put, d_setattr, d_getmut, d_nested = ns["c_put"], ns["c_setattr"], ns["c_getmut"], ns["c_nested"]
         d_lambda, d_lamq, d_outlam, d_reads = ns["c_lambda"], ns["c_lamq"], ns["c_outlam"], ns["c_reads"]
         d_tryelse, d_match, d_handleras, d_walrus = ns["c_tryelse"], ns["c_match"], ns["c_handleras"], ns["c_walrus"]
@@ -1397,9 +1397,9 @@ class Node:
                 return 0
             return d_effect(x)
 
-        def c_v2q(x):
-            ns["v2q"](x)
-            return d_v2q(x)
+        def c_seacastq(x):
+            ns["seacastq"](x)
+            return d_seacastq(x)
 
         def c_question(x):
             ns["askq"](x)
@@ -1479,7 +1479,7 @@ class Node:
                   c_branch=c_branch, c_args=c_args, c_result=c_result, c_extra=c_extra, c_fallthrough=c_fallthrough,
                   c_arms=c_arms, c_plain=c_plain, c_none=c_none, message_id=message_id, c_qualified=c_qualified,
                   c_aliasrow=c_aliasrow, c_methodarg=c_methodarg, c_brres=c_brres, c_finally=c_finally,
-                  c_handler=c_handler, c_with=c_with, c_effect=c_effect, c_v2q=c_v2q, c_put=c_put,
+                  c_handler=c_handler, c_with=c_with, c_effect=c_effect, c_seacastq=c_seacastq, c_put=c_put,
                   c_setattr=c_setattr, c_getmut=c_getmut, c_nested=c_nested, c_lambda=c_lambda, c_lamq=c_lamq,
                   c_outlam=c_outlam, c_reads=c_reads, c_tryelse=c_tryelse, c_match=c_match, c_handleras=c_handleras,
                   c_walrus=c_walrus, c_rebind=c_rebind, c_again=c_again, c_has=c_has)
@@ -1532,7 +1532,7 @@ class Node:
         def c_doc(x):
             if not on:
                 return 0
-            ns["v2q"](x)
+            ns["seacastq"](x)
             return d_doc(x)
         ns["c_doc"] = c_doc
 '''
@@ -1580,8 +1580,8 @@ def self_test():
                moved == [("subscript", "a", 7)] and set(before) == set(after), f"moved {moved}")
     sets = (QUESTIONS_DOC, QUESTIONS_Seacast, TRACED, TRACED_Seacast, DEFS_DOC, RETURNS_DOC)
     saved = [set(s) for s in sets]
-    names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_v2q", "c_doc"}
-    for s, v in zip(sets, ({"askq"}, {"askq", "v2q"}, {"trf"}, {"trf"}, names,
+    names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_seacastq", "c_doc"}
+    for s, v in zip(sets, ({"askq"}, {"askq", "seacastq"}, {"trf"}, {"trf"}, names,
                            names - {"c_none", "message_id"})):
         s.clear()
         s.update(v)
@@ -1608,11 +1608,12 @@ def self_test():
             c = cls(scan(d).rows, "c_has")
             report("control: a toy's `has` that writes is no read, c_has a layer", c == "layer", f"got {c}")
             (Path(d) / "layers.py").write_text(LAYERS)
-            got = [r for r in rows if r["name"] == "c_v2q"]
+            got = [r for r in rows if r["name"] == "c_seacastq"]
             ok = (len(got) == 1 and got[0]["class"] == "per-document"
                   and got[0]["by_document"]["seacast-lite.md"] == "observer"
                   and got[0]["by_document"]["seacast"].startswith("layer"))
-            report("c_v2q per document: an observer under seacast-lite.md, a layer under v2 (a v2 question)", ok,
+            report("c_seacastq per document: an observer under seacast-lite.md, a layer under seacast.md "
+                   "(a seacast.md question)", ok,
                    f"got {[(r['class'], r.get('by_document')) for r in got]}")
             got = [r for r in rows if r["name"] == "c_closed"]
             ok = (len(got) == 1 and got[0]["class"] == "closure-dependent"
@@ -1624,7 +1625,7 @@ def self_test():
                   and got[0]["closure"] == {"on": "not on", "true": "own",
                                             "false": {"seacast-lite.md": "observer", "seacast": "layer"}})
             report("c_doc closure-dependent, its branches per document: own where `not on`; where not, an observer "
-                   "under seacast-lite.md and a layer under v2 (a v2 question)", ok,
+                   "under seacast-lite.md and a layer under seacast.md (a seacast.md question)", ok,
                    f"got {[(r['class'], r.get('closure')) for r in got]}")
         # the lists count a row of a traced name that has no one class; the control, the same row an observer
         # in WRAPPERS, counts none

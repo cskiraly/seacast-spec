@@ -306,15 +306,15 @@ KEYS_SPLIT_Seacast = {"promises": (1, 2, "seacast-lite.md's (§6.1), unchanged: 
                                     "two keys, the ask and the peer")}
 
 
-def sec3_check(names, SEACAST=OWN_Seacast, undeclared=UNDECLARED_Seacast, keys=None, arity=None, split=KEYS_SPLIT_Seacast):
+def sec3_check(names, seacast=OWN_Seacast, undeclared=UNDECLARED_Seacast, keys=None, arity=None, split=KEYS_SPLIT_Seacast):
     """§3's names against the tables' lists (schema.py's, schema_seacast.py's, FOREIGN, the aliases): what differs, as
     one line each. A name of §3 in no list; a name of schema_seacast.py's not in §3, unless it is named in `undeclared`;
     a named one that §3 declares after all; and, given §3's key counts (`keys`, sec3_keys), a table of the schemas
     that §3 declares with another count of keys than its schema row's (`arity`, by default SCHEMA_KEYS), since a
     table whose shape changes keeps its name; a table named in `split` must have its two counts there."""
-    known = set(OWN) | set(SEACAST) | set(FOREIGN) | set(ALIASES_Seacast)
+    known = set(OWN) | set(seacast) | set(FOREIGN) | set(ALIASES_Seacast)
     out = [f"{n}: in §3, in no list" for n in names if n not in known]
-    out += [f"{n}: in schema_seacast.py, not in §3" for n in SEACAST if n not in names and n not in undeclared]
+    out += [f"{n}: in schema_seacast.py, not in §3" for n in seacast if n not in names and n not in undeclared]
     out += [f"{n}: named as not in §3, and §3 declares it" for n in undeclared if n in names]
     arity = SCHEMA_KEYS if arity is None else arity
     out += [f"{n}: {k} key{'' if k == 1 else 's'} in §3, {arity[n]} in its schema row"
@@ -1071,14 +1071,14 @@ def forms_self_test():
     import bits as B                    # noqa: E402: the toy's, beside this repository's documents
     import wire as Wm                   # noqa: E402
 
-    def tracer(SEACAST):
+    def tracer(seacast):
         tr = object.__new__(Tracer3)
-        tr.Wm, tr.doc_seacast = Wm, SEACAST
+        tr.Wm, tr.doc_seacast = Wm, seacast
         return tr
 
-    def run(f, SEACAST):
+    def run(f, seacast):
         try:
-            return f(tracer(SEACAST))
+            return f(tracer(seacast))
         except (SystemExit, TypeError) as e:
             return f"{type(e).__name__}: {e}"
 
@@ -1175,11 +1175,11 @@ def forms_self_test():
     bad = 0
     v2cases = []
     for what, f, want2, want1 in cases:
-        for SEACAST, want in ((True, want2), (False, want1)):
-            got = run(f, SEACAST)
+        for seacast, want in ((True, want2), (False, want1)):
+            got = run(f, seacast)
             ok = same(got, want)
             bad += not ok
-            print(f"forms self-test, {what}, under {'seacast' if SEACAST else 'seacast-lite.md'}: "
+            print(f"forms self-test, {what}, under {'seacast' if seacast else 'seacast-lite.md'}: "
                   f"{'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
         if not same(want1, want2):
             v2cases.append((what, f, want2))
@@ -1322,9 +1322,9 @@ def views_self_test():
     import bits as B                    # noqa: E402: the toy's, beside this repository's documents
     import wire as Wm                   # noqa: E402
 
-    def tables(SEACAST):
+    def tables(seacast):
         tr = object.__new__(Tracer3)
-        tr.Wm, tr.doc_seacast = Wm, SEACAST
+        tr.Wm, tr.doc_seacast = Wm, seacast
         return {t.name: t for t in tr.schema(None)}
 
     g1, g2, g3 = (bytes([n]) * 32 for n in (1, 2, 3))
@@ -2035,7 +2035,8 @@ def timers_self_test():
     bad += not ok
     print(f"timers self-test, the control (the notes' code bypassed): "
           f"{f'fails exactly the {len(noted)} cases of a note or a stop, ok' if ok else f'fails {noted}  <-- FAIL'}")
-    # j: a record's own `after` of SEACAST's three, each against its row written out by hand from timerV2Json's form
+    # j: a record's own `after` of SEACAST's three, each against its row written out by hand from timerSeacastJson's
+    # form
     tr = object.__new__(Tracer3)
     tr.Wm, tr.doc_seacast = Wm, True
 
@@ -2079,9 +2080,9 @@ def timers_self_test():
                   "the same instant's pushes), a setting of neither document, whose SOURCE_OFFERS is ACK or PUBLISH: "
                   "not traced under --doc seacast")
 
-    def offers(SEACAST, mode, plant=False):
+    def offers(seacast, mode, plant=False):
         t = object.__new__(Tracer3)
-        t.doc_seacast = SEACAST
+        t.doc_seacast = seacast
         if plant:
             t.source_offers_check = lambda nd: None
         nd = Node()
@@ -2092,10 +2093,10 @@ def timers_self_test():
             return f"SystemExit: {e}"
         return None
     modes = ((True, "late"), (True, "on"), (True, "off"), (True, "publish"), (False, "late"))
-    ocases = [(f"--source-offers {m} under {'seacast' if SEACAST else 'seacast-lite.md'}", SEACAST, m,
-               late_words if SEACAST and m == "late" else None) for SEACAST, m in modes]
-    for what, SEACAST, m, want in ocases:
-        got = offers(SEACAST, m)
+    ocases = [(f"--source-offers {m} under {'seacast' if seacast else 'seacast-lite.md'}", seacast, m,
+               late_words if seacast and m == "late" else None) for seacast, m in modes]
+    for what, seacast, m, want in ocases:
+        got = offers(seacast, m)
         ok = got == want
         bad += not ok
         print(f"timers self-test, {what}: {'ok' if ok else f'got {got!r}, must be {want!r}  <-- FAIL'}")
@@ -3480,7 +3481,7 @@ class Tracer3(Tracer):
         return t
 
     def msg_seacast(self, m):
-        """A message `send` takes: a HAVE, a WANT or a relation message (V2's msgV2Json)."""
+        """A message `send` takes: a HAVE, a WANT or a relation message (the twin's msgSeacastJson)."""
         kind = type(m).__name__
         return self.have_msg_seacast(m) if kind == "Have" else self.want_seacast(m) if kind == "Want" else self.rel_seacast(m)
 
@@ -3762,7 +3763,7 @@ class Tracer3(Tracer):
     def timer_args(self, name, args):
         """A timer's arguments as a record writes them, by its target's name, for the record's own `after` and for a
         note alike: seacast-lite.md's promise_due and window_timeout by their forms, its other timers by their keys;
-        under SEACAST, seacast.md's three as the twin's timerV2Json has them: reconsider [g, at's word], ask_sample
+        under SEACAST, seacast.md's three as the twin's timerSeacastJson has them: reconsider [g, at's word], ask_sample
         [g, i], resample [g, i, q, first]. An ask_sample armed with a third argument stops the tracer: the twin's form
         has none."""
         key = self.key
