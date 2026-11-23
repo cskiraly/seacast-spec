@@ -1615,7 +1615,7 @@ sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/
   echo "  the carried cases: $e1; $e2; $e3"
 }
 f_cases() {             # piece F: S1-8a's count (carried), S1-8b in both halves, S1-C5's line; local, after carried
-  local churn=chains/custody-floor-churn1 nb r0 nsr m rc tl lines refused rows s8a s8b s5
+  local churn=chains/custody-floor-churn1 nb r0 nsr m rc tl lines refused rows s8a s8b s5 c fw
   local ok8a=0 okw=0 oks=0 okp=0 ok5=0
   local tline="node [0-9]+'s send_relation to [0-9]+: a GRAFT of the −1 family; a counted record put in after it, at node [0-9]+; node [0-9]+'s send_relation to [0-9]+: a PRUNE of the −1 family; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
   : > "$OUT/c-fcases.txt"
@@ -1684,6 +1684,45 @@ EOF_BO
   else
     echo "S1-8b, the reader, plain: as it must: its lines $lines refused, each \"not a line the tracer writes: a number with a sign\"; $(grep -m 1 '^replay: ' "$OUT/chains/fam-plain.replay"); trailer: $((r0 + 1)) records written, $((r0 - 2)) read" >> "$OUT/c-fcases.txt"; okp=1
   fi
+  # families_seacast.py's input: it takes only a whole run's trace, or its copy would hold a prefix as a whole run's.
+  # Three copies of seacast/hand5 (the small step's): cut before its trailer; its trailer line cut to 20 characters,
+  # with no newline (a trailer whose write failed); its trailer saying the run stopped. Each must be refused, with
+  # exit 1 and its words
+  rm -f "$OUT/chains/fam-cut".* "$OUT/chains/fam-cutline".* "$OUT/chains/fam-stop".*
+  $PY - "$OUT/seacast/hand5.jsonl.gz" "$OUT/chains" > "$OUT/chains/fam-copies.out" 2>&1 <<'EOF_FC'
+import gzip
+import json
+import sys
+src, d = sys.argv[1], sys.argv[2]
+prev = None
+with gzip.open(src, "rt") as f, gzip.open(f"{d}/fam-cut.in.jsonl.gz", "wt", compresslevel=1) as cut, \
+        gzip.open(f"{d}/fam-cutline.in.jsonl.gz", "wt", compresslevel=1) as cutline, \
+        gzip.open(f"{d}/fam-stop.in.jsonl.gz", "wt", compresslevel=1) as stop:
+    for line in f:
+        if prev is not None:
+            for o in (cut, cutline, stop):
+                o.write(prev)
+        prev = line
+    t = json.loads(prev)["trailer"]
+    assert "stopped" not in t, "seacast/hand5's trailer says its run stopped"
+    cutline.write(prev[:20])
+    stop.write(json.dumps({"trailer": dict(t, stopped="SystemExit: a planted stop")}, separators=(",", ":")) + "\n")
+EOF_FC
+  okc=1 fw=""
+  for c in cut cutline stop; do
+    $PY "$T/families_seacast.py" signed "$OUT/chains/fam-$c.in.jsonl.gz" "$OUT/chains/fam-$c.jsonl.gz" > "$OUT/chains/fam-$c.out" 2>&1
+    rc=$?
+    case $c in
+      cut) tl="no trailer: a trace cut short is not a whole run's" ;;
+      cutline) tl="the trailer line is cut: a trace cut short is not a whole run's" ;;
+      stop) tl="the trailer says the run stopped (SystemExit: a planted stop); a stopped run's records are not a whole run's" ;;
+    esac
+    if [ "$rc" != 1 ] || ! has -x -F "families_seacast: $OUT/chains/fam-$c.in.jsonl.gz: $tl" "$OUT/chains/fam-$c.out"; then okc=0; fi
+    fw="$fw $c $rc,"
+  done
+  if [ "$okc" = 1 ]; then
+    echo "families_seacast.py's input: as it must: it refuses seacast/hand5 cut before its trailer (\"no trailer\"), with its trailer line cut (\"the trailer line is cut\") and with a trailer that says the run stopped (\"the trailer says the run stopped\"), each with exit 1" >> "$OUT/c-fcases.txt"
+  else echo "families_seacast.py's input: its exits on seacast/hand5's copies:${fw%,}; not each 1 with its words (chains/fam-cut.out, fam-cutline.out, fam-stop.out)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
   # S1-C5 (cases 2 and 3 carried as unreachable from the document): seacast/hand5 (the small step's) enters origin_acked
   # 8 times, in its two branches, inside records that replay with 0 reads not made; and its non-leaf reads logged
   # with the row absent, per table (the tape's row-absent form), by the schema's key counts
@@ -1722,7 +1761,9 @@ EOF_RA
   s8a="the backoff codec's case carried: no record of custody-floor-churn1 reads or writes backoff (its readers relation_room and on_prune and its writer on_prune are not traced, nor are their callers)"
   [ "$ok8a" = 1 ] || s8a="the backoff codec's case not as it must be"
   s8b="S1-8b: the writer writes the −1 family as [\"-\", 1] in a GRAFT, a PRUNE and need, and a plain-int writer is refused; on churn1 the reader replays the three ($((r0 + 1)) records, all ok) and refuses the plain int at their 3 lines"
+  if [ "$okc" = 1 ]; then s8b="$s8b; it refuses a trace cut before its trailer or in it, and one whose trailer says the run stopped"; fi
   [ "$okw$oks$okp" = 111 ] || s8b="S1-8b not as it must be"
+  if [ "$okc" != 1 ]; then s8b="$s8b; families_seacast.py's input not refused as it must be"; fi
   s5="S1-C5: origin_acked entered 8 times on seacast/hand5, 0 reads not made; the rows absent: $rows; cases 2 and 3 carried as unreachable"
   [ "$ok5" = 1 ] || s5="S1-C5 not as it must be"
   echo "  F's three: $s8a; $s8b; $s5"
@@ -2291,7 +2332,8 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # limit); a replaced name entered outside every record on hand5-peer, and its plants (s) and (t) (c-carried.txt)
   carried
   # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-seacast) and reader (families_seacast.py
-  # on churn1, signed and plain); S1-C5's line on seacast/hand5 (c-fcases.txt)
+  # on churn1, signed and plain, and its refusal of seacast/hand5 cut short or stopped); S1-C5's line on seacast/hand5
+  # (c-fcases.txt)
   f_cases
   # H4's plant (n): one of LAYERS' changing layers left out, which the scan names and at whose install the tracer
   # stops (c-h4.err)

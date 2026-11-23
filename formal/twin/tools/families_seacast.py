@@ -16,7 +16,11 @@ IN holds at least two records of send_relation, each sending a GRAFT (custody-fl
   {-1: 2, 3: 0}; a node's record with id 7, families [-1, 3] and high false; the type column; and the return that
   counted computes from them, [-1] (the short families the record covers; high false, so no cap). It has no reads,
   scans, writes or rest. The trailer counts it.
-Every other line is copied as it is. One line on stdout says what was changed."""
+Every other line is copied as it is. One line on stdout says what was changed.
+
+IN must be a whole run's trace, or the copy would hold a prefix as if it were one. It is refused, with exit 1 and
+its words, when its trailer says the run stopped, when its trailer line is not JSON (cut while it was written), when
+it has no trailer, when its stream ends before its end marker, and when a line follows its trailer."""
 import gzip
 import json
 import sys
@@ -96,6 +100,8 @@ def main(argv):
     mode, src, dst = argv
     fam = SIGNED if mode == "signed" else PLAIN
     done, said, at = 0, [], []
+    whole = "a trace cut short is not a whole run's"
+    trailer = False                     # the trailer read: no line may follow it
     with gzip.open(src, "rt") as f, gzip.open(dst, "wt", compresslevel=1) as out:
         k = 0                           # the copy's lines written so far
 
@@ -105,30 +111,45 @@ def main(argv):
             k += 1
             if changed:
                 at.append(k)
-        for line in f:
-            if line.startswith('{"trailer"'):
-                if done != 2:
-                    raise SystemExit(f"families_seacast: {done} records of send_relation, not 2 or more")
-                tl = json.loads(line)
-                by = dict(tl["trailer"]["by_fn"], counted=tl["trailer"]["by_fn"].get("counted", 0) + 1)
-                tl["trailer"] = dict(tl["trailer"], records=tl["trailer"]["records"] + 1, by_fn=dict(sorted(by.items())))
-                put(json.dumps(tl, separators=(",", ":")) + "\n")
-                continue
-            if done >= 2 or not line.startswith('{"n":') or '"fn":"send_relation"' not in line:
-                put(line)
-                continue
-            r = json.loads(line)
-            if r["fn"] != "send_relation":
-                put(line)
-                continue
-            kind = "graft" if done == 0 else "prune"
-            edit(r, kind, fam)
-            put(json.dumps(r, separators=(",", ":")) + "\n", True)
-            said.append(f"node {r['n']}'s send_relation to {r['args'][0]}: a {kind.upper()} of the −1 family")
-            if done == 0:
-                put(json.dumps(counted(r["n"], r["t"], fam), separators=(",", ":")) + "\n", True)
-                said.append(f"a counted record put in after it, at node {r['n']}")
-            done += 1
+        try:
+            for line in f:
+                if trailer:
+                    raise SystemExit(f"families_seacast: {src}: a line after the trailer")
+                if line.startswith('{"trailer"'):
+                    try:
+                        tl = json.loads(line)
+                    except json.JSONDecodeError:
+                        raise SystemExit(f"families_seacast: {src}: the trailer line is cut: {whole}") from None
+                    if "stopped" in tl["trailer"]:
+                        raise SystemExit(f"families_seacast: {src}: the trailer says the run stopped "
+                                         f"({tl['trailer']['stopped']}); a stopped run's records are not a whole run's")
+                    if done != 2:
+                        raise SystemExit(f"families_seacast: {done} records of send_relation, not 2 or more")
+                    by = dict(tl["trailer"]["by_fn"], counted=tl["trailer"]["by_fn"].get("counted", 0) + 1)
+                    tl["trailer"] = dict(tl["trailer"], records=tl["trailer"]["records"] + 1,
+                                         by_fn=dict(sorted(by.items())))
+                    put(json.dumps(tl, separators=(",", ":")) + "\n")
+                    trailer = True
+                    continue
+                if done >= 2 or not line.startswith('{"n":') or '"fn":"send_relation"' not in line:
+                    put(line)
+                    continue
+                r = json.loads(line)
+                if r["fn"] != "send_relation":
+                    put(line)
+                    continue
+                kind = "graft" if done == 0 else "prune"
+                edit(r, kind, fam)
+                put(json.dumps(r, separators=(",", ":")) + "\n", True)
+                said.append(f"node {r['n']}'s send_relation to {r['args'][0]}: a {kind.upper()} of the −1 family")
+                if done == 0:
+                    put(json.dumps(counted(r["n"], r["t"], fam), separators=(",", ":")) + "\n", True)
+                    said.append(f"a counted record put in after it, at node {r['n']}")
+                done += 1
+        except EOFError:
+            raise SystemExit(f"families_seacast: {src}: not readable to its end (EOFError): {whole}") from None
+    if not trailer:
+        raise SystemExit(f"families_seacast: {src}: no trailer: {whole}")
     print(f"families_seacast: {mode}: " + "; ".join(said) + "; the trailer counts the record put in; the copy's lines "
           + ", ".join(map(str, at)))
     return 0

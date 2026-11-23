@@ -2596,10 +2596,75 @@ def orders_self_test():
     return bad
 
 
+def close_self_test():
+    """Tracer3.close on a stand-in tracer (no toy), its output in a temporary directory: the files beside the trace
+    are written before the trailer; a failure there, or in a check at the close, gives the trailer a `stopped` that
+    keeps a reason given; the output is closed and the failure raised again. Each case: the trailer's `stopped`, what
+    the close raised, which files beside the trace stood when the trailer was written, and which stand after."""
+    import tempfile
+    bad = 0
+
+    def run(path, given=None, bare_dir=False, calls_fail=False, check_fail=False):
+        tr = object.__new__(Tracer3)
+        tr.out_path, tr.out = path, gzip.open(path, "wt")
+        tr.nodes_written, tr.doc_seacast, tr.counts, tr.rest_total, tr.bare = True, True, Counter({"f": 2}), 0, Counter()
+        seen = []
+
+        def final_check():
+            if check_fail:
+                raise SystemExit("trace3: a planted check")
+
+        def write_calls():
+            if calls_fail:
+                raise OSError("a planted failure")
+            with open(path + ".calls.json", "w") as f:
+                f.write("{}\n")
+
+        def write(rec):
+            seen.append([x for x in ("bare.json", "calls.json") if os.path.isfile(f"{path}.{x}")])
+            Tracer.write(tr, rec)
+        tr.final_check, tr.loaded_check, tr.write_calls, tr.write = final_check, lambda: None, write_calls, write
+        if bare_dir:
+            os.mkdir(path + ".bare.json")
+        raised = None
+        try:
+            tr.close(stopped=given)
+        except BaseException as e:
+            raised = f"{type(e).__name__}: {e}"
+        try:
+            with gzip.open(path, "rt") as f:
+                stopped = json.loads(f.readlines()[-1])["trailer"].get("stopped")
+        except Exception as e:                  # the output not closed, or no trailer
+            stopped = f"the output not readable to a trailer: {type(e).__name__}"
+        return (stopped, raised, seen, [x for x in ("bare.json", "calls.json") if os.path.isfile(f"{path}.{x}")])
+
+    with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "{}.jsonl.gz").format
+        isdir = f"IsADirectoryError: [Errno 21] Is a directory: '{p('b')}.bare.json'"
+        planted = "OSError: a planted failure"
+        check = "SystemExit: trace3: a planted check"
+        for what, got, want in (
+                ("a, the whole close: no stopped, both files written before the trailer",
+                 run(p("a")), (None, None, [["bare.json", "calls.json"]], ["bare.json", "calls.json"])),
+                ("b, .bare.json's path a directory: stopped with the error, no calls file, raised",
+                 run(p("b"), bare_dir=True), (isdir, isdir, [[]], [])),
+                ("c, the calls file's write failing: stopped with it, .bare.json written, raised",
+                 run(p("c"), calls_fail=True), (planted, planted, [["bare.json"]], ["bare.json"])),
+                ("d, the stop path with c's failure: the first reason stays, c's failure raised",
+                 run(p("d"), given="SystemExit: the first stop", calls_fail=True),
+                 ("SystemExit: the first stop", planted, [["bare.json"]], ["bare.json"])),
+                ("e, final_check failing: stopped with it, no file beside the trace, raised",
+                 run(p("e"), check_fail=True), (check, check, [[]], []))):
+            ok = got == want
+            bad += not ok
+            print(f"close self-test, {what}: {'ok' if ok else f'got {got}, must be {want}  <-- FAIL'}")
+    return bad
+
+
 def self_test_seacast():
     bad = (seacast_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
            + closure_self_test() + timers_self_test() + questions_self_test() + orders_self_test()
-           + observers_self_test())
+           + observers_self_test() + close_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -2730,24 +2795,34 @@ class Tracer3(Tracer):
         self.nodes_written = True
 
     def close(self, stopped=None):
-        """The trailer, and the files beside the trace. `stopped`: the reason a run stopped, which the trailer then
-        carries, so that no reader takes the trace for a whole run's."""
-        if not self.nodes_written:
-            self.write_nodes()
-        else:                           # the traced names once more at the end: a name bound again after the first
-            self.final_check()          #   record is seen too
-        self.loaded_check()
+        """The files beside the trace, then the trailer, last. `stopped`: the reason a run stopped, which the trailer
+        then carries, so that no reader takes the trace for a whole run's. A failure before the trailer (a check
+        here, or a file beside the trace not written) stops the run too: the trailer carries it, unless a reason was
+        given, which then stays, and it is raised again once the trailer is written and the output closed."""
+        failed = None
+        try:
+            if not self.nodes_written:
+                self.write_nodes()
+            else:                       # the traced names once more at the end: a name bound again after the first
+                self.final_check()      #   record is seen too
+            self.loaded_check()
+            if self.doc_seacast:        # the calls run bare at another node, or inside a replaced name entered outside
+                with open(self.out_path + ".bare.json", "w") as f:  # any record: a run output beside the trace
+                    json.dump(dict(sorted(self.bare.items())), f, sort_keys=True)
+                    f.write("\n")
+                self.write_calls()
+        except BaseException as e:
+            failed = e
+            if stopped is None:
+                stopped = (f"{type(e).__name__}: {e}".splitlines() or [""])[0]
         trailer = {"records": sum(self.counts.values()), "by_fn": dict(sorted(self.counts.items())),
                    "rest": self.rest_total}
         if stopped is not None:
             trailer["stopped"] = stopped
         self.write({"trailer": trailer})
         self.out.close()
-        if self.doc_seacast:                 # the calls run bare at another node, or inside a replaced name entered outside
-            with open(self.out_path + ".bare.json", "w") as f:      # any record: a run output beside the trace
-                json.dump(dict(sorted(self.bare.items())), f, sort_keys=True)
-                f.write("\n")
-            self.write_calls()
+        if failed is not None:
+            raise failed
 
     def start_check(self, out):
         """What must hold of this Python before the toy is imported, so that what runs is what the content line

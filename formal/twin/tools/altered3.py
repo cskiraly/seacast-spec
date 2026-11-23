@@ -367,11 +367,44 @@ def content_line():
     return CONTENT[0]
 
 
+def last_line(path, raw):
+    """A trace's last line (`raw`, None for no line), parsed; a line that is not JSON was cut while it was written."""
+    try:
+        return None if raw is None else json.loads(raw)
+    except json.JSONDecodeError:
+        raise SystemExit(f"altered3: {path}: its last line is not JSON: a trace cut short") from None
+
+
+def whole(path, last):
+    """A trace's last line, parsed, must be the trailer of a run that did not stop: a trace cut short, or a stopped
+    run's, is a prefix of a run's records, which no control here may take for a whole run's."""
+    t = last.get("trailer") if isinstance(last, dict) else None
+    if not isinstance(t, dict):
+        raise SystemExit(f"altered3: {path}: its last line is not a trailer: a trace cut short")
+    if "stopped" in t:
+        raise SystemExit(f"altered3: {path}: its trailer says the run stopped: {t['stopped']}")
+
+
+def read_lines(path):
+    """A trace's lines as text; a stream that ends before its end marker is refused."""
+    try:
+        with gzip.open(path, "rt") as f:
+            return f.readlines()
+    except EOFError:
+        raise SystemExit(f"altered3: {path}: not readable to its end (EOFError): a trace cut short") from None
+
+
+WHOLE = set()                           # the paths first() has read to their end and found whole
+
+
 def load(path):
-    """A trace's lines from its header on, parsed. Its first line must be this tree's content line."""
-    with gzip.open(path, "rt") as f:
-        assert f.readline() == content_line(), f"{path}: its first line is not this tree's content line"
-        return [json.loads(x) for x in f]
+    """A trace's lines from its header on, parsed. Its first line must be this tree's content line, and its last a
+    whole run's trailer (whole)."""
+    raw = read_lines(path)
+    assert raw[:1] == [content_line()], f"{path}: its first line is not this tree's content line"
+    lines = [json.loads(x) for x in raw[1:-1]] + ([last_line(path, raw[-1])] if len(raw) > 1 else [])
+    whole(path, lines[-1] if lines else None)
+    return lines
 
 
 def write(f, lines):                    # a line given as text is written as it is; the content line first
@@ -472,6 +505,28 @@ def self_test():
              ("the expected report with exit code 1, and an uncaught exception's line on stderr",
               (1, summary, ex, 0, "may_ask", "post", "uncaught exception: replay: …\n"), False)]
     bad = 0
+    # the trailer check of load and first (whole, last_line): a whole run's trailer taken; a stopped run's, a record,
+    # a line cut in its write and no line refused, each in its words
+    tl = '{"trailer":{"records":1,"by_fn":{"f":1},"rest":0}}\n'
+    for name, step, want in (
+            ("a whole run's trailer", lambda: whole("t", last_line("t", tl)), None),
+            ("a trailer that says the run stopped",
+             lambda: whole("t", last_line("t", tl.replace('"rest":0', '"rest":0,"stopped":"SystemExit: x"'))),
+             "its trailer says the run stopped: SystemExit: x"),
+            ("a record as the last line", lambda: whole("t", last_line("t", '{"n":1,"fn":"f"}\n')),
+             "its last line is not a trailer"),
+            ("the trailer line cut to 20 characters", lambda: whole("t", last_line("t", tl[:20])),
+             "its last line is not JSON"),
+            ("no line", lambda: whole("t", last_line("t", None)), "its last line is not a trailer")):
+        try:
+            step()
+            got = None
+        except SystemExit as e:
+            got = str(e)
+        ok = got is None if want is None else got is not None and want in got
+        bad += not ok
+        print(f"altered3 self-test, the trailer check, {name}: {'taken' if got is None else 'refused: ' + got}"
+              f"{'' if ok else '  <-- must be ' + ('taken' if want is None else 'refused: ' + want)}")
     for name, args, want in cases:
         got = as_must(*args)
         bad += got != want
@@ -981,7 +1036,12 @@ def subset_controls(lines, hand, work, head):
 
 
 def first(directed, want):
-    """The header, the nodes line (each node's constants) and the first record of a trace that `want` accepts."""
+    """The header, the nodes line (each node's constants) and the first record of a trace that `want` accepts. The
+    trace is read to its end once per path before, and must be whole (whole)."""
+    if directed not in WHOLE:
+        raw = read_lines(directed)
+        whole(directed, last_line(directed, raw[-1] if raw else None))
+        WHOLE.add(directed)
     hdr = consts = None
     for x in gzip.open(directed, "rt"):
         d = json.loads(x)
