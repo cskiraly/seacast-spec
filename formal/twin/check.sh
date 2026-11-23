@@ -484,6 +484,10 @@ s_tables() {
     || no "a record writer's arity is not runSeacast's case's (arities.txt)"
   [ "$(tail -n 1 "$OUT/arities.txt")" = "records_seacast: 72 covered names, 0 difference(s)" ] \
     || no "the arity check's last line is not 72 covered names and no difference (arities.txt)"
+  # its default path (no argument: the tree's own Replay.lean) gives the same lines as the build's copy
+  (cd "$T" && $PY records_seacast.py) > "$OUT/arities-default.txt" 2>&1
+  if cmp -s "$OUT/arities-default.txt" "$OUT/arities.txt"; then rm -f "$OUT/arities-default.txt"
+  else no "records_seacast.py with no argument does not print arities.txt (arities-default.txt)"; fi
   tail -n 1 "$OUT/arities.txt" | sed 's/^/  /'
   for c in forward on_chunk; do
     why=$(cd "$T" && $PY - "$rv" "$c" "$T" <<'EOF'

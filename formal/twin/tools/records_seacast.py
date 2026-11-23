@@ -552,7 +552,7 @@ def arity_check(replay_lean_path):
 
 
 if __name__ == "__main__":
-    path = sys.argv[1] if len(sys.argv) > 1 else str(HERE.parent / "SpecTwin" / "V2" / "Replay.lean")
+    path = sys.argv[1] if len(sys.argv) > 1 else str(HERE.parent / "SpecTwin" / "Seacast" / "Replay.lean")
     lines = check_lines(path)
     for _, line in lines:
         print(line)
