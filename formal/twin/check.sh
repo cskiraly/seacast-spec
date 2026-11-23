@@ -1783,10 +1783,17 @@ calls_one() {           # $1: a trace under OUT, without .jsonl.gz: calls_seacas
   local g=$OUT/reached/${1//\//__}
   $PY "$T/calls_seacast.py" "$OUT" "$1" > "$g.txt" 2> "$g.err"; echo $? > "$g.rc"
 }
-calls_plant() {         # $1: a plant's letter, $2: its fault: its trace on hand5's arguments, and calls_seacast.py over it
-  local f=$OUT/reached/plant-$1
-  (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$2" . "$f.jsonl.gz" > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
-  $PY "$T/calls_seacast.py" --any "$OUT" "reached/plant-$1" > "$f.txt" 2>&1; echo $? > "$f.crc"
+calls_plant() {         # $1: a plant's letter, $2: its fault, the rest: its cell's arguments (none: hand5's, the plant's
+  #                       own): its trace, and calls_seacast.py over it
+  local l=$1 f=$OUT/reached/plant-$1 q=$2; shift 2
+  (cd "$TOY" && $PY "$T/tracerfaults3.py" "--$q" . "$f.jsonl.gz" "$@" > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
+  $PY "$T/calls_seacast.py" --any "$OUT" "reached/plant-$l" > "$f.txt" 2>&1; echo $? > "$f.crc"
+}
+calls_control() {       # plant (w)'s control: its cell's arguments traced by trace3.py, and calls_seacast.py over it
+  local f=$OUT/reached/plant-wc
+  # shellcheck disable=SC2086
+  (cd "$TOY" && $PY "$T/trace3.py" . "$f.jsonl.gz" $LATE16 --doc seacast --digest > "$f.out" 2> "$f.err"); echo $? > "$f.rc"
+  $PY "$T/calls_seacast.py" --any "$OUT" reached/plant-wc > "$f.txt" 2>&1; echo $? > "$f.crc"
 }
 das_paths() {           # the inventory's paths of need das, one a line, in its order
   awk -F '\t' '!/^#/ && $3 == "das" { print $1 }' "$HERE/inventory.tsv"
@@ -1809,8 +1816,9 @@ needs_line() {          # the needs this OUT's traces were made for: das when da
   echo "needs: ${w:--}"
 }
 calls_summary() {       # piece (b): each SEACAST trace's reached names, and the IWANTs respond, retry_offer and ask_parked
-  #                       enqueue, by their records and by their calls, with the calls file's three controls
-  #                       (c-reached.txt, which the pull carries); plants (u) and (v), each refused by its control; and
+  #                       enqueue, by their records and by their calls, with the calls file's four controls
+  #                       (c-reached.txt, which the pull carries); plants (u), (v) and (w), each refused by its control
+  #                       alone, and (w)'s control; the IWANT makers, from the documents (c-iwant-makers.txt); and
   #                       every trace held to formal/twin/inventory.tsv by inventory_seacast.py, the needs line first
   #                       (c-inventory.txt; the inventory's copy, inventory.tsv, which the pull carries too)
   local rel rels g n=0 s=0 bad= p ok=0 why= inv=
@@ -1822,6 +1830,9 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   for rel in $rels; do par calls_one "$rel"; done
   par calls_plant u calls-nested-off-v2
   par calls_plant v calls-iwants-off-v2
+  # shellcheck disable=SC2086
+  par calls_plant w calls-paired-off-v2 $LATE16 --doc seacast       # the paired omission, on a cell of its own
+  par calls_control
   par_end || true       # each one's status is read below
   needs_line > "$OUT/c-reached.txt"
   for rel in $rels; do
@@ -1837,26 +1848,36 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   else
     echo "c-reached: $n traces read, $s skipped; the controls hold in every one" >> "$OUT/c-reached.txt"
   fi
-  for p in u:calls-nested-off-v2:reach v:calls-iwants-off-v2:by-fn; do
+  for p in u:calls-nested-off-v2:reach v:calls-iwants-off-v2:by-fn w:calls-paired-off-v2:by-fn; do
     local l=${p%%:*} q=${p#*:} f c
     c=${q#*:}; q=${q%%:*}; f=$OUT/reached/plant-$l
     if [ "$(cat "$f.rc")" != 0 ] || ! has -x -E "tracerfaults3: $q, planted [1-9][0-9]* times?" "$f.err"; then
       why="$why ($l) not planted, or its run stopped;"
     elif [ "$(cat "$f.crc")" != 1 ] || ! has -E "^reached/plant-$l: controls: NOT: $c: " "$f.txt" \
-        || has -E "^reached/plant-$l: controls: NOT: .*(K4a|$( [ "$c" = reach ] && echo by-fn || echo reach)): " "$f.txt"; then
+        || has -E "^reached/plant-$l: controls: NOT: .*(K4a|asked|$( [ "$c" = reach ] && echo by-fn || echo reach)): " "$f.txt"; then
       why="$why ($l) not refused by $c alone;"
     else
       ok=$((ok + 1))
     fi
   done
+  f=$OUT/reached/plant-wc               # (w)'s control: the same cell, no plant: the controls hold
+  if [ "$(cat "$f.rc")" = 0 ] && [ "$(cat "$f.crc")" = 0 ] && has -E "^reached/plant-wc: controls: K4a .*: hold$" "$f.txt"; then
+    ok=$((ok + 1))
+  else
+    why="$why (w)'s control does not hold;"
+  fi
   if [ -n "$why" ]; then
     no "the calls summary's plants:$why (reached/plant-*.txt)"
   fi
+  # P1 and P2, the IWANT makers, from the documents (calls_seacast.py --makers)
+  local mk=
+  $PY "$T/calls_seacast.py" --makers "$ROOT" > "$OUT/c-iwant-makers.txt" 2>&1 && mk=ok \
+    || no "the IWANT makers are not FNS's, one site each under no loop (c-iwant-makers.txt)"
   # every trace met as its inventory line says, by class and need (inventory_seacast.py)
   $PY "$T/inventory_seacast.py" "$OUT/inventory.tsv" "$OUT/c-reached.txt" > "$OUT/c-inventory.txt" 2>&1 && inv=ok \
     || no "the calls summary against the inventory (c-inventory.txt)"
-  if [ -z "$bad" ] && [ "$ok" = 2 ] && [ -n "$inv" ]; then
-    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u) and (v) each refused by their control; the inventory: $(grep -v -c '^#' "$OUT/inventory.tsv") lines, each as it must be (c-inventory.txt)"
+  if [ -z "$bad" ] && [ "$ok" = 4 ] && [ -n "$mk" ] && [ -n "$inv" ]; then
+    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u), (v) and (w) each refused by their control alone, (w)'s control holding; the IWANT makers: respond, retry_offer and ask_parked, one site each under no loop (c-iwant-makers.txt); the inventory: $(grep -v -c '^#' "$OUT/inventory.tsv") lines, each as it must be (c-inventory.txt)"
   else
     echo "  the calls summary: not as it must be"
   fi

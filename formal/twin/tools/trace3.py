@@ -3601,13 +3601,19 @@ class Tracer3(Tracer):
                  else self.control(x) if isinstance(x, self.Wm.Control)
                  else ["chunk", self.chunk(x)], bool(urgent)], bool(r)]
 
+    @staticmethod
+    def zero_calls():
+        return {"record": 0, "in": Counter(), "asked": Counter(), "ext": 0, "outer": 0, "observer": 0}
+
     def count_call(self, name, branch, host=None):
-        """Under SEACAST, a call of a traced name, by where it ran: "record" (it opened one), "in" (inside an open record,
-        by that record's fn, `host`), "ext" (inside an interface call) or "observer" (an observer's own code). Its bare
-        calls are .bare.json's, added at the end."""
-        c = self.calls.setdefault(name, {"record": 0, "in": Counter(), "ext": 0, "observer": 0})
-        if branch == "in":
-            c["in"][host] += 1
+        """Under SEACAST, a call of a traced name, by where it ran: "record" (it opened one), "in" (its own call inside an
+        open record, which the record's `reached` names, by that record's fn, `host`), "asked" (a replaced name asked
+        as a question by an open record's own code, by that record's fn), "ext" (inside an interface call), "outer" (a
+        replaced name entered outside any record) or "observer" (an observer's own code). Its bare calls are
+        .bare.json's, added at the end. Each of sec61's and iface_of's wrappers counts every call it takes."""
+        c = self.calls.setdefault(name, self.zero_calls())
+        if branch in ("in", "asked"):
+            c[branch][host] += 1
         else:
             c[branch] += 1
 
@@ -3618,33 +3624,43 @@ class Tracer3(Tracer):
             ins[o] += 1
         self.open_iw.append(name)
 
-    def iw_leave(self, name, branch, tape, k):
-        """That call left: the IWANTs in the enqueue rows its record's tape gained since it was entered (k rows)."""
+    def iw_leave(self, name, branch, tape, k, host=None):
+        """That call left: the IWANTs in the enqueue rows its record's tape gained since it was entered (k rows); a call
+        inside another's record by that record's fn, `host`."""
         self.open_iw.pop()
-        self.count_iwants(name, branch, tape[k:])
+        self.count_iwants(name, branch, tape[k:], host)
 
-    def count_iwants(self, name, branch, rows):
+    def count_iwants(self, name, branch, rows, host=None):
         asks = [n for t in rows if isinstance(t, (list, tuple)) and len(t) >= 2 and t[0] == "enqueue"
                 for n in iwant_asks(t[1])]
-        s = self.iw.setdefault(name, {}).setdefault(branch, {"calls": 0, "with": 0, "iwants": 0, "asks": Counter()})
+        d = self.iw.setdefault(name, {})
+        if branch == "in":                  # the in half by host
+            d = d.setdefault("in", {})
+            branch = host
+        s = d.setdefault(branch, {"calls": 0, "with": 0, "iwants": 0, "asks": Counter()})
         s["calls"] += 1
         s["with"] += 1 if asks else 0
         s["iwants"] += len(asks)
         s["asks"].update(asks)
 
     def write_calls(self):
-        """OUT.calls.json, under SEACAST: count_call's counts with the bare ones, count_iwants' and the IW_NAMES inside
-        one another, keys sorted."""
+        """OUT.calls.json, under SEACAST: count_call's counts with the bare ones, for every traced name (zeros too);
+        count_iwants', the record half and the in half by host; and the IW_NAMES inside one another; keys sorted."""
         bare = Counter()
         for k, v in self.bare.items():
             bare[k.split(" ", 1)[1]] += v
         calls = {}
-        for n in sorted(set(self.calls) | set(bare)):
-            c = self.calls.get(n, {"record": 0, "in": Counter(), "ext": 0, "observer": 0})
-            calls[n] = {"record": c["record"], "in": dict(sorted(c["in"].items())), "bare": bare[n], "ext": c["ext"],
-                        "observer": c["observer"]}
-        iw = {n: {b: {"calls": s["calls"], "with": s["with"], "iwants": s["iwants"],
-                      "asks": {str(a): m for a, m in sorted(s["asks"].items())}} for b, s in sorted(d.items())}
+        for n in sorted(set(self.traced) | set(self.calls) | set(bare)):
+            c = self.calls.get(n, self.zero_calls())
+            calls[n] = {"record": c["record"], "in": dict(sorted(c["in"].items())),
+                        "asked": dict(sorted(c["asked"].items())), "bare": bare[n], "ext": c["ext"],
+                        "outer": c["outer"], "observer": c["observer"]}
+
+        def part(s):
+            return {"calls": s["calls"], "with": s["with"], "iwants": s["iwants"],
+                    "asks": {str(a): m for a, m in sorted(s["asks"].items())}}
+        iw = {n: {b: part(s) if b == "record" else {h: part(t) for h, t in sorted(s.items())}
+                  for b, s in sorted(d.items())}
               for n, d in sorted(self.iw.items())}
         inside = {n: dict(sorted(c.items())) for n, c in sorted(self.inside.items())}
         with open(self.out_path + ".calls.json", "w") as f:
@@ -3797,6 +3813,8 @@ class Tracer3(Tracer):
         row on the record's tape; elsewhere bare. Under SEACAST, an `after` or `start` inside a question at the node is a
         note of the outermost question there (arm_timer), written in its row (call_log)."""
         tr = self
+        counted = tr.doc_seacast and name in tr.traced     # under SEACAST a traced name (replaced here): each of
+        #                                                     its calls counted by the path it takes (count_call)
 
         @functools.wraps(fn)
         def w(*args, **kw):
@@ -3804,6 +3822,8 @@ class Tracer3(Tracer):
             if ob is not None:              # asked by an observer's own code (class 6): no question of the record's,
                 if name in TIMER_KINDS:     #   bare; a timer it arms changes the node
                     raise SystemExit(ob.words(f"arms a timer ({name})", "an observer changes nothing"))
+                if counted:
+                    tr.count_call(name, "observer")
                 return fn(*args, **kw)
             if tr.doc_seacast:
                 foreign = st["depth"] and st["node"] != int(nd.id)     # another node's record is open
@@ -3811,26 +3831,35 @@ class Tracer3(Tracer):
                     raise SystemExit(f"trace3: node {nd.id}: {name} is called while node {st['node']}'s record "
                                      f"is open and no question runs")  #   stops as a traced one does
                 if foreign or st["supp"]:       # bare: inside a question at another node, or inside a replaced
-                    if name in tr.traced:       #   name entered outside a record; a traced name (replaced here)
+                    if counted:                 #   name entered outside a record; a traced name (replaced here)
                         tr.bare[f"{nd.id} {name}"] += 1     # counted as sec61 counts its own; a tape name's
                     return fn(*args, **kw)                  #   call goes on no tape
                 if not st["depth"] and name in replaced:    # a replaced name entered
-                    st["supp"] += 1                                             #   outside any record:
-                    try:                                                        #   nothing inside it is a
-                        return fn(*args, **kw)                                  #   record
+                    if counted:                                                 #   outside any record:
+                        tr.count_call(name, "outer")                            #   nothing inside it is a
+                    st["supp"] += 1                                             #   record
+                    try:
+                        return fn(*args, **kw)
                     finally:
                         st["supp"] -= 1
+                if not st["depth"] and counted:     # a traced name here, with no record open, is a replaced one
+                    raise SystemExit(f"trace3: node {nd.id}: {name}, a traced name, reached the replaced names' "
+                                     f"wrapper outside any record, not replaced here")
                 if st["depth"] and st["ext"] and name in TIMER_KINDS and not NOTES_OFF[0]:     # a timer armed
                     r, note = tr.arm_timer(nd, name, fn, args, kw)          #   inside a question at this node:
                     st["notes"].append(note)                                #   a note of the outermost one
                     return r
             if not st["depth"] or st["ext"]:    # not asked by §6.1's own code
+                if counted and st["ext"]:       # inside a question at the record's node
+                    tr.count_call(name, "ext")
                 return fn(*args, **kw)
             # under SEACAST, a replaced name the twin cannot ask (NOASK_Seacast), called by a record's own code: the twin would
             # run its own function there, where the node ran another
             if tr.doc_seacast and name in NOASK_Seacast:
                 raise SystemExit(f"trace3: node {nd.id}: {name} is replaced here, and {st['cur']['fn']}'s record "
                                  f"calls it: the twin has no question for {name}, and would run its own code there")
+            if counted:                         # a question asked by the record's own code, by its fn: one row on
+                tr.count_call(name, "asked", st["cur"]["fn"])      # the record's tape (calls_seacast.py's asked)
             # the tracer's third state: what the rest of the node reads is behind the tape, but its
             # accesses of the own tables are logged apart, as the callee's `cr` and `cw`
             # under SEACAST an argument of EAGER_Seacast's is written as it was handed over: encoded here, before the call,
@@ -4337,7 +4366,7 @@ class Tracer3(Tracer):
                         if name == "defer":
                             st["defers"] -= 1
                         if iw:
-                            tr.iw_leave(name, "in", st["cur"]["tape"], k)
+                            tr.iw_leave(name, "in", st["cur"]["tape"], k, st["cur"]["fn"])
                 found = {}                          # under SEACAST every installed slot checked at the record's entry, a
                 if tr.doc_seacast:                       #   draw the toy has bound re-wrapped for the record (K13)
                     found = rewrap_draws(ns, slots, rewrap)

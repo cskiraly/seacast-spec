@@ -69,6 +69,7 @@ import functools
 import runpy
 import sys
 import types
+from collections import Counter
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -903,10 +904,42 @@ def calls_iwants_off_seacast():
     hand5's respond). Counted once for each call left out."""
     tracer_instance()
 
-    def count_iwants(self, name, branch, rows):
+    def count_iwants(self, name, branch, rows, host=None):
         PLANTED[0] += 1
 
     T.Tracer3.count_iwants = count_iwants
+
+
+def calls_paired_off_seacast():
+    """Under v2, plant (w), the paired omission, on a cell's arguments (check.sh's $LATE16 --doc seacast): in the
+    first record whose fn is not one of IW_NAMES, whose reached holds exactly one of them (X) and whose tape holds k >= 1
+    IWANTs, X is taken out of the record's reached, and k calls with those k IWANTs out of the calls file's counts of X
+    inside the record's fn (calls[X].in and X's in part). The calls file and reached then agree, and only the tape shows
+    the IWANTs: calls_seacast.py's by-fn control must refuse it, alone. Counted once."""
+    _write = T.Tracer3.write
+
+    @functools.wraps(_write)
+    def write(self, rec):
+        if not PLANTED[0] and isinstance(rec, dict) and "fn" in rec and rec["fn"] not in T.IW_NAMES:
+            n = set(rec.get("reached", ())) & set(T.IW_NAMES)
+            asks = [a for t in rec.get("tape", ()) if isinstance(t, (list, tuple)) and len(t) >= 2 and t[0] == "enqueue"
+                    for a in T.iwant_asks(t[1])]
+            if len(n) == 1 and asks:
+                x, h, k = n.pop(), rec["fn"], len(asks)
+                rec["reached"] = [y for y in rec["reached"] if y != x]
+                c = self.calls[x]["in"]
+                c[h] -= k
+                s = self.iw[x]["in"][h]
+                s["calls"] -= k
+                s["with"] -= k
+                s["iwants"] -= k
+                s["asks"] -= Counter(asks)      # (no zero left behind)
+                if c[h] <= 0:
+                    del c[h], self.iw[x]["in"][h]
+                PLANTED[0] += 1
+        return _write(self, rec)
+
+    T.Tracer3.write = write
 
 
 def timers_note_dropped_seacast():
@@ -1091,7 +1124,8 @@ def suppressed_filter_seacast(toy, off):
 
 CELL_PLANTS_Seacast = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-checks-off-v2",  # on a cell's arguments
                   "--per-node-depth-v2", "--suppressed-filter-v2", "--suppressed-filter-v2-off",
-                  "--timers-note-dropped-v2", "--timers-delay-no-eps-v2", "--timers-note-per-index-v2")   # timers_seacast.py's (i)-(iii)
+                  "--timers-note-dropped-v2", "--timers-delay-no-eps-v2", "--timers-note-per-index-v2",   # timers_seacast.py's (i)-(iii)
+                  "--calls-paired-off-v2")      # calls_seacast.py's (w), on $LATE16 --doc seacast
 
 
 def hdr_read_seacast(raw):
@@ -1551,6 +1585,8 @@ def main(argv):
             calls_nested_off_seacast()
         elif fault == "--calls-iwants-off-v2":
             calls_iwants_off_seacast()
+        elif fault == "--calls-paired-off-v2":
+            calls_paired_off_seacast()
         elif fault == "--timers-note-dropped-v2":
             timers_note_dropped_seacast()
         elif fault == "--timers-delay-no-eps-v2":
