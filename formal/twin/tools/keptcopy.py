@@ -26,7 +26,7 @@ TWIN = Path(__file__).resolve().parent.parent
 COPY = "SpecTwin/Seacast/Kept.lean"
 
 M2 = "the monad: M2"
-V1 = "a function of seacast-lite.md's Lean, through v1"
+V1 = "a function of seacast-lite.md's Lean, through lite"
 LATE = "a call the Python binds late: SEACAST's function"
 IWANT = "the IWANT it builds: SEACAST's, unmarked, its asks plain"
 
@@ -56,15 +56,15 @@ FUNCTIONS = {
     ]),
     "onBlockInstalled": ("SpecTwin/Sec42.lean", [
         (M2, "def onBlockInstalled (root : Root) : M m Unit", "def onBlockInstalled (root : Root) : M2 m Unit", 1),
-        (V1, "(← messageId f)", "(← v1 (messageId f))", 1),
+        (V1, "(← messageId f)", "(← lite (messageId f))", 1),
         (LATE + " (SEACAST's on_validated takes no fuel)", "onValidated deferDepth p f (← validateChunk f)",
-         "Seacast.onValidated p f (← v1 (validateChunk f))", 1),
-        (V1, "← popTiedRoot root", "← v1 (popTiedRoot root)", 1),
-        (V1, "        dropTie p g bits ", "        v1 (dropTie p g bits) ", 1),
-        (V1, "← N (← desc g)", "← v1 (N (← desc g))", 1),
-        (V1, "addOffer (.want g i) p", "v1 (addOffer (.want g i) p)", 1),
-        (V1, "← ledger g0", "← v1 (ledger g0)", 1),
-        (V1, "      retryOffer a\n", "      v1 (retryOffer a)\n", 1),
+         "Seacast.onValidated p f (← lite (validateChunk f))", 1),
+        (V1, "← popTiedRoot root", "← lite (popTiedRoot root)", 1),
+        (V1, "        dropTie p g bits ", "        lite (dropTie p g bits) ", 1),
+        (V1, "← N (← desc g)", "← lite (N (← desc g))", 1),
+        (V1, "addOffer (.want g i) p", "lite (addOffer (.want g i) p)", 1),
+        (V1, "← ledger g0", "← lite (ledger g0)", 1),
+        (V1, "      retryOffer a\n", "      lite (retryOffer a)\n", 1),
         ("the no-bid branch: ledger entered", NOBID_OLD, NOBID_NEW, 1),
     ]),
     "respond": ("SpecTwin/Sec41.lean", [

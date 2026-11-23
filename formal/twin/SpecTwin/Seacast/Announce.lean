@@ -10,7 +10,7 @@ and `send_have`; §4.7's `source_pool`, `unpush`, `candidates_for_source`, `orig
 and `origin_acked`; §4.8's `send_gossip`; and §4.9's `projected`. Each comes after every function it calls
 (`Seacast/Relations.lean`'s rule).
 
-- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `v1`: `have_bits` (§4.2 there), `owe`
+- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `lite`: `have_bits` (§4.2 there), `owe`
   (§5.2) and `N` (§1). SEACAST's functions of the same names as `seacast-lite.md`'s (`announce`, `note_push`, `unpush`,
   `send_have`, `origin_written`, `origin_acked`, `send_gossip`, `projected`) are this namespace's, and calls
   among them name it (`Seacast.announce`).
@@ -83,7 +83,7 @@ def holdingOf (g : Group) (bits : Bits) : M2 m Have := do
 /-- `send_have(p, g)` (§4.2) [c7]: a holding, the whole bitmap, urgent -/
 def sendHave (p : Peer) (g : Group) : M2 m Unit := do
   enter "send_have"
-  let h ← holdingOf g (← v1 (haveBits g))                     -- `holding_of(g, have_bits(g))`
+  let h ← holdingOf g (← lite (haveBits g))                     -- `holding_of(g, have_bits(g))`
   -- `if g in origin and MERGE_HOLDINGS and merge_waiting(p, h): return`
   if (← origin g).isSome && (← read).c2.MERGE_HOLDINGS then
     if ← NodeSeacast.mergeWaiting p h then
@@ -101,8 +101,8 @@ def sendHaveCall (p : Peer) (g : Group) : M2 m Unit := do
 def announce (p : Peer) (g : Group) (bits : Bits) : M2 m Unit := do
   enter "announce"
   -- `bits & ~pushed[p][g] & ~peer_has[p][g].bits & interest_of_peer(p, g)`, read left to right
-  let pu ← v1 (pushed p g)
-  let ph ← v1 (peerHas p g)
+  let pu ← lite (pushed p g)
+  let ph ← lite (peerHas p g)
   let b := Bits.andI ((bits.minus pu).minus ph) (← interestOfPeer p g)
   if b == 0 then                                              -- an empty bitmap is not sent
     branch "announce: nothing to offer"
@@ -111,7 +111,7 @@ def announce (p : Peer) (g : Group) (bits : Bits) : M2 m Unit := do
   if ← NodeSeacast.send p (.have h) false then
     branch "announce: sent"
   else
-    v1 (owe p g b)                                            -- refused by a full queue: owed (v0.5)
+    lite (owe p g b)                                            -- refused by a full queue: owed (v0.5)
     branch "announce: refused, owed"
 
 /-- `announce_extra(g, i)` (§4.4, [D5]): the links outside the relation that want chunk i, at forward time -/
@@ -191,7 +191,7 @@ def unpush (p : Peer) (g : Group) (i : Nat) : M2 m Unit := do
       let c ← colourOf g i
       pure ((← sourcePool T g c).contains p)
   if owes then
-    v1 (owe p g (1 <<< i))
+    lite (owe p g (1 <<< i))
     branch "unpush: owed"
   else
     branch "unpush: not owed"
@@ -232,13 +232,13 @@ def originWritten (f : ChunkF) : M2 m Unit := do
 to the peers `origin_acked` would offer it to, and our holding names every chunk -/
 def offerAtPublish (g : Group) (d : Descriptor) : M2 m Unit := do
   enter "offer_at_publish"
-  setOrigin g ((1 <<< (← v1 (N (some d)))) - 1)              -- `origin[g] = all_bits(N(d))`
+  setOrigin g ((1 <<< (← lite (N (some d)))) - 1)              -- `origin[g] = all_bits(N(d))`
   for q in ← NodeSeacast.order "offer_at_publish" (← suppressionScope g) do
     sendHaveCall q g
   let T ← NodeSeacast.typeOfGroup g
   -- `offers.setdefault(q, set()).add(i)`: a dict, in the order its keys were first set
   let mut offers : List (Peer × Bits) := []
-  for i in List.range (← v1 (N (some d))) do                  -- `range(N(d))`: N read again
+  for i in List.range (← lite (N (some d))) do                  -- `range(N(d))`: N read again
     for q in ← sourcePool T g (← colourOf g i) do
       offers := if offers.any (·.1 == q) then offers.map fun (x, b) => if x == q then (x, b.set i) else (x, b)
                 else offers ++ [(q, (0 : Bits).set i)]
@@ -292,7 +292,7 @@ def projected (p : Peer) (g : Group) : M2 m Bool := do
   if (← NodeSeacast.threshold T h) == (← NodeSeacast.indexCount T h) then
     branch "projected: no code"                               -- every index is needed: nothing is projected
     return false
-  let has ← v1 (peerHas p g)                                  -- `has, sent = peer_has[p][g].bits, sent_to[p][g]`
+  let has ← lite (peerHas p g)                                  -- `has, sent = peer_has[p][g].bits, sent_to[p][g]`
   let sent ← sentToBits p g
   let r := has.popcount + (← read).base.c.FAN_IN * (sent.minus has).popcount ≥ (← NodeSeacast.threshold T h)
   branch (if r then "projected: the threshold reached without us" else "projected: not yet")

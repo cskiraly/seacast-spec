@@ -3,7 +3,7 @@
 gen.py appends TABLES_Seacast to schema.py's TABLES, so that State.lean, Tables.lean and ReplayTables.lean stay one
 each, with one `Cell`. A trace under seacast-lite.md has none of these
 entries, and they read as missing there. The list a seacast-lite.md trace's header is checked against, `ownTables`,
-stays schema.py's; these tables' names are `v2Tables`.
+stays schema.py's; these tables' names are `seacastTables`.
 
 A table's codec follows from two things: what a read of a missing key does in the toy's container
 (toy/node.py, `_seacast`), and what the code observes of a stored value.

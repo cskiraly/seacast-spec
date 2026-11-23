@@ -3,7 +3,7 @@ import SpecTwin.Seacast.KeptKnown
 /-! # A record's values in the forms of its document: known answers
 
 The cases were written before the readers took the document. Each reads a value as a record writes it, under
-seacast.md (`Form.v2`) or `seacast-lite.md` (`Form.v1`), and either reads the value it states or is refused with a
+seacast.md (`Form.seacast`) or `seacast-lite.md` (`Form.lite`), and either reads the value it states or is refused with a
 message that starts as quoted. Under each document the other's forms are refused. Each position of a record has
 one reader, injective there: an IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, the one
 constructor in that place, and a lane's IWANT under v2 into `.iwantSeacast`. -/
@@ -47,75 +47,75 @@ def msgIn (s : String) (f : Form) : Except String Msg := do msg (← Json.parse 
 
 def ph (v : String) (f : Form) : Except String (Option Val) := valIn "peer_has" s!"[5, {gq}]" v f
 
-#guard readsAs (ph "[2, 3, true, false]" .v2) (some (.have { bits := 2, ttl := 3, claimAll := true, complete := false }))
-#guard readsAs (ph "[2, 3, false, true]" .v2) (some (.have { bits := 2, ttl := 3, claimAll := false, complete := true }))
-#guard refusedWith "not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: " (ph "[2, 3]" .v2)
+#guard readsAs (ph "[2, 3, true, false]" .seacast) (some (.have { bits := 2, ttl := 3, claimAll := true, complete := false }))
+#guard readsAs (ph "[2, 3, false, true]" .seacast) (some (.have { bits := 2, ttl := 3, claimAll := false, complete := true }))
+#guard refusedWith "not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: " (ph "[2, 3]" .seacast)
 -- the claims are JSON booleans
 #guard refusedWith "not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: "
-  (ph "[2, 3, 1, 0]" .v2)
-#guard readsAs (ph "[2, 3]" .v1) (some (.have { bits := 2, ttl := 3 }))
-#guard refusedWith "not an entry of peer_has: " (ph "[2, 3, false, false]" .v1)
+  (ph "[2, 3, 1, 0]" .seacast)
+#guard readsAs (ph "[2, 3]" .lite) (some (.have { bits := 2, ttl := 3 }))
+#guard refusedWith "not an entry of peer_has: " (ph "[2, 3, false, false]" .lite)
 
 /-! ## 2. A lane's controls -/
 
 -- an IWANT under v2: unmarked with a flagged ask; marked with a plain ask; an ask by structured id
-#guard readsAs (ctlIn s!"[\"iwant\", [[[{gq}, 3], true, 2, false]], false]" .v2)
+#guard readsAs (ctlIn s!"[\"iwant\", [[[{gq}, 3], true, 2, false]], false]" .seacast)
   (.iwantSeacast false [{ key := .want gk 3, standing := true, hops := 2, probe := false }])
-#guard readsAs (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], true]" .v2) (.iwantSeacast true [{ key := .want gk 3 }])
-#guard readsAs (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 0, false]], false]" .v2) (.iwantSeacast false [{ key := sidKey }])
+#guard readsAs (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], true]" .seacast) (.iwantSeacast true [{ key := .want gk 3 }])
+#guard readsAs (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 0, false]], false]" .seacast) (.iwantSeacast false [{ key := sidKey }])
 -- an ask by structured id carries no flags: the Python's id is bytes, which the tracer writes as [id, false, 0, false]
 #guard refusedWith "an ask of a structured id has no flags: "
-  (ctlIn s!"[\"iwant\", [[\"{sid}\", true, 0, false]], false]" .v2)
+  (ctlIn s!"[\"iwant\", [[\"{sid}\", true, 0, false]], false]" .seacast)
 #guard refusedWith "an ask of a structured id has no flags: "
-  (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 1, false]], false]" .v2)
+  (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 1, false]], false]" .seacast)
 #guard refusedWith "an ask of a structured id has no flags: "
-  (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 0, true]], false]" .v2)
-#guard refusedWith "under seacast.md an IWANT is [\"iwant\", asks, want]: " (ctlIn s!"[\"iwant\", [[{gq}, 3]]]" .v2)
-#guard refusedWith "not an ask with its flags: " (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0]], false]" .v2)
-#guard refusedWith "not a bool: " (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], 0]" .v2)
+  (ctlIn s!"[\"iwant\", [[\"{sid}\", false, 0, true]], false]" .seacast)
+#guard refusedWith "under seacast.md an IWANT is [\"iwant\", asks, want]: " (ctlIn s!"[\"iwant\", [[{gq}, 3]]]" .seacast)
+#guard refusedWith "not an ask with its flags: " (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0]], false]" .seacast)
+#guard refusedWith "not a bool: " (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], 0]" .seacast)
 -- an IWANT under seacast-lite.md
-#guard readsAs (ctlIn s!"[\"iwant\", [[{gq}, 3]]]" .v1) (.iwant [.want gk 3])
+#guard readsAs (ctlIn s!"[\"iwant\", [[{gq}, 3]]]" .lite) (.iwant [.want gk 3])
 #guard refusedWith "not a control message of a queue entry: "
-  (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], false]" .v1)
+  (ctlIn s!"[\"iwant\", [[[{gq}, 3], false, 0, false]], false]" .lite)
 
 -- an IDONTWANT under v2: a holding with its claims; a stock id beside one; a bitmap without claims refused
 def stock : String := String.ofList (List.replicate 40 'b')
-#guard readsAs (ctlIn s!"[\"idontwant\", [[\"holding\", {gq}, 5, true, true]]]" .v2)
+#guard readsAs (ctlIn s!"[\"idontwant\", [[\"holding\", {gq}, 5, true, true]]]" .seacast)
   (.idontwant [.holding gk 5 true true])
-#guard readsAs (ctlIn s!"[\"idontwant\", [\"{stock}\", [\"holding\", {gq}, 5, false, false]]]" .v2)
+#guard readsAs (ctlIn s!"[\"idontwant\", [\"{stock}\", [\"holding\", {gq}, 5, false, false]]]" .seacast)
   (.idontwant [.other stock, .holding gk 5 false false])
 #guard refusedWith "under seacast.md an IDONTWANT's bitmap is a holding: "
-  (ctlIn s!"[\"idontwant\", [[\"bits\", {gq}, 5]]]" .v2)
+  (ctlIn s!"[\"idontwant\", [[\"bits\", {gq}, 5]]]" .seacast)
 -- an IDONTWANT under seacast-lite.md: a holding refused
-#guard refusedWith "not an IHAVE's entry: " (ctlIn s!"[\"idontwant\", [[\"holding\", {gq}, 5, false, false]]]" .v1)
+#guard refusedWith "not an IHAVE's entry: " (ctlIn s!"[\"idontwant\", [[\"holding\", {gq}, 5, false, false]]]" .lite)
 
 -- an IHAVE, under either document: a bitmap, and a holding refused
-#guard readsAs (ctlIn s!"[\"ihave\", [[\"bits\", {gq}, 5]]]" .v2) (.ihave [.bitmap gk 5])
-#guard readsAs (ctlIn s!"[\"ihave\", [[\"bits\", {gq}, 5]]]" .v1) (.ihave [.bitmap gk 5])
-#guard refusedWith "not an IHAVE's entry: " (ctlIn s!"[\"ihave\", [[\"holding\", {gq}, 5, true, false]]]" .v2)
-#guard refusedWith "not an IHAVE's entry: " (ctlIn s!"[\"ihave\", [[\"holding\", {gq}, 5, true, false]]]" .v1)
+#guard readsAs (ctlIn s!"[\"ihave\", [[\"bits\", {gq}, 5]]]" .seacast) (.ihave [.bitmap gk 5])
+#guard readsAs (ctlIn s!"[\"ihave\", [[\"bits\", {gq}, 5]]]" .lite) (.ihave [.bitmap gk 5])
+#guard refusedWith "not an IHAVE's entry: " (ctlIn s!"[\"ihave\", [[\"holding\", {gq}, 5, true, false]]]" .seacast)
+#guard refusedWith "not an IHAVE's entry: " (ctlIn s!"[\"ihave\", [[\"holding\", {gq}, 5, true, false]]]" .lite)
 
 -- the relation controls under v2, each with its one message; gossipsub's PRUNE without one
 def joinJ : String := "[\"join\", \"row\", \"DERIVED\", 0, \"FORWARD\", 1]"
 def joinV : Relation :=
   .join { objectType := "row", interest := .derived, custodyCount := 0, duty := .forward, colours := 1 }
-#guard readsAs (ctlIn s!"[\"join\", [{joinJ}]]" .v2) (.relation joinV)
-#guard readsAs (ctlIn "[\"graft\", [[\"graft\", \"row\", [\"-\", 1], 0, \"OUT\", true]]]" .v2)
+#guard readsAs (ctlIn s!"[\"join\", [{joinJ}]]" .seacast) (.relation joinV)
+#guard readsAs (ctlIn "[\"graft\", [[\"graft\", \"row\", [\"-\", 1], 0, \"OUT\", true]]]" .seacast)
   (.relation (.graft { objectType := "row", family := -1, colour := 0, direction := .outward, answer := true }))
-#guard readsAs (ctlIn "[\"prune\", [[\"prune\", \"column\", 3, 1, \"IN\"]]]" .v2)
+#guard readsAs (ctlIn "[\"prune\", [[\"prune\", \"column\", 3, 1, \"IN\"]]]" .seacast)
   (.relation (.prune { objectType := "column", family := 3, colour := 1, direction := .inward }))
-#guard readsAs (ctlIn "[\"prune\", []]" .v2) .prune
-#guard refusedWith "a relation control holds one message: " (ctlIn "[\"join\", []]" .v2)
-#guard refusedWith "a relation control holds one message: " (ctlIn s!"[\"join\", [{joinJ}, {joinJ}]]" .v2)
-#guard refusedWith "a relation control's message is of another kind: " (ctlIn s!"[\"graft\", [{joinJ}]]" .v2)
+#guard readsAs (ctlIn "[\"prune\", []]" .seacast) .prune
+#guard refusedWith "a relation control holds one message: " (ctlIn "[\"join\", []]" .seacast)
+#guard refusedWith "a relation control holds one message: " (ctlIn s!"[\"join\", [{joinJ}, {joinJ}]]" .seacast)
+#guard refusedWith "a relation control's message is of another kind: " (ctlIn s!"[\"graft\", [{joinJ}]]" .seacast)
 -- under seacast-lite.md a relation control is refused
-#guard refusedWith "not a control message of a queue entry: " (ctlIn s!"[\"join\", [{joinJ}]]" .v1)
+#guard refusedWith "not a control message of a queue entry: " (ctlIn s!"[\"join\", [{joinJ}]]" .lite)
 
 -- a whole lane of peer 5
 def lane1 : String := s!"[[null, [[\"iwant\", [[[{gq}, 3], false, 0, false]], true]], false]]"
-#guard readsAs (valIn "queue" "[5, \"normal\"]" lane1 .v2)
+#guard readsAs (valIn "queue" "[5, \"normal\"]" lane1 .seacast)
   (some (.lane [{ chunk := none, control := some [.iwantSeacast true [{ key := .want gk 3 }]], solicited := false }]))
-#guard refusedWith "not a control message of a queue entry: " (valIn "queue" "[5, \"normal\"]" lane1 .v1)
+#guard refusedWith "not a control message of a queue entry: " (valIn "queue" "[5, \"normal\"]" lane1 .lite)
 
 /-! ## 3. The nodes line's `types` -/
 
@@ -205,21 +205,21 @@ def roundTrip (s : String) : Bool :=
 /-- An IWANT of chunk 3, enqueued on its own, in SEACAST's form: `marked` its mark, `standing` its ask's flag. -/
 def iw (marked standing : Bool) : String := s!"[[\"iwant\", [[[{gq}, 3], {standing}, 0, false]], {marked}]]"
 
-#guard readsAs (msgIn (iw false false) .v2) (.iwant [.want gk 3])
-#guard refusedWith "an IWANT enqueued on its own is seacast-lite.md's, unmarked: " (msgIn (iw true false) .v2)
-#guard refusedWith "an IWANT enqueued on its own is seacast-lite.md's, its asks plain: " (msgIn (iw false true) .v2)
-#guard refusedWith "under seacast.md an IWANT is [\"iwant\", asks, want]: " (msgIn s!"[[\"iwant\", [[{gq}, 3]]]]" .v2)
-#guard readsAs (msgIn s!"[[\"iwant\", [[{gq}, 3]]]]" .v1) (.iwant [.want gk 3])
-#guard refusedWith "not an IWANT, nor an IDONTWANT or an IHAVE of one bitmap: " (msgIn (iw false false) .v1)
+#guard readsAs (msgIn (iw false false) .seacast) (.iwant [.want gk 3])
+#guard refusedWith "an IWANT enqueued on its own is seacast-lite.md's, unmarked: " (msgIn (iw true false) .seacast)
+#guard refusedWith "an IWANT enqueued on its own is seacast-lite.md's, its asks plain: " (msgIn (iw false true) .seacast)
+#guard refusedWith "under seacast.md an IWANT is [\"iwant\", asks, want]: " (msgIn s!"[[\"iwant\", [[{gq}, 3]]]]" .seacast)
+#guard readsAs (msgIn s!"[[\"iwant\", [[{gq}, 3]]]]" .lite) (.iwant [.want gk 3])
+#guard refusedWith "not an IWANT, nor an IDONTWANT or an IHAVE of one bitmap: " (msgIn (iw false false) .lite)
 -- `respond`'s entry: a lane's IWANT, then gossipsub's PRUNE
 #guard readsAs
-  (msgIn s!"[\"entry\", [null, [[\"iwant\", [[[{gq}, 3], false, 0, false]], false], [\"prune\", []]], false]]" .v2)
+  (msgIn s!"[\"entry\", [null, [[\"iwant\", [[[{gq}, 3], false, 0, false]], false], [\"prune\", []]], false]]" .seacast)
   (.entry { chunk := none, control := some [.iwantSeacast false [{ key := .want gk 3 }], .prune], solicited := false })
 -- an IDONTWANT of one bitmap has no v2 form here
 #guard refusedWith "not an IDONTWANT of one bitmap: "
-  (msgIn s!"[[\"idontwant\", [[\"holding\", {gq}, 5, false, false]]]]" .v2)
+  (msgIn s!"[[\"idontwant\", [[\"holding\", {gq}, 5, false, false]]]]" .seacast)
 #guard refusedWith "under seacast.md an IDONTWANT's bitmap is a holding: "
-  (msgIn s!"[[\"idontwant\", [[\"bits\", {gq}, 5]]]]" .v2)
+  (msgIn s!"[[\"idontwant\", [[\"bits\", {gq}, 5]]]]" .seacast)
 
 /-! ## A question's timer notes
 
@@ -228,8 +228,8 @@ question the replay reads, whose answer is none). Group `g6` is `bytes(range(32)
 0.625 (a jittered start, `CHECK_TIME` 0.5 plus 0.125). -/
 
 /-- A tape item read under the document `f`, with its notes, or none. -/
-def notesIn (s : String) (f : Form := .v2) : Except String (List Note) := do
-  let (_, log) ← tapeItem (← Json.parse s) (if f == .v2 then docSeacast else {})
+def notesIn (s : String) (f : Form := .seacast) : Except String (List Note) := do
+  let (_, log) ← tapeItem (← Json.parse s) (if f == .seacast then docSeacast else {})
   return (log.map (·.timers)).getD []
 
 def g6 : String := "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f"
@@ -244,21 +244,21 @@ def loggedWith (log : String) : String := "[\"wake\",[7],null," ++ log ++ "]"
 def retry3 : String := s!"[\"after\",{w25},\"retry_offer\",[[\"{g6}\",3]]]"
 
 -- one `after` in a question: one note, with the delay's word, the target and the arguments read
-#guard readsAs (notesIn (noted s!"[{retry3}]")) [{ delay := w25, timer := .v1 (.retryOffer (.want g6 3)) }]
+#guard readsAs (notesIn (noted s!"[{retry3}]")) [{ delay := w25, timer := .lite (.retryOffer (.want g6 3)) }]
 -- two, in the order armed
 #guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\",[[\"{g6}\",5]]],[\"after\",{w75},\"ask_parked\",[[\"{g6}\",2]]]]"))
-  [{ delay := w25, timer := .v1 (.retryOffer (.want g6 5)) }, { delay := w75, timer := .v1 (.askParked (.want g6 2)) }]
+  [{ delay := w25, timer := .lite (.retryOffer (.want g6 5)) }, { delay := w75, timer := .lite (.askParked (.want g6 2)) }]
 -- a jittered start of decode_group
 #guard readsAs (notesIn (noted s!"[[\"start\",{w625},\"decode_group\",[\"{g6}\"]]]")) [{ delay := w625, timer := .start g6 }]
 -- §6.1's two others, and the toy callback
 #guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"promise_due\",[[\"{g6}\",3],2,{w75}]]]"))
-  [{ delay := w25, timer := .v1 (.promiseDue (.want g6 3) 2 0.75) }]
+  [{ delay := w25, timer := .lite (.promiseDue (.want g6 3) 2 0.75) }]
 #guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"window_timeout\",[[2,\"{g6}\",3],{w75}]]]"))
-  [{ delay := w25, timer := .v1 (.windowTimeout (2, g6, 3) 0.75) }]
+  [{ delay := w25, timer := .lite (.windowTimeout (2, g6, 3) 0.75) }]
 #guard readsAs (notesIn (noted s!"[[\"after\",{w25},\"Node._alarm.<locals>.alarm_due\",[\"{g6}\",3,2,{w75}]]]"))
   [{ delay := w25, timer := .alarmDue g6 3 2 0.75 }]
 -- notes beside what the question read and wrote
-#guard readsAs (notesIn (loggedWith s!"\{\"cr\":[],\"cw\":[],\"timers\":[{retry3}]}")) [{ delay := w25, timer := .v1 (.retryOffer (.want g6 3)) }]
+#guard readsAs (notesIn (loggedWith s!"\{\"cr\":[],\"cw\":[],\"timers\":[{retry3}]}")) [{ delay := w25, timer := .lite (.retryOffer (.want g6 3)) }]
 -- a question with no notes reads none, as before
 #guard readsAs (notesIn "[\"wake\",[7],null]") []
 
@@ -277,23 +277,23 @@ def logOf (s : String) : Except String CallLog := do
 
 -- a note beside a non-empty cr and cw reads as beside empty ones
 #guard readsAs (notesIn (loggedWith ("{" ++ lane2 ++ ",\"timers\":[" ++ retry3 ++ "]}")))
-  [{ delay := w25, timer := .v1 (.retryOffer (.want g6 3)) }]
+  [{ delay := w25, timer := .lite (.retryOffer (.want g6 3)) }]
 -- and the cr and cw beside it are read as they are without it
 #guard match logOf (loggedWith ("{" ++ lane2 ++ ",\"timers\":[" ++ retry3 ++ "]}")), logOf (loggedWith ("{" ++ lane2 ++ "}")) with
   | .ok a, .ok b => a.cr == b.cr && a.cw == b.cw && a.cr.length == 2 && a.cw.length == 3 && b.timers.isEmpty
   | _, _ => false
 
-/-- SEACAST's three, as the record's own `after` writes them (`timerV2Json`'s form), and the same target and arguments in
-a note: the note reads them into the timer whose `timerV2Json` is that target and those arguments, so that an entry
+/-- SEACAST's three, as the record's own `after` writes them (`timerSeacastJson`'s form), and the same target and arguments in
+a note: the note reads them into the timer whose `timerSeacastJson` is that target and those arguments, so that an entry
 and a note write a timer with one codec. -/
-def v2Args : List (String × String) :=
+def seacastArgs : List (String × String) :=
   [("reconsider", s!"[\"{g6}\",4609434218613702656]"), ("ask_sample", s!"[\"{g6}\",3]"),
    ("resample", s!"[\"{g6}\",3,9,true]")]
-#guard v2Args.all fun (t, xs) =>
+#guard seacastArgs.all fun (t, xs) =>
   match Json.parse xs, (do noteOf (← Json.parse s!"[\"after\",{w25},\"{t}\",{xs}]") : Except String Note) with
-  | .ok x, .ok { timer := .v2 tv, .. } => (timerV2Json tv).1 == t && (timerV2Json tv).2.compress == x.compress
+  | .ok x, .ok { timer := .seacast tv, .. } => (timerSeacastJson tv).1 == t && (timerSeacastJson tv).2.compress == x.compress
   | _, _ => false
-#guard v2Args.all fun (t, xs) =>
+#guard seacastArgs.all fun (t, xs) =>
   (do tapeItem (← Json.parse s!"[\"after\",[{w25},\"{t}\",{xs}],null]") docSeacast : Except String TapeItem) matches .ok _
 -- §6.1's timers as a record's own entry, read by the same codec as before
 #guard match (do entry (← Json.parse s!"[\"after\",[{w25},\"retry_offer\",[[\"{g6}\",3]]],null]") : Except String Entry) with
@@ -302,7 +302,7 @@ def v2Args : List (String × String) :=
 #guard refusedWith "not a timer of §6.1: " (entry (Json.arr #[.str "after", Json.arr #[(w25.toNat : Json), .str "flush", Json.arr #[]], .null]))
 
 -- refused, each with its words
-#guard refusedWith "timers under seacast-lite.md, whose tracer writes none: " (notesIn (noted s!"[{retry3}]") .v1)
+#guard refusedWith "timers under seacast-lite.md, whose tracer writes none: " (notesIn (noted s!"[{retry3}]") .lite)
 #guard refusedWith "timers: not a list of notes: " (notesIn (noted s!"\{\"r\":{retry3}}"))
 #guard refusedWith "timers: an empty list, which the tracer does not write: " (notesIn (noted "[]"))
 #guard refusedWith "a timer note is [kind, delay, target, args]: " (notesIn (noted s!"[[\"after\",{w25},\"retry_offer\"]]"))

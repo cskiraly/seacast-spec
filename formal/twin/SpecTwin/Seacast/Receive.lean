@@ -15,7 +15,7 @@ The twin of `forward` (§4.4), `on_validated`, `defer` and `on_chunk` (§4.2), a
   written in two parts: its head (`enter`, and the test of the group's lifetime and the slot's window), and its
   body past the `DEFER` test. `defer` runs the head and the body, as the Python's call does with a verdict that
   is not `DEFER`; `on_validated` runs the head, then `defer` or the body. Nothing is `mutual`.
-- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `v1`: `message_id` (the toy's `chunk_id`),
+- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `lite`: `message_id` (the toy's `chunk_id`),
   `tie`, `choose_push`, `add_offer`, `tied_to_root`, `parked`, `last_resort`, `outstanding`,
   `over_ihave_limits` and `may_ask`. The node's helpers are `Node61`'s questions: `seen`, `accepted`,
   `mark_seen`, `live`, `admitted`, `reserve`, `penalise`, `authenticable`, `shuffled`, and
@@ -53,7 +53,7 @@ def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit
     let fam ← NodeSeacast.family T g                               -- `fam, c = T.family(g), colour_of(g, i)`
     let c ← colourOf g i
     let pushers ← (← NodeSeacast.links T).filterM fun q => do return (← pushOutOf q T fam).contains c
-    let holding ← pushers.filterM fun q => do return (← v1 (peerHas q g)).has i   -- [c4] the sender, normally
+    let holding ← pushers.filterM fun q => do return (← lite (peerHas q g)).has i   -- [c4] the sender, normally
     -- `[q for q in pushers if q not in holding and q != from_peer and interest_of_peer(q, g).has(i) and not
     -- peer_has[q][g].complete]`, left to right
     let cands ← pushers.filterM fun q => do
@@ -64,12 +64,12 @@ def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit
     let budget ← if ← param T "EAGER" (·.EAGER) then
         pure (((← read).base.c.R_NODE : Int) - (holding.length : Int)).toNat
       else pure 0
-    let targets ← v1 (choosePush f cands budget false)        -- seacast-lite.md §5.3 unchanged
+    let targets ← lite (choosePush f cands budget false)        -- seacast-lite.md §5.3 unchanged
     for q in targets do
       if ← enqueue q (.chunk f) false then
         Seacast.notePush q g i                                     -- [c7, c16]
       else
-        v1 (owe q g (1 <<< i))                                -- [c3] refused: offered instead (v0.5)
+        lite (owe q g (1 <<< i))                                -- [c3] refused: offered instead (v0.5)
         branch "forward: a push refused, owed"
     for q in cands do
       if !targets.contains q then Seacast.announce q g (1 <<< i)   -- [c3] offered instead
@@ -96,7 +96,7 @@ private def validatedHead (f : ChunkF) : M2 m Bool := do
 
 /-- `on_validated`'s body past its `DEFER` test: level 1's verdict is ACCEPT or REJECT -/
 private def validatedBody (p : Peer) (f : ChunkF) (result : Verdict) : M2 m Unit := do
-  markSeen (← v1 (messageId f))                               -- accepted or rejected: never validated again
+  markSeen (← lite (messageId f))                               -- accepted or rejected: never validated again
   if result == .reject then                                   -- level 1 failures are the sender's
     penalise p
     branch "on_validated: rejected"
@@ -134,10 +134,10 @@ def defer (p : Peer) (f : ChunkF) : M2 m Unit := do
   if !(← admitted p (.chunk f)) then                          -- beyond the peer's unknown groups: ignored
     branch "defer: not admitted"
     return
-  v1 (tie p f)                                                -- kept or refused, its sender is tied to the root
+  lite (tie p f)                                                -- kept or refused, its sender is tied to the root
   if ← reserve p f then                                       -- a per-peer reservation in the bounded store
     setPending f.root ((← pendingOf f.root) ++ [(p, f)])      -- `pending[f.beacon_block_root].append((p, f))`
-    setPendingId (← v1 (messageId f)) true                    -- `pending_ids.add(chunk_id(f))`
+    setPendingId (← lite (messageId f)) true                    -- `pending_ids.add(chunk_id(f))`
     branch "defer: kept"
   else
     branch "defer: refused"                                   -- not kept; its sender stays tied
@@ -154,7 +154,7 @@ def onValidated (p : Peer) (f : ChunkF) (result : Verdict) : M2 m Unit := do
 /-- `on_chunk(p, f)` (§4.2) -/
 def onChunk (p : Peer) (f : ChunkF) : M2 m Unit := do
   enter "on_chunk"
-  let mid ← v1 (messageId f)                                  -- `mid = chunk_id(f)`
+  let mid ← lite (messageId f)                                  -- `mid = chunk_id(f)`
   -- `if seen(mid) or mid in pending_ids:` a duplicate, a chunk rejected before, or one waiting
   let dup ← if ← seen mid then pure true else pendingId? mid
   if dup then
@@ -164,7 +164,7 @@ def onChunk (p : Peer) (f : ChunkF) : M2 m Unit := do
       sendHaveCall p f.g                                      -- [c14] duplicates are acknowledged too
       branch "on_chunk: a duplicate, acknowledged"
     else if ← pendingId? mid then                             -- another copy of one that waits: its sender too
-      v1 (tie p f)
+      lite (tie p f)
       branch "on_chunk: a duplicate of one waiting, tied"
     else
       branch "on_chunk: a duplicate, ignored"
@@ -240,7 +240,7 @@ def onOffer (p : Peer) (h : Have) : M2 m (List Key) := do
   let offered := (Bits.andI h.bits (← interestOf g)).minus (← mineBits g)
   for i in offered.toList do
     let a : Key := .want g i
-    v1 (addOffer a p)                                         -- [c5] the offer table (v0.5 §6.1)
+    lite (addOffer a p)                                         -- [c5] the offer table (v0.5 §6.1)
     -- `if gated(a) or not authenticable(g): continue`: [c6] stop-pull; the gate first
     if ← gated a then
       branch "on_offer: gated"
@@ -248,23 +248,23 @@ def onOffer (p : Peer) (h : Have) : M2 m (List Key) := do
     if !(← authenticable g) then
       branch "on_offer: no gate"
       continue
-    if ← v1 (tiedToRoot p a) then                             -- its copy waits for its gate
+    if ← lite (tiedToRoot p a) then                             -- its copy waits for its gate
       branch "on_offer: tied"
       continue
-    if ← v1 (parked p a) then                                 -- [c5] park; every announcer parked: last resort
-      v1 (lastResort a)
+    if ← lite (parked p a) then                                 -- [c5] park; every announcer parked: last resort
+      lite (lastResort a)
       branch "on_offer: parked"
       continue
-    if ← v1 (outstanding p a) then                            -- an ask of it to p is open
+    if ← lite (outstanding p a) then                            -- an ask of it to p is open
       branch "on_offer: outstanding"
       continue
     candidates := candidates ++ [a]
   let mut asks : List Key := []
   for a in ← shuffled candidates do                           -- seacast-lite.md §6.1: one ask per index at a time
-    if ← v1 (overIhaveLimits p) then
+    if ← lite (overIhaveLimits p) then
       setHeldBack (a.group, a.index) a                        -- retried at the next heartbeat (§4.8)
       branch "on_offer: held back"
-    else if ← v1 (mayAsk a p) then
+    else if ← lite (mayAsk a p) then
       asks := asks ++ [a]
       setIhaveAsked p ((← ihaveAsked p) + 1)                  -- an ask in reply to p's offers
       branch "on_offer: asked"

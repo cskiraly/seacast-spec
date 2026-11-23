@@ -165,7 +165,7 @@ def serveStanding (g : Group) (i : Nat) : M2 m Unit := do
   if popped.isSome then eraseStanding g i
   for q in ← NodeSeacast.order "serve_standing" ((popped.getD {}).toList) do
     -- `peer_has[q][g].has(i) or served[q][g] >= …SERVE_LIMIT`
-    if (← v1 (peerHas q g)).has i then
+    if (← lite (peerHas q g)).has i then
       branch "serve_standing: held already"
       continue
     if ← servedOut q g then
@@ -240,7 +240,7 @@ def knownInScope (g : Group) : M2 m Bits := do
   let mut known ← mineBits g                                  -- `known = mine[g].copy()`
   for q in ← NodeSeacast.order "known_in_scope" (← suppressionScope g) do
     if ((← claims? g).getD {}).contains q then continue       -- `if q in claims[g]: continue`
-    known := known ||| (← v1 (peerHas q g))                   -- `known |= peer_has[q][g].bits`
+    known := known ||| (← lite (peerHas q g))                   -- `known |= peer_has[q][g].bits`
   return known
 
 /-- `known_across(g)` (§4.6, R4): what our relation peers on the other axis hold of g -/
@@ -254,7 +254,7 @@ def knownAcross (g : Group) : M2 m Bits := do
       -- `any(peer_has[q][g2].has(i2) for q in suppression_scope(g2))`: the reads stop at the first holder
       let mut held := false
       for q in ← NodeSeacast.order "known_across" (← suppressionScope g2) do
-        if (← v1 (peerHas q g2)).has i2 then
+        if (← lite (peerHas q g2)).has i2 then
           held := true
           break
       if held then

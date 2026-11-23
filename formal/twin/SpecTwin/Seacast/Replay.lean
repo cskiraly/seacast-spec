@@ -18,7 +18,7 @@ import SpecTwin.Seacast.Manifest
   its question, and a `sample_without_replacement` answer k distinct members.
 - **The orders.** An `order` or `keys` answer must be a permutation of the members the twin computed
   (`Replay.permOf`).
-- **The values.** A record's values are read in seacast.md's forms (`docSeacast`, `Form.v2`): `peer_has`'s entry
+- **The values.** A record's values are read in seacast.md's forms (`docSeacast`, `Form.seacast`): `peer_has`'s entry
   with its two claims, and a lane's controls with SEACAST's IWANT, holdings and relation controls. Each position has
   one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
@@ -90,7 +90,7 @@ def wantJson (w : Want) : Json :=
   Json.arr #[Json.str "want", Json.str w.group, (w.bits : Json), Json.bool w.standing, (w.hops : Json),
              Json.bool w.probe]
 
-def msgV2Json : MsgSeacast → Json
+def msgSeacastJson : MsgSeacast → Json
   | .have h => haveJson h
   | .want w => wantJson w
   | .relation r => relationJson r
@@ -102,7 +102,7 @@ def coverJson (r : Cover) : Json :=
               (match r.high with | some b => [("high", Json.bool b)] | none => []))
 
 /-- A v2 timer's target and arguments, as `after(delay, fn, *args)` names them. -/
-def timerV2Json : TimerSeacast → String × Json
+def timerSeacastJson : TimerSeacast → String × Json
   | .reconsider g t => ("reconsider", Json.arr #[Json.str g, floatJson t])
   | .askSample g i => ("ask_sample", Json.arr #[Json.str g, (i : Json)])
   | .resample g i q first => ("resample", Json.arr #[Json.str g, (i : Json), (q : Json), Json.bool first])
@@ -295,7 +295,7 @@ def raisesKeySeacast (j : Json) : Except String String :=
   | j => do return toString (← intOf j)
 
 /-- How a record of a trace under seacast.md is read. -/
-def docSeacast : Doc := { entry := entrySeacast, raisesKey := raisesKeySeacast, form := .v2 }
+def docSeacast : Doc := { entry := entrySeacast, raisesKey := raisesKeySeacast, form := .seacast }
 
 /-! ## Answering SEACAST's questions from the tape -/
 
@@ -343,8 +343,8 @@ instance : NodeSeacast R where
   decodeAtK T g := askCall "DECODE_AT_K" [Json.str T, Json.str g] boolOf
   decodeLater T g := askCall "DECODE_LATER" [Json.str T, Json.str g] (optOf floatOf)
   repairTo T g := askCall "REPAIR_TO" [Json.str T, Json.str g] (peerList "REPAIR_TO")
-  send p x u := askCall "send" [(p : Json), msgV2Json x, Json.bool u] boolOf
-  afterSeacast d t := let (f, xs) := timerV2Json t; askCall "after" [floatJson d, Json.str f, xs] nothing
+  send p x u := askCall "send" [(p : Json), msgSeacastJson x, Json.bool u] boolOf
+  afterSeacast d t := let (f, xs) := timerSeacastJson t; askCall "after" [floatJson d, Json.str f, xs] nothing
   links T := askCall "links" [Json.str T] (peerList "links")
   linkCover q T := askCall "link_cover" [(q : Json), Json.str T] fun j => do
     let r ← coverOf j
@@ -459,7 +459,7 @@ def keptSeacast : List String := Manifest.kept ++ Manifest.nodeOwn.map (·.1)
 /-- Where a record under v2 goes, by its function's name. -/
 inductive Route where
   /-- SEACAST's own code, by one of `runSeacast`'s cases -/
-  | v2
+  | seacast
   /-- a kept function's v2 form (`Seacast/Kept.lean`) -/
   | form
   /-- `seacast-lite.md`'s code, by `Replay.run` with SEACAST's forms -/
@@ -472,7 +472,7 @@ inductive Route where
 node's own helpers, and every other name refused. -/
 def routeSeacast (f : String) : Route :=
   if keptFormsSeacast.contains f then .form
-  else if fnsSeacast.contains f then .v2
+  else if fnsSeacast.contains f then .seacast
   else if keptSeacast.contains f then .kept
   else .refused
 
@@ -484,7 +484,7 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     (r : Record) (rowReads : List String := []) : Except String (Array String × Nat) := do
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"
   match routeSeacast r.fn with
-  | .kept => return ← run c replaced traced r rowReads .v2
+  | .kept => return ← run c replaced traced r rowReads .seacast
   | .refused => throw s!"not a function of the twin under seacast.md: {r.fn}"
   | _ => pure ()
   let ctx : Ctx2 := { base := { c, now := Float.ofBits r.t, replaced }, c2, params }
@@ -540,9 +540,9 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
       exec (probePromise (← Replay.groupKey g) (← nat i)) fun v => do
         let w ← probePromiseOf r.ret      -- the time compared as its bits
         return (v.map fun (k, t) => (k, t.toBits)) == (w.map fun (k, t) => (k, t.toBits))
-    | "probe_waits", #[a, p] => do exec (probeWaits (← askV2Of a) (← nat p)) (retIs r.ret boolOf)
-    | "probe_settled", #[a] => do exec (probeSettled (← askV2Of a)) (retIs r.ret boolOf)
-    | "probe_of_claim", #[p, a] => do exec (probeOfClaim (← nat p) (← optOf askV2Of a)) (retIs r.ret boolOf)
+    | "probe_waits", #[a, p] => do exec (probeWaits (← askSeacastOf a) (← nat p)) (retIs r.ret boolOf)
+    | "probe_settled", #[a] => do exec (probeSettled (← askSeacastOf a)) (retIs r.ret boolOf)
+    | "probe_of_claim", #[p, a] => do exec (probeOfClaim (← nat p) (← optOf askSeacastOf a)) (retIs r.ret boolOf)
     | "serve_probe", #[p, g, f] => do exec (serveProbe (← nat p) (← Replay.groupKey g) (← chunkN f)) none_
     | "serve_standing", #[g, i] => do exec (serveStanding (← Replay.groupKey g) (← nat i)) none_
     | "drop_wants_beyond", #[g] => do exec (dropWantsBeyond (← Replay.groupKey g)) none_
@@ -564,7 +564,7 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "decode_group", #[g] => do exec (decodeGroup (← Replay.groupKey g)) none_
     | "claims_close", #[p] => do exec (claimsClose (← nat p)) none_
     | "note_claim", #[p, g] => do exec (noteClaim (← nat p) (← Replay.groupKey g)) none_
-    | "filter_entry", #[p, e] => do exec (filterEntry (← nat p) (← qentry e .v2)) (retIs r.ret (optOf (qentry · .v2)))
+    | "filter_entry", #[p, e] => do exec (filterEntry (← nat p) (← qentry e .seacast)) (retIs r.ret (optOf (qentry · .seacast)))
     -- forward, §4.2's chunk, §4.3's holding and offer
     | "forward", #[f, p] => do exec (forward (← chunkN f) (← nat p) none) none_
     | "forward", #[f, p, axes] => do exec (forward (← chunkN f) (← nat p) (← optOf giList axes)) none_
@@ -575,7 +575,7 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "on_offer", #[p, h] => do exec (onOffer (← nat p) (← haveOf h)) fun v => do return v == (← (← arr r.ret).mapM key)
     -- §4.10, §4.12, §4.13
     | "ask_scale", #[] => do exec askScale fun v => do return v.toBits == (← bits64 r.ret)
-    | "own_chunk", #[e] => do exec (ownChunk (← qentry e .v2)) (retIs r.ret boolOf)
+    | "own_chunk", #[e] => do exec (ownChunk (← qentry e .seacast)) (retIs r.ret boolOf)
     | "pick", #[q, ks] => do exec (pick (← nat q) (← natList ks)) (retIs r.ret nat)
     | "choose", #[q] => do exec (choose (← nat q)) (retIs r.ret nat)
     | "ask_sample", #[g, i] => do exec (askSample (← Replay.groupKey g) (← nat i) false) none_

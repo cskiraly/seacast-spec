@@ -43,24 +43,24 @@ def header (own foreign traced : List String) (more : List (String × Json)) : J
 
 def hdSeacast (traced : List String := traced43) (more : List (String × Json) := []) : Json :=
   header Manifest.own Manifest.foreign traced (args ["--doc", "seacast"] ++ more)
-def hdV1 (more : List (String × Json) := []) : Json := header ownTables ["known_id", "chunks"] traced43 more
+def hdLite (more : List (String × Json) := []) : Json := header ownTables ["known_id", "chunks"] traced43 more
 
 def fails (hd : Json) (only? : Option String := none) : List String := (readHeader hd only?).failures
 
 -- B1, the document
-#guard formIs (headerForm (Json.mkObj [])) .v1
-#guard formIs (headerForm (Json.mkObj (args ["--seed", "3"]))) .v1
-#guard formIs (headerForm (Json.mkObj (args ["--doc", "lite"]))) .v1
-#guard formIs (headerForm (Json.mkObj (args ["--doc=seacast"]))) .v2
-#guard formIs (headerForm (Json.mkObj (args ["--doc", "seacast"]))) .v2
+#guard formIs (headerForm (Json.mkObj [])) .lite
+#guard formIs (headerForm (Json.mkObj (args ["--seed", "3"]))) .lite
+#guard formIs (headerForm (Json.mkObj (args ["--doc", "lite"]))) .lite
+#guard formIs (headerForm (Json.mkObj (args ["--doc=seacast"]))) .seacast
+#guard formIs (headerForm (Json.mkObj (args ["--doc", "seacast"]))) .seacast
 #guard failsWith "header: a document this replay does not read: v3" (headerForm (Json.mkObj (args ["--doc", "v3"])))
 #guard failsWith "header: args is not a list of strings: null" (headerForm (Json.mkObj [("args", Json.null)]))
 #guard failsWith "header: args is not a list of strings: [42]" (headerForm (Json.mkObj [("args", Json.arr #[jn 42])]))
 -- the values of --doc before v0.12.0, as the headers of traces written then hold them: the same documents
-#guard formIs (headerForm (Json.mkObj (args ["--doc", "v2"]))) .v2
-#guard formIs (headerForm (Json.mkObj (args ["--doc=v2"]))) .v2
-#guard formIs (headerForm (Json.mkObj (args ["--doc", "v03"]))) .v1
-#guard formIs (headerForm (Json.mkObj (args ["--doc=v03"]))) .v1
+#guard formIs (headerForm (Json.mkObj (args ["--doc", "v2"]))) .seacast
+#guard formIs (headerForm (Json.mkObj (args ["--doc=v2"]))) .seacast
+#guard formIs (headerForm (Json.mkObj (args ["--doc", "v03"]))) .lite
+#guard formIs (headerForm (Json.mkObj (args ["--doc=v03"]))) .lite
 -- the document word of each header argument list, old values and new, the first --doc of a doubled one; trace3.py's
 -- doc_of reads the same table the same way (OLD_DOCS)
 #guard docOf [] == none
@@ -75,9 +75,9 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
 
 -- B2, the tables
 #guard fails (hdSeacast) == []
-#guard (readHeader hdSeacast none).form == .v2
-#guard fails (hdV1) == []
-#guard (readHeader hdV1 none).form == .v1
+#guard (readHeader hdSeacast none).form == .seacast
+#guard fails (hdLite) == []
+#guard (readHeader hdLite none).form == .lite
 #guard fails (header ownTables ["known_id", "chunks"] traced43 (args ["--doc", "seacast"]))
   == ["header: the tables are not this twin's (own, foreign)"]
 #guard fails (header Manifest.own Manifest.foreign traced43 [])
@@ -90,20 +90,20 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
   == ["header: traced names that seacast.md's manifest does not list: on_frame"]
 #guard fails (hdSeacast (sortBy (· < ·) ("window_release" :: traced43)))
   == ["header: traced holds window_release, which is cut at every node"]
-#guard fails (hdV1 [("traced", strs (sortBy (· < ·) ("on_frame" :: traced43)))]) == []   -- not seacast-lite.md's check
+#guard fails (hdLite [("traced", strs (sortBy (· < ·) ("on_frame" :: traced43)))]) == []   -- not seacast-lite.md's check
 
 -- B4, --only under v2
 #guard fails hdSeacast (some "fn=respond") == []
 #guard fails hdSeacast (some "fn=announce")
   == ["subset: --only fn=announce: not a function the header lists as traced, nor a table of the twin's own"]
 #guard fails hdSeacast (some "table=probe") == []
-#guard fails hdV1 (some "table=probe")
+#guard fails hdLite (some "table=probe")
   == ["subset: --only table=probe: not a function the header lists as traced, nor a table of the twin's own"]
-#guard fails hdV1 (some "table=offers") == []
+#guard fails hdLite (some "table=offers") == []
 
 -- B5, row_reads with the document of B1
 #guard (readHeader (hdSeacast traced43 [("row_reads", strs rowTables)]) none).rowReads == rowTables
-#guard fails (hdV1 [("row_reads", strs rowTables)]) == ["header: row_reads in a trace of seacast-lite.md"]
+#guard fails (hdLite [("row_reads", strs rowTables)]) == ["header: row_reads in a trace of seacast-lite.md"]
 
 /-! ## The nodes line -/
 
@@ -121,13 +121,13 @@ def consts31 : List (String × Json) :=
     else (k, jn 1)
 
 /-- SEACAST's five: `SAMPLE_OUTSTANDING` 4, as the toy's, and `SERVE_BUDGET` null, no limit. -/
-def v2Five : List (String × Json) :=
+def seacastFive : List (String × Json) :=
   [("ANSWERS_FIRST", Json.bool false), ("ASK_UPLINK", word0), ("MERGE_HOLDINGS", Json.bool false),
    ("SAMPLE_OUTSTANDING", jn 4), ("SERVE_BUDGET", Json.null)]
 
 /-- The 36 with these members put in their place (a member given as `none` left out). -/
 def consts36 (change : List (String × Option Json) := []) : Json :=
-  Json.mkObj ((consts31 ++ v2Five).filterMap fun (k, v) =>
+  Json.mkObj ((consts31 ++ seacastFive).filterMap fun (k, v) =>
     match change.lookup k with
     | some (some w) => some (k, w)
     | some none => none
@@ -147,7 +147,7 @@ def entry (change : List (String × Option Json) := []) : Json :=
     | none => some (k, v))
 
 def line2 (e : Json) (whole : Bool := false) (traced : List String := traced43) :
-    Except String (List (Nat × NodeV2Cfg)) :=
+    Except String (List (Nat × NodeSeacastCfg)) :=
   nodesLineSeacast (Json.arr #[e]) whole traced
 
 def chains (l : List (String × List String)) : Json := Json.mkObj (l.map fun (k, v) => (k, strs v))
@@ -181,9 +181,9 @@ def chains (l : List (String × List String)) : Json := Json.mkObj (l.map fun (k
 def js (s : String) : Json := match Json.parse s with
   | .ok j => j
   | .error _ => Json.str s!"unparsed: {s}"
-def soIs (v : String) : Except String (List (Nat × NodeV2Cfg)) :=
+def soIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
   line2 (entry [("consts", some (consts36 [("SAMPLE_OUTSTANDING", some (js v))]))])
-def sbIs (v : String) : Except String (List (Nat × NodeV2Cfg)) :=
+def sbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
   line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", some (js v))]))])
 #guard failsWith "nodes: consts: no SAMPLE_OUTSTANDING" (line2 (entry [("consts", some (consts36 [("SAMPLE_OUTSTANDING", none)]))]))
 #guard failsWith "nodes: consts: no SERVE_BUDGET" (line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", none)]))]))
@@ -254,14 +254,14 @@ def sbIs (v : String) : Except String (List (Nat × NodeV2Cfg)) :=
 /-! ## The dispatch -/
 
 -- D1, the route
-#guard routeSeacast "announce" == .v2
+#guard routeSeacast "announce" == .seacast
 #guard ["on_pace_tick", "on_block_installed", "respond"].all (routeSeacast · == .form)
 #guard ["with_owed", "build_group", "outstanding", "held"].all (routeSeacast · == .kept)
 #guard ["on_frame", "on_heartbeat", "next_to_send", "wake_front", "track_in_flight", "window_release", "window_timeout",
         "no_such_function"].all (routeSeacast · == .refused)
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
-#guard Manifest.covered.all fun f => routeSeacast f == .v2 || routeSeacast f == .form
+#guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
 #guard fnsSeacast.length == 70                                                  -- v0.11.1's joined, drop_wants_beyond
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
@@ -275,9 +275,9 @@ def sbIs (v : String) : Except String (List (Nat × NodeV2Cfg)) :=
 
 -- D4, a subset's pick by the tape reads the list of the trace's document
 def tapeLine : String := "{\"tape\": [[\"send_have\", \"[1]\", \"null\"], [\"forward\", \"[]\", \"null\"]]}"
-#guard asks .v2 tapeLine "send_have"
-#guard !asks .v1 tapeLine "send_have"
-#guard asks .v1 tapeLine "forward" && asks .v2 tapeLine "forward"
-#guard !asks .v2 "{\"tape\": [[\"window_release\", \"[]\", \"null\"]]}" "window_release"
+#guard asks .seacast tapeLine "send_have"
+#guard !asks .lite tapeLine "send_have"
+#guard asks .lite tapeLine "forward" && asks .seacast tapeLine "forward"
+#guard !asks .seacast "{\"tape\": [[\"window_release\", \"[]\", \"null\"]]}" "window_release"
 
 end SpecTwin.Seacast.DispatchKnown

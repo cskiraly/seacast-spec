@@ -351,7 +351,7 @@ structure Ctx2 where
 abbrev M2 (m : Type → Type) := ReaderT Ctx2 m
 
 /-- A call of `seacast-lite.md`'s Lean from SEACAST's: it reads the base context. -/
-def v1 {m : Type → Type} {α : Type} (x : M m α) : M2 m α := fun c => x c.base
+def lite {m : Type → Type} {α : Type} (x : M m α) : M2 m α := fun c => x c.base
 
 /-- `T.params.X`: the twin reads it from the context, with no question. A type the node has no parameters for,
 or a parameter the type does not have, crashes as the toy's `AttributeError`. -/

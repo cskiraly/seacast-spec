@@ -13,7 +13,7 @@ lines. Each comes after every function it calls (`Seacast/Relations.lean`'s rule
 - **No two of them call each other directly in a cycle:** `arm` reaches `reconsider` through a timer
   (`afterSeacast`), and `check_completion` and `reconsider` start `decode_group` through `start`, a question, as
   `seacast-lite.md`'s Lean does. So no block here is `mutual`.
-- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `v1`: `drop_beyond`, `close_promises`,
+- **`seacast-lite.md`'s functions that v2 calls unchanged** run through `lite`: `drop_beyond`, `close_promises`,
   `drop_group`, `add_offer`, `owe`, `held` and `tied_to_root`. The node's helpers are `Node61`'s questions:
   `open_group` (SEACAST's binding writes more, but the question is the same), `store`, `start`,
   `penalise`, `close_promises_of_group`, `deliver` and `payload_of`.
@@ -46,7 +46,7 @@ def pushRebuiltAsSource (g2 : Group) (items : List (Nat × ChunkF)) : M2 m Unit 
     -- not peer_has[q][g2].complete and interest_of_peer(q, g2).has(i2)]`, left to right
     let cands ← (← NodeSeacast.shuffledPeers (← NodeSeacast.repairTo T2 g2)).filterM fun q => do
       let e := (← peerHasEntry? q g2).getD {}
-      if (e.bits ||| (← v1 (pushed q g2))).has i2 then return false
+      if (e.bits ||| (← lite (pushed q g2))).has i2 then return false
       if ((← peerHasEntry? q g2).getD {}).complete then return false
       return (← interestOfPeer q g2).has i2
     let r := (← read).base.c.R_NODE
@@ -54,7 +54,7 @@ def pushRebuiltAsSource (g2 : Group) (items : List (Nat × ChunkF)) : M2 m Unit 
       if ← enqueue q (.chunk f) false then
         Seacast.notePush q g2 i2
       else
-        v1 (owe q g2 (1 <<< i2))                              -- refused: offered instead (v0.5)
+        lite (owe q g2 (1 <<< i2))                              -- refused: offered instead (v0.5)
         branch "push_rebuilt_as_source: a push refused, owed"
     for q in cands.drop r do
       Seacast.announce q g2 (1 <<< i2)                             -- [c3] offered to the rest
@@ -89,7 +89,7 @@ def pushRebuilt (g : Group) (new : List Nat) : M2 m Unit := do
       continue
     for q in ← NodeSeacast.shuffledPeers (← NodeSeacast.repairTo T2 g2) do   -- whose interest includes them (I3) [D4]
       let e := (← peerHasEntry? q g2).getD {}
-      let known := e.bits ||| (← v1 (pushed q g2))           -- what q claimed, and what we chose to push it
+      let known := e.bits ||| (← lite (pushed q g2))           -- what q claimed, and what we chose to push it
       let short : Int := (k : Int) - (known.popcount : Int)   -- q's shortfall: none after its decode claim
       if short ≤ 0 || e.complete then continue
       let want ← interestOfPeer q g2                          -- [I3] into interest only
@@ -101,7 +101,7 @@ def pushRebuilt (g : Group) (new : List Nat) : M2 m Unit := do
         if ← enqueue q (.chunk f) false then
           Seacast.notePush q g2 i2
         else
-          v1 (owe q g2 (1 <<< i2))                            -- refused: offered instead (v0.5)
+          lite (owe q g2 (1 <<< i2))                            -- refused: offered instead (v0.5)
           branch "push_rebuilt: a push refused, owed"
       branch "push_rebuilt: a peer short"
 
@@ -121,7 +121,7 @@ def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
     NodeSeacast.releaseWantedGroups                                --   §4.5: a place that ran out goes before it opens
     openGroup g f                                             --   hdr[g], T_of[g], interest[g], known_at[g]
     dropWantsBeyond g                                         --   §4.5: its count is known now
-    v1 (dropBeyond g)                                         --   what named an index it has not goes
+    lite (dropBeyond g)                                         --   what named an index it has not goes
   if (← state? g) == some .invalid then                       -- a dropped group (§4.6)
     branch "fill: invalid"
     return
@@ -138,7 +138,7 @@ def fill (g : Group) (i : Nat) (f : ChunkF) (p : Option Peer) : M2 m Unit := do
   | none => setRebuilt g ((← rebuiltBits g).set i)
   probeAnswer g i p                                           -- (R5) the claimant's own copy passes its probe
   let kept ← probePromise g i                                 -- (R5) another peer's copy leaves it open
-  v1 (closePromises g i none)                                 -- [c5] the chunk arrived, from anyone
+  lite (closePromises g i none)                                 -- [c5] the chunk arrived, from anyone
   if let some ((a, q), t) := kept then setPromise a q t       -- `promises[kept[0]] = kept[1]`
   serveStandingCall g i                                       -- WANTs that preceded it are answered now
   serveWaitingProbe g i                                       -- (R5) and a probe that reached us while we decoded
@@ -211,7 +211,7 @@ def deferOnClaim (g : Group) : M2 m Unit := do
   let q ← NodeSeacast.choiceOfSet ((← claims? g).getD {}).toList   -- `q = probed[g] = choice(list(claims[g]))`
   setProbed g q
   let a : Key := .want g i
-  v1 (addOffer a q)                                           -- a claim is an offer of every index (§6.1's tables)
+  lite (addOffer a q)                                           -- a claim is an offer of every index (§6.1's tables)
   setTried a q now                                            -- `tried[a][q] = now`
   setProbeAsk a true                                          -- `probe_asks.add(a)`: gated exempts it; a write
                                                               --   with no read, as the tracer's view of a set logs it
@@ -309,7 +309,7 @@ def decodeGroup (g : Group) : M2 m Unit := do
     branch "decode_group: expired meanwhile"
     return
   let some whole := whole
-    | v1 (dropGroup g)                                        -- [D6]
+    | lite (dropGroup g)                                        -- [D6]
       branch "decode_group: dropped"
   -- `[i for i in whole if not received[g].has(i)]`: rebuilt, and not received meanwhile
   let new ← (whole.map (·.1)).filterM fun i => do return !(← receivedBits g).has i
@@ -380,12 +380,12 @@ private def keepAsks (p : Peer) (want : Bool) (asks : List AskSeacast) : M2 m (L
   -- `(not held(a) or probe_waits(a, p)) and not probe_settled(a) and not gated(a) and not expired(group(a)) and
   -- not tied_to_root(p, a)`, left to right
   let kept ← asks.filterM fun a => do
-    if ← v1 (held a.key) then
+    if ← lite (held a.key) then
       if !(← probeWaits a p) then return false
     if ← probeSettled a then return false
     if ← gated a.key then return false
     if ← expired a.key.group then return false
-    return !(← v1 (tiedToRoot p a.key))
+    return !(← lite (tiedToRoot p a.key))
   for a in kept do
     let g := a.key.group
     -- `if probe_waits(a, p) and group(a) not in probe_sent:` our probe, written now
@@ -414,7 +414,7 @@ def filterEntry (p : Peer) (entry : QEntry) : M2 m (Option QEntry) := do
     -- `exempt = entry.solicited and probe_answers[p][f.group].has(f.index)`: our answer to p's probe
     let exempt ← if entry.solicited then do pure ((← probeAnswerBits p f.g).has f.i) else pure false
     -- `CANCEL and not exempt and peer_has[p][f.group].has(f.index)`
-    let cancel ← if c.CANCEL && !exempt then do pure ((← v1 (peerHas p f.g)).has f.i) else pure false
+    let cancel ← if c.CANCEL && !exempt then do pure ((← lite (peerHas p f.g)).has f.i) else pure false
     if cancel then
       e := { e with chunk := none }                           -- [c8] it became a duplicate
       branch "filter_entry: cancelled"

@@ -145,7 +145,7 @@ def wantsFromMe (p : Peer) (g : Group) : M2 m IBits := do
     return 0
   let i ← interestOfPeer p g
   -- `interest_of_peer(p, g) & ~e.bits & ~pushed[p][g]`
-  return IBits.and (IBits.and i (IBits.not (IBits.ofBits e.bits))) (IBits.not (IBits.ofBits (← v1 (pushed p g))))
+  return IBits.and (IBits.and i (IBits.not (IBits.ofBits e.bits))) (IBits.not (IBits.ofBits (← lite (pushed p g))))
 
 /-- `serves(q, g, i)` (§1.3): q's interest holds index i of g, so q will hold it -/
 def serves (q : Peer) (g : Group) (i : Nat) : M2 m Bool := do

@@ -16,7 +16,7 @@ builds is one a record under v2 writes in SEACAST's form: the toy has one IWANT 
 `tools/keptcopy.py` holds it:
 
 - The monad is `M2 m`, and `paceTurns` takes seacast-lite.md's context as `(← read).base`.
-- A function of seacast-lite.md's Lean runs through `v1`. The node's questions and the tables are called as they are.
+- A function of seacast-lite.md's Lean runs through `lite`. The node's questions and the tables are called as they are.
 - A call that the Python binds late names SEACAST's function: `Seacast.sendGossip`, `Seacast.paceTurns` and `Seacast.onValidated`.
   SEACAST's `on_validated` takes no fuel, since it does not recurse through `defer`.
 - The no-bid branch of `on_block_installed` is reached under v2, for a block of columns. There the Python calls
@@ -63,11 +63,11 @@ def onBlockInstalled (root : Root) : M2 m Unit := do
   let waits ← pendingOf root                                -- `for p, f in pending.pop(root, []):`, in the list's
   erasePending root                                         --   own order
   for (p, f) in waits do
-    setPendingId (← v1 (messageId f)) false                      -- `pending_ids.discard(message_id(f))`
+    setPendingId (← lite (messageId f)) false                      -- `pending_ids.discard(message_id(f))`
     release p f                                             -- the reservation goes back
-    Seacast.onValidated p f (← v1 (validateChunk f))          -- `on_validated(p, f, validate_chunk(f))`
+    Seacast.onValidated p f (← lite (validateChunk f))          -- `on_validated(p, f, validate_chunk(f))`
   let g0 ← bidGroup root                                    -- the group this root's bid commits
-  for (p, groups) in ← v1 (popTiedRoot root) do                  -- `for p, groups in tied.pop(root, {}).items():` the
+  for (p, groups) in ← lite (popTiedRoot root) do                  -- `for p, groups in tied.pop(root, {}).items():` the
     let _ ← tieSlot? root p                                 --   copies that waited for this root;
     eraseTieSlot root p                                     --   `tie_slot.pop((root, p), None)`
     for (g, bits) in groups do                              -- `for g, bits in groups.items():`
@@ -75,7 +75,7 @@ def onBlockInstalled (root : Root) : M2 m Unit := do
         branch "on_block_installed: a tie of an expired group"
         continue
       if g0 != some g then                                  -- a copy naming a group its root does not commit
-        v1 (dropTie p g bits)                                    --   is a forgery: nothing is released
+        lite (dropTie p g bits)                                    --   is a forgery: nothing is released
         branch "on_block_installed: a tie of another group, dropped"
         continue
       let _ ← parkUntil? p g                                -- `park[p].pop(g, None)`: the senders' parks for the
@@ -85,18 +85,18 @@ def onBlockInstalled (root : Root) : M2 m Unit := do
         if done.contains p then                             --   their indices clear,
           setAskedParked (g, i) (done.erase p)
         if (← desc g).isSome then                           -- `if g in desc and i >= N(desc[g]): continue`: an
-          let n ← v1 (N (← desc g))                              --   index the group, known now, has not is dropped
+          let n ← lite (N (← desc g))                              --   index the group, known now, has not is dropped
                                                             --   (§8.2), the others kept,
           if i ≥ n then
             branch "on_block_installed: an index beyond the count learnt meanwhile"
             continue
         if !(← mineBits g).has i then                       --   and each is an offer of its index again
-          v1 (addOffer (.want g i) p)
+          lite (addOffer (.want g i) p)
       branch "on_block_installed: a tie released"
   match g0 with                                             -- `for a in ledger(g0): retry_offer(a)`: what was
   | some g0 =>                                              --   announced meanwhile (§4.4), and what the ties
-    for a in ← v1 (ledger g0) do                                 --   released, is asked for now
-      v1 (retryOffer a)
+    for a in ← lite (ledger g0) do                                 --   released, is asked for now
+      lite (retryOffer a)
   | none =>                                                 -- a block of columns, reached under v2: the Python's
     enter "ledger"                                          --   `ledger(None)` is entered, asks the peers, and
     let _ ← connectedTopicPeers                             --   reads `offered[q][None]`, which the tracer does

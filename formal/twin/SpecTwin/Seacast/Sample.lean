@@ -58,7 +58,7 @@ def pick (p : Peer) (ks : List Nat) : M2 m Nat := do
   for k in ks do
     let some e := normal[k]? | crash "IndexError: list index out of range (pick: q.normal[k])"
     let some f := e.chunk | crash "AttributeError: 'NoneType' object has no attribute 'group' (pick)"
-    let n ← v1 (holders f.g f.i)
+    let n ← lite (holders f.g f.i)
     best := match best with
       | some (bn, bk) => if n < bn || (n == bn && k < bk) then some (n, k) else some (bn, bk)
       | none => some (n, k)
@@ -87,7 +87,7 @@ def choose (p : Peer) : M2 m Nat := do
       return (← pick p asked)
   if (← read).base.c.RAREST then                              -- [c9] v0.3: up to the first control-only entry
     branch "choose: the rarest"
-    v1 (rarest normal)
+    lite (rarest normal)
   else
     branch "choose: the first"
     return 0
@@ -116,7 +116,7 @@ def askSample (g : Group) (i : Nat) (first : Bool) : M2 m Unit := do
   -- `[q for q in links(T) if q not in sampled_from[b] and not parked(q, Ask(g, i))]`
   let fresh ← (← NodeSeacast.links T).filterM fun q => do
     if (← sampledFromOf b).contains q then return false
-    return !(← v1 (parked q a))
+    return !(← lite (parked q a))
   -- `[q for q in fresh if serves(q, g, i) and not high_custody(q, T)]`
   let direct ← fresh.filterM fun q => do
     if !(← serves q g i) then return false

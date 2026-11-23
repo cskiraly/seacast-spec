@@ -791,7 +791,7 @@ def state_file():
         *wrapped([f'"{t.name}"' for t in TABLES if t.name not in V2_NAMES], "  "),
         "",
         "/-- `seacast.md`'s tables (`gen/schema_seacast.py`), by the names its records give them, in the schema's order. -/",
-        "def v2Tables : List String :=",
+        "def seacastTables : List String :=",
         *wrapped([f'"{t.name}"' for t in TABLES if t.name in V2_NAMES], "  "),
         "",
         "end SpecTwin",
@@ -885,7 +885,7 @@ def replay_tables_file():
         "",
         "/-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the",
         "document whose forms a lane and a peer's holding take (`laneEntries`, `haveEntry`). -/",
-        "def val (c : Cell) (j : Json) (f : Form := .v1) : Except String (Option Val) := do",
+        "def val (c : Cell) (j : Json) (f : Form := .lite) : Except String (Option Val) := do",
         "  if j == .null then return none",
         "  match c with",
         *r["val"],
@@ -960,7 +960,7 @@ FILES = {"SpecTwin/State.lean": state_file, "SpecTwin/Tables.lean": tables_file,
          "SpecTwin/ReplayTables.lean": replay_tables_file, "SpecTwin/Seacast/Manifest.lean": manifest_file}
 # the names the first three files declare, which no other file of the twin may declare (the tripwire). `lift` and
 # `instReaderT` are left out: `Node61` has a `lift` of its own, by hand.
-NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "v2Tables", "Tables", "TablesWhole", "ofState",
+NAMES = ("State", "Cell", "Level", "Touch", "ownTables", "seacastTables", "Tables", "TablesWhole", "ofState",
          "cell", "val", "level", "valueAt", "put", "drop", "entries", "under", "covers")
 DECL = re.compile(r"^\s*(?:/--.*?-/\s*)?(?:@\[[^\]]*\]\s*)?"
                   r"(?:(?:private|protected|partial|noncomputable|unsafe|nonrec|public|scoped|local)\s+)*"

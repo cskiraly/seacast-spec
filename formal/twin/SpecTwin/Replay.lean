@@ -132,7 +132,7 @@ structure Record where
 The parsers of keys and of values are `ReplayBase.lean`'s; of an entry, its value and a level, `ReplayTables.lean`'s. -/
 
 /-- A list of footprint entries, each `[table, path, value]`, no entry twice. -/
-def cells (what : String) (j : Json) (f : Form := .v1) : Except String (List (Cell × Option Val)) := do
+def cells (what : String) (j : Json) (f : Form := .lite) : Except String (List (Cell × Option Val)) := do
   let l ← (← arr j).mapM fun e => do
     let #[.str table, path, v] ← e.getArr? | throw s!"not an entry of {what}: {e.compress}"
     let c ← cell table path
@@ -145,21 +145,21 @@ its own is `seacast-lite.md`'s (`retry_offer`, `ask_parked`), since SEACAST's ow
 SEACAST's form, unmarked and with plain asks, and is read into `.iwant`, the one constructor in that place; a marked
 IWANT or a flagged ask there is refused. An IDONTWANT of one bitmap has no v2 form here: no function a record
 under v2 names enqueues one. -/
-def msg (j : Json) (f : Form := .v1) : Except String Msg := do
+def msg (j : Json) (f : Form := .lite) : Except String Msg := do
   match ← j.getArr? with
   | #[.str "entry", q] => return .entry (← qentry q f)     -- next_to_send's owed answer, a whole entry
   | #[.str "chunk", c] => return .chunk (← chunkF c)       -- push_rebuilt's chunk alone
   | #[e] => match f, ← e.getArr? with
-    | .v1, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
-    | .v2, #[.str "iwant", asks, w] =>
+    | .lite, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
+    | .seacast, #[.str "iwant", asks, w] =>
       if ← boolOf w then throw s!"an IWANT enqueued on its own is seacast-lite.md's, unmarked: {j.compress}"
-      let asks ← (← arr asks).mapM askV2Of
+      let asks ← (← arr asks).mapM askSeacastOf
       if !asks.all fun a => !a.standing && a.hops == 0 && !a.probe then
         throw s!"an IWANT enqueued on its own is seacast-lite.md's, its asks plain: {j.compress}"
       return .iwant (asks.map (·.key))
-    | .v2, #[.str "iwant", _] => throw s!"under seacast.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
+    | .seacast, #[.str "iwant", _] => throw s!"under seacast.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
     | _, #[.str "idontwant", .arr #[h]] =>                -- one HAVE: a group's whole bitmap (§4.2)
-      match ← (if f == .v1 then ihaveEntry h else idontwantSeacast h) with
+      match ← (if f == .lite then ihaveEntry h else idontwantSeacast h) with
       | .bitmap g b => return .have g b
       | _ => throw s!"not an IDONTWANT of one bitmap: {j.compress}"
     | _, #[.str "ihave", .arr #[h]] => match ← ihaveEntry h with      -- announce's offer, one bitmap (§5.2)
@@ -295,7 +295,7 @@ passes its own (`Seacast/Replay.lean`).
 structure Doc where
   entry : Json → Option (Except String Entry) := fun _ => none
   raisesKey : Json → Except String String := fun j => do return toString (← nat j)
-  form : Form := .v1
+  form : Form := .lite
 
 def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
   if let some e := doc.entry j then return ← e
@@ -354,7 +354,7 @@ def entry (j : Json) (doc : Doc := {}) : Except String Entry := do
   | "pop_owed_answer", #[p] => return .popOwedAnswer (← nat p) (← chunkF r)
   | "after", #[d, .str f, xs] =>
     if r != .null then throw s!"after returns nothing: {j.compress}"
-    match timerV1Of f (← xs.getArr?) with
+    match timerLiteOf f (← xs.getArr?) with
     | some t => return .after (← bits64 d) (← t)
     | none => throw s!"not a timer of §6.1: {j.compress}"
   | name, as =>
@@ -383,7 +383,7 @@ def tapeItem (j : Json) (doc : Doc := {}) : Except String TapeItem := do
     let timers ← match field o "timers" with
       | none => pure []
       | some t =>
-        if doc.form != .v2 then throw s!"timers under seacast-lite.md, whose tracer writes none: {j.compress}"
+        if doc.form != .seacast then throw s!"timers under seacast-lite.md, whose tracer writes none: {j.compress}"
         notesOf t
     let cr ← cells "cr" cr doc.form
     let cw ← cells "cw" cw doc.form
@@ -979,7 +979,7 @@ set_option maxHeartbeats 400000 in
 make, or the first difference. `f`: the forms of the entries its arguments and return value hold, the record's
 document's. -/
 def run (c : Consts) (replaced traced : List String) (r : Record) (rowReads : List String := [])
-    (f : Form := .v1) : Except String (Array String × Nat) := do
+    (f : Form := .lite) : Except String (Array String × Nat) := do
   let ctx : Ctx := { c, now := Float.ofBits r.t, replaced }
   -- a node that runs something else under a traced name has no record of that function
   if replaced.contains r.fn then throw s!"a record of {r.fn} at a node that has replaced it"

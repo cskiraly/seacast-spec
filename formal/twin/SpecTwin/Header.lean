@@ -97,16 +97,16 @@ parser takes those two words alone. A header written before v0.12.0 names them `
 as the new words. -/
 def headerForm (hd : Json) : Except String Form := do
   match docOf (← argsOf hd) with
-  | none | some "lite" => return .v1
-  | some "seacast" => return .v2
+  | none | some "lite" => return .lite
+  | some "seacast" => return .seacast
   | some d => throw s!"header: a document this replay does not read: {d}"
 
 /-- The tables a header names under each document: its own, then the other sections' it reads. Under `seacast-lite.md`
 the twin's own tables as the schema names them (`ownTables`, generated) and the two it reads (`unwanted` is the
 twin's own); under `seacast.md` the manifest's two lists. -/
 def docTables : Form → List String × List String
-  | .v1 => (ownTables, ["known_id", "chunks"])
-  | .v2 => (Seacast.Manifest.own, Seacast.Manifest.foreign)
+  | .lite => (ownTables, ["known_id", "chunks"])
+  | .seacast => (Seacast.Manifest.own, Seacast.Manifest.foreign)
 
 /-- Under `seacast.md`, what is wrong with the header's `traced`: a name the manifest cuts at every node first,
 then the names it does not list as covered, kept or the node's own. -/
@@ -128,7 +128,7 @@ def onlyKnown (f : Form) (traced : List String) (w : String) : Bool :=
 
 /-- What the header gives the replay, and every failure found in it, in the order the replay prints them. -/
 structure HeaderRead where
-  form : Form := .v1
+  form : Form := .lite
   /-- the functions traced: sorted names, none twice; a record's `reached` names none but these -/
   traced : Option (List String) := none
   /-- the tables whose rows the view logs as read (`rowReadsOf`) -/
@@ -142,14 +142,14 @@ def readHeader (hd : Json) (only? : Option String) : HeaderRead := Id.run do
   let mut fails : List String := []
   let form := match headerForm hd with
     | .ok f => f
-    | .error _ => .v1
+    | .error _ => .lite
   if let .error e := headerForm hd then fails := fails ++ [e]
   let format := (hd.getObjValAs? Nat "format").toOption
   let tables (k : String) := (hd.getObjValAs? (List String) k).toOption
   let schema := tables "own" == some (docTables form).1 && tables "foreign" == some (docTables form).2
   let traced? := (do names "traced" (← hd.getObjVal? "traced") : Except String (List String)).toOption
   if traced?.isNone then fails := fails ++ ["header: traced is not a sorted list of names, none twice"]
-  if form == .v2 then
+  if form == .seacast then
     if let some e := traced?.bind tracedSeacast then fails := fails ++ [e]
   let mut rowReads : List String := []
   match rowReadsOf hd with
@@ -165,8 +165,8 @@ def readHeader (hd : Json) (only? : Option String) : HeaderRead := Id.run do
 /-- The names a subset's `fn=NAME` also picks by the tape: those a node may replace, which are asked on the tape
 where replaced and are not among what the record reached there. -/
 def asksNames : Form → List String
-  | .v1 => replaceable
-  | .v2 => Seacast.Manifest.replaceable ++ Seacast.Manifest.replaceableWhole
+  | .lite => replaceable
+  | .seacast => Seacast.Manifest.replaceable ++ Seacast.Manifest.replaceableWhole
 
 /-- A record's line asks `f` on the tape, by the tape entry's text, `["NAME",`, anywhere in the line, for the
 replaceable names of the trace's document alone: the tape is not at the line's end, and the line is not parsed
@@ -230,7 +230,7 @@ def chainsOf (j : Json) : Except String (List (String × List String)) := do
     return (k, l)
 
 /-- One node's configuration under `seacast.md`. -/
-structure NodeV2Cfg where
+structure NodeSeacastCfg where
   c : Consts
   c2 : Seacast.ConstsSeacast
   /-- the parameters of each type the node can answer `type_of_group` with, the payload's always -/
@@ -242,9 +242,9 @@ structure NodeV2Cfg where
 manifest's cut, is one the manifest lets a node replace, is `validate_chunk` only in a trace of the whole state, and
 is one the header lists as traced. Of `chains`: every key is traced, every replaced name is a key, and a key whose
 innermost layer is not the document's is replaced. Nothing more of `chains` is read. The first failure. -/
-def nodesLineSeacast (j : Json) (whole : Bool) (traced : List String) : Except String (List (Nat × NodeV2Cfg)) := do
+def nodesLineSeacast (j : Json) (whole : Bool) (traced : List String) : Except String (List (Nat × NodeSeacastCfg)) := do
   let mem := ["n", "consts", "replaced", "types", "chains"]
-  let mut out : List (Nat × NodeV2Cfg) := []
+  let mut out : List (Nat × NodeSeacastCfg) := []
   for e in (← j.getArr?) do
     members "nodes" e mem mem
     let (c, c2) ← (constsSeacast (← e.getObjVal? "consts")).mapError ("nodes: " ++ ·)

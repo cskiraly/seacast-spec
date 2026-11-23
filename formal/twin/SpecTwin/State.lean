@@ -279,7 +279,7 @@ def ownTables : List String :=
    "origin", "planned", "pushed", "desc", "in_flight", "waiters", "sent", "unwanted"]
 
 /-- `seacast.md`'s tables (`gen/schema_seacast.py`), by the names its records give them, in the schema's order. -/
-def v2Tables : List String :=
+def seacastTables : List String :=
   ["join_recv", "join_sent", "push_out", "push_in", "grafted_out", "grafted_in", "owed_relations", "backoff", "T_of",
    "rebuilt", "interest", "known_at", "standing", "routed_standing", "claims", "reconsider_at", "deferred", "duty_at",
    "waited", "probe", "probed", "probe_asks", "probe_sent", "probe_ok", "rsample", "rsample_step", "rsample_asked",

@@ -31,7 +31,7 @@ def wantOf (j : Json) : Except String Want := do
            probe := ← boolOf p }
 
 /-- A message `send` takes: a HAVE, a WANT or a relation. -/
-def msgV2Of (j : Json) : Except String MsgSeacast :=
+def msgSeacastOf (j : Json) : Except String MsgSeacast :=
   match j.getArrVal? 0 with
   | .ok (.str "have") => do return .have (← haveOf j)
   | .ok (.str "want") => do return .want (← wantOf j)
@@ -56,8 +56,8 @@ def repairVerdictJson : RepairVerdict → Json
   | .notRepaired => Json.str "NOT_REPAIRED"
   | .asked => Json.str "ASKED"
 
-/-- An `after` row's timer, read back from its name and its arguments: the inverse of `timerV2Json`. -/
-def timerV2Of (f : String) (xs : Json) : Except String TimerSeacast := do
+/-- An `after` row's timer, read back from its name and its arguments: the inverse of `timerSeacastJson`. -/
+def timerSeacastOf (f : String) (xs : Json) : Except String TimerSeacast := do
   match f, ← xs.getArr? with
   | "reconsider", #[g, t] => return .reconsider (← Replay.groupKey g) (← floatOf t)
   | "ask_sample", #[g, i] => return .askSample (← Replay.groupKey g) (← nat i)
@@ -116,7 +116,7 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
     let t ← typeId t; let g ← Replay.groupKey g
     return natsJson <$> NodeSeacast.repairTo (m := R) t g
   | "send", #[p, x, u] => do
-    let p ← nat p; let x ← msgV2Of x; let u ← boolOf u
+    let p ← nat p; let x ← msgSeacastOf x; let u ← boolOf u
     return Json.bool <$> NodeSeacast.send (m := R) p x u
   | "links", #[t] => do
     let t ← typeId t
@@ -200,7 +200,7 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
     let xs ← pairs "index and chunk" nat chunkF xs
     return pairsJson <$> NodeSeacast.shuffledPairs (m := R) xs
   | "afterSeacast", #[d, .str f, xs] => do
-    let d ← floatOf d; let t ← timerV2Of f xs
+    let d ← floatOf d; let t ← timerSeacastOf f xs
     return unitJson <$> NodeSeacast.afterSeacast (m := R) d t
   | "releaseWantedGroups", #[] =>
     return unitJson <$> NodeSeacast.releaseWantedGroups (m := R)

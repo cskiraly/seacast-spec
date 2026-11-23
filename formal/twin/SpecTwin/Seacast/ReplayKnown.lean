@@ -95,22 +95,22 @@ def e3 : String := s!"[{chunk3}, null, false]"
 
 /-! ## An order entry: `known_in_scope(g)` -/
 
-/-- `peer_has`'s entries in SEACAST's form, with the two claims; `v1` writes them in `seacast-lite.md`'s. -/
-def reads4 (v1 : Bool := false) : String :=
-  let claims := if v1 then "" else ", false, false"
+/-- `peer_has`'s entries in SEACAST's form, with the two claims; `lite` writes them in `seacast-lite.md`'s. -/
+def reads4 (lite : Bool := false) : String :=
+  let claims := if lite then "" else ", false, false"
   s!"[[\"mine\", [{gq}], 1], [\"push_in\", [5, \"row\", 0], [0]], [\"push_in\", [7, \"row\", 0], [1]], " ++
   s!"[\"claims\", [{gq}], null], [\"peer_has\", [5, {gq}], [2, 3{claims}]], [\"peer_has\", [7, {gq}], [4, 3{claims}]]]"
 def tape4 (order : List String) : String :=
   "[" ++ ", ".intercalate ([s!"[\"type_of_group\", [{gq}], \"row\"]", s!"[\"family\", [\"row\", {gq}], 0]",
     "[\"links\", [\"row\"], [5, 7]]"] ++ order) ++ "]"
-def r4 (order : List String) (v1 : Bool := false) : String :=
-  line "known_in_scope" s!"[{gq}]" (reads4 v1) "[]" "[]" (tape4 order) (ret "7")
+def r4 (order : List String) (lite : Bool := false) : String :=
+  line "known_in_scope" s!"[{gq}]" (reads4 lite) "[]" "[]" (tape4 order) (ret "7")
     "[\"known_in_scope\", \"suppression_scope\"]" "[\"claims\", \"mine\", \"peer_has\", \"push_in\"]"
 
 #guard passes (r4 ["[\"order\", \"known_in_scope\", [7, 5]]"])
 -- `seacast-lite.md`'s form of a `peer_has` entry is refused under v2
 #guard failsWith "not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: "
-  (r4 ["[\"order\", \"known_in_scope\", [7, 5]]"] (v1 := true))
+  (r4 ["[\"order\", \"known_in_scope\", [7, 5]]"] (lite := true))
 #guard passes (r4 ["[\"order\", \"known_in_scope\", [5, 7]]"])
 #guard failsHolding "tape: " "is not of the twin's rows" (r4 ["[\"order\", \"known_in_scope\", [9, 5]]"])
 #guard failsHolding "tape: " "asked" (r4 [])

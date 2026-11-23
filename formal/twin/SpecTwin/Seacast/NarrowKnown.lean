@@ -59,9 +59,9 @@ def decodeAsk (c : String) : Except String Json := do
 
 /-! ## 3. A queue entry's chunk, under each document -/
 
-#guard isNarrow (qentry (parse s!"[{chunk6}, null, false]") .v2)
-#guard (qentry (parse s!"[{chunk3}, null, false]") .v2).isOk
-#guard (qentry (parse s!"[{chunk6}, null, false]") .v1).isOk         -- seacast-lite.md's, as before
+#guard isNarrow (qentry (parse s!"[{chunk6}, null, false]") .seacast)
+#guard (qentry (parse s!"[{chunk3}, null, false]") .seacast).isOk
+#guard (qentry (parse s!"[{chunk6}, null, false]") .lite).isOk         -- seacast-lite.md's, as before
 
 /-! ## 4 and 5. Records' chunk arguments and `respond`'s answers, replayed by `runSeacast` -/
 
@@ -85,11 +85,11 @@ def wideRecords (c : String) : List (String × String) :=
 #guard (wideRecords chunk6).all fun (fn, a) => !isNarrow (replay (rec1 fn a))
 
 /-- The same record replayed under seacast-lite.md: its run with seacast-lite.md's form. -/
-def replayV1 (l : String) : Except String (Array String × Nat) := do
-  run c0 [] traced (← record (← Json.parse l)) [] .v1
+def replayLite (l : String) : Except String (Array String × Nat) := do
+  run c0 [] traced (← record (← Json.parse l)) [] .lite
 
 -- the kept three under seacast-lite.md read six members, as before
 #guard [("message_id", s!"[{chunk6}]"), ("tie_room", s!"[2, {chunk6}]"),
-        ("choose_push", s!"[{chunk6}, [2, 3], 1, false]")].all fun (fn, a) => !isNarrow (replayV1 (rec1 fn a))
+        ("choose_push", s!"[{chunk6}, [2, 3], 1, false]")].all fun (fn, a) => !isNarrow (replayLite (rec1 fn a))
 
 end SpecTwin.Seacast.NarrowKnown

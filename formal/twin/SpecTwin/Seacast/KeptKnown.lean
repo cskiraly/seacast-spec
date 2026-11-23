@@ -5,7 +5,7 @@ import SpecTwin.Seacast.ReplayKnown
 The cases were written before their forms in `Seacast/Kept.lean`. Each record is a JSON line in the tracer's form,
 hand-built from seacast-lite.md's Python of the functions and seacast.md's `send_gossip`, or taken from a trace
 under v2 and written in SEACAST's forms. Each is replayed in two ways: `asSeacast` replays it with `runSeacast`, which runs the v2
-forms, and `asV1` with `Replay.run`, which runs seacast-lite.md's forms. A pass is a "fewer" count of 0, and a failure
+forms, and `asLite` with `Replay.run`, which runs seacast-lite.md's forms. A pass is a "fewer" count of 0, and a failure
 an error that starts with the quoted prefix.
 
 A node's `traced` names hold the two functions. The type `column` has `ANNOUNCE_EXTRA` at `ALL_JOINED`, so SEACAST's
@@ -27,8 +27,8 @@ def asSeacast (l : String) : Except String (Array String × Nat) := do
   runSeacast c0 c2 paramsK [] tracedK (← record (← Json.parse l) docSeacast)
 
 /-- The replay of one line with seacast-lite.md's forms (`Replay.run`), its values read in SEACAST's forms. -/
-def asV1 (l : String) : Except String (Array String × Nat) := do
-  run c0 [] tracedK (← record (← Json.parse l) docSeacast) [] .v2
+def asLite (l : String) : Except String (Array String × Nat) := do
+  run c0 [] tracedK (← record (← Json.parse l) docSeacast) [] .seacast
 
 def fewer (x : Except String (Array String × Nat)) : Option Nat :=
   match x with
@@ -59,7 +59,7 @@ def k2 : String :=
     (ret "null") "[\"on_pace_tick\", \"send_gossip\"]" "[\"pace_queue\"]"
 
 #guard fewer (asSeacast k2) == some 0
-#guard failsWith "tape: " (asV1 k2)
+#guard failsWith "tape: " (asLite k2)
 
 /-! ## K3 and K4: `on_block_installed` with nothing pending and nothing tied, and no connected topic peer -/
 
@@ -74,14 +74,14 @@ def installed (bid reached : String) : String :=
 def k3 : String := installed "null" "[\"ledger\", \"on_block_installed\"]"
 
 #guard fewer (asSeacast k3) == some 0
-#guard failsWith "reached: the twin entered" (asV1 k3)
+#guard failsWith "reached: the twin entered" (asLite k3)
 #guard failsWith "reached: the twin entered" (asSeacast (installed "null" "[\"on_block_installed\"]"))
 
 /-- K4: a bid of the group, whose ledger finds nothing: the two forms agree. -/
 def k4 : String := installed gq "[\"ledger\", \"on_block_installed\"]"
 
 #guard fewer (asSeacast k4) == some 0
-#guard fewer (asV1 k4) == some 0
+#guard fewer (asLite k4) == some 0
 
 /-! ## K5 to K7: `respond`
 
@@ -89,9 +89,9 @@ The record of K5 is a trace's: hand5 under seacast.md has one record of `respond
 node asks peer 4 for chunk 0 of a group, with no answers and no prunes. The IWANT stands three times, in
 `enqueue`'s argument, in the call's note of the normal lane, and in the record's writes. -/
 
-/-- `respond`'s IWANT of chunk 0, in SEACAST's form, or in `seacast-lite.md`'s with `v1`. -/
-def iwant0 (v1 : Bool) : String :=
-  if v1 then s!"[\"iwant\", [[{gq}, 0]]]" else s!"[\"iwant\", [[[{gq}, 0], false, 0, false]], false]"
+/-- `respond`'s IWANT of chunk 0, in SEACAST's form, or in `seacast-lite.md`'s with `lite`. -/
+def iwant0 (lite : Bool) : String :=
+  if lite then s!"[\"iwant\", [[{gq}, 0]]]" else s!"[\"iwant\", [[[{gq}, 0], false, 0, false]], false]"
 
 /-- A record of `respond` whose one enqueued entry, also the normal lane after it, is `entry`. -/
 def responded (args entry : String) : String :=
@@ -102,13 +102,13 @@ def responded (args entry : String) : String :=
     (ret "null") "[\"respond\"]" "[\"queue\"]"
 
 /-- The record with one ask and no answer: the entry is the control alone, an IWANT and an empty PRUNE. -/
-def asked1 (v1 : Bool) : String :=
-  responded s!"[4, [[{gq}, 0]], [], 0]" s!"[null, [{iwant0 v1}, [\"prune\", []]], false]"
+def asked1 (lite : Bool) : String :=
+  responded s!"[4, [[{gq}, 0]], [], 0]" s!"[null, [{iwant0 lite}, [\"prune\", []]], false]"
 
 -- K5: in SEACAST's forms the record passes with `respond`'s v2 form; seacast-lite.md's builds `.iwant`, which `enqueue`'s
 -- argument does not hold
 #guard fewer (asSeacast (asked1 false)) == some 0
-#guard failsWith "tape: " (asV1 (asked1 false))
+#guard failsWith "tape: " (asLite (asked1 false))
 
 -- K6: the record as seacast-lite.md's forms write it is refused under v2, before anything runs
 #guard failsWith "under seacast.md an IWANT is [\"iwant\", asks, want]: " (asSeacast (asked1 true))
@@ -118,6 +118,6 @@ def answered1 : String :=
   responded s!"[4, [], [{ReplayKnown.chunk3}], 0]" s!"[{ReplayKnown.chunk3}, null, true]"
 
 #guard fewer (asSeacast answered1) == some 0
-#guard fewer (asV1 answered1) == some 0
+#guard fewer (asLite answered1) == some 0
 
 end SpecTwin.Seacast.KeptKnown

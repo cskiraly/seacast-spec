@@ -106,7 +106,7 @@ def cell (table : String) (path : Json) : Except String Cell := do
 
 /-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the
 document whose forms a lane and a peer's holding take (`laneEntries`, `haveEntry`). -/
-def val (c : Cell) (j : Json) (f : Form := .v1) : Except String (Option Val) := do
+def val (c : Cell) (j : Json) (f : Form := .lite) : Except String (Option Val) := do
   if j == .null then return none
   match c with
   | .askedAt _ | .tried .. | .promise .. | .park .. | .sent _ | .backoff .. | .knownAt _ | .reconsiderAt _ | .dutyAt _ => return some (.time (← bits64 j))

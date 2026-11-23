@@ -337,20 +337,20 @@ def sortBy {α} (f : α → α → Bool) (l : List α) : List α := (l.toArray.q
 /-- The document whose forms a record's values take: `seacast-lite.md`'s or seacast.md's. Under each, the other's
 forms are refused, as any form the reader does not know is. -/
 inductive Form where
-  | v1
-  | v2
+  | lite
+  | seacast
   deriving BEq, Repr, Inhabited
 
 /-- A chunk under a record's document, at a place where seacast.md writes it narrow: `chunkN` under
 seacast.md, and `chunkF` under seacast-lite.md, as before. -/
 def chunkIn (f : Form) (j : Json) : Except String ChunkF :=
   match f with
-  | .v2 => chunkN j
-  | .v1 => chunkF j
+  | .seacast => chunkN j
+  | .lite => chunkF j
 
 /-- An ask with its flags: `[key, standing, hops, probe]`. A structured id carries no flags, since the Python's is
 bytes, so its ask is `[id, false, 0, false]` and any other is refused. -/
-def askV2Of (j : Json) : Except String AskSeacast := do
+def askSeacastOf (j : Json) : Except String AskSeacast := do
   let #[k, s, h, p] ← j.getArr? | throw s!"not an ask with its flags: {j.compress}"
   let a : AskSeacast := { key := ← key k, standing := ← boolOf s, hops := ← nat h, probe := ← boolOf p }
   if let .id .. := a.key then
@@ -371,16 +371,16 @@ def idontwantSeacast (j : Json) : Except String IhaveEntry := do
 - Under seacast.md: an IWANT is `["iwant", [ask, ...], want]`, each ask with its flags, whatever its mark and
   flags. An IHAVE is as under `seacast-lite.md`. An IDONTWANT's bitmaps are holdings. A JOIN, a GRAFT or a PRUNE of
   v2 is `[kind, [message]]`, with one message, of that kind. gossipsub's PRUNE stays `["prune", []]`. -/
-def ctl (j : Json) (f : Form := .v1) : Except String Ctl := do
+def ctl (j : Json) (f : Form := .lite) : Except String Ctl := do
   match f, ← j.getArr? with
-  | .v1, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
-  | .v2, #[.str "iwant", asks, w] => return .iwantSeacast (← boolOf w) (← (← arr asks).mapM askV2Of)
-  | .v2, #[.str "iwant", _] => throw s!"under seacast.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
+  | .lite, #[.str "iwant", ids] => return .iwant (← (← arr ids).mapM key)
+  | .seacast, #[.str "iwant", asks, w] => return .iwantSeacast (← boolOf w) (← (← arr asks).mapM askSeacastOf)
+  | .seacast, #[.str "iwant", _] => throw s!"under seacast.md an IWANT is [\"iwant\", asks, want]: {j.compress}"
   | _, #[.str "ihave", ids] => return .ihave (← (← arr ids).mapM ihaveEntry)
-  | .v1, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM ihaveEntry)
-  | .v2, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM idontwantSeacast)
+  | .lite, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM ihaveEntry)
+  | .seacast, #[.str "idontwant", ids] => return .idontwant (← (← arr ids).mapM idontwantSeacast)
   | _, #[.str "prune", .arr #[]] => return .prune
-  | .v2, #[.str k, .arr ms] =>
+  | .seacast, #[.str k, .arr ms] =>
     if !["join", "graft", "prune"].contains k then throw s!"not a control message of a queue entry: {j.compress}"
     let #[m] := ms | throw s!"a relation control holds one message: {j.compress}"
     let r ← relation m
@@ -391,23 +391,23 @@ def ctl (j : Json) (f : Form := .v1) : Except String Ctl := do
 
 /-- A queue entry: `[chunk or null, control or null, solicited]`, its chunk and its controls in the document's forms
 (the chunk narrow under seacast.md, `chunkIn`). -/
-def qentry (j : Json) (f : Form := .v1) : Except String QEntry := do
+def qentry (j : Json) (f : Form := .lite) : Except String QEntry := do
   let #[c, ctrl, .bool sol] ← j.getArr? | throw s!"not a queue entry: {j.compress}"
   let chunk ← if c == .null then pure none else some <$> chunkIn f c
   let control ← if ctrl == .null then pure none else some <$> (← arr ctrl).mapM (ctl · f)
   return { chunk, control, solicited := sol }
 
 /-- A lane's value: its entries, in order. -/
-def laneEntries (j : Json) (f : Form := .v1) : Except String (List QEntry) := do (← arr j).mapM (qentry · f)
+def laneEntries (j : Json) (f : Form := .lite) : Except String (List QEntry) := do (← arr j).mapM (qentry · f)
 
 /-- An entry of `peer_has` (§4.3): `[bits, ttl]` under `seacast-lite.md`, and `[bits, ttl, claim_all, complete]` under
 seacast.md, with §1.5's two claims of a holding as JSON booleans. -/
-def haveEntry (j : Json) (f : Form := .v1) : Except String HaveEntry := do
+def haveEntry (j : Json) (f : Form := .lite) : Except String HaveEntry := do
   match f with
-  | .v1 =>
+  | .lite =>
     let #[b, t] ← j.getArr? | throw s!"not an entry of peer_has: {j.compress}"
     return { bits := ← nat b, ttl := ← nat t }
-  | .v2 =>
+  | .seacast =>
     let #[b, t, .bool ca, .bool c] ← j.getArr?
       | throw s!"not an entry of peer_has under seacast.md, [bits, ttl, claim_all, complete]: {j.compress}"
     return { bits := ← nat b, ttl := ← nat t, claimAll := ca, complete := c }
@@ -416,23 +416,23 @@ def haveEntry (j : Json) (f : Form := .v1) : Except String HaveEntry := do
 
 /-- §6.1's timers by their target and arguments, as the record's own `after` writes them (the tracer's
 `after_args`). An entry and a note read them with this one codec. -/
-def timerV1Of : String → Array Json → Option (Except String Timer)
+def timerLiteOf : String → Array Json → Option (Except String Timer)
   | "retry_offer", #[a] => some do return .retryOffer (← key a)
   | "ask_parked", #[a] => some do return .askParked (← key a)
   | "promise_due", #[a, p, t] => some do return .promiseDue (← key a) (← nat p) (Float.ofBits (← bits64 t))
   | "window_timeout", #[k, t] => some do return .windowTimeout (← sendKey k) (Float.ofBits (← bits64 t))
   | _, _ => none
 
-/-- SEACAST's three timers by their target and arguments, in `timerV2Json`'s form: `reconsider [g, at]`,
+/-- SEACAST's three timers by their target and arguments, in `timerSeacastJson`'s form: `reconsider [g, at]`,
 `ask_sample [g, i]` and `resample [g, i, q, first]`, with a time as its word. `ask_sample` takes two arguments. -/
-def timerV2Of : String → Array Json → Option (Except String Seacast.TimerSeacast)
+def timerSeacastOf : String → Array Json → Option (Except String Seacast.TimerSeacast)
   | "reconsider", #[g, t] => some do return .reconsider (← groupKey g) (Float.ofBits (← bits64 t))
   | "ask_sample", #[g, i] => some do return .askSample (← groupKey g) (← nat i)
   | "resample", #[g, i, q, f] => some do return .resample (← groupKey g) (← nat i) (← nat q) (← boolOf f)
   | _, _ => none
 
 /-- The targets an `after` in a note may name: §6.1's four and SEACAST's three. -/
-def timerTargetsV1 : List String := ["retry_offer", "ask_parked", "promise_due", "window_timeout"]
+def timerTargetsLite : List String := ["retry_offer", "ask_parked", "promise_due", "window_timeout"]
 def timerTargetsSeacast : List String := ["reconsider", "ask_sample", "resample"]
 
 /-- The one toy callback a note may name, by its qualified name: the timer that `--alarm-wait`'s `filter_entry`
@@ -442,8 +442,8 @@ def alarmDue : String := "Node._alarm.<locals>.alarm_due"
 /-- What a timer that a question armed runs: one of §6.1's timers, one of SEACAST's three, the toy callback
 `alarm_due (g, i, q, at)`, or `decode_group (g)` by a `start`. -/
 inductive NoteTimer where
-  | v1 (t : Timer)
-  | v2 (t : Seacast.TimerSeacast)
+  | lite (t : Timer)
+  | seacast (t : Seacast.TimerSeacast)
   | alarmDue (g : Group) (i : Nat) (q : Peer) (at_ : Float)
   | start (g : Group)
   deriving BEq, Repr
@@ -470,8 +470,8 @@ def noteOf (n : Json) : Except String Note := do
   let delay ← tryCatch (bits64 d) fun _ => throw s!"a timer note's delay is the 64-bit word of a finite float: {n.compress}"
   match k, f with
   | .str "after", .str t =>
-    if timerTargetsV1.contains t then return { delay, timer := .v1 (← noteArgs t xs (timerV1Of t)) }
-    if timerTargetsSeacast.contains t then return { delay, timer := .v2 (← noteArgs t xs (timerV2Of t)) }
+    if timerTargetsLite.contains t then return { delay, timer := .lite (← noteArgs t xs (timerLiteOf t)) }
+    if timerTargetsSeacast.contains t then return { delay, timer := .seacast (← noteArgs t xs (timerSeacastOf t)) }
     if t == alarmDue then
       return { delay, timer := ← noteArgs t xs fun
         | #[g, i, q, a] => some do return .alarmDue (← groupKey g) (← nat i) (← nat q) (Float.ofBits (← bits64 a))
