@@ -1,0 +1,50 @@
+# The traces the calls summary can meet under seacast/, chains/ and rows/, one line each: path TAB class TAB needs TAB why.
+# class: must (read, its controls hold), stopped (a run the tracer stops), plant or copy (each skipped as such).
+# needs: - (every run), das (absent under --no-das), seacastcells (the cells under seacast.md, all of them).
+# Readers refuse a file that is not sorted, holds a path twice, an unknown word, or a line without four fields.
+chains/custody-floor-churn1	must	-	piece E's real cell: the tracer-wide depth (carried 7), and the families' source
+chains/das-hoardcol-w16	must	das	the chain cases' cell: the hoarders
+chains/das-samplers-mcoff	must	das	the chain cases' cell: the samplers, the member check off
+chains/fam-plain	copy	-	the families' reader: the plain copy of churn1 (families_seacast.py)
+chains/fam-signed	copy	-	the families' reader: the signed copy of churn1 (families_seacast.py)
+chains/hand5-off	stopped	-	D3's cell: the source's announce bound through publish, which the tracer must stop
+chains/hand5-peer	must	-	the chain cases' cell: hand5 with --promise-mode peer
+chains/plant-a	plant	-	plant (a): close_promises' chain cut on hand5-peer (chaincases.py --cut)
+chains/plant-b	plant	-	plant (b): chain-filter-observer-v2 on hand5-peer
+chains/plant-c	plant	das	plant (c): chain-bindings-v2 on das-hoardcol-w16
+chains/plant-d	plant	das	plant (d): chain-owed-observer-v2 on das-samplers-mcoff
+chains/plant-d5	plant	-	D5's control: bindings-checks-off-v2 on hand5-off
+chains/plant-e	plant	-	plant (e): chain-owed-changing-v2 on hand5-peer
+chains/plant-h	plant	das	plant (h): owed-flipped-observer-v2 on das-samplers
+chains/plant-i	plant	das	plant (i): owed-flipped-changing-v2 on das-samplers
+chains/plant-j	plant	das	plant (j): known-replaced-v2 on das-samplers-mcoff
+chains/plant-l	plant	das	plant (l): verdict-replaced-v2 on das-hoardcol-w16
+chains/plant-p	plant	-	plant (p): noask-in-record-v2 on hand5-peer
+chains/plant-pc	plant	-	plant (p)'s control: noask-in-record-v2 on hand5-v2
+chains/plant-q	plant	-	plant (q): entry-check-off-v2 on hand5-off
+chains/plant-r	plant	-	plant (r): per-node-depth-v2 on custody-floor-churn1
+chains/plant-s	plant	-	plant (s): suppressed-filter-v2 on hand5-peer
+chains/plant-t	plant	-	plant (t): suppressed-filter-v2-off on hand5-peer
+rows/das-alarm	must	das	the alarm's cell
+rows/das-claim	must	das	the replaced names' rows: send_have at the liars
+rows/das-hoardcol-bias	stopped	das	control (m): the bias cell, which the tracer must stop
+rows/das-keeper-ignore	must	das	the replaced names' rows: note_claim at the supernodes
+rows/plant-k	plant	-	plant (k): push_rebuilt's last argument left out (chaincases.py --drop-arg)
+seacast/announce	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/cap-wait	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/dcb20	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/hand5	must	-	the small trace under seacast.md
+seacast/hand5-own	must	-	hand5 with --rebuilt none --fault sil30
+seacast/hand5-publish	must	-	hand5 with the source's offers at publish (H7b)
+seacast/hold	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/ihave-limits	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/late-block	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/loss-thin	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/none	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/push	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/push-deep	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/rr-stripe	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/silent	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/withholders	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/without-a	must	seacastcells	a cell under seacast.md (cells3.py)
+seacast/without-b	must	seacastcells	a cell under seacast.md (cells3.py)
