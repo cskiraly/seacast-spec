@@ -37,11 +37,13 @@ formal/twin/inventory.tsv, which inventory_seacast.py holds the summary to; doc 
    node may replace (manifest_seacast's REPLACEABLE and REPLACEABLE_WHOLE) with a call counted; or `none called`.
 6. `REL: controls: ...`, which hold, or NOT with the first ones that fail:
    - K4a: each name's records in the calls file are the trailer's (raises included) and the replay's fn line's;
-   - by-fn: each part as line 4 says, from the tapes. An IWANT on a record whose fn is not one of the three, and
-     whose `reached` holds none of them, fails it: by P1 an IWANT comes only from a call of one of the three. asked or
-     outer for one of the three fails it (none is replaceable);
-   - asked: for each traced name (each name of the calls file) and record fn H, the rows the name heads on the tapes
-     of H's records are its asked count inside H: a question asked by a record's own code writes one row there;
+   - by-fn: the calls file holds an entry for each name the header traces (its `traced`), and for no other; a header
+     with no traced names fails it. Then each part as line 4 says, from the tapes. An IWANT on a record whose fn is
+     not one of the three, and whose `reached` holds none of them, fails it: by P1 an IWANT comes only from a call of
+     one of the three. asked or outer for one of the three fails it (none is replaceable);
+   - asked: for each name the header traces and record fn H, the rows the name heads on the tapes of H's records are
+     its asked count inside H (0 where the calls file has no entry for it): a question asked by a record's own code
+     writes one row there;
    - reach, a consistency check: for each record fn F and name X other than F, X's calls inside F's records are at
      least the records of F whose `reached` holds X, and none where none does.
 Exit 0 when the controls hold or the trace is skipped, 1 when one fails, 2 on a usage error.
@@ -235,6 +237,18 @@ def main(argv):
     print(f"{rel}: calls: " + "; ".join(line3(x) for x in FNS) + f"; one inside another: {nested}")
 
     bad = []
+    # by-fn: first the calls file's entries, one for each name the header traces and none other; the asked check
+    # below runs over the same names, so that a name left out of the calls file is not left out of the check
+    traced = header.get("traced")
+    if not isinstance(traced, list):
+        bad.append("by-fn: the header names no traced names")
+        tnames = sorted(calls)
+    else:
+        tnames = sorted(set(traced))
+        for x in sorted(set(traced) - set(calls)):
+            bad.append(f"by-fn: the calls file has no entry for {x}, which the header traces")
+        for x in sorted(set(calls) - set(traced)):
+            bad.append(f"by-fn: the calls file has an entry for {x}, which the header does not trace")
     # by-fn: the record halves; the in parts, by host; the summed parts, by host
     parts, inparts = [], 0
     for x in FNS:
@@ -273,7 +287,8 @@ def main(argv):
             bad.append(f"by-fn: {x}, which no node replaces, asked {c['asked']}, outer {c['outer']}")
     # asked: each traced name's questions inside H against the rows it heads on H's records' tapes
     pairs = set()
-    for name, c in sorted(calls.items()):
+    for name in tnames:
+        c = calls.get(name, {})
         rows = {h: k for (hd, h), k in heads.items() if hd == name}
         for h in sorted(set(rows) | set(c.get("asked", {}))):
             pairs.add((name, h))
@@ -423,7 +438,8 @@ def byfn_base():
 
 
 def byfn_cases():
-    """(case, a change to the base, the exit, the words its line 6 must hold, or line 4's for a holding case)."""
+    """(case, a change to the base, the exit, the words its line 6 must hold, or line 4's for a holding case[, the
+    header's traced names, False for a header without them; the base's calls names where left out])."""
     def orphan(r, c, w):
         r.append({"fn": "on_chunk", "reached": ["on_chunk"], "tape": ask(1)})
         c["on_chunk"] = cell("on_chunk", record=1)
@@ -465,6 +481,12 @@ def byfn_cases():
          "asked: forward inside on_block_installed"),
         ("by-fn: outer for one of the three", lambda r, c, w: c["retry_offer"].update(outer=1), 1,
          "by-fn: retry_offer, which no node replaces"),
+        ("by-fn: a traced name with no entry in the calls file", lambda r, c, w: c.pop("forward"), 1,
+         "by-fn: the calls file has no entry for forward"),
+        ("by-fn: an entry for a name not traced", lambda r, c, w: c.update(extra=cell("extra")), 1,
+         "by-fn: the calls file has an entry for"),
+        ("by-fn: a header with no traced list", lambda r, c, w: None, 1, "by-fn: the header names no traced names",
+         False),
     ]
 
 
@@ -500,9 +522,13 @@ def self_test():
     import tempfile
     good = total = 0
 
-    def run(out, rel, args, trailer, anyname, recs, calls, iws):
+    def run(out, rel, args, trailer, anyname, recs, calls, iws, traced=None):
+        """traced: the header's traced names; None for the calls file's names, False for a header without them."""
+        hd = {"args": args, "format": 7}
+        if traced is not False:
+            hd["traced"] = sorted(calls) if traced is None else traced
         with gzip.open(out / f"{rel}.jsonl.gz", "wt") as f:
-            for x in [{"content": "self-test"}, {"header": {"args": args, "format": 7}}, {"nodes": []}] + \
+            for x in [{"content": "self-test"}, {"header": hd}, {"nodes": []}] + \
                     [dict(r, n=j, t=0) for j, r in enumerate(recs)]:
                 f.write(json.dumps(x) + "\n")
             if trailer is not None:
@@ -528,12 +554,13 @@ def self_test():
             total += 1
             print(f"calls_seacast: self-test: {name}: {lines[0] if lines else 'no line'}"
                   f"{'' if ok else '  <-- NOT as it must be: ' + want}")
-        for name, change, want, words in byfn_cases():
+        for name, change, want, words, *hd in byfn_cases():
             recs, calls, iws = copy.deepcopy(byfn_base())
+            traced = hd[0] if hd else sorted(calls)         # the base's names, before the case's change
             change(recs, calls, iws)
             by = Counter(r["fn"] for r in recs)
             rc, lines = run(out, "seacast/b", ["--doc", "seacast"], {"records": len(recs), "by_fn": dict(by),
-                            "rest": 0}, False, recs, calls, iws)
+                            "rest": 0}, False, recs, calls, iws, traced)
             if want == 0:
                 ok = rc == 0 and len(lines) == 6 and words in lines[3] and lines[5].endswith(": hold")
                 shown = lines[3] if len(lines) > 3 else (lines[-1] if lines else "no line")
