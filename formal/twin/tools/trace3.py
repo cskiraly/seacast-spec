@@ -2683,7 +2683,9 @@ class Tracer3(Tracer):
         F.ATTR_LEVELS[N.PeerQueue] = ("urgent", "normal")    # a PeerQueue's lanes are its keys
         F.ATTR_READS[N.PeerQueue] = {"has_chunks": ("normal",)}  # next_to_send's `q.has_chunks()`
         # the content line first: what this trace is made from (content.py); written when the output opens, after
-        # every check here, so that a run refused here leaves no file
+        # every check here, so that a run these checks refuse leaves no file. A refusal later, by the toy's own
+        # argument checks or at the install, leaves a file whose trailer says the run stopped (close), with 0 records
+        # or more, which every reader takes as stopped
         self.content_line = content.line(content.content(self.toy))
         self.counts = Counter()
         self.nodes = []                 # (node, its constants, its replaced names, its types, its chains), as each is

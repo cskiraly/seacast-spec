@@ -5,8 +5,9 @@ records they arm.
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
                                       2: a trace it cannot read, not a trace under seacast.md, or a run that stopped
                                       (its trailer says so, or it has none)
-    python3 timers_seacast.py --self-test  thirty-three small traces it writes, each with the result written for it
-                                      (twenty-five of the checks, six of the header's document, two runs that stopped)
+    python3 timers_seacast.py --self-test  thirty-six small traces it writes, each with the result written for it
+                                      (twenty-six of the checks, each with its reasons' words; six of the header's
+                                      document; two runs that stopped; two lookups that stop the checker)
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -24,7 +25,8 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       entry's read of known_at[g] (absent: 0.0) and START_DELAY of the group's type at that node (the nodes line).
       The trace does not name the group's type there. The type taken is one whose START_DELAY exceeds
       t - known_at[g], which is on_offer's condition for asking at all; types of one START_DELAY give one delay. If
-      no START_DELAY fits, or two different ones do, the checker stops.
+      no START_DELAY fits, or two different ones do, the checker stops there: with exit 1 when failures came before
+      the lookup, which it reports, and exit 2 when none did.
   K3, K4  a count per key (node, ask, due): the due of a note or an own after is the arming t plus its delay, added
       as floats as the simulator adds them; a record's is its t. With A the notes and own afters due at a key and R
       the retry_offer records there, K3 requires R >= A (each armed timer fires; a key past the last record is left
@@ -59,7 +61,10 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       its node's heartbeat for the same ask counts as fired, by the retry (the limit above, seen from K3). No check
       requires each held value to be retried: K4 bounds the records from above, and the heartbeat's retries are
       excused, not required. And a held_back write made outside any record (inside a question at another node) is
-      not seen; the document's one writer is a record of its own wherever it is traced.
+      not seen; the document's one writer is a record of its own wherever it is traced. Nor is one a question
+      makes inside a record, which its tape entry's log holds (`cw`), not the record's writes: none is made now,
+      since held_back's one writer, on_offer, has one caller, on_frame, which is not traced, so each call of
+      on_offer is a record of its own.
 
 The other lines are counts of the trace's other timers: the `enqueue` entries with timers, the notes that name
 `alarm_due`, the records of `promise_due`, the notes of kind `start` (a `start` inside a question), and any other
@@ -113,6 +118,10 @@ def chunk(a):
         except ValueError:
             pass
     return a
+
+
+class Ambiguous(Exception):
+    """K2's lookup of a group's START_DELAY found none, or two: the checker stops there."""
 
 
 def check(path, out):
@@ -242,9 +251,8 @@ def check(path, out):
                     continue
                 sds = {sd for sd in delays.get(n, {}).values() if t - known_at < sd}
                 if len(sds) != 1:
-                    out.append(f"timers_seacast: {path}: node {n} at {t!r}: no single START_DELAY fits t - known_at "
-                               f"({sorted(sds)}); K2 cannot be checked")
-                    return 2
+                    raise Ambiguous(f"timers_seacast: {path}: node {n} at {t!r}: no single START_DELAY fits t - "
+                                    f"known_at ({sorted(sds)}); K2 cannot be checked")
                 sd = sds.pop()
                 want_d = max(0.0, known_at + sd - t) + 1e-6          # the binding's order: known_at + START_DELAY - now
                 for tm, a in zip(ours, asks):
@@ -256,6 +264,16 @@ def check(path, out):
                     key = (n, k, bits(t + fl(tm[1])))
                     arm[key] += 1
                     by_note[key] += 1
+    except Ambiguous as e:              # the checker stops: the failures gathered before the lookup are still reported
+        out.append(str(e))
+        if not any(fails.values()):
+            return 2
+        for c in sorted(fails):
+            if fails[c]:
+                out.append(f"timers_seacast: {c} FAILS: {len(fails[c])} failure(s), before the lookup that stopped it")
+                out.extend(f"  {c}: {w}" for w in fails[c][:LIMIT])
+        out.append(f"timers_seacast: the timers of deferred_offers FAIL on {path}")
+        return 1
     except (OSError, EOFError, ValueError, KeyError, IndexError, TypeError) as e:
         out.append(f"timers_seacast: {path}: a line it cannot read: {e!r}")
         return 2
@@ -351,7 +369,7 @@ def check(path, out):
     return 0
 
 
-# --- the self-test: twenty-three small traces, one node (0), one row group G, START_DELAY 1.0 -----------------
+# --- the self-test: thirty-six small traces, one node (0), one row group G, START_DELAY 1.0 ------------------
 G = "aa" * 32
 
 
@@ -403,52 +421,63 @@ def _beat(t):
 
 TRACED = ["drop_stale_waits", "on_offer", "retry_offer"]       # the fixtures' header: on_offer traced, as in v2's
 NO_OFFER = ["drop_stale_waits", "retry_offer"]                 # an older head's: on_offer not traced
-CASES = [  # (name, records, the checks that must fail[, the header's traced names, None for none; TRACED if left out])
-    ("u1 one note, one record", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]), _retry(_due(0.25), 3)], set()),
+# the words of a failure's reason, one boundary each: K1's notes against the asks newly armed; K3's records at a key;
+# K2's delay; K4's record not armed and not excused (held branch, then the heartbeat alone), and K4's cap
+NEW, THERE, DELAY = "asks newly armed", "record(s) there", "'s delay"
+ARMED, BEYOND, CAP = "armed there", "beyond its timers", "at most one is the heartbeat's"
+CASES = [  # (name, records, {each check that must fail: its reasons' words}[, the header's traced names, None for
+    #         none; TRACED if left out]). A case holds when the failed checks are its keys, each failure line of a
+    #         check holds one of its words, and each word is in one of them
+    ("u1 one note, one record", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]), _retry(_due(0.25), 3)], {}),
     ("u2 two notes at one key, two records", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3]), _entry(0.25, 1 << 3, [3])]),
-                                              _retry(_due(0.25), 3), _retry(_due(0.25), 3)], {"K1"}),
+                                              _retry(_due(0.25), 3), _retry(_due(0.25), 3)], {"K1": [NEW]}),
     ("u3 a note and an own after at one key, one record", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3]), _own(0.25, 3)]),
-                                                           _retry(_due(0.25), 3)], {"K3"}),
+                                                           _retry(_due(0.25), 3)], {"K3": [THERE]}),
     ("u4 one note, two records at its key", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]), _retry(_due(0.25), 3),
-                                             _retry(_due(0.25), 3)], {"K4"}),
+                                             _retry(_due(0.25), 3)], {"K4": [ARMED]}),
     ("u5 a delay without its + 1e-6", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3], eps=False)]),
-                                       _retry(_due(0.25, eps=False), 3)], {"K2"}),
+                                       _retry(_due(0.25, eps=False), 3)], {"K2": [DELAY]}),
     ("u6 a note for an ask already armed", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]),
                                             _rec(0.5, tape=[_entry(0.5, 1 << 3, [3])]), _retry(_due(0.25), 3),
-                                            _retry(_due(0.5), 3)], {"K1"}),
-    ("u7 a note due after the last record", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]), _rec(0.5)], set()),
+                                            _retry(_due(0.5), 3)], {"K1": [NEW]}),
+    ("u7 a note due after the last record", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3])]), _rec(0.5)], {}),
     ("u8 a note and an own after at one key, two records", [_rec(0.25, tape=[_entry(0.25, 1 << 3, [3]),
                                                                              _own(0.25, 3)]),
-                                                            _retry(_due(0.25), 3), _retry(_due(0.25), 3)], set()),
-    ("u9 a record at a heartbeat, its ask held back", [_held(0.25, 3), _retry(0.7, 3), _beat(0.7)], set()),
-    ("u10 a record at a heartbeat, another ask held back", [_held(0.25, 4), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+                                                            _retry(_due(0.25), 3), _retry(_due(0.25), 3)], {}),
+    ("u9 a record at a heartbeat, its ask held back", [_held(0.25, 3), _retry(0.7, 3), _beat(0.7)], {}),
+    ("u10 a record at a heartbeat, another ask held back", [_held(0.25, 4), _retry(0.7, 3), _beat(0.7)],
+     {"K4": [ARMED]}),
     ("u11 two records at a heartbeat for one write", [_held(0.25, 3), _retry(0.7, 3), _retry(0.7, 3), _beat(0.7)],
-     {"K4"}),
-    ("u12 a record, its ask held back, no heartbeat", [_held(0.25, 3), _retry(0.7, 3)], {"K4"}),
-    ("u13 a write an earlier heartbeat cleared", [_held(0.25, 3), _beat(0.5), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+     {"K4": [CAP, ARMED]}),
+    ("u12 a record, its ask held back, no heartbeat", [_held(0.25, 3), _retry(0.7, 3)], {"K4": [ARMED]}),
+    ("u13 a write an earlier heartbeat cleared", [_held(0.25, 3), _beat(0.5), _retry(0.7, 3), _beat(0.7)],
+     {"K4": [ARMED]}),
     ("u14 on_offer not traced, a record at a heartbeat", [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7)],
-     set(), NO_OFFER),
+     {}, NO_OFFER),
     ("u15 on_offer not traced, two records at a heartbeat", [_rec(0.25, "on_holding"), _retry(0.7, 3),
-                                                             _retry(0.7, 3), _beat(0.7)], {"K4"}, NO_OFFER),
+                                                             _retry(0.7, 3), _beat(0.7)], {"K4": [CAP]}, NO_OFFER),
     ("u16 on_offer not traced, one chunk by index and by id at a heartbeat",
-     [_rec(0.25, "on_holding"), _retry(0.7, 3), _retry_id(0.7, 3), _beat(0.7)], {"K4"}, NO_OFFER),
-    ("u17 on_offer recorded, no write, a record at a heartbeat", [_rec(0.25), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+     [_rec(0.25, "on_holding"), _retry(0.7, 3), _retry_id(0.7, 3), _beat(0.7)], {"K4": [CAP]}, NO_OFFER),
+    ("u17 on_offer recorded, no write, a record at a heartbeat", [_rec(0.25), _retry(0.7, 3), _beat(0.7)],
+     {"K4": [ARMED]}),
     ("u18 one key written twice in an epoch, two records at its heartbeat",
-     [_held(0.25, 3), _held(0.5, 3), _retry(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+     [_held(0.25, 3), _held(0.5, 3), _retry(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4": [CAP, ARMED]}),
     ("u19 a marker, then a hold and a record at its t (the record after the marker)",
-     [_beat(0.7), _held(0.7, 3), _retry(0.7, 3)], {"K4"}),
+     [_beat(0.7), _held(0.7, 3), _retry(0.7, 3)], {"K4": [ARMED]}),
     ("u20 two epochs closed at one t, a hold and a record in each",
-     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4"}),
-    ("u21 as u20, the second epoch left open",
-     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 3), _retry(0.7, 3)], {"K4"}),
+     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 3), _retry(0.7, 3), _beat(0.7)], {"K4": [CAP]}),
+    ("u21 a second chunk held and retried in an epoch left open (one record a chunk: no cap)",
+     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 4), _retry(0.7, 4)], {"K4": [ARMED]}),
+    ("u21c u21's control: the same, its epoch closed at the record's t",
+     [_held(0.25, 3), _retry(0.7, 3), _beat(0.7), _held(0.7, 4), _retry(0.7, 4), _beat(0.7)], {}),
     ("u22 on_offer not traced, a marker, then a record at its t",
-     [_rec(0.25, "on_holding"), _beat(0.7), _retry(0.7, 3)], {"K4"}, NO_OFFER),
+     [_rec(0.25, "on_holding"), _beat(0.7), _retry(0.7, 3)], {"K4": [BEYOND]}, NO_OFFER),
     ("u23 on_offer not traced, two epochs closed at one t, a record in each",
-     [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7), _retry(0.7, 3), _beat(0.7)], {"K4"}, NO_OFFER),
+     [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7), _retry(0.7, 3), _beat(0.7)], {"K4": [CAP]}, NO_OFFER),
     ("u24 on_offer traced, none recorded, a record at a heartbeat (the branch is the header's, not the records')",
-     [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7)], {"K4"}),
+     [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7)], {"K4": [ARMED]}),
     ("u25 a header with no traced names, a record at a heartbeat", [_rec(0.25, "on_holding"), _retry(0.7, 3),
-                                                                     _beat(0.7)], set(), None),
+                                                                     _beat(0.7)], {}, None),
 ]
 # the header's document in either form and under its name before v0.12.0, u1's records: (name, args, exit)
 HEADERS = [
@@ -464,22 +493,41 @@ STOPS = [
     ("s1 a trailer that says the run stopped", "SystemExit: x", "SystemExit: x"),
     ("s2 no trailer", None, "no trailer"),
 ]
+# K2's lookup that stops the checker: node 0 given a second type whose START_DELAY (2.0) also exceeds t - known_at, so
+# that an entry with notes finds two. (name, records, exit, the failed checks)
+TWO = {"row": {"START_DELAY": bits(1.0)}, "column": {"START_DELAY": bits(2.0)}}
+AMBIG = [
+    ("k1 a K1 failure (an entry with no notes, index 3 wanted), then an ambiguous lookup",
+     [_rec(0.25, tape=[_entry(0.25, 1 << 3, [])]), _rec(0.5, tape=[_entry(0.5, 1 << 4, [4])])], 1, {"K1"}),
+    ("k2 an ambiguous lookup, no failure before it", [_rec(0.5, tape=[_entry(0.5, 1 << 4, [4])])], 2, set()),
+]
 
 
-def _write(p, records, args=("--doc", "seacast"), stopped=False, traced=TRACED):
+def _write(p, records, args=("--doc", "seacast"), stopped=False, traced=TRACED, types=None):
     """stopped: False for a whole run's trailer, None for no trailer, or the reason its trailer carries; traced: the
-    header's traced names, or None for a header without them."""
+    header's traced names, or None for a header without them; types: node 0's, or None for row's and payload's."""
     with gzip.open(p, "wt") as fh:
         fh.write(json.dumps({"content": "self-test"}) + "\n")
         fh.write(json.dumps({"header": dict({"args": list(args)}, **({} if traced is None else {"traced": traced}))})
                  + "\n")
-        fh.write(json.dumps({"nodes": [{"n": [0], "types": {"row": {"START_DELAY": bits(1.0)},
-                                                            "payload": {"START_DELAY": 0}}}]}) + "\n")
+        fh.write(json.dumps({"nodes": [{"n": [0], "types": types or {"row": {"START_DELAY": bits(1.0)},
+                                                                     "payload": {"START_DELAY": 0}}}]}) + "\n")
         for r in records:
             fh.write(json.dumps(r) + "\n")
         if stopped is not None:
             fh.write(json.dumps({"trailer": dict({"records": len(records)},
                                                  **({} if stopped is False else {"stopped": stopped}))}) + "\n")
+
+
+def reasons_hold(out, must):
+    """The failed checks are must's keys; each failure line of a check holds one of its words; each word is in one."""
+    if {w.split()[1] for w in out if " FAILS: " in w} != set(must):
+        return False
+    for c, words in must.items():
+        lines = [w for w in out if w.startswith(f"  {c}: ")]
+        if not all(any(x in w for x in words) for w in lines) or not all(any(x in w for w in lines) for x in words):
+            return False
+    return True
 
 
 def self_test():
@@ -491,10 +539,10 @@ def self_test():
             out = []
             rc = check(p, out)
             failed = {w.split()[1] for w in out if " FAILS: " in w}
-            ok = rc == (1 if must else 0) and failed == must
+            ok = rc == (1 if must else 0) and reasons_hold(out, must)
             good += ok
             print(f"timers_seacast: self-test: {name}: exit {rc}, failed {sorted(failed) or 'none'}"
-                  f"{'' if ok else ' <-- NOT as it must be: ' + str(sorted(must))}")
+                  f"{'' if ok else ' <-- NOT as it must be: ' + str(must)}")
             if not ok:
                 print("\n".join("    " + w for w in out))
         for name, args, want in HEADERS:
@@ -515,7 +563,21 @@ def self_test():
             print(f"timers_seacast: self-test: {name}: exit {rc}{'' if ok else ' <-- NOT as it must be: exit 2, not read'}")
             if not ok:
                 print("\n".join("    " + w for w in out))
-    total = len(CASES) + len(HEADERS) + len(STOPS)
+        for name, records, want, must in AMBIG:
+            _write(p, records, types=TWO)
+            out = []
+            rc = check(p, out)
+            stop = (f"timers_seacast: {p}: node 0 at 0.5: no single START_DELAY fits t - known_at ([1.0, 2.0]); "
+                    "K2 cannot be checked")
+            failed = {w.split()[1] for w in out if " FAILS: " in w}
+            ok = rc == want and failed == must and out[:1] == [stop] and (
+                len(out) == 1 if want == 2 else out[-1] == f"timers_seacast: the timers of deferred_offers FAIL on {p}")
+            good += ok
+            print(f"timers_seacast: self-test: {name}: exit {rc}, failed {sorted(failed) or 'none'}"
+                  f"{'' if ok else f' <-- NOT as it must be: exit {want}, the stop line first'}")
+            if not ok:
+                print("\n".join("    " + w for w in out))
+    total = len(CASES) + len(HEADERS) + len(STOPS) + len(AMBIG)
     print(f"timers_seacast: self-test: {good} of {total} cases as they must be")
     return 0 if good == total else 1
 

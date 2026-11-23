@@ -1423,6 +1423,9 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
     echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $tied; $said (--no-das: the six DAS names and the bias cell skipped)"
   else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $tied; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
 }
+whole_replay() {        # whole_replay RC N FILE: a replay of N records, whole: exit 0 and FILE's summary line N of N ok
+  [ "$1" = 0 ] && [ -n "$2" ] && has -x -F "replay: $2 records, $2 ok, 0 mismatched" "$3"
+}
 stops() {               # piece D: point 5's stop, plant (p), and its control; point 6's stop (D3), with its entry check
   #                       removed (q), and with both checks removed (D5's control); every cell local
   local n5= f5= nc= fc= rec= nq= plain got why s5 s6 s7 ok5=0 okc=0 ok3=0 okq=0 okr=0
@@ -1470,8 +1473,8 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   else echo "D3 point 6, on hand5-off: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-stops.txt"; fi
   # D3's trace given to the replay: its trailer says it stopped, and the replay must refuse it at that key (Main.lean's
   # envelope: "trailer: not a member of it: stopped"), so that a stopped run is never replayed as a whole one; its
-  # control, a copy without the key, whose replay does not name the key (its exit is read, not required)
-  local rcs rcc
+  # control, a copy without the key, which must replay whole (whole_replay, N its trailer's records) and not name the key
+  local rcs rcc ncc
   rm -f "$OUT/c-stopped.replay" "$OUT/c-stopped-control.replay" "$OUT/c-stopped-control.jsonl.gz"
   if ! $PY -c 'import gzip, json, sys
 t = json.loads(gzip.open(sys.argv[1], "rt").read().splitlines()[-1]).get("trailer") or {}
@@ -1486,12 +1489,14 @@ lines[-1] = json.dumps(t, separators=(",", ":")) + "\n"
 with gzip.open(sys.argv[2], "wt") as f:
     f.write("".join(lines))' "$OUT/chains/hand5-off.jsonl.gz" "$OUT/c-stopped-control.jsonl.gz"
     zcat "$OUT/c-stopped-control.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/c-stopped-control.replay" 2>&1; rcc=${PIPESTATUS[1]}
+    ncc=$($PY -c 'import gzip, json, sys
+print(json.loads(gzip.open(sys.argv[1], "rt").read().splitlines()[-1])["trailer"]["records"])' "$OUT/c-stopped-control.jsonl.gz" 2> /dev/null)
     if [ "$rcs" = 0 ] || ! has -F "trailer: not a member of it: stopped" "$OUT/c-stopped.replay"; then
       echo "D3's trace, replayed: not refused at its trailer's stopped key (rc $rcs; c-stopped.replay)  <-- NOT" >> "$OUT/c-stops.txt"
-    elif [ ! -s "$OUT/c-stopped-control.replay" ] || has -F "trailer: not a member of it: stopped" "$OUT/c-stopped-control.replay"; then
-      echo "D3's trace, replayed: its copy without the key not replayed, or the key named there too (c-stopped-control.replay)  <-- NOT" >> "$OUT/c-stops.txt"
+    elif ! whole_replay "$rcc" "$ncc" "$OUT/c-stopped-control.replay" || has -F "trailer: not a member of it: stopped" "$OUT/c-stopped-control.replay"; then
+      echo "D3's trace, replayed: its copy without the key not replayed whole, or the key named there (rc $rcc, trailer $ncc; c-stopped-control.replay)  <-- NOT" >> "$OUT/c-stops.txt"
     else
-      echo "D3's trace, replayed: refused at its trailer's stopped key, as it must (rc $rcs: $(grep -m 1 -F 'trailer: not a member of it: stopped' "$OUT/c-stopped.replay" | cut -c1-120)); its copy without the key: rc $rcc, the key not named" >> "$OUT/c-stops.txt"
+      echo "D3's trace, replayed: refused at its trailer's stopped key, as it must (rc $rcs: $(grep -m 1 -F 'trailer: not a member of it: stopped' "$OUT/c-stopped.replay" | cut -c1-120)); its copy without the key: rc 0, \"replay: $ncc records, $ncc ok, 0 mismatched\", $ncc its trailer's records, the key not named" >> "$OUT/c-stops.txt"
     fi
   fi
   # (q): the entry check skipped, the same record's exit check must stop it, with the same words but "exit"
@@ -1616,7 +1621,7 @@ sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/
 }
 f_cases() {             # piece F: S1-8a's count (carried), S1-8b in both halves, S1-C5's line; local, after carried
   local churn=chains/custody-floor-churn1 nb r0 nsr m rc tl lines refused rows s8a s8b s5 c fw
-  local ok8a=0 okw=0 oks=0 okp=0 ok5=0
+  local ok8a=0 okw=0 oks=0 okp=0 ok5=0 okc=0
   local tline="node [0-9]+'s send_relation to [0-9]+: a GRAFT of the −1 family; a counted record put in after it, at node [0-9]+; node [0-9]+'s send_relation to [0-9]+: a PRUNE of the −1 family; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
   : > "$OUT/c-fcases.txt"
   # The backoff codec's case (its #guard refuses +inf as the leaf, Seacast/Codecs.lean), carried: no record of churn1
@@ -1968,6 +1973,11 @@ timers_all_one() {      # $1: a trace under OUT, without .jsonl.gz: timers_seaca
   local g=$OUT/timersall/${1//\//__}
   (cd "$T" && $PY timers_seacast.py "$OUT/$1.jsonl.gz") > "$g.txt" 2>&1; echo $? > "$g.rc"
 }
+reached_count() {       # the count of traces the calls summary read: c-reached.txt's one c-reached: line, its last, with
+  #                       either of its endings; nothing otherwise
+  [ "$(grep -c '^c-reached: ' "$OUT/c-reached.txt" 2> /dev/null)" = 1 ] || return 0
+  tail -n 1 "$OUT/c-reached.txt" | sed -n -E 's/^c-reached: ([0-9]+) traces read, [0-9]+ skipped; (the controls hold in every one|the controls fail, or the tool did, in:.*)$/\1/p'
+}
 timers_all() {          # deferred_offers' timers over exactly the inventory's must traces whose need the run had, each
   #                       read by the calls summary (plants, copies and runs that stopped are other lines; a must
   #                       trace the summary did not read is a NOT): each holds, or stops at the type's lookup (two
@@ -2007,9 +2017,13 @@ timers_all() {          # deferred_offers' timers over exactly the inventory's m
     fi
   done
   total=$(echo $chk | wc -w)
-  nread=$(sed -n 's/^c-reached: \([0-9]*\) traces read, [0-9]* skipped; the controls hold in every one$/\1/p' "$OUT/c-reached.txt" 2> /dev/null)
+  nread=$(reached_count)
   [ "$total" -gt 0 ] || no "deferred_offers' timers over every trace: no trace to check"
-  [ -z "$nread" ] || [ "$total" = "$nread" ] || no "deferred_offers' timers over every trace: $total checked, where the calls summary read $nread (c-timers-all.txt)"
+  if [ -z "$nread" ]; then
+    no "deferred_offers' timers over every trace: c-reached.txt does not end in its one c-reached: line, so the count of traces the calls summary read is not known (c-reached.txt)"
+  elif [ "$total" != "$nread" ]; then
+    no "deferred_offers' timers over every trace: $total checked, where the calls summary read $nread (c-timers-all.txt)"
+  fi
   [ -z "$fl" ] || no "deferred_offers' timers over every trace: failed in:$fl (c-timers-all.txt)"
   [ "$ws" = 0 ] || no "deferred_offers' timers over every trace: $ws enqueue entries carry a timer (c-timers-all.txt)"
   echo "  deferred_offers' timers over the inventory's $total must traces, each read by the calls summary: $h hold ($hn with notes, $h0 with none), $st stopped at the type's lookup${stn:+ (in:$stn)}, $(echo $fl | wc -w) fail; enqueue entries with timers: $ws; start notes: ${sn:+in$sn}${sn:-none} (c-timers-all.txt)"

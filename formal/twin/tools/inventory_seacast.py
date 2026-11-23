@@ -4,17 +4,18 @@
     python3 -I inventory_seacast.py --needs N [--partial] INVENTORY C-REACHED          the check
     python3 -I inventory_seacast.py --must --needs N [--partial] INVENTORY C-REACHED   the must lines whose need the
                                                                                        run had, a path a line
-    python3 -I inventory_seacast.py --self-test                  thirty-three small cases it writes
+    python3 -I inventory_seacast.py --self-test                  thirty-six small cases it writes
 
 N: the needs the run was invoked for, declared by its caller (check.sh, from its flags), never read from the output:
 `-`, or das and seacastcells joined by commas, each at most once, in that order. --partial is required when N is
 short of das,seacastcells, and refused with it: a run with fewer needs is a partial one, said twice.
 
 INVENTORY: `#` lines are comments; every other line is `path TAB class TAB need TAB why`, sorted by its bytes, each
-path once. class: must, stopped, plant or copy. need: `-` (every run), das or seacastcells. C-REACHED: the calls
-summary's file, whose first line is `needs: WORDS`, the needs the run had (das and seacastcells, each at most once, in
-that order), or `needs: -`; WORDS must be N's, with spaces. A trace there is read when it has a line
-`PATH (format ...`, and skipped when it has a line `skipped: PATH: CLASS: WHY`; a skip line without a class has none.
+path once and without white space. class: must, stopped, plant or copy. need: `-` (every run), das or seacastcells.
+C-REACHED: the calls summary's file, whose first line is `needs: WORDS`, the needs the run had (das and seacastcells,
+each at most once, in that order), or `needs: -`; WORDS must be N's, with spaces. A trace there is read when it has a
+line `PATH (format ...`, and skipped when it has a line `skipped: PATH: CLASS: WHY`; a skip line without a class has
+none. A path read twice, or skipped twice, is refused.
 
 The check, for each path:
 - a listed path whose need the run had is present, read or skipped;
@@ -50,6 +51,8 @@ def read_inventory(text):
         path, cls, need, why = f
         if not path or not why:
             raise Refused(f"line {i}: an empty path or why")
+        if re.search(r"\s", path):          # the calls summary names a path by \S+
+            raise Refused(f"line {i}: a path with white space: {path!r}")
         if cls not in CLASSES:
             raise Refused(f"line {i}: an unknown class: {cls}")
         if need not in NEEDS:
@@ -103,13 +106,15 @@ def read_reached(text, decl):
     for line in lines[1:]:
         if line.startswith("skipped: "):
             m = re.match(r"^skipped: (\S+): (\S+): (.+)$", line)
-            if m:
-                skipped[m.group(1)] = m.group(2)
-            else:
-                skipped[line.split(" ")[1].rstrip(":")] = None
+            p, c = (m.group(1), m.group(2)) if m else (line.split(" ")[1].rstrip(":"), None)
+            if p in skipped:                # a summary names each trace once
+                raise Refused(f"the calls summary skips {p} twice")
+            skipped[p] = c
             continue
         m = re.match(r"^(\S+) \(format ", line)
         if m:
+            if m.group(1) in read:
+                raise Refused(f"the calls summary reads {m.group(1)} twice")
             read.add(m.group(1))
     return said, needs, read, skipped
 
@@ -226,7 +231,13 @@ def cases():
     out.append(("a line of three fields", inv_text([("chains/a", "must", "-")] + rows[1:]), good, 2, "3 fields"))
     out.append(("a line of five fields", inv_text([("chains/a", "must", "-", "why", "more")] + rows[1:]), good, 2,
                 "5 fields"))
+    out.append(("a path with white space", inv_text([("chains/a x",) + rows[0][1:]] + rows[1:]), good, 2,
+                "a path with white space"))
     out.append(("no needs line", base, reached_text(None, READ, SKIP), 2, "not its needs line"))
+    out.append(("a trace read twice", base, reached_text(FULL, READ + ["chains/a"], SKIP), 2,
+                "reads chains/a twice"))
+    out.append(("a trace skipped twice", base, good + "skipped: chains/c: stopped: why\n", 2,
+                "skips chains/c twice"))
     out.append(("an unknown needs word", base, reached_text("needs: das cells", READ, SKIP), 2, "unknown needs word"))
     out.append(("a needs word twice", base, reached_text("needs: das das seacastcells", READ, SKIP), 2, "twice"))
     # the declaration (--needs, --partial): the needs line must be it, and it must be in its form

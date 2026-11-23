@@ -413,6 +413,29 @@ def write(f, lines):                    # a line given as text is written as it 
     f.write_text(start + "".join((r if isinstance(r, str) else dump(r)) + "\n" for r in lines if r is not RAW))
 
 
+def doc_span(args):
+    """Where the document option is in a header's args, as trace3.doc_of finds it: (k, 2) for `--doc D`, (k, 1) for
+    `--doc=D`. Args without one are refused."""
+    for i, a in enumerate(args):
+        if a == "--doc" and i + 1 < len(args):
+            return i, 2
+        if a.startswith("--doc="):
+            return i, 1
+    raise SystemExit(f"altered3: no document option in the args: {args}")
+
+
+def without_doc(args):
+    """The args with the document option taken out."""
+    k, w = doc_span(args)
+    return args[:k] + args[k + w:]
+
+
+def with_doc(args, d):
+    """The args with D in the document option's place, in its spelling."""
+    k, w = doc_span(args)
+    return args[:k] + (["--doc", d] if w == 2 else [f"--doc={d}"]) + args[k + w:]
+
+
 def alone(hdr, consts, r, rest=None):
     """A trace of one record, with its trailer."""
     n = len(r.get("rest", [])) if rest is None else rest
@@ -527,6 +550,15 @@ def self_test():
         bad += not ok
         print(f"altered3 self-test, the trailer check, {name}: {'taken' if got is None else 'refused: ' + got}"
               f"{'' if ok else '  <-- must be ' + ('taken' if want is None else 'refused: ' + want)}")
+    # the document option in either spelling (doc_span): taken out, the other words kept and no document left; put
+    # back as v3 in the same spelling
+    for opt in (["--doc", "seacast"], ["--doc=seacast"]):
+        args = ["--n", "4"] + opt + ["--seed", "1"]
+        wv = with_doc(args, "v3")
+        ok = (without_doc(args) == ["--n", "4", "--seed", "1"] and header3.trace3.doc_of(without_doc(args)) is None
+              and header3.trace3.doc_of(wv) == "v3" and len(wv) == len(args) and (wv[2] == "--doc") == (len(opt) == 2))
+        bad += not ok
+        print(f"altered3 self-test, the document option, {json.dumps(opt)}: {'ok' if ok else 'NOT  <-- must be ok'}")
     for name, args, want in cases:
         got = as_must(*args)
         bad += got != want
@@ -801,7 +833,6 @@ def seacast_header_controls(v2trace, work):
         return out
 
     args = list(h["args"])
-    k = args.index("--doc")
     # the reasons of a SEACAST trace read as seacast-lite.md's: its traced, its tables where they differ, its row_reads
     lost = (["traced: ", "own: "] + (["foreign: "] if list(header3.trace3.FOREIGN) != list(header3.manifest_seacast.FOREIGN)
                                      else []) + ["row_reads: "])
@@ -813,7 +844,7 @@ def seacast_header_controls(v2trace, work):
         "with gated among its traced": (variant(traced=sorted(h["traced"] + ["gated"])), False, ["traced: "]),
         "with the whole block as its traced": (variant(traced=sorted(header3.trace3.BLOCK)), False, ["traced: "]),
         "with SEACAST's kept less its first name as its traced": (variant(traced=h["traced"][1:]), False, ["traced: "]),
-        "SEACAST's kept, from a trace not run with --doc seacast": (variant(args=args[:k] + args[k + 2:]), False, lost),
+        "SEACAST's kept, from a trace not run with --doc seacast": (variant(args=without_doc(args)), False, lost),
         "with seacast-lite.md's own as its own": (variant(own=list(header3.trace3.OWN)), False, ["own: "]),
         # the envelope
         "with format twice": (text.replace('"format":7', '"format":3,"format":7', 1), False,
@@ -824,7 +855,7 @@ def seacast_header_controls(v2trace, work):
                                                           ["header: a member trace3.py does not write: zz"]),
         "with args null": (variant(args=None), False, ["args: not a list of words"] + lost),
         "with args [42]": (variant(args=[42]), False, ["args: not a list of words"] + lost),
-        "with --doc v3 for --doc seacast": (variant(args=args[:k + 1] + ["v3"] + args[k + 2:]), False,
+        "with --doc v3 for --doc seacast": (variant(args=with_doc(args, "v3")), False,
                                        ["args: a document trace3.py does not write: v3"] + lost),
     }
     assert text.count('"format":7') == 1, "the SEACAST header's format is not written once as 7"
@@ -921,7 +952,6 @@ def row_reads_controls(v2trace, work, head):
     leaf["rest"] = sorted(rec["rest"] + rows, key=lambda x: json.dumps(x[:2], separators=(",", ":")))
     retable(leaf)
     args = list(h["args"])
-    k = args.index("--doc")
     bad = 0
     cases = {   # name -> (the lines, the replay's exit code, the reads not made: None for any, or a test)
         f"a {rec['fn']} record with {len(rows)} rows read on the way down, alone": (
@@ -934,7 +964,7 @@ def row_reads_controls(v2trace, work, head):
             alone(variant(row_reads=["tied"]), consts, rec), 1, None,
             'header: row_reads is not ["owed","planned","queue","tied"]: ["tied"]'),
         "the same, row_reads in a trace not run with --doc seacast": (
-            alone(variant(args=args[:k] + args[k + 2:]), consts, rec), 1, None,
+            alone(variant(args=without_doc(args)), consts, rec), 1, None,
             "header: row_reads in a trace of seacast-lite.md"),
     }
     for name, (ls, want, fewer_ok, why) in cases.items():

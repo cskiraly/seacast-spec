@@ -32,7 +32,9 @@ formal/twin/inventory.tsv, which inventory_seacast.py holds the summary to; doc 
      W = I (P2), and I and ASKS come from the tapes of H's records whose `reached` holds X and no other of the three;
      L is the larger of those records and I. The tapes do not tell how many calls of X a record made beyond these;
    - `X and Y in H (I, ASKS): summed`: H's records where two or more of the three ran (inside one another, or one
-     inside a record of another), whose IWANTs the tapes do not split among them.
+     inside a record of another), whose IWANTs the tapes do not split among them. The part names the two or three
+     that ran there and bounds their IWANTs together: in the calls file each one's IWANTs inside H are at most I, and
+     their sum is at least I where H is not one of the three. It does not certify each one's calls or IWANTs inside H.
 5. `REL: replaced: NAME (record r, in {...}, asked {HOST: n}, bare b, ext e, outer o, observer v); ...`: each name a
    node may replace (manifest_seacast's REPLACEABLE and REPLACEABLE_WHOLE) with a call counted; or `none called`.
 6. `REL: controls: ...`, which hold, or NOT with the first ones that fail:
