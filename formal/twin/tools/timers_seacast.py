@@ -4,7 +4,8 @@ records they arm.
 
     python3 timers_seacast.py TRACE        exit 0: K1 to K4 hold; 1: one fails (each failure named, up to 5 per check);
                                       2: a trace it cannot read, or not a trace under seacast.md
-    python3 timers_seacast.py --self-test  twenty-three small traces it writes, each with the result written for it
+    python3 timers_seacast.py --self-test  twenty-nine small traces it writes, each with the result written for it
+                                      (twenty-three of the checks, six of the header's document)
 
 `deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
@@ -62,6 +63,11 @@ import struct
 import sys
 import tempfile
 from collections import Counter, defaultdict
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import trace3                           # noqa: E402: its doc_of reads a header's document, as header3.py does
 
 LIMIT = 5                     # failures named per check
 
@@ -112,7 +118,7 @@ def check(path, out):
         out.append(f"timers_seacast: {path}: not a trace it can read: {e}")
         return 2
     args = header.get("args", [])
-    if not any(args[j:j + 2] == ["--doc", "seacast"] for j in range(len(args))):
+    if trace3.doc_of(args) != "seacast":                    # either form, and v2, the name before v0.12.0
         out.append(f"timers_seacast: {path}: not a trace under seacast.md (no --doc seacast in its header's args)")
         return 2
     delays = {}                                                 # node -> {type: START_DELAY}
@@ -425,21 +431,34 @@ CASES = [  # (name, records, the checks that must fail)
     ("u23 no on_offer recorded, two epochs closed at one t, a record in each",
      [_rec(0.25, "on_holding"), _retry(0.7, 3), _beat(0.7), _retry(0.7, 3), _beat(0.7)], {"K4"}),
 ]
+# the header's document in either form and under its name before v0.12.0, u1's records: (name, args, exit)
+HEADERS = [
+    ("h1 --doc=seacast", ["--doc=seacast"], 0),
+    ("h2 --doc v2 (before v0.12.0)", ["--doc", "v2"], 0),
+    ("h3 --doc=v2", ["--doc=v2"], 0),
+    ("h4 --doc lite", ["--doc", "lite"], 2),
+    ("h5 --doc=v03 (before v0.12.0)", ["--doc=v03"], 2),
+    ("h6 no --doc", [], 2),
+]
+
+
+def _write(p, records, args=("--doc", "seacast")):
+    with gzip.open(p, "wt") as fh:
+        fh.write(json.dumps({"content": "self-test"}) + "\n")
+        fh.write(json.dumps({"header": {"args": list(args)}}) + "\n")
+        fh.write(json.dumps({"nodes": [{"n": [0], "types": {"row": {"START_DELAY": bits(1.0)},
+                                                            "payload": {"START_DELAY": 0}}}]}) + "\n")
+        for r in records:
+            fh.write(json.dumps(r) + "\n")
+        fh.write(json.dumps({"trailer": {"records": len(records)}}) + "\n")
 
 
 def self_test():
     good = 0
     with tempfile.TemporaryDirectory() as d:
+        p = os.path.join(d, "u.jsonl.gz")
         for name, records, must in CASES:
-            p = os.path.join(d, "u.jsonl.gz")
-            with gzip.open(p, "wt") as fh:
-                fh.write(json.dumps({"content": "self-test"}) + "\n")
-                fh.write(json.dumps({"header": {"args": ["--doc", "seacast"]}}) + "\n")
-                fh.write(json.dumps({"nodes": [{"n": [0], "types": {"row": {"START_DELAY": bits(1.0)},
-                                                                    "payload": {"START_DELAY": 0}}}]}) + "\n")
-                for r in records:
-                    fh.write(json.dumps(r) + "\n")
-                fh.write(json.dumps({"trailer": {"records": len(records)}}) + "\n")
+            _write(p, records)
             out = []
             rc = check(p, out)
             failed = {w.split()[1] for w in out if " FAILS: " in w}
@@ -449,8 +468,18 @@ def self_test():
                   f"{'' if ok else ' <-- NOT as it must be: ' + str(sorted(must))}")
             if not ok:
                 print("\n".join("    " + w for w in out))
-    print(f"timers_seacast: self-test: {good} of {len(CASES)} cases as they must be")
-    return 0 if good == len(CASES) else 1
+        for name, args, want in HEADERS:
+            _write(p, CASES[0][1], args)
+            out = []
+            rc = check(p, out)
+            ok = rc == want and (want == 0 or any("not a trace under seacast.md" in w for w in out))
+            good += ok
+            print(f"timers_seacast: self-test: {name}: exit {rc}{'' if ok else f' <-- NOT as it must be: exit {want}'}")
+            if not ok:
+                print("\n".join("    " + w for w in out))
+    total = len(CASES) + len(HEADERS)
+    print(f"timers_seacast: self-test: {good} of {total} cases as they must be")
+    return 0 if good == total else 1
 
 
 def main(argv):

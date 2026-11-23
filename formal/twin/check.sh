@@ -29,7 +29,7 @@
 #             three controls (a copy with one wrong row fails, its control)
 #   selftests each tool's own cases (content.py, mutants3.py, altered3.py, commentsonly.py, fullid.py, against.py,
 #             matrixdiff.py, trace3.py's of the names seacast.md keeps, gen/schema_seacast.py's encoders,
-#             keptcopy.py's, labcites.py's, scan_bindings.py's and timers_seacast.py's); and no line of the twin's sources (the
+#             keptcopy.py's, labcites.py's, scan_bindings.py's, timers_seacast.py's and calls_seacast.py's); and no line of the twin's sources (the
 #             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
 #             cites the notes beside which they were developed (labcites.py), a citation planted in
 #             README.md's copy reported
@@ -435,10 +435,11 @@ keptcopy.py --self-test ^ok: every case as it must be$
 labcites.py --self-test ^labcites self-test, planted: (.*), must be \1$
 scan_bindings.py --self-test ^ok: every case as it must be$
 timers_seacast.py --self-test ^timers_seacast: self-test: ([0-9]+) of \1 cases as they must be$
+calls_seacast.py --self-test ^calls_seacast: self-test: ([0-9]+) of \1 cases as they must be$
 EOF_SELF
   rm -f "$OUT/selftest.out"
-  [ "$n" = 13 ] || no "not 13 tools' self-tests passed"
-  echo "  $n of 13 tools' own cases as they must be (selftests.txt)"
+  [ "$n" = 14 ] || no "not 14 tools' self-tests passed"
+  echo "  $n of 14 tools' own cases as they must be (selftests.txt)"
   # the twin's text: its sources as the build copied them, its tools, and the prose beside them (every *.md but
   # out/'s, record/'s and .lake/'s, which the copy leaves out; tools/' own are read with tools/): none cites the
   # notes beside which it was developed

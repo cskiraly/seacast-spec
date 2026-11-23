@@ -30,6 +30,10 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+import trace3                           # noqa: E402: its doc_of reads a header's document, as header3.py does
+
 FNS = ("respond", "retry_offer", "ask_parked")
 
 
@@ -51,10 +55,9 @@ def enqueued(rec):
 
 
 def doc_of(args):
-    for j, a in enumerate(args):
-        if a == "--doc" and j + 1 < len(args):
-            return args[j + 1]
-    return "seacast-lite.md"
+    """The document a header's args name, as trace3.doc_of reads them (either form, and the names before v0.12.0),
+    with lite where they name none (the toy's default, seacast-lite.md)."""
+    return trace3.doc_of(args) or "lite"
 
 
 def main(argv):
@@ -197,5 +200,49 @@ def main(argv):
     return 0
 
 
+# --- the self-test: one small trace under each of eight args forms: (args, its first line's start) --------------
+DOCS = [
+    (["--doc", "seacast"], "seacast/t (format 7, doc seacast): 1 records"),
+    (["--doc=seacast"], "seacast/t (format 7, doc seacast): 1 records"),
+    (["--doc", "v2"], "seacast/t (format 7, doc seacast): 1 records"),
+    (["--doc=v2"], "seacast/t (format 7, doc seacast): 1 records"),
+    (["--doc", "lite"], "skipped: seacast/t: doc lite"),
+    (["--doc=v03"], "skipped: seacast/t: doc lite"),
+    ([], "skipped: seacast/t: doc lite"),
+    (["--doc", "v3"], "skipped: seacast/t: doc v3"),
+]
+
+
+def self_test():
+    import contextlib
+    import io
+    import tempfile
+    good = 0
+    with tempfile.TemporaryDirectory() as d:
+        out = Path(d)
+        (out / "seacast").mkdir()
+        for args, want in DOCS:
+            with gzip.open(out / "seacast" / "t.jsonl.gz", "wt") as f:
+                for x in ({"content": "self-test"}, {"header": {"args": args, "format": 7}}, {"nodes": []},
+                          {"n": 0, "t": 0, "fn": "x", "reached": ["x"], "tape": []},
+                          {"trailer": {"records": 1, "by_fn": {"x": 1}, "rest": 0}}):
+                    f.write(json.dumps(x) + "\n")
+            (out / "seacast" / "t.jsonl.gz.calls.json").write_text(json.dumps(
+                {"calls": {"x": {"record": 1, "in": {}, "bare": 0, "ext": 0, "observer": 0}}, "iwants": {},
+                 "inside": {}}))
+            buf = io.StringIO()
+            with contextlib.redirect_stdout(buf):
+                rc = main([str(out), "seacast/t"])
+            lines = buf.getvalue().splitlines()
+            read = not want.startswith("skipped: ")
+            ok = (rc == 0 and bool(lines) and lines[0].startswith(want)
+                  and (len(lines) == 4 and lines[3].endswith(": hold") if read else len(lines) == 1))
+            good += ok
+            print(f"calls_seacast: self-test: {' '.join(args) or '(no --doc)'}: {lines[0] if lines else 'no line'}"
+                  f"{'' if ok else '  <-- NOT as it must be: ' + want}")
+    print(f"calls_seacast: self-test: {good} of {len(DOCS)} cases as they must be")
+    return 0 if good == len(DOCS) else 1
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1:]))
+    sys.exit(self_test() if sys.argv[1:] == ["--self-test"] else main(sys.argv[1:]))
