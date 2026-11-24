@@ -10,8 +10,7 @@ SEACAST's nodes). No other write through a view is touched: a deletion, `pop`, `
 logged as always. The tracer must stop, with a non-zero exit code and a line that says the log does not account for
 the state before the call. The log's `rest` is read after the call, so an unlogged write to an entry the call never
 logged shows there as if it had been there before, and the comparison with the tables at the call's start fails.
-(The line for the state after the call is for an unlogged write that changes a logged one.) If the tracer writes
-its trace to the end, the check of the log checks nothing under SEACAST.
+If the tracer writes its trace to the end, the check of the log checks nothing under SEACAST.
 
 What the control cannot show: a fault on an entry the call read before writing it shows as that entry's changed
 value and is recorded as the write it is, so that fault alone does not stop the tracer. It stops at the first fault
