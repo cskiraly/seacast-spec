@@ -359,17 +359,18 @@ def _message_class(rd, c):
 
 def message_field(rd, fn, n, par):
     """Whether `X.a`, a read of one of the type's function names that is not a call, is a field of a wire message,
-    a read the type check then passes. It passes the read in two cases. (i) X is a parameter of fn annotated with a
-    class that _message_class accepts, `a` is one of that class's pinned fields, and _bound_in finds no other binding
-    of X in fn. (ii) At the first comprehension around the read whose generators bind X, one generator binds X with
-    the plain name X as its target, over a subscript of a table of MESSAGE_TABLES that _bound_in finds unbound in fn;
-    the read is in the element or in that generator's conditions, and the way up to it crosses no lambda and no other
-    comprehension. It refuses some reads that are fields, on the safe side.
+    a read the type check then passes. It passes the read in two cases. (i) X is one of fn's positional or keyword
+    parameters (not *X nor **X), annotated with the plain name of a class that _message_class accepts, `a` is one of
+    that class's pinned fields, and _bound_in finds no other binding of X in fn. (ii) At the first comprehension
+    around the read whose generators bind X, exactly one generator binds X, with the plain name X as its target, over
+    a subscript of a table of MESSAGE_TABLES, named plainly, that _bound_in finds unbound in fn; the read is in the
+    element (a dict comprehension's key or value) or in that generator's conditions, and the way up to it crosses no
+    lambda and no other comprehension. It refuses some reads that are fields, on the safe side.
 
-    What it can miss: it trusts an annotation and a table's declared entries, and Python checks neither. If a caller
-    passed an ObjectType as on_graft's `gr: Graft`, `gr.family` would read the type's function, and this would pass
-    it as Graft's field. A planted form of the code may fool it in other ways: it is a reading of the syntax, not a
-    proof."""
+    What it can miss: it trusts an annotation and a table's declared entries, and Python checks neither. In
+    `def c(gr: Graft): return gr.family`, called with an object type, `gr.family` is the type's function, and this
+    passes it as Graft's field. A planted form of the code may fool it in other ways: it is a reading of the syntax,
+    not a proof."""
     x = n.value
     if FIELD_OFF[0] or not isinstance(x, ast.Name):
         return False

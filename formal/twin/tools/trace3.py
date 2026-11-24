@@ -1304,6 +1304,8 @@ def forms_self_test():
          "SystemExit: trace3: node 3: type row: M is no natural above 0"),
         ("a MAX_RELATIONS of 10^5000, too long to print", lambda: prm(MAX_RELATIONS=10 ** 5000),
          "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf: an int of 16610 bits"),
+        ("a MAX_RELATIONS of a list holding 10^5000", lambda: prm(MAX_RELATIONS=[10 ** 5000]),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
         ("SAMPLE_OUTSTANDING, the node's since v0.11.1, as a type's", lambda: prm(SAMPLE_OUTSTANDING=4),
          "SystemExit: trace3: node 3: type row: SAMPLE_OUTSTANDING is a parameter the tracer does not know"),
     ]
@@ -4398,11 +4400,12 @@ class Tracer3(Tracer):
     @staticmethod
     def shown(v):
         """A value in a stop's words, bounded: an int too long for this Python to print (ValueError) as its size in
-        bits, and a longer repr cut to its first 100 characters."""
+        bits, another value it cannot print (a list holding such an int) as so, and a longer repr cut to its first
+        100 characters."""
         try:
             s = repr(v)
         except ValueError:
-            return f"an int of {v.bit_length()} bits"
+            return f"an int of {v.bit_length()} bits" if type(v) is int else "a value too long to print"
         return s if len(s) <= 120 else f"{s[:100]}… ({len(s)} characters)"
 
     def type_params(self, nd, tid, prm):
