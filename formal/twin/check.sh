@@ -74,7 +74,7 @@
 #   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of the
 #             names that are seacast-lite.md's all the way down); the tracer's self-test of those names
 #   seacastdirected, seacastdirectedreplays  as above: the 8 directed sets under seacast.md, read by replays and
-#             headers too (not among the record's 55 traces below)
+#             headers too, and among the record's 63 traces below
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
 #   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
@@ -95,13 +95,14 @@
 #             --no-das: the DAS cells and the plants on them skipped, which each line says; the check is then a
 #             part, not a pass
 #   seeds     the same bytes whatever Python's hash seed, which is random in every process of an isolated Python:
-#             every directed set made again twice, two cells once (46 traces)
+#             every directed set, the 8 under seacast.md among them, made again twice, two cells once (62 traces)
 #   sizes     sizes.txt: each of the record's traces as the tracer wrote it: bytes, lines, the longest line; and
 #             full-id-keys.txt: its records that hold a chunk's full id anywhere but where one stands by design
 #             (fullid.py): none in a cell's trace under either document, where the nodes ask by index
 #   manifest  record-manifest.txt: the content line's sha256, the Python and the platform, each document's file
 #             sha256 (for provenance: the content line names the documents by their code), and the two hashes of
-#             each of the record's 55 traces (15 cells, three hand traces, 22 directed sets, 15 SEACAST cells)
+#             each of the record's 63 traces (15 cells, three hand traces, 22 directed sets, 15 SEACAST cells, and 8
+#             directed sets under seacast.md)
 # The steps `replays`, `headers` and the hashes then cover the record's traces.
 # With --against DIR too (a record: a directory with a run's record-manifest.txt and content.line), a last step:
 #   against   the run's manifest against the record's (against.py): as recorded; or another content and the same
@@ -242,9 +243,11 @@ if [ -z "$RECORD" ]; then
 elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under seacast.md
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
   TRACES="$RTRACES $SMALL"
-else                    # the record's 55, then the three small ones
+else                    # the record's 63: the 55 of both documents' cells and of the hand and directed traces, then the
+  #                       8 directed sets under seacast.md; TRACES in the order it had: the 55, the small ones, the 8
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "seacast/$c"; done)"
-  TRACES="$RTRACES $SMALL $(echo $SDTRACES)"    # and the directed sets under seacast.md, which are not the record's
+  TRACES="$RTRACES $SMALL $(echo $SDTRACES)"
+  RTRACES="$RTRACES $(echo $SDTRACES)"
 fi
 [ -z "$V2STEPS" ] || TRACES="$TRACES $(for c in $CELLS; do echo "seacast/$c"; done) $(echo $SDTRACES)"    # seacastcells' and seacastdirected's traces, read too
 
@@ -2485,11 +2488,16 @@ again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a proce
   # shellcheck disable=SC2046
   (cd "$TOY" && $PY "$T/${tool%% *}" . "$OUT/seeds/$d-again$2.jsonl.gz" --n 20000 --seed 1 $(case "$tool" in *" "*) echo "${tool#* }" ;; esac) > /dev/null 2>&1)
 }
+again_seacastdirected() {   # $1: a directed set under seacast.md; $2: 1 or 2: made again, in a process of its own,
+  (cd "$TOY" && $PY "$T/directed_seacast.py" . "$OUT/seeds/seacastdirected-$1-again$2.jsonl.gz" --set "$1" \
+      --n 20000 --seed 1 > /dev/null 2>&1)    #   as one_seacastdirected makes it
+}
 seed_cells() {          # the seeds' cells, traced and replayed once more: their report to a file of its own
   # shellcheck disable=SC2086
   $PY "$T/cells3.py" "$TOY" "$OUT/seeds" -j 2 --replay "$REPLAY" $SEEDCELLS > "$OUT/seeds/cells.txt" 2>&1
 }
-s_seeds() {             # the same bytes whatever Python's hash seed: every directed set made again twice, two cells once
+s_seeds() {             # the same bytes whatever Python's hash seed: every directed set (the 8 under seacast.md among
+  #                       them) made again twice, two cells once
   local d s a b n=0 want h1 h2
   # The tracers' Python runs isolated and reads no PYTHONHASHSEED: its hash seed is random in every process. That
   # is what this step stands on, so it is shown first: two processes hash one string differently.
@@ -2499,6 +2507,7 @@ s_seeds() {             # the same bytes whatever Python's hash seed: every dire
     *) no "Python's hash randomization is off: a retrace shows nothing" ;; esac
   rm -rf "$OUT/seeds"; mkdir -p "$OUT/seeds"; : > "$OUT/same-content.txt"
   for d in $DIRS; do for s in 1 2; do par again_directed "$d" "$s"; done; done
+  for d in $SDIRS; do for s in 1 2; do par again_seacastdirected "$d" "$s"; done; done
   # shellcheck disable=SC2086
   [ -z "$SEEDCELLS" ] || par seed_cells
   par_end || no "a trace could not be made again"
@@ -2507,12 +2516,19 @@ s_seeds() {             # the same bytes whatever Python's hash seed: every dire
     echo "$d, made again ($s), and the run's own: $b, $a: $([ "$a" = "$b" ] && echo equal || echo DIFFERENT)" >> "$OUT/same-content.txt"
     [ "$a" = "$b" ] && n=$((n + 1))
   done; done
+  for d in $SDIRS; do for s in 1 2; do
+    a=$(zcat "$OUT/seacastdirected/$d.jsonl.gz" | sha256sum | cut -c1-64)
+    b=$(zcat "$OUT/seeds/seacastdirected-$d-again$s.jsonl.gz" 2> /dev/null | sha256sum | cut -c1-64)
+    echo "seacastdirected/$d, made again ($s), and the run's own: $b, $a: $([ "$a" = "$b" ] && echo equal \
+      || echo DIFFERENT)" >> "$OUT/same-content.txt"
+    [ "$a" = "$b" ] && n=$((n + 1))
+  done; done
   for d in $SEEDCELLS; do
     a=$(zcat "$OUT/traces/$d.jsonl.gz" | sha256sum | cut -c1-64); b=$(zcat "$OUT/seeds/$d.jsonl.gz" 2> /dev/null | sha256sum | cut -c1-64)
     echo "$d, traced twice: $a, $b: $([ "$a" = "$b" ] && echo equal || echo DIFFERENT)" >> "$OUT/same-content.txt"
     [ "$a" = "$b" ] && n=$((n + 1))
   done
-  want=$(( 2 * $(echo $DIRS | wc -w) + $(echo $SEEDCELLS | wc -w) ))
+  want=$(( 2 * ($(echo $DIRS | wc -w) + $(echo $SDIRS | wc -w)) + $(echo $SEEDCELLS | wc -w) ))
   [ "$n" = "$want" ] || no "not $want comparisons equal (same-content.txt)"
   echo "  $n of $want traces made again, each in a process with a hash seed of its own, have the same bytes (same-content.txt)"
 }
@@ -2539,7 +2555,7 @@ s_sizes() {
     k=$(echo "$t" | tr '/' '-')
     cat "$OUT/sizes/$k.size" >> "$OUT/sizes.txt" 2> /dev/null || no "$t has no size"
     cat "$OUT/sizes/$k.fullid" >> "$OUT/full-id-keys.txt" 2> /dev/null || { no "$t has no full-id count"; continue; }
-    case "$t" in traces/hand5*|directed/*) ;; *)        # a cell under either document: its nodes ask by index
+    case "$t" in traces/hand5*|directed/*|seacastdirected/*) ;; *)    # a cell under either document: by index
       n=$(sed -n 's/^[^:]*: \([0-9]*\) lines with a full id .*/\1/p' "$OUT/sizes/$k.fullid")
       [ "$n" = 0 ] || no "$t: ${n:-no count of} lines with a full id where the nodes ask by index" ;; esac
   done
@@ -2587,7 +2603,7 @@ s_against() {           # the run's manifest against the record's
     *) no "the run is not the record's, or one of the two cannot be read (against.py's exit code $rc; against.txt): $(tail -n 1 "$OUT/against.txt" | cut -c1-120)" ;;
   esac
 }
-s_manifest() {           # the record's 55 traces by their two hashes, with what they were made from and by
+s_manifest() {           # the record's 63 traces by their two hashes, with what they were made from and by
   local f=$OUT/record-manifest.txt
   { echo "content $(sha256sum < "$CONTENT" | cut -c1-64)"
     echo "python $($PY -c 'import sys, platform; print(platform.python_version(), platform.machine(), sys.platform)')"
