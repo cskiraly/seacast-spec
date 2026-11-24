@@ -224,8 +224,10 @@ and exactly the branch labels it was written for, in order:
   on, two answers in their order, a DECLARED peer's bit already set, the probe answered and the DECLARED peer's WANT;
 - `route_want` with several links in order, one parked, and a fallback past a link that does not forward;
 - `index_bound` at its bounds, known and not, and without the parameter; `our_interest_for`'s three cases;
-- each `KeyError` of a missing JOIN, as the Python raises it. The toy reaches none of them, since `links(T)` needs both
-  JOINs (toy/node.py:1399-1402); each is a record of what the Python does in that state.
+- each `KeyError` of a missing JOIN, as the Python raises it. No call through `on_want` reaches one in the toy, since
+  `links(T)` needs both JOINs (toy/node.py:1399-1402) and `on_want` makes these lookups only past `joined`. A direct
+  call of `outside`, `our_interest_for` or `route_want` can reach the lookup of p's JOIN. Each is a record of what the
+  Python does in that state.
 
 Several must fail: a wrong return, a question out of order, a record of `on_want` at a node that replaced it, and the
 four questions' answers that their readers refuse by their own checks.
@@ -528,7 +530,8 @@ def wP (asks : String) (unw : String := "null") (first : String := chunkQ) : Str
     (tapeTo ++ [resQ 3 "null"]) (ret "[]") reachedTo)
   [inInterest, "on_want: nothing to answer with"]
 -- a routed standing ask through us, a forwarding node, not stored and not passed on (past the limit), outside our
--- interest: `our_interest_for` is asked a third time, after `route_want`, and the ask is not kept
+-- interest: `our_interest_for` is asked once, at its third call site, on_want's standing test after `route_want`
+-- (`outside` returns at the routed guard, and p's ALL skips the DECLARED test), and the ask is not kept
 #guard takes (rec1 "on_want" s!"[4, [{askOf 3 (st := true) (hops := 1)}]]"
     [rd "desc" gp "null", rd "join_sent" (pT 4) (jn "DECLARED" "FORWARD"), rd "origin" gp "null",
      rd "mine" gp "null", rd "join_recv" (pT 4) (jn "ALL" "NONE"), rd "peer_has" (pg 4) "null",
@@ -635,8 +638,9 @@ def out1 (routed : Bool) (reads tape : List String) (r : String) (reached : List
   [] [tog, s!"[\"own_id\", [], {nid}]",
       s!"[\"derived_interest\", [\"row\", {gq}, null, {nid}, {jn "DERIVED" "NONE"}], 6]"] (ret "6")
   ["our_interest_for"]) []
--- no JOIN sent to p: KeyError on the type. The toy cannot reach it: on_want and outside ask it only of a link
--- past `joined`, which the toy's links(T) passes only with both JOINs (toy/node.py:1399-1402)
+-- no JOIN sent to p: KeyError on the type. No call through on_want reaches it in the toy: on_want and outside ask it
+-- only of a link past `joined`, which the toy's links(T) passes only with both JOINs (toy/node.py:1399-1402). A
+-- direct call of our_interest_for can
 #guard takes (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) "null"] [] [tog]
   [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["our_interest_for"]) ["raises: KeyError"]
 
@@ -687,7 +691,8 @@ def servesTape : List String := [tog, linksQ "[4, 5]", tog, tog]
      "[\"route_next\", [\"row\", 0, [5]], [5]]", choice5, sendQ 1 "true"] (ret "true") ["route_want", "serves"])
   ["serves: DECLARED", "serves: DECLARED", "route_want: passed on"]
 -- the two KeyErrors of route_want's own. No JOIN sent to p: on_want asks route_want only past `joined`, which the
--- toy's links(T) passes only with both JOINs (toy/node.py:1399-1402), so the toy cannot reach it
+-- toy's links(T) passes only with both JOINs (toy/node.py:1399-1402), so no call through on_want reaches it in the
+-- toy. A direct call of route_want can
 #guard takes (rec1 "route_want" s!"[4, {gq}, 3, 1]" [rd "join_sent" (pT 4) "null"] [] [tog]
     [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["route_want"])
   ["raises: KeyError"]

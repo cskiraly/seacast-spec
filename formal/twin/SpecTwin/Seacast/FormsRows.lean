@@ -355,8 +355,9 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "owedMissingNode" => p "0"
   | "repairVerdictNode" => p "\"repaired\""
   | "knownInScopeNode" => p "[\"-\",1]"
-  -- §4.5's four, each refused by its reader's own check, not by the JSON's kind or shape: own_id's hex digits;
-  -- resolve's structured id; chunk_of's id asked (a narrow chunk, well formed, of the all-zero group's index 0)
+  -- §4.5's four. Three are refused by their readers' own checks, not by the JSON's kind or shape: own_id's hex
+  -- digits; resolve's structured id; chunk_of's id asked (a narrow chunk, well formed, of the all-zero group's
+  -- index 0). admitted_group's "true" is the Boolean form's control, refused by its kind: a string to a Boolean
   | "ownId" => p "\"7fe\""
   | "admittedGroup" => p "\"true\""
   | "resolve" => p "\"abcd\""
