@@ -87,8 +87,9 @@ MESSAGE_TABLES = {"owed_relations": "schema_seacast's kind relations: the JOINs,
 # the wire message classes whose fields a function may read by a parameter annotated with one, each with its reason.
 # Python does not enforce an annotation, and a document may add any class with Container among its bases; a class not
 # listed here is no wire message to the tell
-# Each is pinned: the documents must define it exactly so, its fields in order with their annotations' text, or the
-# tell does not trust it. The annotation's name is pinned, not what it names (FamilyId is §1.3's, in the prose)
+# Each is pinned: the documents must define it exactly so, its fields in order with their annotations as Python prints
+# them back (`ast.unparse`: `(FamilyId)` is `FamilyId`), or the tell does not trust it. The annotation's name is
+# pinned, not what it names (FamilyId is §1.3's, in the prose)
 MESSAGE_CLASSES = {"Graft": ("§2's GRAFT: its family is a FamilyId field (on_graft's gr)",
                              (("object_type", "TypeId"), ("family", "FamilyId"), ("colour", "uint16"),
                               ("direction", "Direction"), ("answer", "boolean"))),
@@ -338,7 +339,7 @@ def _message_class(rd, c):
     """A wire message class of the documents, as MESSAGE_CLASSES pins it: listed; defined by one top-level ClassDef
     of the two documents, its name bound nowhere else in either by _bound_in over the module; its bases Container
     alone, with no keyword and no decorator; and its body the pinned fields in order, each an annotation of a plain
-    name with no value, its annotation's text as pinned, and nothing else.
+    name with no value, its annotation as pinned when Python prints it back (`ast.unparse`), and nothing else.
 
     What it can miss: it pins the annotations' names, not what they name, and _bound_in reads the syntax. A
     document that set `globals()["Graft"] = ObjectType` would keep the pin and change the class."""
@@ -366,6 +367,10 @@ def message_field(rd, fn, n, par):
     a subscript of a table of MESSAGE_TABLES, named plainly, that _bound_in finds unbound in fn; the read is in the
     element (a dict comprehension's key or value) or in that generator's conditions, and the way up to it crosses no
     lambda and no other comprehension. It refuses some reads that are fields, on the safe side.
+
+    It reads neither the context of `X.a` nor more of a generator's target than its names. A store `gr.family = 0` or
+    a `del gr.family` passes as a field too. A generator whose target names X anywhere counts as binding X, so
+    `[gr.family for gr.slot in xs]` is refused, though (i) holds.
 
     What it can miss: it trusts an annotation and a table's declared entries, and Python checks neither. In
     `def c(gr: Graft): return gr.family`, called with an object type, `gr.family` is the type's function, and this

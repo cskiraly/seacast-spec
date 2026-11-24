@@ -80,7 +80,8 @@ READONLY_METHODS = {"get", "keys", "values", "items", "copy", "count", "index", 
 # the builtins taken as reads of what they are handed: any other builtin handed a table denies (setattr, map, ...).
 # In followed code, a callable one is handed to run must be one the test reads, `next` must advance the function's own
 # iterator, and the name must be no local one (Scanner.builtin_runs, binds_name). What this can miss: a builtin that
-# exhausts or runs what it is handed in another way; `sum(node.draw_stream)` passes
+# exhausts or runs what it is handed in another way; `sum(node.draw_stream)` passes, and `len`, `hash`, `repr` and
+# `hasattr` run the handed object's `__len__`, `__hash__`, `__repr__` and `__getattr__` unfollowed
 READONLY_BUILTINS = {"len", "list", "tuple", "set", "frozenset", "dict", "sorted", "reversed", "iter", "next",
                      "enumerate", "zip", "sum", "min", "max", "any", "all", "isinstance", "bool", "int", "float", "str",
                      "repr", "hash", "id", "type", "abs", "round", "range", "callable", "bytes", "hasattr"}
@@ -729,7 +730,10 @@ class Scanner:
     @staticmethod
     def binds_name(name, scope):
         """Whether the function, or a function around it, binds `name` (a parameter, a local, a capture, a local
-        function): a builtin's spelling is then no builtin."""
+        function): a builtin's spelling is then no builtin.
+
+        What it can miss: a function around the followed one, as the pre-pass reads it, has no bindings noted but its
+        captures and local functions. An enclosing function's parameter named `sorted` is not seen."""
         s = scope
         while s is not None:
             if name in s.bound or name in s.captures or name in s.funcs:
@@ -741,7 +745,11 @@ class Scanner:
         """Followed code's call of a builtin taken as a read: why it may do more than read, or None. A callable it is
         handed to run (a `key=`, `iter(f, sentinel)`'s first argument) must be a lambda or a local function (read as
         the function's own code) or a builtin taken as a read; `next` must advance the function's own new iterator
-        (a name bound only to a new object, `iter(…)` made there, or a generator expression)."""
+        (a name bound only to a new object, `iter(…)` made there, or a generator expression).
+
+        What it can miss: `iter` of an iterator is that iterator, so `next(iter(node.draw_stream))` passes, and so
+        does `next(y for y in node.draw_stream)`, a new generator over a shared iterator. `next` is itself a builtin
+        taken as a read, so `sorted(its, key=next)` passes, and it advances each iterator in `its`."""
         f = call.func.id
         if "callback" not in self.off:
             run = [k.value for k in call.keywords if k.arg == "key"]
@@ -784,18 +792,22 @@ class Scanner:
 
     def constructor(self, c, name, seen):
         """A toy class's constructor, called in followed code: why it may do more than make a new object, or None.
-        Refused: a class with a decorator (a dataclass's default_factory among them), a base, a keyword (a metaclass),
-        or any method defined by `def` but its __init__: __new__, __post_init__ and __init_subclass__ among them, and
-        every method a store, a mutator or an operator on the new object would run unfollowed (__setattr__,
-        __setitem__, append, …). Refused too: a class body with any other statement but a docstring, `__slots__` and
-        constants assigned to names that are no dunder name (plain_class_stmt): an `__init__` bound to a lambda, an
-        assigned `__setattr__ = hook`, a decorated `__init__`; and a second `def __init__`, of which Python runs the
-        last. Else its own __init__, if it has one, is followed by
-        the same test, with its receiver taken to be the new object; an `__init__` that binds its receiver's name
-        (`self = shared`) is refused. The class's own source is pinned beside its __init__'s (`followed`).
+        The guard is a reading of the syntax. Refused: a class with a decorator (a dataclass's default_factory among
+        them), a base, a keyword (a metaclass), or any method defined by `def` but its __init__: __new__,
+        __post_init__ and __init_subclass__ among them, and every method a store, a mutator or an operator on the new
+        object would run unfollowed (__setattr__, __setitem__, append, …). Refused too: a class body with any other
+        statement but a docstring, `__slots__` (with any value) and constants assigned to names that are no dunder
+        name (plain_class_stmt): an `__init__` bound to a lambda, an assigned `__setattr__ = hook`, a decorated
+        `__init__`; and a second `def __init__`, of which Python runs the last. Else its own `def __init__`, if it has
+        one, is followed by the same test, with its receiver taken to be the new object; an `__init__` that assigns
+        or deletes its receiver's name (`self = shared`) is refused. The class's own source is pinned beside its
+        __init__'s (`followed`).
 
         What it can miss: which class a name is. A class made in the enclosing function under the name of one of
-        the file's classes is read as the file's: one whose `__init__` clears `node.pending` passes."""
+        the file's classes is read as the file's: one whose `__init__` clears `node.pending` passes. Nor does it see a
+        binding of the receiver's name that is no assignment: after `except E as self` in `__init__`, `self.count = 1`
+        passes, and so it does after an import or a match pattern bound to the name. And it reads no `async def
+        __init__`: it takes such a class as having no `__init__`."""
         if "ctor-guard" not in self.off and (
                 c.decorator_list or c.bases or c.keywords
                 or any(isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name != "__init__"
@@ -932,7 +944,8 @@ class Scanner:
             if (self.depth and "aug" not in self.off and isinstance(n, ast.AugAssign)
                     and isinstance(n.target, ast.Name) and n.target.id not in scope.fresh):
                 # followed code: `x op= v` may change x's object in place (a bitmap's `__ior__`, a list's `+=`), so x
-                # must be the function's own new object (`n = 0; n += 1` is: both its stores make one)
+                # must be the function's own new object (`n = 0; n += 1` is: both its stores make one). `fresh`
+                # counts the name's assignments, and a binding by `except … as e` is none, so after it `e += …` passes
                 return (f"augments {n.target.id} in place, which the follow cannot establish as its own new "
                         f"object")
             if not isinstance(n, ast.Call):
@@ -1176,6 +1189,10 @@ class Scanner:
                 out.add(name)
         return out
 
+    # whether a toy class's method only reads: no store or delete of an attribute or an item, no global or nonlocal,
+    # and each call spelled as a read method's or a read builtin's. What it can miss: it reads a callee by its
+    # spelling and does not follow it, so `self.cache.copy()` passes whatever `copy` it reaches, and
+    # `sorted(xs, key=self.bump)` passes though the key runs
     @staticmethod
     def only_reads(d):
         for n in ast.walk(d):
