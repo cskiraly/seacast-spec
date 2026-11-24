@@ -728,15 +728,17 @@ and exactly the branch labels it was written for, in order:
   backoff that runs out exactly now (not counted, and deleted), the slice `cs[:n]` at `n` = 0 and -1;
 - `relation_room` at a type with parameters but no `MAX_RELATIONS` (`param`'s missing-field arm);
 - the parameters the Python leaves unread, each at a type that lacks it, so that a read would raise: `MAX_RELATIONS`
-  where the pair is held (`payload`), and `M` where no family has duty (`bare`, which lacks `M` alone), beside `M`'s
-  `AttributeError` where one does;
+  where the pair is held (`payload`), and `M` where no family has duty (`bare`, which lacks `M` alone among the
+  parameters §4.1's upkeep reads), beside `M`'s `AttributeError` where one does;
 - the owed messages: a JOIN of the record's own type not counted, a GRAFT of the type counted, with `answer` false and
   with it true, a GRAFT of another type not counted, and a PRUNE of the type counted. That a JOIN's type is not read
   is the audit's: a record holds no read of a message's fields;
 - symmetric upkeep at each of its places: below the floor, between the floor and the cap (the repair alone), and at
   the cap with a draw of 2 and of 0; and a symmetric PRUNE with a backoff, ending both ways with two backoffs;
-- each `KeyError` of a missing JOIN sent, as the Python raises it. The toy reaches none of them, since `links(T)`
-  needs both JOINs (toy/node.py:1399-1402); each is a record of what the Python does in that state.
+- each `KeyError` of a missing JOIN sent, as the Python raises it. The toy reaches none of them: `on_graft` returns
+  first unless `joined(p, T)`, which is `p in links(T)`, and the toy's `links(T)` needs both JOINs
+  (toy/node.py:1399-1402). Each record answers `links` with p on its tape, and is a record of what the Python does in
+  that state.
 
 Several must fail: a wrong return, a question out of order, `type_of` answered once where the Python asks it twice,
 the six questions' answers that their readers refuse by their own checks, and a draw of a negative count at the
@@ -1059,7 +1061,8 @@ def symCalls : List String := ["on_graft", "joined", "relation_room"]
     (room 4 "column") [] (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" true, sendQ 4 (pr "column" "BOTH")])
     (ret "null") (symCalls ++ ["no", "send_relation"]))
   [below, "on_graft: symmetric, no", sent]
--- symmetric, no JOIN sent to p: KeyError on the type. The toy cannot reach it (links(T) needs both JOINs)
+-- symmetric, no JOIN sent to p: KeyError on the type. The toy cannot reach it: on_graft returns unless joined(p, T),
+-- and the toy's links(T) needs both JOINs. The tape answers links with p
 #guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]"
     (symReads "null" "null" "null" "null" ++ [rd "join_sent" (pt 4 "column") "null"])
     (room 4 "column") [] (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" true]) (raisesKey "column") symCalls)
@@ -1145,7 +1148,8 @@ def o1 : String := rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
                      sendQ 4 (gr "row" "OUT" true), chunksQ])
     (ret "null") (symCalls ++ ["yes", "send_relation", "join_push"]))
   [below, "on_graft: pushes to us, yes", sent, "on_graft: our pushes, yes", sent]
--- IN, no JOIN sent to p: KeyError on the type. The toy cannot reach it (links(T) needs both JOINs)
+-- IN, no JOIN sent to p: KeyError on the type. The toy cannot reach it: on_graft returns unless joined(p, T), and
+-- the toy's links(T) needs both JOINs. The tape answers links with p
 #guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" false}]"
     [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "null", rd "join_sent" (pt 4 "row") "null"]
     (room 4 "row") [] (entryQ "row") (raisesKey "row") symCalls)
