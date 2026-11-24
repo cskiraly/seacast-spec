@@ -155,7 +155,8 @@ def check(toy, trace):
     # the directed records hold the whole state, a cell's do not (directed42.py's, §4.2's; directed4b.py's, its
     # deferral path's)
     whole = args[:1] in (["directed3"], ["directed44"], ["directed42"], ["directed4b"], ["directed7"],
-                                             ["directed1"], ["directed6o"], ["directed64"], ["directed64h"], ["directed46"], ["directed43"], ["directed41"], ["directed46d"], ["directed3v"], ["directed52"], ["directed53"], ["directed54"], ["directed71"], ["directed51"])   # among them §1's (directed1.py),
+                                             ["directed1"], ["directed6o"], ["directed64"], ["directed64h"], ["directed46"], ["directed43"], ["directed41"], ["directed46d"], ["directed3v"], ["directed52"], ["directed53"], ["directed54"], ["directed71"], ["directed51"],
+                                             ["directed_seacast"])   # among them §1's (directed1.py), seacast.md's (directed_seacast.py),
     #                                              drop_offer's (directed6o.py), §6.4's (directed64.py, directed64h.py), §4.6's (directed46.py), §4.3's (directed43.py), §4.1's (directed41.py), §4.6's decode's (directed46d.py), §3's (directed3v.py)
     if h.get("whole") is not whole:
         why.append(f"whole: {h.get('whole')!r}, must be {whole!r} for this kind of trace")

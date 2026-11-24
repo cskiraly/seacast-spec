@@ -53,6 +53,11 @@
 #   small     hand5 (whole; §6.1's twelve alone; at PUBLISH), late16, and hand5 twice under seacast.md: each
 #             traced and replayed, its digest the untraced run's with the same arguments
 #   directed  the 22 directed sets, traced and replayed
+#   seacastdirected (--v2steps and the record's) the 8 directed sets under seacast.md (directed_seacast.py's),
+#             traced: each set's scenarios counted and summing to its records, and serve_d's setup the publish's 132
+#             records of group_id
+#   seacastdirectedreplays (with it) those 8 traces replayed, every record ok; a step of its own, so that each of the
+#             two fits a local scope of 285 s (serve_d's trace and its replay take about 3 min each)
 #   replays   every replay above read a trace that is not empty, to its trailer, with no record mismatched and no
 #             read of the Python's left unmade
 #   headers   every trace's first line is this tree's content line, and its header of the kind its name says
@@ -68,6 +73,8 @@
 #   cells     every cell of the toy's check.py, not `none` alone: each digest golden.txt's, each replayed
 #   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of the
 #             names that are seacast-lite.md's all the way down); the tracer's self-test of those names
+#   seacastdirected, seacastdirectedreplays  as above: the 8 directed sets under seacast.md, read by replays and
+#             headers too (not among the record's 55 traces below)
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
 #   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
@@ -117,9 +124,10 @@
 # --rehearsal "M1 M2 …" with it: these mutants alone, on the hand traces and the directed sets alone (no cell):
 # a trial of the step and of the merge (`mutants3.py --merge … --rehearsal M1,M2,…`), never a part of a matrix.
 #
-# With --v2steps (not with --record or --matrix, which run them all): the quick check and four of the record's steps,
-# seacastcells, schemacontrols, viewcontrols and tracercontrols, with the 15 cells' SEACAST traces among those the steps
-# replays and headers read; its pass is "check.sh: PASS (with seacastcells, schemacontrols, viewcontrols and
+# With --v2steps (not with --record or --matrix, which run them all): the quick check and six of the record's steps,
+# seacastcells, seacastdirected, seacastdirectedreplays, schemacontrols, viewcontrols and tracercontrols, with the 15
+# cells' SEACAST traces and the 8 directed sets under seacast.md among those the steps replays and headers read; its
+# pass is "check.sh: PASS (with seacastcells, seacastdirected, seacastdirectedreplays, schemacontrols, viewcontrols and
 # tracercontrols)". Without it the steps and the traces are the quick check's.
 #
 # It prints "check.sh: PASS" and exits 0 only if every step ran and showed what it must.
@@ -131,7 +139,7 @@ TOY=${SPEC_TOY:-$ROOT/toy}
 OUT=$HERE/out/check
 J=4
 ALL="build selftests tables scope mutants screen cells small directed replays headers picks controls perturbed"
-RECORD_ALL="build selftests tables scope mutants screen cells seacastcells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols seeds sizes manifest"
+RECORD_ALL="build selftests tables scope mutants screen cells seacastcells small directed seacastdirected seacastdirectedreplays replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols seeds sizes manifest"
 MATRIX_ALL="build mutants cells small directed replays headers matrix"
 RECORD=
 PART=
@@ -173,7 +181,7 @@ fi
 if [ -n "$V2STEPS" ]; then     # the quick check, the record's two steps of the tracer under seacast.md, and the
   #                              schema's and the views' controls, in RECORD_ALL's order
   [ -z "$RECORD" ] || { echo "check.sh: --v2steps goes without --record or --matrix"; exit 2; }
-  ALL="build selftests tables scope mutants screen cells seacastcells small directed replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols"
+  ALL="build selftests tables scope mutants screen cells seacastcells small directed seacastdirected seacastdirectedreplays replays headers picks controls perturbed schemacontrols viewcontrols tracercontrols"
 fi
 if [ -n "$PART" ]; then
   case "$PART" in [1-8]/[1-8]) ;; *) echo "check.sh: --matrix K/N, with N from 1 to 8 and K from 1 to N"; exit 2 ;; esac
@@ -185,7 +193,7 @@ elif [ -n "$SAMPLE" ]; then echo "check.sh: --sample goes with --matrix K/N"; ex
 [ -n "$STEPS" ] || STEPS=$ALL
 for s in $STEPS; do case " $ALL " in *" $s "*) ;; *) echo "check.sh: no step $s (the steps: $ALL)"; exit 2 ;; esac; done
 if [ "$STEPS" = "$ALL" ]; then rm -rf "$OUT"; fi
-mkdir -p "$OUT/traces" "$OUT/directed" "$OUT/seacast" || exit 2
+mkdir -p "$OUT/traces" "$OUT/directed" "$OUT/seacast" "$OUT/seacastdirected" || exit 2
 OUT=$(cd "$OUT" && pwd)
 LOG=$OUT/check.txt
 REPLAY=$OUT/twin/.lake/build/bin/replay
@@ -209,6 +217,14 @@ dirtool() {             # a directed set's tool, and its own options
     *) echo "$1.py" ;;
   esac
 }
+SDIRS="control serve_h serve_hplus serve_d upkeep_h upkeep_r upkeep_w upkeep_wu"     # directed_seacast.py's sets
+sdir_shape() {          # a set of SDIRS: its scenarios' count, and the records its replay reads (serve_d's 132 setup
+  case $1 in            #   records of group_id among them)
+    control) echo "1 20000" ;; serve_h) echo "10 20000" ;; serve_hplus) echo "2 20000" ;; serve_d) echo "8 20132" ;;
+    upkeep_h) echo "15 20000" ;; upkeep_r) echo "4 20000" ;; upkeep_w) echo "2 20000" ;; upkeep_wu) echo "6 20000" ;;
+  esac
+}
+SDTRACES=$(for s in $SDIRS; do echo "seacastdirected/$s"; done)
 HAND5="--nodes 5 --degree 4 --msgs 1 --payload 16384 --seed 7"
 DAS30="--nodes 30 --degree 8 --msgs 1 --setting rows --supernodes 10 --blobs 4 --seed 7 --doc seacast"   # the chain cases'
 LATE16="--nodes 16 --degree 8 --msgs 2 --seed 7 --late-block 30,400"
@@ -228,9 +244,9 @@ elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cel
   TRACES="$RTRACES $SMALL"
 else                    # the record's 55, then the three small ones
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "seacast/$c"; done)"
-  TRACES="$RTRACES $SMALL"
+  TRACES="$RTRACES $SMALL $(echo $SDTRACES)"    # and the directed sets under seacast.md, which are not the record's
 fi
-[ -z "$V2STEPS" ] || TRACES="$TRACES $(for c in $CELLS; do echo "seacast/$c"; done)"    # seacastcells' traces, read too
+[ -z "$V2STEPS" ] || TRACES="$TRACES $(for c in $CELLS; do echo "seacast/$c"; done) $(echo $SDTRACES)"    # seacastcells' and seacastdirected's traces, read too
 
 replay_of() {           # $1: a trace, without its .jsonl.gz: replayed to $1.replay; the status is the replay's, kept in
   zcat "$OUT/$1.jsonl.gz" | "$REPLAY" --content "$CONTENT" > "$OUT/$1.replay" 2>&1      #   $1.replay.rc
@@ -790,6 +806,38 @@ s_directed() {
   par_end || no "a directed set was not traced, or its replay did not end with status 0"
   echo "  $(ls "$OUT"/directed/*.jsonl.gz 2> /dev/null | wc -l) of 22 directed sets traced"
 }
+one_seacastdirected() {
+  local s=$1
+  rm -f "$OUT/seacastdirected/$s.jsonl.gz" "$OUT/seacastdirected/$s.replay" "$OUT/seacastdirected/$s.replay.rc"
+  (cd "$TOY" && $PY "$T/directed_seacast.py" . "$OUT/seacastdirected/$s.jsonl.gz" --set "$s" --n 20000 --seed 1 \
+      > "$OUT/seacastdirected/$s.out" 2> "$OUT/seacastdirected/$s.err")
+}
+s_seacastdirected() {   # traced alone: the replays are the next step's
+  local s k n f
+  for s in $SDIRS; do par one_seacastdirected "$s"; done
+  par_end || no "a directed set under seacast.md was not traced"
+  for s in $SDIRS; do
+    read -r k n <<< "$(sdir_shape "$s")"
+    f=$OUT/seacastdirected/$s.err
+    [ "$(grep -c -E '^directed_seacast: [A-Za-z0-9_]+: [0-9]+$' "$f")" = "$k" ] || no "$s: not $k scenarios counted ($s.err)"
+    [ "$(grep -E '^directed_seacast: [A-Za-z0-9_]+: [0-9]+$' "$f" | awk '{s += $3} END {print s + 0}')" = 20000 ] \
+      || no "$s: its scenarios' records do not sum to 20000 ($s.err)"
+  done
+  has -x -F "directed_seacast: setup: 132 records, {'group_id': 132}" "$OUT/seacastdirected/serve_d.err" \
+    || no "serve_d: its setup is not the publish's 132 records of group_id (serve_d.err)"
+  echo "  $(ls "$OUT"/seacastdirected/*.jsonl.gz 2> /dev/null | wc -l) of 8 directed sets under seacast.md traced"
+}
+s_seacastdirectedreplays() {
+  local s k n
+  for s in $SDIRS; do par replay_of "seacastdirected/$s"; done
+  par_end || no "a directed set under seacast.md was not replayed, or its replay did not end with status 0"
+  for s in $SDIRS; do
+    read -r k n <<< "$(sdir_shape "$s")"
+    has -x -F "replay: $n records, $n ok, 0 mismatched" "$OUT/seacastdirected/$s.replay" \
+      || no "$s: not its $n records replayed, each ok ($s.replay)"
+  done
+  echo "  $(grep -l -x -E 'replay: [0-9]+ records, [0-9]+ ok, 0 mismatched' "$OUT"/seacastdirected/*.replay 2> /dev/null | wc -l) of 8 directed sets under seacast.md replayed, none mismatched"
+}
 by_cells3() {           # $1: a trace of TRACES: replayed by cells3.py, as a cell of check.py, whose verdict requires the
   case $1 in traces/*|seacast/*) case " $CELLS none " in *" ${1#*/} "*) return 0 ;; esac ;; esac   #   replay's code 0
   return 1
@@ -807,7 +855,7 @@ s_replays() {
     parsed_whole "$f" || { no "$t: the parser refused a line of it"; continue; }
     has -E '^replay: [1-9][0-9]* records, [1-9][0-9]* ok, 0 mismatched$' "$f" || { no "$t: a record mismatched, or none read"; continue; }
     has -x "reads of the Python's that the twin did not make: 0" "$f" || { no "$t: a read of the Python's not made"; continue; }
-    case $t in seacast/*) bare_none "$OUT/$t.jsonl.gz" || { no "$t: its run counted bare calls ($t.jsonl.gz.bare.json)"; continue; } ;; esac
+    case $t in seacast/*|seacastdirected/*) bare_none "$OUT/$t.jsonl.gz" || { no "$t: its run counted bare calls ($t.jsonl.gz.bare.json)"; continue; } ;; esac
     has -E "^content: as --content's, [0-9]+ names\$" "$f" || { no "$t: its content line was not compared, or is not this tree's"; continue; }
     if grep -E '^(content|header|nodes|trailer|consts|subset): ' "$f" | grep -v -e '^header: {' -e "^content: as --content's, " | grep -q .; then no "$t: the replay refused a line of the envelope"; continue; fi
     n=$((n + 1))
@@ -821,6 +869,8 @@ s_headers() {
     || no "hand5-sec61 alone must be of §6.1's twelve"
   [ "$(grep -c -E "/seacast/hand5(-own)?\.jsonl\.gz: .*tracing SEACAST's kept and covered, " "$OUT/headers.txt")" = 2 ] || no "the two small SEACAST traces must be of SEACAST's kept and covered names"
   [ "$(grep -c -E "/seacast/[a-z0-9-]+\.jsonl\.gz: .*tracing SEACAST's kept and covered, " "$OUT/headers.txt")" = "$(grep -c -E '/seacast/[a-z0-9-]+\.jsonl\.gz: ' "$OUT/headers.txt")" ] || no "a SEACAST trace is not of SEACAST's kept and covered names"
+  [ "$(grep -c -E "/seacastdirected/[a-z_]+\.jsonl\.gz: .*tracing SEACAST's kept and covered, " "$OUT/headers.txt")" = "$(echo "$TRACES" | tr ' ' '\n' | grep -c '^seacastdirected/')" ] \
+    || no "a directed set under seacast.md is not of SEACAST's kept and covered names, or one is missing"
   echo "  $(grep -c . "$OUT/headers.txt") headers read (headers.txt)"
   # the question writers' example rows (tools/forms-seacast-examples.tsv, which the build step's replay --forms reads),
   # made again by the writers from this run's seacast/hand5: so that the file cannot drift from the writers
@@ -2579,8 +2629,8 @@ s_manifest() {           # the record's 55 traces by their two hashes, with what
   elif [ -n "$PART" ]; then echo "check.sh: PASS (part $PART of the matrix)"
   elif [ -n "$FEWCELLS" ]; then echo "check.sh: these steps passed ($STEPS): a rehearsal over the cells [$CELLS], not a record"
   elif [ -n "$RECORD" ]; then echo "check.sh: PASS (the record's run)"
-  elif [ -n "$V2STEPS" ]; then echo "check.sh: PASS (with seacastcells, schemacontrols, viewcontrols and tracercontrols)"
+  elif [ -n "$V2STEPS" ]; then echo "check.sh: PASS (with seacastcells, seacastdirected, seacastdirectedreplays, schemacontrols, viewcontrols and tracercontrols)"
   else echo "check.sh: PASS"; fi
 } 2>&1 | tee "$LOG"
-case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with seacastcells, schemacontrols, viewcontrols and tracercontrols)") true ;; *) false ;; esac \
+case "$(tail -n 1 "$LOG")" in "check.sh: PASS"|"check.sh: PASS (the record's run)"|"check.sh: PASS (part "*|"check.sh: PASS (with seacastcells, seacastdirected, seacastdirectedreplays, schemacontrols, viewcontrols and tracercontrols)") true ;; *) false ;; esac \
   || { { [ "$STEPS" != "$ALL" ] || [ -n "$REHEARSAL" ] || [ -n "$SAMPLE" ] || [ -n "$FEWCELLS" ] || [ -n "$NODAS" ]; } && tail -n 1 "$LOG" | grep -q '^check.sh: these steps passed'; }
