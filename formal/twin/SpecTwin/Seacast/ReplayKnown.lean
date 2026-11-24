@@ -638,9 +638,9 @@ def out1 (routed : Bool) (reads tape : List String) (r : String) (reached : List
   [] [tog, s!"[\"own_id\", [], {nid}]",
       s!"[\"derived_interest\", [\"row\", {gq}, null, {nid}, {jn "DERIVED" "NONE"}], 6]"] (ret "6")
   ["our_interest_for"]) []
--- no JOIN sent to p: KeyError on the type. No call through on_want reaches it in the toy: on_want and outside ask it
--- only of a link past `joined`, which the toy's links(T) passes only with both JOINs (toy/node.py:1399-1402). A
--- direct call of our_interest_for can
+-- no JOIN sent to p: KeyError on the type. No call through on_want reaches it in the toy: on_want asks it, itself
+-- and through outside, only of a link past `joined`, which the toy's links(T) passes only with both JOINs
+-- (toy/node.py:1399-1402). A direct call of our_interest_for can
 #guard takes (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) "null"] [] [tog]
   [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["our_interest_for"]) ["raises: KeyError"]
 
