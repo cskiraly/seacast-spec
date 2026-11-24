@@ -1240,6 +1240,13 @@ def forms_self_test():
     def prm(**kw):
         p = Wm.Container(**kw)
         return tr.type_params(Nd, "row", p)
+
+    class NeverNe(float):               # a float subclass whose own != would decide the integral test
+        def __ne__(self, other):
+            return False
+
+    class SubInt(int):
+        pass
     pcases = [
         ("naturals, booleans, floats (+inf where unbounded), the width, none's two",
          lambda: prm(M=1, EAGER=False, START_DELAY=0.5, SERVE_LIMIT=math.inf, ANNOUNCE_EXTRA="ALL_JOINED",
@@ -1289,6 +1296,14 @@ def forms_self_test():
          "SystemExit: trace3: node 3: type row: START_DELAY is no finite number"),
         ("a START_DELAY of the int 10^400, beyond any float", lambda: prm(START_DELAY=10 ** 400),
          "SystemExit: trace3: node 3: type row: START_DELAY is no finite number"),
+        ("a MAX_RELATIONS of 2.5 as a float subclass whose != is always false", lambda: prm(MAX_RELATIONS=NeverNe(2.5)),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a START_DELAY of 3 as a plain int subclass", lambda: prm(START_DELAY=SubInt(3)),
+         "SystemExit: trace3: node 3: type row: START_DELAY is no finite number"),
+        ("an M of 3 as a plain int subclass", lambda: prm(M=SubInt(3)),
+         "SystemExit: trace3: node 3: type row: M is no natural above 0"),
+        ("a MAX_RELATIONS of 10^5000, too long to print", lambda: prm(MAX_RELATIONS=10 ** 5000),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf: an int of 16610 bits"),
         ("SAMPLE_OUTSTANDING, the node's since v0.11.1, as a type's", lambda: prm(SAMPLE_OUTSTANDING=4),
          "SystemExit: trace3: node 3: type row: SAMPLE_OUTSTANDING is a parameter the tracer does not know"),
     ]
@@ -4368,21 +4383,33 @@ class Tracer3(Tracer):
     ANNOUNCE_WIDTHS = ("ALL_JOINED", "SAMPLE", "NONE")
 
     @staticmethod
-    def float_exact(v):
-        """Whether v is a number a float's word holds exactly: no bool, an int or a float, and float(v) == v. An int
-        above 2^53 that a float rounds is not, nor one too large for any float (OverflowError); nor a NaN."""
-        if isinstance(v, bool) or not isinstance(v, (int, float)):
-            return False
+    def exact_float(v):
+        """The float whose word holds v exactly, or None: v's type is int or float itself (no bool, no subclass, whose
+        own comparisons would decide), float(v) is taken once, and it equals v. An int above 2^53 that a float rounds
+        gives None, as does one too large for any float (OverflowError), and a NaN."""
+        if type(v) not in (int, float):
+            return None
         try:
-            return float(v) == v
+            f = float(v)
         except OverflowError:
-            return False
+            return None
+        return f if f == v else None
+
+    @staticmethod
+    def shown(v):
+        """A value in a stop's words, bounded: an int too long for this Python to print (ValueError) as its size in
+        bits, and a longer repr cut to its first 100 characters."""
+        try:
+            s = repr(v)
+        except ValueError:
+            return f"an int of {v.bit_length()} bits"
+        return s if len(s) <= 120 else f"{s[:100]}… ({len(s)} characters)"
 
     def type_params(self, nd, tid, prm):
         """One type's parameters, each in its form (types_seacast); a parameter of no listed kind stops the tracer, so
         that a new one is given its form before a trace holds it."""
         def stop(name, v, what):
-            raise SystemExit(f"trace3: node {nd.id}: type {tid}: {name} is {what}: {v!r}")
+            raise SystemExit(f"trace3: node {nd.id}: type {tid}: {name} is {what}: {self.shown(v)}")
         out = {}
         for name, v in sorted(vars(prm).items()):
             if name in self.TYPE_FUNCTIONS:
@@ -4393,7 +4420,7 @@ class Tracer3(Tracer):
                     stop(name, v, words)
                 continue
             if name in self.TYPE_NATS:
-                if isinstance(v, bool) or not isinstance(v, int) or v < 0 or (name in self.TYPE_POSITIVE and v == 0):
+                if type(v) is not int or v < 0 or (name in self.TYPE_POSITIVE and v == 0):
                     stop(name, v, "no natural" + (" above 0" if name in self.TYPE_POSITIVE else ""))
                 out[name] = v
             elif name in self.TYPE_BOOLS:
@@ -4401,15 +4428,15 @@ class Tracer3(Tracer):
                     stop(name, v, "no boolean")
                 out[name] = v
             elif name in self.TYPE_COUNTS:
-                if not self.float_exact(v) or math.isnan(v) or (
-                        math.isinf(v) and v < 0) or (math.isfinite(v) and (v < 0 or v != int(v))):
+                f = self.exact_float(v)
+                if f is None or (math.isinf(f) and f < 0) or (math.isfinite(f) and (f < 0 or not f.is_integer())):
                     stop(name, v, "no count nor +inf")
-                out[name] = fbits(v)
+                out[name] = fbits(f)
             elif name in self.TYPE_FLOATS:
-                if not self.float_exact(v) or math.isnan(v) or (
-                        math.isinf(v) and not (v > 0 and name in self.TYPE_UNBOUNDED)):
+                f = self.exact_float(v)
+                if f is None or (math.isinf(f) and not (f > 0 and name in self.TYPE_UNBOUNDED)):
                     stop(name, v, "no finite number" + (" nor +inf" if name in self.TYPE_UNBOUNDED else ""))
-                out[name] = fbits(v)
+                out[name] = fbits(f)
             elif name == "ANNOUNCE_EXTRA":
                 if v not in self.ANNOUNCE_WIDTHS:
                     stop(name, v, f"none of {self.ANNOUNCE_WIDTHS}")

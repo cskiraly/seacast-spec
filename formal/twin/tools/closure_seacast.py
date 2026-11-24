@@ -87,8 +87,14 @@ MESSAGE_TABLES = {"owed_relations": "schema_seacast's kind relations: the JOINs,
 # the wire message classes whose fields a function may read by a parameter annotated with one, each with its reason.
 # Python does not enforce an annotation, and a document may add any class with Container among its bases; a class not
 # listed here is no wire message to the tell
-MESSAGE_CLASSES = {"Graft": "§2's GRAFT: its family is a FamilyId field (on_graft's gr)",
-                   "Prune": "§2's PRUNE: its family is a FamilyId field (on_prune's pr)"}
+# Each is pinned: the documents must define it exactly so, its fields in order with their annotations' text, or the
+# tell does not trust it. The annotation's name is pinned, not what it names (FamilyId is §1.3's, in the prose)
+MESSAGE_CLASSES = {"Graft": ("§2's GRAFT: its family is a FamilyId field (on_graft's gr)",
+                             (("object_type", "TypeId"), ("family", "FamilyId"), ("colour", "uint16"),
+                              ("direction", "Direction"), ("answer", "boolean"))),
+                   "Prune": ("§2's PRUNE: its family is a FamilyId field (on_prune's pr)",
+                             (("object_type", "TypeId"), ("family", "FamilyId"), ("colour", "uint16"),
+                              ("direction", "Direction")))}
 FIELD_OFF = [False]     # the self-test's control: no read is a wire message's field
 
 COMPS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
@@ -132,8 +138,11 @@ def _walruses(comp, out):
 def _bound_in(fn, name, own=None):
     """Whether `name` is bound anywhere in fn, nested scopes too, other than by `own` (one of fn's parameters): a
     store or delete of it (an assignment, a for's or comprehension's target, a walrus, del), an argument (fn's, a
-    lambda's, a nested def's), an except's name, an import's name, a nested def's or class's name. A binding in a
-    nested scope may not shadow the read; it is refused all the same. A match, global and nonlocal are STOPS."""
+    lambda's, a nested def's), an except's name, an import's name, a nested def's or class's name, a global or
+    nonlocal naming it. A binding in a nested scope may not shadow the read; it counts all the same. `fn` may be a
+    whole module, `own` a ClassDef of it.
+
+    What it can miss: a binding the syntax does not show, such as `globals()[name] = v` or one made by exec."""
     for m in ast.walk(fn):
         if m is own or m is fn:
             continue
@@ -141,7 +150,8 @@ def _bound_in(fn, name, own=None):
                 or (isinstance(m, ast.arg) and m.arg == name)
                 or (isinstance(m, ast.ExceptHandler) and m.name == name)
                 or (isinstance(m, ast.alias) and (m.asname or m.name).split(".")[0] == name)
-                or (isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and m.name == name)):
+                or (isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and m.name == name)
+                or (isinstance(m, (ast.Global, ast.Nonlocal)) and name in m.names)):
             return True
     return False
 
@@ -178,8 +188,10 @@ class Reading:
         self.drop = frozenset(drop)
         self.defs = {}
         self.classes = {}               # the documents' top-level classes, seacast.md's over seacast-lite.md's
+        self.trees = []                 # each document's module, for what binds a name anywhere in it
         for src in (p_src, seacast_src):
             tree = ast.parse(src)
+            self.trees.append(tree)
             tables = {}
             for t in symtable.symtable(src, "<document>", "exec").get_children():
                 if str(t.get_type()).lower().endswith("function"):
@@ -323,23 +335,45 @@ def _parents(fn):
 
 
 def _message_class(rd, c):
-    """A class of the documents that is a wire message: listed in MESSAGE_CLASSES, with Container among its bases."""
-    c = rd.classes.get(c) if c in MESSAGE_CLASSES else None
-    return c is not None and any(isinstance(b, ast.Name) and b.id == "Container" for b in c.bases)
+    """A wire message class of the documents, as MESSAGE_CLASSES pins it: listed; defined by one top-level ClassDef
+    of the two documents, its name bound nowhere else in either by _bound_in over the module; its bases Container
+    alone, with no keyword and no decorator; and its body the pinned fields in order, each an annotation of a plain
+    name with no value, its annotation's text as pinned, and nothing else.
+
+    What it can miss: it pins the annotations' names, not what they name, and _bound_in reads the syntax. A
+    document that set `globals()["Graft"] = ObjectType` would keep the pin and change the class."""
+    if c not in MESSAGE_CLASSES:
+        return False
+    defs = [d for t in rd.trees for d in t.body if isinstance(d, ast.ClassDef) and d.name == c]
+    if len(defs) != 1 or any(_bound_in(t, c, own=defs[0]) for t in rd.trees):
+        return False
+    d = defs[0]
+    if (len(d.bases) != 1 or not isinstance(d.bases[0], ast.Name) or d.bases[0].id != "Container" or d.keywords
+            or d.decorator_list):
+        return False
+    body = [(s.target.id, ast.unparse(s.annotation)) if (isinstance(s, ast.AnnAssign) and s.simple
+                                                         and isinstance(s.target, ast.Name) and s.value is None)
+            else None for s in d.body]
+    return body == list(MESSAGE_CLASSES[c][1])
 
 
 def message_field(rd, fn, n, par):
     """Whether `X.a`, a read of one of the type's function names that is not a call, is a field of a wire message,
-    in one of two cases. (i) X is a parameter of fn annotated with a class of MESSAGE_CLASSES that the documents
-    define with Container among its bases and that declares `a` in its body, and fn binds X nowhere else, nested
-    scopes too (_bound_in). (ii) At the first comprehension around the read whose generators bind X, exactly one
-    generator binds X, its target is the plain name X, its iterable subscripts a table of MESSAGE_TABLES that fn binds
-    nowhere (_bound_in), and the read is in the comprehension's element or in that generator's conditions; a read in
-    a later generator is refused. Any other such read is one the check cannot follow."""
+    a read the type check then passes. It passes the read in two cases. (i) X is a parameter of fn annotated with a
+    class that _message_class accepts, `a` is one of that class's pinned fields, and _bound_in finds no other binding
+    of X in fn. (ii) At the first comprehension around the read whose generators bind X, one generator binds X with
+    the plain name X as its target, over a subscript of a table of MESSAGE_TABLES that _bound_in finds unbound in fn;
+    the read is in the element or in that generator's conditions, and the way up to it crosses no lambda and no other
+    comprehension. It refuses some reads that are fields, on the safe side.
+
+    What it can miss: it trusts an annotation and a table's declared entries, and Python checks neither. If a caller
+    passed an ObjectType as on_graft's `gr: Graft`, `gr.family` would read the type's function, and this would pass
+    it as Graft's field. A planted form of the code may fool it in other ways: it is a reading of the syntax, not a
+    proof."""
     x = n.value
     if FIELD_OFF[0] or not isinstance(x, ast.Name):
         return False
-    below, child, up = None, n, par.get(id(n))
+    below, child, up, crossed = None, n, par.get(id(n)), False
     while up is not None and up is not fn:
         if isinstance(up, COMPS):
             gens = [g for g in up.generators
@@ -350,19 +384,21 @@ def message_field(rd, fn, n, par):
                                                   getattr(up, "value", None)))
                          or (child is g and any(below is c for c in g.ifs)))
                 it = g.iter
-                return bool(len(gens) == 1 and isinstance(g.target, ast.Name) and where
+                return bool(not crossed and len(gens) == 1 and isinstance(g.target, ast.Name) and where
                             and isinstance(it, ast.Subscript) and isinstance(it.value, ast.Name)
                             and it.value.id in MESSAGE_TABLES and not _bound_in(fn, it.value.id))
-        elif isinstance(up, ast.Lambda) and x.id in _arg_names(up.args):
-            return False
+            crossed = True
+        elif isinstance(up, ast.Lambda):
+            if x.id in _arg_names(up.args):
+                return False
+            crossed = True
         below, child, up = child, up, par.get(id(up))
     a = next((a for a in fn.args.posonlyargs + fn.args.args + fn.args.kwonlyargs if a.arg == x.id), None)
     if a is None or not isinstance(a.annotation, ast.Name) or not _message_class(rd, a.annotation.id):
         return False
     if _bound_in(fn, x.id, own=a):
         return False
-    return any(isinstance(s, ast.AnnAssign) and isinstance(s.target, ast.Name) and s.target.id == n.attr
-               for s in rd.classes[a.annotation.id].body)
+    return n.attr in dict(MESSAGE_CLASSES[a.annotation.id][1])
 
 
 def _context_kind(n, up, par):
@@ -681,10 +717,14 @@ def self_test(N, m, schema_values, type_functions):
          ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
     ]
     # the tell of a wire message's field (message_field): two that pass, then the reads it cannot follow
-    cls = ("class Container:\n    pass\n\nclass Graft(Container):\n    family: int\n    colour: int\n\n"
-           "class Prune(Container):\n    colour: int\n\nclass LocalType(Container):\n    family: Callable\n\n"
-           "class ObjectType:\n    family: int\n\n")
+    # the pinned Graft, as MESSAGE_CLASSES has it; cls0, the classes without it, for the cases that bring their own
+    graft = ("class Graft(Container):\n    object_type: TypeId\n    family: FamilyId\n    colour: uint16\n"
+             "    direction: Direction\n    answer: boolean\n\n")
+    cls0 = ("class Container:\n    pass\n\nclass Prune(Container):\n    colour: int\n\n"
+            "class LocalType(Container):\n    family: Callable\n\nclass ObjectType:\n    family: int\n\n")
+    cls = cls0.replace("class Prune", graft + "class Prune")
     ret = "    return {m.family for m in owed_relations[p]}\n"
+    use = "def c(p, gr: Graft):\n    return gr.family\n"
     odd = "a read of the type's function family that is not a call, in c: "
     tell = [
         ("the tell: gr: Graft, a wire message, its family field", "def c(p, gr: Graft):\n    return gr.family\n",
@@ -736,8 +776,34 @@ def self_test(N, m, schema_values, type_functions):
          "def c(p):\n    return {(lambda m: m.family)(p) for m in owed_relations[p]}\n", [odd + "lambda m: m.family"]),
         ("the tell: gr: Graft, a lambda's argument elsewhere",
          "def c(p, gr: Graft):\n    f = lambda gr: 0\n    return gr.family\n", [odd + "return gr.family"]),
+        ("the tell: a lambda's walrus between the read and the comprehension, in its condition",
+         "def c(p):\n    return {m.colour for m in owed_relations[p] if (lambda: ((m := T), m.family)[1])()}\n",
+         [odd + "((m := T), m.family)"]),
+        ("the tell: a lambda's walrus between the read and the comprehension, in its element",
+         "def c(p):\n    return {(lambda: ((m := T), m.family)[1])() for m in owed_relations[p]}\n",
+         [odd + "((m := T), m.family)"]),
+        ("the tell: a read in an inner comprehension's first iterable, refused on the safe side",
+         "def c(p):\n    return {tuple(k for m in [m.family] for k in [m]) for m in owed_relations[p]}\n",
+         [odd + "[m.family]"]),
+        ("the tell: a read in an inner comprehension that does not bind m, refused on the safe side",
+         "def c(p, o):\n    return {tuple(m.family for k in o) for m in owed_relations[p]}\n",
+         [odd + "(m.family for k in o)"]),
     ]
     cases += [(what, "types", synth(cls + src, ["c"]), want) for what, src, want in tell]
+    # each listed class pinned (_message_class): the cases bring their own Graft, after cls0
+    pins = [
+        ("the pin: the pinned Graft", graft + use, []),
+        ("the pin: Graft's family annotated Callable", graft.replace("family: FamilyId", "family: Callable") + use,
+         [odd + "return gr.family"]),
+        ("the pin: Graft with a def family after its fields",
+         graft.replace("boolean\n", "boolean\n\n    def family(self):\n        return 0\n") + use,
+         [odd + "return gr.family"]),
+        ("the pin: Graft rebound at the top level", graft + "Graft = ObjectType\n\n" + use, [odd + "return gr.family"]),
+        ("the pin: Graft with a second base", graft.replace("(Container)", "(Container, ObjectType)") + use,
+         [odd + "return gr.family"]),
+        ("the pin: Graft defined twice", graft + graft + use, [odd + "return gr.family"]),
+    ]
+    cases += [(what, "types", synth(cls0 + src, ["c"]), want) for what, src, want in pins]
 
     def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False, field_off=False):
         """A case's findings. `stub`: every check replaced by one that finds nothing, the case's input made as it
@@ -793,7 +859,7 @@ def self_test(N, m, schema_values, type_functions):
             [cases[15][0]])
     control("the tell of a wire message's field off",
             [w for w, k, a, want in cases if k == "types" and a[0] is not None and run(k, a, field_off=True) != want],
-            [tell[0][0], tell[1][0], tell[7][0], tell[9][0]])     # the cases with a read the tell passes
+            [tell[0][0], tell[1][0], tell[7][0], tell[9][0], pins[0][0]])     # the cases with a read the tell passes
     # the documents as they are, with the lists as they are: no finding
     found, lines = check(real[True], m, schema_values, type_functions)
     ok = not found
