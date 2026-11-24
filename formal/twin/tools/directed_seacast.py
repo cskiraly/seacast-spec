@@ -9,9 +9,13 @@ scenarios. The frames:
 - **H:** hand5's nodes (`--nodes 5 --degree 4 --msgs 1 --payload 16384 --seed 7 --doc seacast`), nothing published;
 - **H+:** H, with the config's MAX_PENDING_GROUPS 1 and SERVE_BUDGET 2 (run.py has no option for either);
 - **D:** DAS30's nodes (`--nodes 30 --degree 8 --msgs 1 --setting rows --supernodes 10 --blobs 4 --seed 7 --doc
-  seacast`) with `--forward-limit 2`, after the simulator's publish of one block, so that its column and row groups
-  exist. That publish runs node 1's own traced functions, whose records come first in the trace and are printed apart,
-  as the setup.
+  seacast`) with `--forward-limit 2`, after the simulator's publish of one block with every column withheld, so that
+  its column and row groups exist and the proposer pushes nothing. That publish runs node 1's own traced functions,
+  whose records come first in the trace and are printed apart, as the setup;
+- **R:** H, with the config's MAX_RELATIONS 2 (run.py has no option for it) and `--prune-backoff 1`;
+- **W:** `--nodes 17 --degree 16 --msgs 1 --payload 16384 --seed 7 --doc seacast`, so that a node has 16 peers;
+- **WU:** W with `--upkeep on`, so that the default type is symmetric and `candidates` runs.
+A frame that names its peer count stops before the first record if a recording node has another.
 
 The nodes are built by the toy's run.py, with the tracer installed as trace3.py's main installs it under SEACAST: at
 the end of each node's construction, so that it sees every name as the node finally binds it. The simulator never
@@ -45,6 +49,13 @@ The sets:
   simulator does not know, of the default type, with a drawn descriptor of 1 to 8 chunks, and no group is
   authenticable (no block was published); on D, g is one of the published block's column or row groups, with the
   simulator's own header.
+- **upkeep_h** (H), **upkeep_r** (R), **upkeep_w** (W) and **upkeep_wu** (WU), nodes 2 to 4, the relations of
+  §4.1, J1 to M4: `on_join`, `on_graft`, `on_prune`, `maintain_relations` and, in one scenario, `graft` itself, each
+  on a state whose path is one and the same for every record of the scenario. By default the type is the default
+  one, P, the family 0 and the colour 0; p is a link of P, with JOINs both ways as built (interest ALL, duty
+  FORWARD); and no peer is in any relation of ours, has a GRAFT of ours unanswered, or is in a backoff, and nothing
+  is owed: each record starts with the six relation tables empty at its node (the toy's static mesh fills
+  `push_in` and `push_out` at the build) and the JOIN tables as built.
 """
 import argparse
 import sys
@@ -59,6 +70,7 @@ import trace3                           # noqa: E402
 HAND5 = ["--nodes", "5", "--degree", "4", "--msgs", "1", "--payload", "16384", "--seed", "7", "--doc", "seacast"]
 DAS30 = ["--nodes", "30", "--degree", "8", "--msgs", "1", "--setting", "rows", "--supernodes", "10", "--blobs", "4",
          "--seed", "7", "--doc", "seacast", "--forward-limit", "2"]
+W16 = ["--nodes", "17", "--degree", "16", "--msgs", "1", "--payload", "16384", "--seed", "7", "--doc", "seacast"]
 GROUPS = [bytes([0x31 * (j + 1)]) * 32 for j in range(3)]     # groups the simulator does not know: the default type
 ROOT = bytes([0xa1]) * 32
 # the tables the serving scenarios draw or their calls write, put back before each record (chunks and known_id
@@ -66,7 +78,9 @@ ROOT = bytes([0xa1]) * 32
 RESET = ("join_recv", "join_sent", "owed_relations", "desc", "state", "mine", "peer_has", "origin", "served",
          "probe_waiting", "probe_served", "standing", "routed_standing", "want_p", "unwanted", "serve_count",
          "served_hb", "offered_to", "forwarded", "park", "T_of", "chunks", "known_id")
-CTX = {}                                # the frame: the simulator, the toy's modules, the tracer
+# the relation tables, emptied before each record of the relation scenarios; the JOIN tables are put back as built
+RELATIONS = ("push_in", "push_out", "grafted_in", "grafted_out", "backoff", "owed_relations")
+CTX = {}                              # the frame: the simulator, the toy's modules, the tracer
 
 
 def build(tr, argv, config=None, publish=False):
@@ -413,16 +427,302 @@ def s20(rng, nd, ns, B):
     return "route_want", (p, g, i, 1)
 
 
-SETS = {     # name: (frame, the nodes its records are made at, its scenarios, each record from the build's state)
-    "control": ("H", (2, 3, 4), {"note_claim": note_claim}, False),
+# ---- the relation scenarios' helpers: the type P, the family 0 and the colour 0 unless a row says otherwise
+
+def rel(ns, kind, T_id, d, fam=0, c=0, answer=False):
+    """A GRAFT or a PRUNE as the toy's own classes make one (seacast.md §4.1's `Graft(...)`, `Prune(...)`)."""
+    if kind == "Graft":
+        return ns["Graft"](object_type=T_id, family=fam, colour=c, direction=d, answer=answer)
+    return ns["Prune"](object_type=T_id, family=fam, colour=c, direction=d)
+
+
+def on_rel(rng, nd):
+    """The defaults: p, one of the node's peers, a link of P as built, and P."""
+    return rng.choice(sorted(nd.peers)), nd._P
+
+
+def holds(ns, table, q, P, fam=0, c=0):
+    """`table[q][P][fam]` holds the colour c: one of the four sets of seacast.md §4.1, written as the toy's add."""
+    ns[table][q][P][fam].add(c)
+
+
+def not_a_link(rng, ns, p, P):
+    """p no link of P, as S1 draws it: its JOIN not received, ours not sent, or ours owed, a third each."""
+    r = rng.random()
+    if r < 1 / 3:
+        F.unwrap(ns["join_recv"])[p].pop(P, None)
+    elif r < 2 / 3:
+        F.unwrap(ns["join_sent"])[p].pop(P, None)
+    else:
+        ns["owed_relations"][p].append(ns["Join"](object_type=P.id, interest="ALL", custody_count=0, duty="FORWARD",
+                                                  colours=1))
+
+
+def two_pairs(rng, ns, p, P, owed=None):
+    """p holds two pairs of P other than (0, 0), at R's limit of two: (1, 0) pushed to us, and (2, 0) pushed by us
+    or, in about half the draws (`owed` None), a GRAFT of ours for it still owed."""
+    holds(ns, "push_in", p, P, fam=1)
+    if owed is None:
+        owed = rng.random() < 0.5
+    if owed:
+        ns["owed_relations"][p].append(rel(ns, "Graft", P.id, "IN", fam=2))
+    else:
+        holds(ns, "push_out", p, P, fam=2)
+
+
+def others(rng, nd, p, lo, hi):
+    """lo to hi of the node's peers other than p, drawn."""
+    qs = [q for q in sorted(nd.peers) if q != p]
+    return rng.sample(qs, rng.randint(lo, hi))
+
+
+# ---- the relation scenarios, J1 to M4: each record's path, in the twin's labels
+
+def j1(rng, nd, ns, B):
+    """J1: a JOIN of a type the node does not run. -> on_join: a type the node does not run."""
+    p, P = on_rel(rng, nd)
+    return "on_join", (p, ns["Join"](object_type="column", interest="ALL", custody_count=0, duty="FORWARD",
+                                     colours=1))
+
+
+def j2(rng, nd, ns, B):
+    """J2: a JOIN of P with two colours, P's M being 1. -> on_join: colours not the type's."""
+    p, P = on_rel(rng, nd)
+    return "on_join", (p, ns["Join"](object_type=P.id, interest="ALL", custody_count=0, duty="FORWARD", colours=2))
+
+
+def j3(rng, nd, ns, B):
+    """J3: a JOIN of P before ours went. -> on_join: answered."""
+    p, P = on_rel(rng, nd)
+    F.unwrap(ns["join_sent"])[p].pop(P, None)
+    return "on_join", (p, ns["Join"](object_type=P.id, interest="ALL", custody_count=0, duty="FORWARD", colours=1))
+
+
+def g1(rng, nd, ns, B):
+    """G1: a GRAFT of a type the node does not run. -> on_graft: a type the node does not run."""
+    p, P = on_rel(rng, nd)
+    return "on_graft", (p, rel(ns, "Graft", "column", "OUT"))
+
+
+def g2(rng, nd, ns, B):
+    """G2: a GRAFT of P from no link of P. -> on_graft: a link that has not joined the type."""
+    p, P = on_rel(rng, nd)
+    not_a_link(rng, ns, p, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "OUT"))
+
+
+def g3(rng, nd, ns, B):
+    """G3 (R): p's GRAFT of a third pair, p at the limit of two. -> relation_room: at the limit; on_graft: no room."""
+    p, P = on_rel(rng, nd)
+    two_pairs(rng, ns, p, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "OUT"))
+
+
+def g4(rng, nd, ns, B):
+    """G4: p pushes us already. -> relation_room: the pair held; on_graft: pushes to us held, yes again."""
+    p, P = on_rel(rng, nd)
+    holds(ns, "push_in", p, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "OUT"))
+
+
+def g5(rng, nd, ns, B):
+    """G5: p pushes us already, and the GRAFT is a yes or answers ours. -> relation_room: the pair held; on_graft:
+    pushes to us held, no answer."""
+    p, P = on_rel(rng, nd)
+    holds(ns, "push_in", p, P)
+    answer = rng.random() < 0.5
+    if not answer:
+        holds(ns, "grafted_in", p, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "OUT", answer=answer))
+
+
+def g6(rng, nd, ns, B):
+    """G6: the defaults. -> relation_room: below the limit; on_graft: pushes to us, yes."""
+    p, P = on_rel(rng, nd)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "OUT"))
+
+
+def g7(rng, nd, ns, B):
+    """G7 (W): 12 to 14 other peers push us already, P's F_HI being 12. -> relation_room: below the limit; on_graft:
+    pushes to us, no."""
+    p, P = on_rel(rng, nd)
+    for q in others(rng, nd, p, 12, 14):
+        holds(ns, "push_in", q, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "OUT"))
+
+
+def g8(rng, nd, ns, B):
+    """G8: we push p already. -> relation_room: the pair held; on_graft: our pushes held, yes again."""
+    p, P = on_rel(rng, nd)
+    holds(ns, "push_out", p, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "IN"))
+
+
+def g9(rng, nd, ns, B):
+    """G9: we push p already, and the GRAFT is a yes or answers ours. -> relation_room: the pair held; on_graft: our
+    pushes held, no answer."""
+    p, P = on_rel(rng, nd)
+    holds(ns, "push_out", p, P)
+    answer = rng.random() < 0.5
+    if not answer:
+        holds(ns, "grafted_out", p, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "IN", answer=answer))
+
+
+def g10(rng, nd, ns, B):
+    """G10: p asks us to push it. -> relation_room: below the limit; on_graft: our pushes, yes."""
+    p, P = on_rel(rng, nd)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "IN"))
+
+
+def g11(rng, nd, ns, B):
+    """G11: p asks us to push it, our JOIN of P to p of no duty. -> relation_room: below the limit; on_graft: our
+    pushes, no."""
+    p, P = on_rel(rng, nd)
+    ns["join_sent"][p][P] = join(P, "ALL", duty="NONE")
+    return "on_graft", (p, rel(ns, "Graft", P.id, "IN"))
+
+
+def g12(rng, nd, ns, B):
+    """G12 (WU): a symmetric GRAFT, up to 5 other peers in the relation both ways. -> relation_room: below the limit;
+    on_graft: symmetric, yes."""
+    p, P = on_rel(rng, nd)
+    for q in others(rng, nd, p, 0, 5):
+        holds(ns, "push_in", q, P)
+        holds(ns, "push_out", q, P)
+    return "on_graft", (p, rel(ns, "Graft", P.id, "BOTH"))
+
+
+def g13(rng, nd, ns, B):
+    """G13 (WU): a symmetric GRAFT that answers ours, or a yes to a relation held. -> relation_room: the pair held;
+    on_graft: symmetric, taken without an answer."""
+    p, P = on_rel(rng, nd)
+    answer = False
+    if rng.random() < 0.5:
+        holds(ns, "grafted_in" if rng.random() < 0.5 else "grafted_out", p, P)
+    else:
+        holds(ns, "push_in", p, P)
+        answer = True
+    return "on_graft", (p, rel(ns, "Graft", P.id, "BOTH", answer=answer))
+
+
+def g14(rng, nd, ns, B):
+    """G14 (WU): a symmetric GRAFT, our JOIN of P to p of no duty. -> relation_room: below the limit; on_graft:
+    symmetric, no."""
+    p, P = on_rel(rng, nd)
+    ns["join_sent"][p][P] = join(P, "ALL", duty="NONE")
+    return "on_graft", (p, rel(ns, "Graft", P.id, "BOTH"))
+
+
+def q1(rng, nd, ns, B):
+    """Q1: a PRUNE of a type the node does not run. -> on_prune: a type the node does not run."""
+    p, P = on_rel(rng, nd)
+    return "on_prune", (p, rel(ns, "Prune", "column", "BOTH"))
+
+
+def q2(rng, nd, ns, B):
+    """Q2: a PRUNE of P from no link of P. -> on_prune: a link that has not joined the type."""
+    p, P = on_rel(rng, nd)
+    not_a_link(rng, ns, p, P)
+    return "on_prune", (p, rel(ns, "Prune", P.id, "BOTH"))
+
+
+def q3(rng, nd, ns, B):
+    """Q3: a PRUNE of a relation held both ways, and one backoff of the family 1, run out a second ago. -> on_prune:
+    a backoff run out; relation_room: the pair held; on_prune: pushes to us end, no backoff; on_prune: our pushes
+    end, no backoff."""
+    p, P = on_rel(rng, nd)
+    holds(ns, "push_in", p, P)
+    holds(ns, "push_out", p, P)
+    ns["backoff"][p][P][1][(0, "IN")] = ns["now"] - 1
+    return "on_prune", (p, rel(ns, "Prune", P.id, "BOTH"))
+
+
+def q4(rng, nd, ns, B):
+    """Q4 (R): a PRUNE of a third pair, p at the limit of two. -> relation_room: at the limit; on_prune: no room."""
+    p, P = on_rel(rng, nd)
+    two_pairs(rng, ns, p, P)
+    return "on_prune", (p, rel(ns, "Prune", P.id, "OUT"))
+
+
+def q5(rng, nd, ns, B):
+    """Q5 (R): a PRUNE of a relation held both ways, R's backoff 1. -> relation_room: the pair held; on_prune: pushes
+    to us end, a backoff; on_prune: our pushes end, a backoff."""
+    p, P = on_rel(rng, nd)
+    holds(ns, "push_in", p, P)
+    holds(ns, "push_out", p, P)
+    return "on_prune", (p, rel(ns, "Prune", P.id, "BOTH"))
+
+
+def a1(rng, nd, ns, B):
+    """A1 (R): graft called itself, p at the limit of two. -> relation_room: at the limit; graft: no room."""
+    p, P = on_rel(rng, nd)
+    two_pairs(rng, ns, p, P, owed=False)
+    return "graft", (p, P, 0, 0, "IN")
+
+
+def both_ways(ns, qs, P):
+    for q in qs:
+        holds(ns, "push_in", q, P)
+        holds(ns, "push_out", q, P)
+
+
+def m1(rng, nd, ns, B):
+    """M1 (WU): 0 to 5 peers in the relation both ways, and no peer's JOIN of P of duty FORWARD, so no candidate. ->
+    maintain_relations: below the floor."""
+    P = nd._P
+    for q in sorted(nd.peers):
+        ns["join_recv"][q][P] = join(P, "ALL", duty="NONE")
+    both_ways(ns, rng.sample(sorted(nd.peers), rng.randint(0, 5)), P)
+    return "maintain_relations", (P,)
+
+
+def m2(rng, nd, ns, B):
+    """M2 (WU): 6 to 10 peers in the relation both ways, and one more that only pushes us. -> maintain_relations: a
+    half-held relation grafted; relation_room: the pair held; graft: sent."""
+    P = nd._P
+    qs = rng.sample(sorted(nd.peers), rng.randint(7, 11))
+    both_ways(ns, qs[1:], P)
+    holds(ns, "push_in", qs[0], P)
+    return "maintain_relations", (P,)
+
+
+def m3(rng, nd, ns, B):
+    """M3 (WU): 12 to 15 peers in the relation both ways, P's F_HI being 12. -> maintain_relations: at the cap."""
+    P = nd._P
+    both_ways(ns, rng.sample(sorted(nd.peers), rng.randint(12, 15)), P)
+    return "maintain_relations", (P,)
+
+
+def m4(rng, nd, ns, B):
+    """M4 (W): 13 to 15 peers push us, P's F_HI being 12. -> maintain_relations: past the cap, one way."""
+    P = nd._P
+    for q in rng.sample(sorted(nd.peers), rng.randint(13, 15)):
+        holds(ns, "push_in", q, P)
+    return "maintain_relations", (P,)
+
+
+SETS = {     # name: (frame, the nodes its records are made at, its scenarios, what each record starts from)
+    "control": ("H", (2, 3, 4), {"note_claim": note_claim}, None),
     "serve_h": ("H", (2, 3, 4), {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "S5": s5, "S6": s6, "S7": s7, "S8": s8,
-                                 "S9": s9, "S20": s20}, True),
-    "serve_hplus": ("H+", (2, 3, 4), {"S10": s10, "S11": s11}, True),
+                                 "S9": s9, "S20": s20}, "serve"),
+    "serve_hplus": ("H+", (2, 3, 4), {"S10": s10, "S11": s11}, "serve"),
     "serve_d": ("D", tuple(range(2, 31)), {"S12": s12, "S13": s13, "S14": s14, "S15": s15, "S16": s16, "S17": s17,
-                                           "S18": s18, "S19": s19}, True),
+                                           "S18": s18, "S19": s19}, "serve"),
+    "upkeep_h": ("H", (2, 3, 4), {"J1": j1, "J2": j2, "J3": j3, "G1": g1, "G2": g2, "G4": g4, "G5": g5, "G6": g6,
+                                  "G8": g8, "G9": g9, "G10": g10, "G11": g11, "Q1": q1, "Q2": q2, "Q3": q3},
+                 "upkeep"),
+    "upkeep_r": ("R", (2, 3, 4), {"G3": g3, "Q4": q4, "Q5": q5, "A1": a1}, "upkeep"),
+    "upkeep_w": ("W", (2, 3, 4), {"G7": g7, "M4": m4}, "upkeep"),
+    "upkeep_wu": ("WU", (2, 3, 4), {"G12": g12, "G13": g13, "G14": g14, "M1": m1, "M2": m2, "M3": m3}, "upkeep"),
 }
-FRAMES = {"H": (HAND5, None, False), "H+": (HAND5, {"MAX_PENDING_GROUPS": 1, "SERVE_BUDGET": 2}, False),
-          "D": (DAS30, None, True)}
+# what a record starts from: the tables put back as the build left them (all but the JOIN tables empty then), and
+# the tables emptied
+STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS)}
+FRAMES = {   # name: (run.py's arguments, the config's additions, a block published, each recording node's peers)
+    "H": (HAND5, None, False, 4), "H+": (HAND5, {"MAX_PENDING_GROUPS": 1, "SERVE_BUDGET": 2}, False, 4),
+    "D": (DAS30, None, True, None), "R": (HAND5 + ["--prune-backoff", "1"], {"MAX_RELATIONS": 2}, False, 4),
+    "W": (W16, None, False, 16), "WU": (W16 + ["--upkeep", "on"], None, False, 16)}
 
 
 def main(argv):
@@ -433,21 +733,24 @@ def main(argv):
     ap.add_argument("--n", type=int, default=20000)
     ap.add_argument("--seed", type=int, default=1)
     a = ap.parse_args(argv)
-    frame, nodes, scenarios, reset = SETS[a.set]
+    frame, nodes, scenarios, start = SETS[a.set]
     toy = Path(a.toy).resolve()
     tr = trace3.Tracer3(toy, a.out, ["directed_seacast", "--doc", "seacast", f"--n={a.n}", f"--seed={a.seed}",
                                      f"--set={a.set}"], whole=True)
     try:
-        args, config, publish = FRAMES[frame]
+        args, config, publish, npeers = FRAMES[frame]
         sim = build(tr, args, config, publish)
         setup = dict(tr.counts)
+        if npeers is not None and any(len(sim.nodes[k].peers) != npeers for k in nodes):
+            raise SystemExit(f"directed_seacast: frame {frame}: the recording nodes' peers are "
+                             f"{[len(sim.nodes[k].peers) for k in nodes]}, not {npeers} each")
         import bits as B                # noqa: E402: the pinned toy's
         import random
         import wire as Wm               # noqa: E402
         CTX.update(sim=sim, Wm=Wm, tr=tr, column=sorted(g for g, t in sim.gtype.items() if t == "column"),
                    row=sorted(g for g, t in sim.gtype.items() if t == "row"))
-        saved = ({k: {name: save(k, name, F.unwrap(sim.nodes[k].ns[name])) for name in RESET} for k in nodes}
-                 if reset else None)
+        kept, emptied = STARTS[start] if start else ((), ())
+        saved = {k: {name: save(k, name, F.unwrap(sim.nodes[k].ns[name])) for name in kept} for k in nodes}
         rng = random.Random(a.seed)
         calls = Counter()
         keys = sorted(scenarios)
@@ -457,9 +760,11 @@ def main(argv):
             ns = nd.ns
             ns["now"] = rng.choice([1.0, 3.25])
             key = rng.choice(keys)
-            if reset:                   # the build's state, and no asker places; nothing an earlier record queued
-                for name in RESET:
+            if start:                   # the build's state, and no asker places; nothing an earlier record queued
+                for name in kept:
                     restore(F.unwrap(ns[name]), saved[k][name])
+                for name in emptied:
+                    F.unwrap(ns[name]).clear()
                 nd.want_unknown.clear()
                 queues = F.unwrap(ns["queue"])
                 for q in nd.peers:
