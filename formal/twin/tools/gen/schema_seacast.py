@@ -76,11 +76,15 @@ def whole(level, doc, used=False, note=None):
 
 
 def rel(name, field, what):
-    """One of the four relation tables (`lazy3(LazySet)`): the colours per peer, type and family."""
+    """One of the four relation tables (`lazy3(LazySet)`): the colours per peer, type and family. A link's type is
+    read whole by §6.3's `relation_room` (`m[p][T].items()`)."""
     return Table(name, field, field, [P, TY, FAM], "colours",
                  read=(f"{field}Of", f"`{name}[p][T][fam]`: {what}"), write=(f"set{field[0].upper()}{field[1:]}",
                                                                              f"`{name}[p][T][fam].add(c)`, `.discard(c)`"),
-                 scans=[whole(f"{field}All", f"every `{name}`", note=f"every `{name}[p][T][fam]`")])
+                 scans=[whole(f"{field}All", f"every `{name}`", note=f"every `{name}[p][T][fam]`"),
+                        Scan(f"all{field[0].upper()}{field[1:]}Type", f"{field}Type",
+                             f"every `{name}[p][T]`: `{name}[p][T].items()`", depth=2, used=True,
+                             note=f"every `{name}[p][T][fam]` of one link and type")])
 
 
 TABLES_Seacast = [
@@ -104,7 +108,14 @@ TABLES_Seacast = [
     Table("backoff", "backoff", "backoff", [P, TY, FAM, ("cd", "ColourDir")], "time",
           read=("backoff?", "`backoff[p][T][fam].get((c, direction))`: until when we do not graft p, or none"),
           write=("setBackoff", "`backoff[p][T][fam][(c, direction)] = t`"),
-          scans=[whole("backoffAll", "every `backoff`", note="every `backoff[p][T][fam][(c, direction)]`")]),
+          erase=("eraseBackoff", "`del backoff[p][T][fam][(c, direction)]`: a backoff run out (`on_prune`)"),
+          # relation_room reads a link's type whole (`backoff[p][T].items()`), and on_prune iterates it; each family's
+          # level read whole (`bo.items()`, `not bo`) is a record's scan too, which that of the type covers
+          scans=[whole("backoffAll", "every `backoff`", note="every `backoff[p][T][fam][(c, direction)]`"),
+                 Scan("allBackoffType", "backoffType", "every `backoff[p][T]`: its families, and the keys of each",
+                      depth=2, used=True, note="every `backoff[p][T][fam][(c, direction)]` of one link and type"),
+                 Scan("allBackoffFam", "backoffFam", "every `backoff[p][T][fam]`", depth=3,
+                      note="every `backoff[p][T][fam][(c, direction)]` of one family")]),
     # per group
     Table("T_of", "tOf", "tOf", [G], "typeid",
           read=("tOf?", "`T_of[g]`, as `g in T_of` or `T_of[g]`: the group's type, or none"),

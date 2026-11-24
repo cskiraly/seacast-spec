@@ -702,4 +702,533 @@ def servesTape : List String := [tog, linksQ "[4, 5]", tog, tog]
 
 end Serve
 
+/-! ## §4.1's relations and §6.3's limit on them: `relation_room`, `graft`, `on_prune`, `on_graft`,
+`maintain_relations` and `on_join`
+
+Hand-written records, each written from the Python's order of reads and questions, and each passing with "fewer" 0
+and exactly the branch labels it was written for, in order:
+- one per branch label of `relation_room` (3), `graft` (2), `on_prune` (8), `on_graft` (16), `maintain_relations`
+  (6) and `on_join` (4);
+- the decisions inside an exit that change a read, a question or a write: `graft`'s three directions; a symmetric
+  PRUNE of direction IN ending both ways; a symmetric GRAFT taken without an answer because it answers ours, and
+  because it is a yes to a relation held, and the same relation answered again where it is not a yes; each part of
+  the accept tests refusing in turn (`in_pushers` at the cap, `wants_family`, the duty), and a one-way GRAFT of
+  direction BOTH running both blocks; `uplink_class` FAST and HOME, with the outs' target met;
+- the short-circuits that leave a read or a question unmade: `in_pushers` not asked for a relation held (symmetric),
+  `out_pushees` not asked where the duty is not FORWARD, and `grafted_out[q]` not read where `grafted_in[q]` holds
+  the colour (the half-held relations);
+- `maintain_relations` with two candidates in a known order, one without room, `relation_room` called for each; the
+  half-held relations grafted in `sorted` order where the questions' order is not;
+- the boundaries: `relation_room` at exactly `MAX_RELATIONS` and one below, a pair held in two maps counting once, a
+  backoff that runs out exactly now (not counted, and deleted), the slice `cs[:n]` at `n` = 0 and -1;
+- `relation_room` at a type with parameters but no `MAX_RELATIONS` (`param`'s missing-field arm);
+- each `KeyError` of a missing JOIN sent, as the Python raises it. The toy reaches none of them, since `links(T)`
+  needs both JOINs (toy/node.py:1399-1402); each is a record of what the Python does in that state.
+
+Several must fail: a wrong return, a question out of order, `type_of` answered once where the Python asks it twice,
+and the six questions' answers that their readers refuse by their own checks.
+
+What a record shows, and what it does not: as in §4.5's records, the replay holds the twin to the record's questions
+in order, its return or raise, its writes and the cells it read. It does not show how many times a cell was read, in
+what order, or when a write fell between two questions. Those come from the source-order audit of each function,
+line by line against the Python. The questions are stubbed by their tape entries, and their own reads (`cr`) are
+left out here: the traces carry them.
+
+The link is peer 4, the family 0 and the colour 0. Three types have parameters: `row`, one way, with a limit of 2
+pairs and a backoff of 1.0; `column`, symmetric, with no limit (+∞, the toy's default) and no backoff; `payload`, with
+parameters but no `MAX_RELATIONS`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and `D_OUT_MAX` at 12, 8, 8 and 12 for
+its three types (toy/node.py:1235, :1285, :1330); the records take smaller values, which §1.1's class allows, so that
+their lists stay short, and the twin reads each from the context the same way at any value. A record's time is 0
+unless it says otherwise. -/
+
+namespace Upkeep
+
+open Serve (rd arrL quoted tablesIn jnT)
+
+/-- +∞, the toy's `MAX_RELATIONS` unless a run sets it -/
+def inf : Float := Float.ofBits 9218868437227405312
+
+/-- `row`: one way, M = 1, a floor and a cap of 1 pusher, 1 out (2 on a fast uplink), a limit of 2 pairs per link, a
+backoff of 1.0; `column`: symmetric, M = 1, a floor and a cap of 3, 1 out, no limit and no backoff; `payload`: no
+`MAX_RELATIONS` -/
+def params2 : TypeId → Option TypeParams := fun T =>
+  if T == "row" then
+    some { M := some 1, SYMMETRIC := some false, F_LO := some 1, F_HI := some 1, D_OUT := some 1,
+           D_OUT_FAST := some 2, D_OUT_MAX := some 1, PRUNE_BACKOFF := some 1.0, MAX_RELATIONS := some 2.0 }
+  else if T == "column" then
+    some { M := some 1, SYMMETRIC := some true, F_LO := some 3, F_HI := some 3, D_OUT := some 1,
+           PRUNE_BACKOFF := some 0.0, MAX_RELATIONS := some inf }
+  else if T == "payload" then some { M := some 1, SYMMETRIC := some false, PRUNE_BACKOFF := some 0.0 }
+  else none
+
+def replay2 (l : String) : Except String (Array String × Nat) := do
+  runSeacast c0 c2 params2 [] traced (← record (← Json.parse l) docSeacast) []
+
+/-- The record passes, with no read of the Python's left unmade, through these branch labels in order -/
+def takes2 (l : String) (marks : List String) : Bool :=
+  match replay2 l with
+  | .ok (ms, 0) => ms.toList == marks
+  | _ => false
+
+def fails2 (pre : String) (l : String) : Bool :=
+  match replay2 l with
+  | .error e => e.startsWith pre
+  | .ok _ => false
+
+/-- A record at time `t` (a float's word), with its scans and its rest: the entries it wrote without reading them
+that held a value before it, as the tracer writes them (none here). Its tables are those its reads, scans and writes
+name. -/
+def rec2 (fn args : String) (reads scans writes tape : List String) (out : List (String × String))
+    (reached : List String) (rest : List String := []) (t : String := "0") : String :=
+  let fs := [("n", "1"), ("t", t), ("fn", s!"\"{fn}\""), ("args", args), ("reads", arrL reads),
+             ("scans", arrL scans), ("writes", arrL writes), ("rest", arrL rest), ("tape", arrL tape)] ++ out ++
+            [("reached", quoted (reached.toArray.qsort (· < ·)).toList),
+             ("tables", tablesIn [arrL reads, arrL scans, arrL writes])]
+  "{" ++ ", ".intercalate (fs.map fun (k, v) => s!"\"{k}\": {v}") ++ "}"
+
+/-- 1.0, 2.0 and 3.0 as their words -/
+def f1 : String := "4607182418800017408"
+def f2 : String := "4611686018427387904"
+def f3 : String := "4613937818241073152"
+
+def pt (p : Nat) (T : String) : String := s!"[{p}, \"{T}\"]"
+def ptf (p : Nat) (T : String) (f : Nat := 0) : String := s!"[{p}, \"{T}\", {f}]"
+/-- `backoff[p][T][f][(k, d)]`'s path -/
+def ptfk (p : Nat) (T : String) (f k : Nat) (d : String) : String := s!"[{p}, \"{T}\", {f}, [{k}, \"{d}\"]]"
+def sc (tb path : String) : String := s!"[\"{tb}\", {path}]"
+/-- A relation map's entry `m[p][T][f]`, family 0 unless named -/
+def rc (tb : String) (p : Nat) (T v : String) (f : Nat := 0) : String := rd tb (ptf p T f) v
+def owed0 (p : Nat) : String := rd "owed_relations" s!"[{p}]" "null"
+/-- `relation_room(p, T, …)`'s scans: the four maps' `m[p][T]` and `backoff[p][T]`, and each family's keys of
+`backoff[p][T]` -/
+def room (p : Nat) (T : String) (fams : List Nat := []) : List String :=
+  ["push_in", "push_out", "grafted_in", "grafted_out", "backoff"].map (sc · (pt p T)) ++
+    fams.map fun f => sc "backoff" (ptf p T f)
+/-- row's limit reached at link p by two pairs other than (0, 0): (2, 0) pushed to us, our GRAFT of (3, 0) -/
+def full (p : Nat) : List String := [rc "push_in" p "row" "[0]" 2, rc "grafted_out" p "row" "[0]" 3]
+
+def runsQ (T : String) (b : Bool := true) : String := s!"[\"runs_type\", [\"{T}\"], {b}]"
+def typeQ (T : String) : String := s!"[\"type_of\", [\"{T}\"], \"{T}\"]"
+def linksQ (T ps : String) : String := s!"[\"links\", [\"{T}\"], {ps}]"
+/-- `on_graft`'s and `on_prune`'s entry: the type run, joined by p, and asked again -/
+def entryQ (T : String) : List String := [runsQ T, typeQ T, linksQ T "[4]", typeQ T]
+def inQ (T ps : String) : String := s!"[\"in_pushers\", [\"{T}\", 0, 0], {ps}]"
+def outQ (T ps : String) : String := s!"[\"out_pushees\", [\"{T}\", 0, 0], {ps}]"
+def candQ (T d ps : String) : String := s!"[\"candidates\", [\"{T}\", 0, 0, \"{d}\"], {ps}]"
+def wantsQ (T : String) (b : Bool) : String := s!"[\"wants_family\", [\"{T}\", 0], {b}]"
+def upQ (u : String) : String := s!"[\"uplink_class\", [], \"{u}\"]"
+def dutyQ (T fams : String) : String := s!"[\"families_with_duty\", [\"{T}\"], {fams}]"
+def gr (T d : String) (a : Bool) : String := s!"[\"graft\", \"{T}\", 0, 0, \"{d}\", {a}]"
+def pr (T d : String) : String := s!"[\"prune\", \"{T}\", 0, 0, \"{d}\"]"
+def sendQ (q : Nat) (m : String) (urgent : Bool := false) : String := s!"[\"send\", [{q}, {m}, {urgent}], true]"
+/-- `list(chunks)` of an empty store: `join_push` announces nothing -/
+def chunksQ : String := "[\"keys\", \"chunks\", [], []]"
+def fwd (T : String) : String := rd "join_sent" (pt 4 T) (jnT T "ALL" "FORWARD")
+def none4 (T : String) : String := rd "join_sent" (pt 4 T) (jnT T "ALL" "NONE")
+def args (T : String) : String := s!"[4, \"{T}\", 0, 0]"
+
+def below : String := "relation_room: below the limit"
+def atLimit : String := "relation_room: at the limit"
+def heldPair : String := "relation_room: the pair held"
+def sent : String := "send_relation: sent"
+def raisesKey (T : String) : List (String × String) :=
+  [("raises", "\"KeyError\""), ("raises_key", s!"[\"type\", \"{T}\"]")]
+
+/-! ### relation_room -/
+
+-- nothing held: below the limit, read only here
+#guard takes2 (rec2 "relation_room" (args "row") [owed0 4] (room 4 "row") [] [] (ret "true") ["relation_room"])
+  [below]
+-- one below the limit: one other pair
+#guard takes2 (rec2 "relation_room" (args "row") [rc "push_in" 4 "row" "[0]" 2, owed0 4] (room 4 "row") [] []
+    (ret "true") ["relation_room"])
+  [below]
+-- at exactly the limit: two other pairs
+#guard takes2 (rec2 "relation_room" (args "row") (full 4 ++ [owed0 4]) (room 4 "row") [] [] (ret "false")
+    ["relation_room"])
+  [atLimit]
+-- the pair held, at the limit otherwise: three pairs, the asked one among them
+#guard takes2 (rec2 "relation_room" (args "row") (full 4 ++ [rc "push_out" 4 "row" "[0]", owed0 4]) (room 4 "row")
+    [] [] (ret "true") ["relation_room"])
+  [heldPair]
+-- a pair held in two maps counts once: one pair, below the limit
+#guard takes2 (rec2 "relation_room" (args "row")
+    [rc "push_in" 4 "row" "[0]" 2, rc "push_out" 4 "row" "[0]" 2, owed0 4] (room 4 "row") [] [] (ret "true")
+    ["relation_room"])
+  [below]
+-- at time 2.0: a backoff run out at 1.0 and one that runs out exactly now are not counted, nor an owed JOIN, nor an
+-- owed GRAFT of another type; one pair counted, below the limit
+#guard takes2 (rec2 "relation_room" (args "row")
+    [rc "push_in" 4 "row" "[0]" 2, rd "backoff" (ptfk 4 "row" 3 0 "IN") f1, rd "backoff" (ptfk 4 "row" 5 1 "OUT") f2,
+     rd "owed_relations" "[4]" s!"[{jnT "column" "ALL" "FORWARD"}, [\"graft\", \"column\", 6, 0, \"OUT\", false]]"]
+    (room 4 "row" [3, 5]) [] [] (ret "true") ["relation_room"] (t := f2))
+  [below]
+-- at time 2.0: a backoff that runs out at 3.0 and an owed PRUNE of the type are counted; two pairs, at the limit
+#guard takes2 (rec2 "relation_room" (args "row")
+    [rd "backoff" (ptfk 4 "row" 5 1 "OUT") f3, rd "owed_relations" "[4]" "[[\"prune\", \"row\", 7, 0, \"IN\"]]"]
+    (room 4 "row" [5]) [] [] (ret "false") ["relation_room"] (t := f2))
+  [atLimit]
+-- a type with parameters but no MAX_RELATIONS: AttributeError, from the missing field, where the pair is not held
+#guard takes2 (rec2 "relation_room" (args "payload") [owed0 4] (room 4 "payload") [] []
+    [("raises", "\"AttributeError\"")] ["relation_room"])
+  ["raises: AttributeError"]
+
+/-! ### graft -/
+
+-- no room: nothing written, nothing sent
+#guard takes2 (rec2 "graft" "[4, \"row\", 0, 0, \"IN\"]" (full 4 ++ [owed0 4]) (room 4 "row") [] [] (ret "null")
+    ["graft", "relation_room"])
+  [atLimit, "graft: no room"]
+-- IN: grafted_in alone
+#guard takes2 (rec2 "graft" "[4, \"row\", 0, 0, \"IN\"]" [owed0 4, rc "grafted_in" 4 "row" "null"] (room 4 "row")
+    [rc "grafted_in" 4 "row" "[0]"] [sendQ 4 (gr "row" "IN" false)] (ret "null")
+    ["graft", "relation_room", "send_relation"])
+  [below, "graft: sent", sent]
+-- OUT: grafted_out alone
+#guard takes2 (rec2 "graft" "[4, \"row\", 0, 0, \"OUT\"]" [owed0 4, rc "grafted_out" 4 "row" "null"] (room 4 "row")
+    [rc "grafted_out" 4 "row" "[0]"] [sendQ 4 (gr "row" "OUT" false)] (ret "null")
+    ["graft", "relation_room", "send_relation"])
+  [below, "graft: sent", sent]
+-- BOTH, at a type with no limit: both
+#guard takes2 (rec2 "graft" "[4, \"column\", 0, 0, \"BOTH\"]"
+    [owed0 4, rc "grafted_in" 4 "column" "null", rc "grafted_out" 4 "column" "null"] (room 4 "column")
+    [rc "grafted_in" 4 "column" "[0]", rc "grafted_out" 4 "column" "[0]"] [sendQ 4 (gr "column" "BOTH" false)]
+    (ret "null") ["graft", "relation_room", "send_relation"])
+  [below, "graft: sent", sent]
+
+/-! ### on_prune -/
+
+-- a type the node does not run
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "cell" "IN"}]" [] [] [] [runsQ "cell" false] (ret "null") ["on_prune"])
+  ["on_prune: a type the node does not run"]
+-- a link that has not joined the type
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "row" "IN"}]" [] [] [] [runsQ "row", typeQ "row", linksQ "row" "[5]"]
+    (ret "null") ["on_prune", "joined"])
+  ["on_prune: a link that has not joined the type"]
+-- no room: the cleanup finds nothing, and no backoff is written
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "row" "IN"}]" (full 4 ++ [owed0 4]) (room 4 "row") [] (entryQ "row")
+    (ret "null") ["on_prune", "joined", "relation_room"])
+  [atLimit, "on_prune: no room"]
+-- OUT, p stops pushing us: push_in ends, and our "push me" waits until 1.0
+def p1 : String := rec2 "on_prune" s!"[4, {pr "row" "OUT"}]"
+  [rc "push_in" 4 "row" "[0]", owed0 4, rc "grafted_in" 4 "row" "null"] (room 4 "row")
+  [rc "push_in" 4 "row" "null", rd "backoff" (ptfk 4 "row" 0 0 "IN") f1] (entryQ "row") (ret "null")
+  ["on_prune", "joined", "relation_room"]
+#guard takes2 p1 [heldPair, "on_prune: pushes to us end, a backoff"]
+-- IN, p asks us to stop pushing: push_out ends, and our "I will push you" waits until 1.0
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "row" "IN"}]"
+    [rc "push_out" 4 "row" "[0]", owed0 4, rc "grafted_out" 4 "row" "null"] (room 4 "row")
+    [rc "push_out" 4 "row" "null", rd "backoff" (ptfk 4 "row" 0 0 "OUT") f1] (entryQ "row") (ret "null")
+    ["on_prune", "joined", "relation_room"])
+  [heldPair, "on_prune: our pushes end, a backoff"]
+-- symmetric, a PRUNE of direction IN: the relation ends both ways, with no backoff (PRUNE_BACKOFF 0)
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "column" "IN"}]"
+    [rc "push_in" 4 "column" "[0]", rc "push_out" 4 "column" "[0]", owed0 4, rc "grafted_in" 4 "column" "null",
+     rc "grafted_out" 4 "column" "null"] (room 4 "column")
+    [rc "push_in" 4 "column" "null", rc "push_out" 4 "column" "null"] (entryQ "column") (ret "null")
+    ["on_prune", "joined", "relation_room"])
+  [heldPair, "on_prune: pushes to us end, no backoff", "on_prune: our pushes end, no backoff"]
+-- at time 2.0, the cleanup: family 0's (0, IN) ran out at 1.0 and goes, its (0, OUT) runs out at 3.0 and stays;
+-- family 3's (1, IN) runs out exactly now and goes, which empties the family. Then OUT sets (0, IN) again, to 3.0
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "row" "OUT"}]"
+    [rd "backoff" (ptfk 4 "row" 0 0 "IN") f1, rd "backoff" (ptfk 4 "row" 0 0 "OUT") f3,
+     rd "backoff" (ptfk 4 "row" 3 1 "IN") f2, rc "push_in" 4 "row" "[0]", owed0 4, rc "grafted_in" 4 "row" "null"]
+    (room 4 "row" [0, 3])
+    [rd "backoff" (ptfk 4 "row" 0 0 "IN") f3, rd "backoff" (ptfk 4 "row" 3 1 "IN") "null", rc "push_in" 4 "row" "null"]
+    (entryQ "row") (ret "null") ["on_prune", "joined", "relation_room"] (t := f2))
+  ["on_prune: a backoff run out", "on_prune: a backoff run out", heldPair, "on_prune: pushes to us end, a backoff"]
+
+/-! ### on_graft -/
+
+-- a type the node does not run
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "cell" "OUT" false}]" [] [] [] [runsQ "cell" false] (ret "null")
+    ["on_graft"])
+  ["on_graft: a type the node does not run"]
+-- a link that has not joined the type
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]" [] [] [] [runsQ "row", typeQ "row", linksQ "row" "[5]"]
+    (ret "null") ["on_graft", "joined"])
+  ["on_graft: a link that has not joined the type"]
+-- no room: ignored, unanswered
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]" (full 4 ++ [owed0 4]) (room 4 "row") [] (entryQ "row")
+    (ret "null") ["on_graft", "joined", "relation_room"])
+  [atLimit, "on_graft: no room"]
+
+/-- A symmetric GRAFT's reads before its accept test: `grafted_in`, `grafted_out`, `push_in`, `push_out` -/
+def symReads (gi go pi po : String) : List String :=
+  [owed0 4, rc "grafted_in" 4 "column" gi, rc "grafted_out" 4 "column" go, rc "push_in" 4 "column" pi,
+   rc "push_out" 4 "column" po]
+def symCalls : List String := ["on_graft", "joined", "relation_room"]
+
+-- symmetric, nothing held, not asked: yes, both ways, and join_push announces what we hold (nothing)
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]"
+    (symReads "null" "null" "null" "null" ++ [fwd "column"])
+    (room 4 "column") [rc "push_in" 4 "column" "[0]", rc "push_out" 4 "column" "[0]"]
+    (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" true, sendQ 4 (gr "column" "BOTH" true), chunksQ])
+    (ret "null") (symCalls ++ ["yes", "send_relation", "join_push"]))
+  [below, "on_graft: symmetric, yes", sent]
+-- symmetric, the yes to our GRAFT (grafted_out holds it): taken, with no answer
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" true}]"
+    (symReads "null" "[0]" "null" "null" ++ [fwd "column"])
+    (room 4 "column")
+    [rc "grafted_out" 4 "column" "null", rc "push_in" 4 "column" "[0]", rc "push_out" 4 "column" "[0]"]
+    (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" true, chunksQ]) (ret "null") (symCalls ++ ["join_push"]))
+  [heldPair, "on_graft: symmetric, taken without an answer"]
+-- symmetric, a yes to a relation held one way: made whole with no answer, and in_pushers is not asked
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" true}]" (symReads "null" "null" "[0]" "null")
+    (room 4 "column") [rc "push_out" 4 "column" "[0]"] (entryQ "column" ++ [chunksQ]) (ret "null")
+    (symCalls ++ ["join_push"]))
+  [heldPair, "on_graft: symmetric, taken without an answer"]
+-- the same, where the GRAFT is not a yes: answered yes again
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]" (symReads "null" "null" "[0]" "null")
+    (room 4 "column") [rc "push_out" 4 "column" "[0]"]
+    (entryQ "column" ++ [sendQ 4 (gr "column" "BOTH" true), chunksQ]) (ret "null")
+    (symCalls ++ ["yes", "send_relation", "join_push"]))
+  [heldPair, "on_graft: symmetric, yes", sent]
+-- symmetric, no: in_pushers at F_HI (3); wants_family not asked, join_sent not read
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]" (symReads "null" "null" "null" "null")
+    (room 4 "column") [] (entryQ "column" ++ [inQ "column" "[5, 6, 7]", sendQ 4 (pr "column" "BOTH")]) (ret "null")
+    (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: symmetric, no", sent]
+-- symmetric, no: a family we do not want; join_sent not read
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]" (symReads "null" "null" "null" "null")
+    (room 4 "column") [] (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" false, sendQ 4 (pr "column" "BOTH")])
+    (ret "null") (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: symmetric, no", sent]
+-- symmetric, no: our JOIN to p has duty NONE
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]"
+    (symReads "null" "null" "null" "null" ++ [none4 "column"])
+    (room 4 "column") [] (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" true, sendQ 4 (pr "column" "BOTH")])
+    (ret "null") (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: symmetric, no", sent]
+-- symmetric, no JOIN sent to p: KeyError on the type. The toy cannot reach it (links(T) needs both JOINs)
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "column" "BOTH" false}]"
+    (symReads "null" "null" "null" "null" ++ [rd "join_sent" (pt 4 "column") "null"])
+    (room 4 "column") [] (entryQ "column" ++ [inQ "column" "[]", wantsQ "column" true]) (raisesKey "column") symCalls)
+  [below, "raises: KeyError"]
+
+-- one way, OUT (p will push us), nothing held: yes, "push me"
+def o1 : String := rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
+  [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "null"] (room 4 "row")
+  [rc "push_in" 4 "row" "[0]"] (entryQ "row" ++ [inQ "row" "[]", wantsQ "row" true, sendQ 4 (gr "row" "IN" true)])
+  (ret "null") (symCalls ++ ["yes", "send_relation"])
+#guard takes2 o1 [below, "on_graft: pushes to us, yes", sent]
+-- the yes to our "push me": taken, with no answer
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" true}]"
+    [owed0 4, rc "grafted_in" 4 "row" "[0]", rc "push_in" 4 "row" "null"] (room 4 "row")
+    [rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "[0]"]
+    (entryQ "row" ++ [inQ "row" "[]", wantsQ "row" true]) (ret "null") symCalls)
+  [heldPair, "on_graft: pushes to us, taken without an answer"]
+-- no, "stop pushing me": in_pushers at F_HI (1); wants_family not asked
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
+    [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "null"] (room 4 "row") []
+    (entryQ "row" ++ [inQ "row" "[5]", sendQ 4 (pr "row" "IN")]) (ret "null") (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: pushes to us, no", sent]
+-- no: a family we do not want
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
+    [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "null"] (room 4 "row") []
+    (entryQ "row" ++ [inQ "row" "[]", wantsQ "row" false, sendQ 4 (pr "row" "IN")]) (ret "null")
+    (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: pushes to us, no", sent]
+-- held, and not a yes: yes again
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
+    [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "[0]"] (room 4 "row") []
+    (entryQ "row" ++ [sendQ 4 (gr "row" "IN" true)]) (ret "null") (symCalls ++ ["yes", "send_relation"]))
+  [heldPair, "on_graft: pushes to us held, yes again", sent]
+-- held, and a yes: no answer
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" true}]"
+    [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "[0]"] (room 4 "row") [] (entryQ "row")
+    (ret "null") symCalls)
+  [heldPair, "on_graft: pushes to us held, no answer"]
+-- held, not a yes, but it answers ours (grafted_in): no answer
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
+    [owed0 4, rc "grafted_in" 4 "row" "[0]", rc "push_in" 4 "row" "[0]"] (room 4 "row")
+    [rc "grafted_in" 4 "row" "null"] (entryQ "row") (ret "null") symCalls)
+  [heldPair, "on_graft: pushes to us held, no answer"]
+
+-- one way, IN (p asks us to push it), nothing held, duty FORWARD: yes, "I will push you", and join_push
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" false}]"
+    [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "null", fwd "row"] (room 4 "row")
+    [rc "push_out" 4 "row" "[0]"] (entryQ "row" ++ [outQ "row" "[]", sendQ 4 (gr "row" "OUT" true), chunksQ])
+    (ret "null") (symCalls ++ ["yes", "send_relation", "join_push"]))
+  [below, "on_graft: our pushes, yes", sent]
+-- the yes to our "I will push you": no answer, and join_push
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" true}]"
+    [owed0 4, rc "grafted_out" 4 "row" "[0]", rc "push_out" 4 "row" "null", fwd "row"] (room 4 "row")
+    [rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "[0]"] (entryQ "row" ++ [outQ "row" "[]", chunksQ])
+    (ret "null") (symCalls ++ ["join_push"]))
+  [heldPair, "on_graft: our pushes, taken without an answer"]
+-- no: our JOIN to p has duty NONE; out_pushees not asked
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" false}]"
+    [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "null", none4 "row"] (room 4 "row") []
+    (entryQ "row" ++ [sendQ 4 (pr "row" "OUT")]) (ret "null") (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: our pushes, no", sent]
+-- no: out_pushees at D_OUT_MAX (1)
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" false}]"
+    [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "null", fwd "row"] (room 4 "row") []
+    (entryQ "row" ++ [outQ "row" "[5]", sendQ 4 (pr "row" "OUT")]) (ret "null") (symCalls ++ ["no", "send_relation"]))
+  [below, "on_graft: our pushes, no", sent]
+-- held, and not a yes: yes again
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" false}]"
+    [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "[0]"] (room 4 "row") []
+    (entryQ "row" ++ [sendQ 4 (gr "row" "OUT" true)]) (ret "null") (symCalls ++ ["yes", "send_relation"]))
+  [heldPair, "on_graft: our pushes held, yes again", sent]
+-- held, and a yes: no answer
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" true}]"
+    [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "[0]"] (room 4 "row") [] (entryQ "row")
+    (ret "null") symCalls)
+  [heldPair, "on_graft: our pushes held, no answer"]
+-- BOTH, one way, nothing held: both blocks, in the Python's order, each answered
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "BOTH" false}]"
+    [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "null", rc "grafted_out" 4 "row" "null",
+     rc "push_out" 4 "row" "null", fwd "row"] (room 4 "row")
+    [rc "push_in" 4 "row" "[0]", rc "push_out" 4 "row" "[0]"]
+    (entryQ "row" ++ [inQ "row" "[]", wantsQ "row" true, sendQ 4 (gr "row" "IN" true), outQ "row" "[]",
+                     sendQ 4 (gr "row" "OUT" true), chunksQ])
+    (ret "null") (symCalls ++ ["yes", "send_relation", "join_push"]))
+  [below, "on_graft: pushes to us, yes", sent, "on_graft: our pushes, yes", sent]
+-- IN, no JOIN sent to p: KeyError on the type. The toy cannot reach it (links(T) needs both JOINs)
+#guard takes2 (rec2 "on_graft" s!"[4, {gr "row" "IN" false}]"
+    [owed0 4, rc "grafted_out" 4 "row" "null", rc "push_out" 4 "row" "null", rd "join_sent" (pt 4 "row") "null"]
+    (room 4 "row") [] (entryQ "row") (raisesKey "row") symCalls)
+  [below, "raises: KeyError"]
+
+/-! ### maintain_relations -/
+
+-- one way, below the floor, two candidates in the question's order: 5 at the limit, 6 with room. relation_room is
+-- called for both, each time; 6 is grafted IN, then, as an out on a HOME uplink, OUT
+#guard takes2 (rec2 "maintain_relations" "[\"row\"]"
+    (full 5 ++ [owed0 5, owed0 6, rc "grafted_in" 6 "row" "null", rc "grafted_out" 6 "row" "null"])
+    (room 5 "row" ++ room 6 "row") [rc "grafted_in" 6 "row" "[0]", rc "grafted_out" 6 "row" "[0]"]
+    [dutyQ "row" "[0]", inQ "row" "[]", candQ "row" "IN" "[5, 6]", sendQ 6 (gr "row" "IN" false), outQ "row" "[]",
+     upQ "HOME", candQ "row" "OUT" "[5, 6]", sendQ 6 (gr "row" "OUT" false)]
+    (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
+  [atLimit, below, "maintain_relations: below the floor, one way", below, "graft: sent", sent, atLimit, heldPair,
+   heldPair, "graft: sent", sent]
+-- one way, a FAST uplink: the outs' target is D_OUT_FAST (2), one short; 6 grafted OUT
+#guard takes2 (rec2 "maintain_relations" "[\"row\"]" [owed0 6, rc "grafted_out" 6 "row" "null"] (room 6 "row")
+    [rc "grafted_out" 6 "row" "[0]"]
+    [dutyQ "row" "[0]", inQ "row" "[5]", outQ "row" "[5]", upQ "FAST", candQ "row" "OUT" "[6]",
+     sendQ 6 (gr "row" "OUT" false)]
+    (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
+  [below, below, "graft: sent", sent]
+-- the same on a HOME uplink: the target D_OUT (1) is met; relation_room is called, and nothing grafted
+def m1 : String := rec2 "maintain_relations" "[\"row\"]" [owed0 6] (room 6 "row") []
+  [dutyQ "row" "[0]", inQ "row" "[5]", outQ "row" "[5]", upQ "HOME", candQ "row" "OUT" "[6]"]
+  (ret "null") ["maintain_relations", "relation_room"]
+#guard takes2 m1 [below]
+-- one way, past the cap: ins[F_HI:] pruned IN, from the list asked at the top
+#guard takes2 (rec2 "maintain_relations" "[\"row\"]"
+    [rc "push_in" 6 "row" "[0]", rc "grafted_in" 6 "row" "null", owed0 6] [] [rc "push_in" 6 "row" "null"]
+    [dutyQ "row" "[0]", inQ "row" "[5, 6]", sendQ 6 (pr "row" "IN"), outQ "row" "[]", upQ "HOME",
+     candQ "row" "OUT" "[]"]
+    (ret "null") ["maintain_relations", "prune", "send_relation"])
+  ["maintain_relations: past the cap, one way", sent]
+-- no family with duty: nothing asked of the type, M not read
+#guard takes2 (rec2 "maintain_relations" "[\"row\"]" [] [] [] [dutyQ "row" "[]"] (ret "null") ["maintain_relations"]) []
+-- symmetric, below the floor with none: D_OUT - 0 = 1 of the two candidates grafted BOTH; no relation held half
+#guard takes2 (rec2 "maintain_relations" "[\"column\"]"
+    [owed0 5, owed0 6, rc "grafted_in" 5 "column" "null", rc "grafted_out" 5 "column" "null"]
+    (room 5 "column" ++ room 6 "column") [rc "grafted_in" 5 "column" "[0]", rc "grafted_out" 5 "column" "[0]"]
+    [dutyQ "column" "[0]", inQ "column" "[]", candQ "column" "BOTH" "[5, 6]", sendQ 5 (gr "column" "BOTH" false),
+     inQ "column" "[]", outQ "column" "[]"]
+    (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
+  [below, below, "maintain_relations: below the floor", below, "graft: sent", sent]
+-- symmetric, below the floor with two: D_OUT - 2 = -1, Python's slice drops the last candidate, so 7 of 7 and 8
+-- is grafted
+#guard takes2 (rec2 "maintain_relations" "[\"column\"]"
+    [owed0 7, owed0 8, rc "grafted_in" 7 "column" "null", rc "grafted_out" 7 "column" "null"]
+    (room 7 "column" ++ room 8 "column") [rc "grafted_in" 7 "column" "[0]", rc "grafted_out" 7 "column" "[0]"]
+    [dutyQ "column" "[0]", inQ "column" "[5, 6]", candQ "column" "BOTH" "[7, 8]", sendQ 7 (gr "column" "BOTH" false),
+     inQ "column" "[5, 6]", outQ "column" "[5, 6]"]
+    (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
+  [below, below, "maintain_relations: below the floor, a negative slice", below, "graft: sent", sent]
+-- symmetric, below the floor with one: D_OUT - 1 = 0, none grafted. Then the relations held one way, 8 pushing us
+-- and 7 and 6 pushed, are grafted in sorted order, 6, 7, 8, not the questions' 8, 7, 6
+#guard takes2 (rec2 "maintain_relations" "[\"column\"]"
+    ([owed0 5] ++ [6, 7, 8].flatMap fun q =>
+      [rc "grafted_in" q "column" "null", rc "grafted_out" q "column" "null", owed0 q])
+    (room 5 "column" ++ [6, 7, 8].flatMap (room · "column"))
+    ([6, 7, 8].flatMap fun q => [rc "grafted_in" q "column" "[0]", rc "grafted_out" q "column" "[0]"])
+    [dutyQ "column" "[0]", inQ "column" "[8]", candQ "column" "BOTH" "[5]", inQ "column" "[8]",
+     outQ "column" "[7, 6]", sendQ 6 (gr "column" "BOTH" false), sendQ 7 (gr "column" "BOTH" false),
+     sendQ 8 (gr "column" "BOTH" false)]
+    (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
+  ([below, "maintain_relations: below the floor"] ++
+    (List.replicate 3 ["maintain_relations: a half-held relation grafted", below, "graft: sent", sent]).flatten)
+-- the same with our GRAFTs pending: 5's in grafted_in, so its grafted_out is not read; 6's in grafted_out
+#guard takes2 (rec2 "maintain_relations" "[\"column\"]"
+    [rc "grafted_in" 5 "column" "[0]", rc "grafted_in" 6 "column" "null", rc "grafted_out" 6 "column" "[0]"]
+    [] [] [dutyQ "column" "[0]", inQ "column" "[5]", candQ "column" "BOTH" "[]", inQ "column" "[5]",
+           outQ "column" "[6]"]
+    (ret "null") ["maintain_relations"])
+  ["maintain_relations: below the floor"]
+-- symmetric, at the cap: len(ins) - D_OUT = 2 drawn at random and pruned BOTH; then no relation held half
+#guard takes2 (rec2 "maintain_relations" "[\"column\"]"
+    ([7, 5].flatMap fun q => [rc "push_in" q "column" "[0]", rc "grafted_in" q "column" "null",
+                              rc "push_out" q "column" "[0]", rc "grafted_out" q "column" "null", owed0 q])
+    [] ([7, 5].flatMap fun q => [rc "push_in" q "column" "null", rc "push_out" q "column" "null"])
+    [dutyQ "column" "[0]", inQ "column" "[5, 6, 7]", "[\"sample_without_replacement\", [[5, 6, 7], 2], [7, 5]]",
+     sendQ 7 (pr "column" "BOTH"), sendQ 5 (pr "column" "BOTH"), inQ "column" "[6]", outQ "column" "[6]"]
+    (ret "null") ["maintain_relations", "prune", "send_relation"])
+  ["maintain_relations: at the cap", sent, sent]
+
+/-! ### on_join -/
+
+-- a type the node does not run
+#guard takes2 (rec2 "on_join" s!"[4, {jnT "cell" "ALL" "FORWARD"}]" [] [] [] [runsQ "cell" false] (ret "null")
+    ["on_join"])
+  ["on_join: a type the node does not run"]
+-- colours that are not the type's M (1): the stock path remains
+#guard takes2 (rec2 "on_join" "[4, [\"join\", \"row\", \"ALL\", 0, \"FORWARD\", 4]]" [] [] []
+    [runsQ "row", typeQ "row"] (ret "null") ["on_join"])
+  ["on_join: colours not the type's"]
+-- p's JOIN first: recorded, and answered with ours, which send_join records and sends on the urgent lane
+def j1 : String := rec2 "on_join" s!"[4, {jnT "row" "DECLARED" "NONE"}]" [rd "join_sent" (pt 4 "row") "null", owed0 4]
+  [] [rd "join_recv" (pt 4 "row") (jnT "row" "DECLARED" "NONE"), fwd "row"]
+  [runsQ "row", typeQ "row", s!"[\"our_join\", [\"row\"], {jnT "row" "ALL" "FORWARD"}]", typeQ "row",
+   sendQ 4 (jnT "row" "ALL" "FORWARD") (urgent := true)]
+  (ret "null") ["on_join", "send_join", "send_relation"]
+#guard takes2 j1 ["on_join: answered", sent]
+-- ours first: recorded, not answered
+#guard takes2 (rec2 "on_join" s!"[4, {jnT "row" "DECLARED" "NONE"}]" [fwd "row"] []
+    [rd "join_recv" (pt 4 "row") (jnT "row" "DECLARED" "NONE")] [runsQ "row", typeQ "row"] (ret "null") ["on_join"]
+   )
+  ["on_join: ours went first"]
+
+/-! ### The ones that must fail -/
+
+-- a wrong return
+#guard fails2 "return value: " (rec2 "relation_room" (args "row") [owed0 4] (room 4 "row") [] [] (ret "false")
+    ["relation_room"])
+-- a question out of order: wants_family logged before in_pushers
+#guard fails2 "tape: in_pushers" (rec2 "on_graft" s!"[4, {gr "row" "OUT" false}]"
+    [owed0 4, rc "grafted_in" 4 "row" "null", rc "push_in" 4 "row" "null"] (room 4 "row")
+    [rc "push_in" 4 "row" "[0]"] (entryQ "row" ++ [wantsQ "row" true, inQ "row" "[]", sendQ 4 (gr "row" "IN" true)])
+    (ret "null") (symCalls ++ ["yes", "send_relation"]))
+-- type_of answered once, where on_prune asks it twice
+#guard fails2 "tape: type_of" (rec2 "on_prune" s!"[4, {pr "row" "OUT"}]"
+    [rc "push_in" 4 "row" "[0]", owed0 4, rc "grafted_in" 4 "row" "null"] (room 4 "row")
+    [rc "push_in" 4 "row" "null", rd "backoff" (ptfk 4 "row" 0 0 "IN") f1]
+    [runsQ "row", typeQ "row", linksQ "row" "[4]"]
+    (ret "null") ["on_prune", "joined", "relation_room"])
+-- and the six questions' answers that their readers refuse by their own checks, each in a record that passes
+-- otherwise: a number for a bool, a JOIN's array with another tag, a peer twice in each list of peers, an uplink
+-- class outside the two
+#guard fails2 "tape: runs_type: its answer: not a bool: 1"
+  (rec2 "on_prune" s!"[4, {pr "cell" "IN"}]" [] [] [] ["[\"runs_type\", [\"cell\"], 1]"] (ret "null") ["on_prune"])
+#guard fails2 "tape: our_join: its answer: not a JOIN: "
+  (j1.replace s!"[\"our_join\", [\"row\"], {jnT "row" "ALL" "FORWARD"}]"
+    "[\"our_join\", [\"row\"], [\"graft\", \"row\", \"ALL\", 0, \"FORWARD\", 1]]")
+#guard fails2 "tape: candidates: its answer: candidates: a key twice"
+  (m1.replace (candQ "row" "OUT" "[6]") (candQ "row" "OUT" "[6, 6]"))
+#guard fails2 "tape: in_pushers: its answer: in_pushers: a key twice"
+  (m1.replace (inQ "row" "[5]") (inQ "row" "[5, 5]"))
+#guard fails2 "tape: out_pushees: its answer: out_pushees: a key twice"
+  (m1.replace (outQ "row" "[5]") (outQ "row" "[5, 5]"))
+#guard fails2 "tape: uplink_class: its answer: not an uplink class: \"SLOW\"" (m1.replace (upQ "HOME") (upQ "SLOW"))
+-- and the records these six are made from pass as they are
+#guard takes2 j1 ["on_join: answered", sent] && takes2 m1 [below]
+
+end Upkeep
+
 end SpecTwin.Seacast.ReplayKnown

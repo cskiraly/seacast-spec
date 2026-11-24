@@ -109,6 +109,8 @@ class TablesWhole (m : Type → Type) where
   allOwedRelations : m (List (Peer × List Seacast.Relation))
   /-- every `backoff` -/
   allBackoffAll : m (List (Peer × List (Seacast.TypeId × List (Seacast.Fam × List (ColourDir × Float)))))
+  /-- every `backoff[p][T][fam]` -/
+  allBackoffFam : Peer → Seacast.TypeId → Seacast.Fam → m (List (ColourDir × Float))
   /-- every `T_of` -/
   allTOf : m (List (Group × Seacast.TypeId))
   /-- every `rebuilt` -/
@@ -392,18 +394,26 @@ class Tables (m : Type → Type) extends TablesWhole m where
   pushOutOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `push_out[p][T][fam].add(c)`, `.discard(c)` -/
   setPushOut : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
+  /-- every `push_out[p][T]`: `push_out[p][T].items()` -/
+  allPushOutType : Peer → Seacast.TypeId → m (List (Seacast.Fam × Std.HashSet Nat))
   /-- `push_in[p][T][fam]`: the colours p pushes us -/
   pushInOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `push_in[p][T][fam].add(c)`, `.discard(c)` -/
   setPushIn : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
+  /-- every `push_in[p][T]`: `push_in[p][T].items()` -/
+  allPushInType : Peer → Seacast.TypeId → m (List (Seacast.Fam × Std.HashSet Nat))
   /-- `grafted_out[p][T][fam]`: the colours we offered to push p, unanswered -/
   graftedOutOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `grafted_out[p][T][fam].add(c)`, `.discard(c)` -/
   setGraftedOut : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
+  /-- every `grafted_out[p][T]`: `grafted_out[p][T].items()` -/
+  allGraftedOutType : Peer → Seacast.TypeId → m (List (Seacast.Fam × Std.HashSet Nat))
   /-- `grafted_in[p][T][fam]`: the colours we asked p to push us, unanswered -/
   graftedInOf : Peer → Seacast.TypeId → Seacast.Fam → m (Std.HashSet Nat)
   /-- `grafted_in[p][T][fam].add(c)`, `.discard(c)` -/
   setGraftedIn : Peer → Seacast.TypeId → Seacast.Fam → Std.HashSet Nat → m Unit
+  /-- every `grafted_in[p][T]`: `grafted_in[p][T].items()` -/
+  allGraftedInType : Peer → Seacast.TypeId → m (List (Seacast.Fam × Std.HashSet Nat))
   /-- `owed_relations[p]`: the JOINs, GRAFTs and PRUNEs a full queue refused, in order -/
   owedRelationsOf : Peer → m (List Seacast.Relation)
   /-- `owed_relations[p]` after an append or a `pop(0)` -/
@@ -412,6 +422,10 @@ class Tables (m : Type → Type) extends TablesWhole m where
   backoff? : Peer → Seacast.TypeId → Seacast.Fam → ColourDir → m (Option Float)
   /-- `backoff[p][T][fam][(c, direction)] = t` -/
   setBackoff : Peer → Seacast.TypeId → Seacast.Fam → ColourDir → Float → m Unit
+  /-- `del backoff[p][T][fam][(c, direction)]`: a backoff run out (`on_prune`) -/
+  eraseBackoff : Peer → Seacast.TypeId → Seacast.Fam → ColourDir → m Unit
+  /-- every `backoff[p][T]`: its families, and the keys of each -/
+  allBackoffType : Peer → Seacast.TypeId → m (List (Seacast.Fam × List (ColourDir × Float)))
   /-- `T_of[g]`, as `g in T_of` or `T_of[g]`: the group's type, or none -/
   tOf? : Group → m (Option Seacast.TypeId)
   /-- `T_of[g] = T` -/
@@ -560,9 +574,9 @@ export TablesWhole (allAskedAt allTriedAll allTried allOffers allOfferedAll allO
   allAskedParked allLrArmed allIhaveFrames allIhaveAsked allReceived allMine allState allPendingIds allOwedAll
   allOwedAnswersAll allSentToAll allSlotHeld allPaceQueue allStopPull allPeerHas allHolders allServeCount allOrigin
   allPlannedAll allPushed allDesc allInFlight allWaiters allSent allUnwanted allJoinRecvAll allJoinSentAll
-  allPushOutAll allPushInAll allGraftedOutAll allGraftedInAll allOwedRelations allBackoffAll allTOf allRebuilt
-  allInterest allKnownAt allStandingAll allRoutedStandingAll allReconsiderAt allDeferred allDutyAt allWaited allProbe
-  allProbed allProbeAsk allProbeSent allProbeOk allRsample allRsampleStep allRsampleAskedAll allRsampleFinal
+  allPushOutAll allPushInAll allGraftedOutAll allGraftedInAll allOwedRelations allBackoffAll allBackoffFam allTOf
+  allRebuilt allInterest allKnownAt allStandingAll allRoutedStandingAll allReconsiderAt allDeferred allDutyAt allWaited
+  allProbe allProbed allProbeAsk allProbeSent allProbeOk allRsample allRsampleStep allRsampleAskedAll allRsampleFinal
   allServedAll allOfferedToAll allProbeServedAll allProbeAnswersAll allProbeWaitingAll allSampledFrom
   allSamplesInFlight allHeldSamples allForwarded allServedHb)
 
@@ -830,18 +844,34 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
   setPushOut p T fam cs := do
     note (.write (.pushOut p T fam))
     modify fun s => { s with pushOut := s.pushOut.insert p ((s.pushOut.getD p {}).insert T (((s.pushOut.getD p {}).getD T {}).insert fam cs)) }
+  allPushOutType p T := do
+    let l := (((← get).pushOut.getD p {}).getD T {}).toList
+    note (.scan (.pushOutType p T) (l.map fun (fam, _) => .pushOut p T fam))
+    return l
   pushInOf p T fam := do note (.read (.pushIn p T fam)); return (((← get).pushIn.getD p {}).getD T {}).getD fam {}
   setPushIn p T fam cs := do
     note (.write (.pushIn p T fam))
     modify fun s => { s with pushIn := s.pushIn.insert p ((s.pushIn.getD p {}).insert T (((s.pushIn.getD p {}).getD T {}).insert fam cs)) }
+  allPushInType p T := do
+    let l := (((← get).pushIn.getD p {}).getD T {}).toList
+    note (.scan (.pushInType p T) (l.map fun (fam, _) => .pushIn p T fam))
+    return l
   graftedOutOf p T fam := do note (.read (.graftedOut p T fam)); return (((← get).graftedOut.getD p {}).getD T {}).getD fam {}
   setGraftedOut p T fam cs := do
     note (.write (.graftedOut p T fam))
     modify fun s => { s with graftedOut := s.graftedOut.insert p ((s.graftedOut.getD p {}).insert T (((s.graftedOut.getD p {}).getD T {}).insert fam cs)) }
+  allGraftedOutType p T := do
+    let l := (((← get).graftedOut.getD p {}).getD T {}).toList
+    note (.scan (.graftedOutType p T) (l.map fun (fam, _) => .graftedOut p T fam))
+    return l
   graftedInOf p T fam := do note (.read (.graftedIn p T fam)); return (((← get).graftedIn.getD p {}).getD T {}).getD fam {}
   setGraftedIn p T fam cs := do
     note (.write (.graftedIn p T fam))
     modify fun s => { s with graftedIn := s.graftedIn.insert p ((s.graftedIn.getD p {}).insert T (((s.graftedIn.getD p {}).getD T {}).insert fam cs)) }
+  allGraftedInType p T := do
+    let l := (((← get).graftedIn.getD p {}).getD T {}).toList
+    note (.scan (.graftedInType p T) (l.map fun (fam, _) => .graftedIn p T fam))
+    return l
   owedRelationsOf p := do note (.read (.owedRelations p)); return (← get).owedRelations.getD p []
   setOwedRelations p rs := do
     note (.write (.owedRelations p))
@@ -850,6 +880,13 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
   setBackoff p T fam cd t := do
     note (.write (.backoff p T fam cd))
     modify fun s => { s with backoff := s.backoff.insert p ((s.backoff.getD p {}).insert T (((s.backoff.getD p {}).getD T {}).insert fam ((((s.backoff.getD p {}).getD T {}).getD fam {}).insert cd t))) }
+  eraseBackoff p T fam cd := do
+    note (.write (.backoff p T fam cd))
+    modify fun s => { s with backoff := s.backoff.insert p ((s.backoff.getD p {}).insert T (((s.backoff.getD p {}).getD T {}).insert fam ((((s.backoff.getD p {}).getD T {}).getD fam {}).erase cd))) }
+  allBackoffType p T := do
+    let l := (((← get).backoff.getD p {}).getD T {}).toList.map fun (fam, m) => (fam, m.toList)
+    note (.scan (.backoffType p T) (l.flatMap fun (fam, cds) => cds.map fun (cd, _) => .backoff p T fam cd))
+    return l
   tOf? g := do note (.read (.tOf g)); return (← get).tOf.get? g
   setTOf g ty := do note (.write (.tOf g)); modify fun s => { s with tOf := s.tOf.insert g ty }
   rebuiltBits g := do note (.read (.rebuilt g)); return (← get).rebuilt.getD g 0
@@ -1149,6 +1186,10 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     let l := (← get).backoff.toList.map fun (p, m) => (p, m.toList.map fun (T, m) => (T, m.toList.map fun (fam, m) => (fam, m.toList)))
     note (.scan .backoffAll (l.flatMap fun (p, Ts) => Ts.flatMap fun (T, fams) => fams.flatMap fun (fam, cds) => cds.map fun (cd, _) => .backoff p T fam cd))
     return l
+  allBackoffFam p T fam := do
+    let l := ((((← get).backoff.getD p {}).getD T {}).getD fam {}).toList
+    note (.scan (.backoffFam p T fam) (l.map fun (cd, _) => .backoff p T fam cd))
+    return l
   allTOf := do
     let l := (← get).tOf.toList
     note (.scan .tOf (l.map fun (g, _) => .tOf g))
@@ -1379,16 +1420,22 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   setJoinSent p T jn := f (setJoinSent p T jn)
   pushOutOf p T fam := f (pushOutOf p T fam)
   setPushOut p T fam cs := f (setPushOut p T fam cs)
+  allPushOutType p T := f (allPushOutType p T)
   pushInOf p T fam := f (pushInOf p T fam)
   setPushIn p T fam cs := f (setPushIn p T fam cs)
+  allPushInType p T := f (allPushInType p T)
   graftedOutOf p T fam := f (graftedOutOf p T fam)
   setGraftedOut p T fam cs := f (setGraftedOut p T fam cs)
+  allGraftedOutType p T := f (allGraftedOutType p T)
   graftedInOf p T fam := f (graftedInOf p T fam)
   setGraftedIn p T fam cs := f (setGraftedIn p T fam cs)
+  allGraftedInType p T := f (allGraftedInType p T)
   owedRelationsOf p := f (owedRelationsOf p)
   setOwedRelations p rs := f (setOwedRelations p rs)
   backoff? p T fam cd := f (backoff? p T fam cd)
   setBackoff p T fam cd t := f (setBackoff p T fam cd t)
+  eraseBackoff p T fam cd := f (eraseBackoff p T fam cd)
+  allBackoffType p T := f (allBackoffType p T)
   tOf? g := f (tOf? g)
   setTOf g ty := f (setTOf g ty)
   rebuiltBits g := f (rebuiltBits g)
@@ -1500,6 +1547,7 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   allGraftedInAll := f allGraftedInAll
   allOwedRelations := f allOwedRelations
   allBackoffAll := f allBackoffAll
+  allBackoffFam p T fam := f (allBackoffFam p T fam)
   allTOf := f allTOf
   allRebuilt := f allRebuilt
   allInterest := f allInterest

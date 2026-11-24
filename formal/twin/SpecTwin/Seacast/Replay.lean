@@ -2,6 +2,7 @@ import SpecTwin.Replay
 import SpecTwin.Seacast.Sample
 import SpecTwin.Seacast.Kept
 import SpecTwin.Seacast.Serve
+import SpecTwin.Seacast.Upkeep
 import SpecTwin.Seacast.Manifest
 
 /-! # Replaying a record of a trace under seacast.md
@@ -24,7 +25,7 @@ import SpecTwin.Seacast.Manifest
   one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
 - **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `Seacast/Manifest.lean`). It runs
-  SEACAST's functions (`fnsSeacast`, 75 with §4.5's serving) by their Python names, hands a record of one of
+  SEACAST's functions (`fnsSeacast`, 81 with §4.1's relations) by their Python names, hands a record of one of
   `seacast-lite.md`'s functions that v2 keeps, or of the node's own `held` (`keptSeacast`), to `Replay.run`, runs the
   three that take another form under v2 (`keptFormsSeacast`) in their v2 forms (`Seacast/Kept.lean`), and refuses
   every other name,
@@ -154,11 +155,18 @@ def announceWidthOf : Json → Except String AnnounceWidth
   | .str "NONE" => pure .none
   | j => throw s!"not an announce width: {j.compress}"
 
-/-- One type's parameters in a nodes entry's `types` map, `{NAME: value, ...}` (`TypeParams`). A natural number is
-not negative, and neither `M` nor `MAX_INDICES` is 0. A boolean is JSON's. A float is its 64-bit word and finite, and `SERVE_LIMIT` and
-`FORWARD_LIMIT` may be +∞. `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"` and `"NONE"`. `EVIDENCE` is present
-only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`, one step or more. A parameter the type does not have is left out, and
-its read is the toy's `AttributeError`; a missing member and `null` differ. -/
+/-- `uplink_class()`'s answer: `"FAST"` or `"HOME"`. -/
+def uplinkClassOf : Json → Except String UplinkClass
+  | .str "FAST" => pure .fast
+  | .str "HOME" => pure .home
+  | j => throw s!"not an uplink class: {j.compress}"
+
+/-- One type's parameters in a nodes entry's `types` map, `{NAME: value, ...}` (`TypeParams`). A natural number is not
+negative, and neither `M` nor `MAX_INDICES` is 0. A boolean is JSON's. A float is its 64-bit word and finite, and
+`SERVE_LIMIT`, `FORWARD_LIMIT` and `MAX_RELATIONS` may be +∞. `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"`
+and `"NONE"`. `EVIDENCE` is present only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`, one step or more. A
+parameter the type does not have is left out, and its read is the toy's `AttributeError`; a missing member and `null`
+differ. -/
 def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
   let .ok kvs := j.getObj? | throw s!"types: {t}: not a map of parameters: {j.compress}"
   let mut p : TypeParams := {}
@@ -196,6 +204,7 @@ def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
     | "SAMPLE_WAIT" => p := { p with SAMPLE_WAIT := some (← x false) }
     | "SERVE_LIMIT" => p := { p with SERVE_LIMIT := some (← x true) }
     | "FORWARD_LIMIT" => p := { p with FORWARD_LIMIT := some (← x true) }
+    | "MAX_RELATIONS" => p := { p with MAX_RELATIONS := some (← x true) }
     | "ANNOUNCE_EXTRA" => p := { p with ANNOUNCE_EXTRA := some (← inParam t name (announceWidthOf v)) }
     | "EVIDENCE" =>
       if v != .null then throw s!"types: {t}: EVIDENCE: present only as null in this version: {v.compress}"
@@ -249,7 +258,8 @@ def callNamesSeacast : List String :=
    "wants_family", "duty_for", "route_next", "block_of", "group_of", "node_id", "interest_satisfied",
    "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
    "open_sampling_link", "choice", "own_interest", "window_release", "send_have", "serve_standing", "owed_missing",
-   "repair_verdict", "note_claim", "known_in_scope", "own_id", "admitted_group"]
+   "repair_verdict", "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join",
+   "candidates", "in_pushers", "out_pushees", "uplink_class"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
@@ -378,6 +388,15 @@ instance : NodeSeacast R where
   nodeId p := askCall "node_id" [(p : Json)] hex
   ownId := askCall "own_id" [] hex
   admittedGroup p g := askCall "admitted_group" [(p : Json), Json.str g] boolOf
+  -- §4.1's upkeep. `candidates`, `in_pushers` and `out_pushees` read the node's own tables and its peers; their
+  -- answers are lists of peers, none twice, in the toy's order, which the twin keeps
+  runsType t := askCall "runs_type" [Json.str t] boolOf
+  ourJoin T := askCall "our_join" [Json.str T] joinMsg
+  candidates T fam c d :=
+    askCall "candidates" [Json.str T, intJson fam, (c : Json), directionJson d] (peerList "candidates")
+  inPushers T fam c := askCall "in_pushers" [Json.str T, intJson fam, (c : Json)] (peerList "in_pushers")
+  outPushees T fam c := askCall "out_pushees" [Json.str T, intJson fam, (c : Json)] (peerList "out_pushees")
+  uplinkClass := askCall "uplink_class" [] uplinkClassOf
   interestSatisfied g := askCall "interest_satisfied" [Json.str g] boolOf
   validHaveSeacast h := askCall "valid_have" [haveJson h] boolOf
   mergeWaiting p h := askCall "merge_waiting" [(p : Json), haveJson h] boolOf
@@ -456,8 +475,9 @@ them with their v2 forms (`Seacast/Kept.lean`), not with `Replay.run`. -/
 def keptFormsSeacast : List String := ["on_pace_tick", "on_block_installed", "respond"]
 
 /-- SEACAST's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
-the 66, main's `fill` and `serve_standing`, v0.11.1's `joined` and `drop_wants_beyond`, and §4.5's serving
-(`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`): 75. -/
+the 66, main's `fill` and `serve_standing`, v0.11.1's `joined` and `drop_wants_beyond`, §4.5's serving
+(`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`), and §4.1's relations with §6.3's limit
+(`relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `on_join`): 81. -/
 def fnsSeacast : List String := Manifest.covered.filter (!keptFormsSeacast.contains ·)
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
@@ -522,6 +542,18 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
       exec (counted (← pairs "family and count" intOf intOf need) (← coverOf x) (← typeId t)) (retIs r.ret famsOf)
     | "keep_coverage", #[t] => do exec (keepCoverage (← typeId t)) none_
     | "keep_floor", #[t] => do exec (keepFloor (← typeId t)) none_
+    | "relation_room", #[p, t, f, k] => do
+      exec (relationRoom (← nat p) (← typeId t) (← intOf f) (← nat k)) (retIs r.ret boolOf)
+    | "graft", #[q, t, f, k, d] => do
+      exec (graft (← nat q) (← typeId t) (← intOf f) (← nat k) (← direction d)) none_
+    | "on_prune", #[p, x] => do
+      let .prune pr ← relation x | throw s!"on_prune: not a PRUNE: {x.compress}"
+      exec (onPrune (← nat p) pr) none_
+    | "on_graft", #[p, x] => do
+      let .graft gr ← relation x | throw s!"on_graft: not a GRAFT: {x.compress}"
+      exec (onGraft (← nat p) gr) none_
+    | "maintain_relations", #[t] => do exec (maintainRelations (← typeId t)) none_
+    | "on_join", #[p, j] => do exec (onJoin (← nat p) (← joinMsg j)) none_
     -- §4.2, §4.4, §4.7 to §4.9
     | "fills", #[g, i] => do exec (fills (← Replay.groupKey g) (← nat i)) (retIs r.ret giList)
     | "note_push", #[p, g, i] => do exec (notePush (← nat p) (← Replay.groupKey g) (← nat i)) none_

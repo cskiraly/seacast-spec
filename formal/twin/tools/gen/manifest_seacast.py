@@ -9,7 +9,8 @@ The lists:
   call, main's `fill` and `serve_standing`, then `on_pace_tick` and `on_block_installed`, which seacast.md
   redefines and the twin serves in their v2 forms, then `joined` and `drop_wants_beyond`, which v0.11.1 adds on
   `on_holding`'s path and `fill`'s, then §4.5's serving: `index_bound`, `our_interest_for`, `outside`, §4.10's
-  `route_want`, and `on_want`.
+  `route_want`, and `on_want`, then §4.1's relations and §6.3's limit on them: `relation_room`, `graft`, `on_prune`,
+  `on_graft`, `maintain_relations` and `on_join`.
 - KEPT: seacast-lite.md's functions that a record under seacast.md may name: those seacast-lite.md keeps all the way down
   under v2 (trace3.py's `seacast_kept` over the toy's two documents), less §7.1's window and less NODE_OWN's names.
   `gen.py --check` computes the rule and compares.
@@ -58,7 +59,8 @@ COVERED = [
     "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
     "on_pace_tick", "on_block_installed",
     "joined", "drop_wants_beyond",
-    "index_bound", "our_interest_for", "outside", "route_want", "on_want"]
+    "index_bound", "our_interest_for", "outside", "route_want", "on_want",
+    "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
@@ -100,13 +102,14 @@ FOREIGN = ["known_id", "chunks"]
 
 QUESTIONS = [
     # the globals that covered functions load, classed as questions: each is answered from the tape
-    "accepted", "admitted", "admitted_group", "after", "authenticable", "bid_group", "block_of", "choice",
+    "accepted", "admitted", "admitted_group", "after", "authenticable", "bid_group", "block_of", "candidates", "choice",
     "chunk_of", "close_promises_of_group", "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for",
-    "enqueue", "expired", "families", "families_with_duty", "floor_candidates", "floor_links", "group_bits",
-    "has_room", "high_custody", "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting",
-    "node_id", "open_group", "open_link", "open_sampling_link", "own_id", "payload_of", "penalise", "release",
-    "release_wanted_groups", "reserve", "resolve", "route_next", "sample_without_replacement", "seen", "send",
-    "shuffled", "start", "store", "type_of", "type_of_group", "valid_have", "wake", "wants_family",
+    "enqueue", "expired", "families", "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room",
+    "high_custody", "in_pushers", "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting",
+    "node_id", "open_group", "open_link", "open_sampling_link", "our_join", "out_pushees", "own_id", "payload_of",
+    "penalise", "release", "release_wanted_groups", "reserve", "resolve", "route_next", "runs_type",
+    "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
+    "uplink_class", "valid_have", "wake", "wants_family",
     # the callables of a type's parameters (`T.params`)
     "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
     # the object type's functions, which covered functions call on a type

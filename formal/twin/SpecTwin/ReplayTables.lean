@@ -238,11 +238,17 @@ def level (j : Json) : Except String Level := do
   | "join_recv", #[] => return .joinRecvAll
   | "join_sent", #[] => return .joinSentAll
   | "push_out", #[] => return .pushOutAll
+  | "push_out", #[p, T] => return .pushOutType (← nat p) (← typeId T)
   | "push_in", #[] => return .pushInAll
+  | "push_in", #[p, T] => return .pushInType (← nat p) (← typeId T)
   | "grafted_out", #[] => return .graftedOutAll
+  | "grafted_out", #[p, T] => return .graftedOutType (← nat p) (← typeId T)
   | "grafted_in", #[] => return .graftedInAll
+  | "grafted_in", #[p, T] => return .graftedInType (← nat p) (← typeId T)
   | "owed_relations", #[] => return .owedRelations
   | "backoff", #[] => return .backoffAll
+  | "backoff", #[p, T] => return .backoffType (← nat p) (← typeId T)
+  | "backoff", #[p, T, fam] => return .backoffFam (← nat p) (← typeId T) (← intOf fam)
   | "T_of", #[] => return .tOf
   | "rebuilt", #[] => return .rebuilt
   | "interest", #[] => return .interest
@@ -735,11 +741,17 @@ def under (c : Cell) (l : Level) : Bool :=
   | .joinRecvAll, .joinRecv .. => true
   | .joinSentAll, .joinSent .. => true
   | .pushOutAll, .pushOut .. => true
+  | .pushOutType p T, .pushOut p' T' _ => p == p' && T == T'
   | .pushInAll, .pushIn .. => true
+  | .pushInType p T, .pushIn p' T' _ => p == p' && T == T'
   | .graftedOutAll, .graftedOut .. => true
+  | .graftedOutType p T, .graftedOut p' T' _ => p == p' && T == T'
   | .graftedInAll, .graftedIn .. => true
+  | .graftedInType p T, .graftedIn p' T' _ => p == p' && T == T'
   | .owedRelations, .owedRelations _ => true
   | .backoffAll, .backoff .. => true
+  | .backoffType p T, .backoff p' T' _ _ => p == p' && T == T'
+  | .backoffFam p T fam, .backoff p' T' fam' _ => p == p' && T == T' && fam == fam'
   | .tOf, .tOf _ => true
   | .rebuilt, .rebuilt _ => true
   | .interest, .interest _ => true
@@ -786,6 +798,13 @@ def covers (l₁ l₂ : Level) : Bool :=
   | .tiedRoot r, .tiedPeer r' _ => r == r'
   | .owedAll, .owed _ => true
   | .owedAnswersAll, .owedAnswers _ => true
+  | .pushOutAll, .pushOutType _ _ => true
+  | .pushInAll, .pushInType _ _ => true
+  | .graftedOutAll, .graftedOutType _ _ => true
+  | .graftedInAll, .graftedInType _ _ => true
+  | .backoffAll, .backoffType _ _ => true
+  | .backoffAll, .backoffFam _ _ _ => true
+  | .backoffType p T, .backoffFam p' T' _ => p == p' && T == T'
   | .standingAll, .standing _ => true
   | .probeWaitingAll, .probeWaiting _ => true
   | _, _ => false

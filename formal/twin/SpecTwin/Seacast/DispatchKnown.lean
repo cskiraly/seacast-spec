@@ -267,6 +267,20 @@ def maxIndices (v : Json) : Json := Json.mkObj [("payload", Json.mkObj [("MAX_IN
 #guard failsWith "nodes: types: payload: MAX_INDICES: 0, where a group of a type has at least one index"
   (line2 (entry [("types", some (maxIndices (jn 0)))]))
 #guard failsWith "nodes: types: payload: MAX_INDICES: " (line2 (entry [("types", some (maxIndices (Json.bool true)))]))
+-- `MAX_RELATIONS` (§6.3's `relation_room`): a float's word, read as that float, or +∞'s word, the toy's default;
+-- absent, none, whose read crashes; a NaN's word and a boolean refused
+def maxRelations (v : Json) : Json := Json.mkObj [("payload", Json.mkObj [("MAX_RELATIONS", v)])]
+def maxRelationsBits (j : Json) : Option (Option UInt64) :=
+  match line2 (entry [("types", some j)]) with
+  | .ok ((_, cfg) :: _) => some (((cfg.types.lookup "payload").bind (·.MAX_RELATIONS)).map (·.toBits))
+  | _ => none
+#guard maxRelationsBits (maxRelations (jn (3.0 : Float).toBits.toNat)) == some (some (3.0 : Float).toBits)
+#guard maxRelationsBits (maxRelations (jn 9218868437227405312)) == some (some 9218868437227405312)
+#guard maxRelationsBits (Json.mkObj [("payload", Json.mkObj [("M", jn 1)])]) == some none
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: "
+  (line2 (entry [("types", some (maxRelations (jn 9221120237041090560)))]))
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: "
+  (line2 (entry [("types", some (maxRelations (Json.bool true)))]))
 
 /-! ## The dispatch -/
 
@@ -279,8 +293,9 @@ def maxIndices (v : Json) : Json := Json.mkObj [("payload", Json.mkObj [("MAX_IN
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
 #guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
-#guard fnsSeacast.length == 75                                                  -- v0.11.1's joined, drop_wants_beyond;
-                                                                                --   §4.5's serving, §4.10's route_want
+#guard fnsSeacast.length == 81                                                  -- v0.11.1's joined, drop_wants_beyond;
+                                                                                --   §4.5's serving, §4.10's route_want;
+                                                                                --   §4.1's relations, §6.3's room
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused

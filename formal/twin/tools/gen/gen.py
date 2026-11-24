@@ -455,7 +455,7 @@ def basic():
     for t in TABLES:
         for s in t.scans:
             line = f"  | {s.level}" + "".join(f" ({k} : {ty})" for k, ty in t.keys[:depth(s)])
-            level.append(f"{line:<42}-- {s.note}" if s.note else line)
+            level.append(f"{line:<41} -- {s.note}" if s.note else line)   # a space always, past column 41
     return state, cell, level
 
 

@@ -223,11 +223,17 @@ inductive Level where
   | joinRecvAll                           -- every `join_recv[p][T]`
   | joinSentAll                           -- every `join_sent[p][T]`
   | pushOutAll                            -- every `push_out[p][T][fam]`
+  | pushOutType (p : Peer) (T : Seacast.TypeId) -- every `push_out[p][T][fam]` of one link and type
   | pushInAll                             -- every `push_in[p][T][fam]`
+  | pushInType (p : Peer) (T : Seacast.TypeId) -- every `push_in[p][T][fam]` of one link and type
   | graftedOutAll                         -- every `grafted_out[p][T][fam]`
+  | graftedOutType (p : Peer) (T : Seacast.TypeId) -- every `grafted_out[p][T][fam]` of one link and type
   | graftedInAll                          -- every `grafted_in[p][T][fam]`
+  | graftedInType (p : Peer) (T : Seacast.TypeId) -- every `grafted_in[p][T][fam]` of one link and type
   | owedRelations
   | backoffAll                            -- every `backoff[p][T][fam][(c, direction)]`
+  | backoffType (p : Peer) (T : Seacast.TypeId) -- every `backoff[p][T][fam][(c, direction)]` of one link and type
+  | backoffFam (p : Peer) (T : Seacast.TypeId) (fam : Seacast.Fam) -- every `backoff[p][T][fam][(c, direction)]` of one family
   | tOf
   | rebuilt
   | interest

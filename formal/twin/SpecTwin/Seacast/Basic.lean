@@ -59,13 +59,13 @@ def IBits.toBits? : IBits → Option Bits
   | .ofNat a => some a
   | .negSucc _ => none
 
-/-- A type's 25 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
-`REPAIR_TO`, which are questions) and less `MAX_RELATIONS`, which only §6.3's `relation_room` reads, and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
+/-- A type's 26 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
+`REPAIR_TO`, which are questions), and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
 `REPAIR_REASK`). `SAMPLE_OUTSTANDING` is no type's but the node's (`ConstsSeacast`). Each is optional: the toy gives
 its payload and row types no `SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT`
 (`toy/node.py:1231-1243`, `toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it
-crashes here. The two
-limits that can be unbounded are floats, infinity for none. -/
+crashes here. The three limits that can be unbounded are floats, infinity for none: `SERVE_LIMIT`, `FORWARD_LIMIT`
+and `MAX_RELATIONS`, which §1.1 types `int` and the toy sets to `math.inf` unless a run gives it. -/
 structure TypeParams where
   M : Option Nat := none
   F_LO : Option Nat := none
@@ -89,6 +89,8 @@ structure TypeParams where
   FORWARD_LIMIT : Option Float := none
   /-- The most indices a group of the type has, before its count is known (§4.5's `index_bound`); at least 1. -/
   MAX_INDICES : Option Nat := none
+  /-- The most (family, colour) pairs of the type a link holds in any state (§6.3's `relation_room`). -/
+  MAX_RELATIONS : Option Float := none
   /-- Present and none in this version (§1.5): the nodes line refuses any other value. -/
   EVIDENCE : Option (Option TypeId) := none
   /-- The repair sample's steps `[(S1, L1), …]`, or none (§4.6's `repair_verdict`). -/
@@ -172,6 +174,18 @@ class NodeSeacast (m : Type → Type) where
   familiesWithDuty : TypeId → m (List Fam)
   /-- `wants_family(T, fam)` -/
   wantsFamily : TypeId → Fam → m Bool
+  /-- `runs_type(tid)` (§3): whether the node runs a type of that id -/
+  runsType : TypeId → m Bool
+  /-- `our_join(T)` (§3): the JOIN the node sends for the type -/
+  ourJoin : TypeId → m Join
+  /-- `candidates(T, fam, c, d)` (§3): peers to graft for colour c of the family in direction d, in the node's order -/
+  candidates : TypeId → Fam → Nat → Direction → m (List Peer)
+  /-- `in_pushers(T, fam, c)` (§3): the peers that push us colour c of the family, in the node's order of peers -/
+  inPushers : TypeId → Fam → Nat → m (List Peer)
+  /-- `out_pushees(T, fam, c)` (§3): the peers we push colour c of the family, in the node's order of peers -/
+  outPushees : TypeId → Fam → Nat → m (List Peer)
+  /-- `uplink_class()` (§3, card 17): `FAST` or `HOME` -/
+  uplinkClass : m UplinkClass
   /-- `duty_for(g)` -/
   dutyFor : Group → m Duty
   /-- `route_next(T, fam, qs)`: of the links `qs`, those nearest `fam` -/
@@ -286,6 +300,12 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   families a := f (families a)
   familiesWithDuty a := f (familiesWithDuty a)
   wantsFamily a b := f (wantsFamily a b)
+  runsType a := f (runsType a)
+  ourJoin a := f (ourJoin a)
+  candidates a b c d := f (candidates a b c d)
+  inPushers a b c := f (inPushers a b c)
+  outPushees a b c := f (outPushees a b c)
+  uplinkClass := f uplinkClass
   dutyFor a := f (dutyFor a)
   routeNext a b c := f (routeNext a b c)
   blockOf a := f (blockOf a)

@@ -71,7 +71,7 @@ def sendJoin (p : Peer) (j : Join) : M2 m Unit := do
   sendRelation p (.join j)
 
 /-- `push_in[q][T][fam].discard(c)` and the other three: a colour that is not there is no write -/
-private def discardColour (get : Peer → TypeId → Fam → M2 m (Std.HashSet Nat))
+def discardColour (get : Peer → TypeId → Fam → M2 m (Std.HashSet Nat))
     (set : Peer → TypeId → Fam → Std.HashSet Nat → M2 m Unit) (q : Peer) (T : TypeId) (fam : Fam) (c : Nat) :
     M2 m Unit := do
   let s ← get q T fam

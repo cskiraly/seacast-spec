@@ -56,6 +56,10 @@ def repairVerdictJson : RepairVerdict → Json
   | .notRepaired => Json.str "NOT_REPAIRED"
   | .asked => Json.str "ASKED"
 
+def uplinkClassJson : UplinkClass → Json
+  | .fast => Json.str "FAST"
+  | .home => Json.str "HOME"
+
 /-- An `after` row's timer, read back from its name and its arguments: the inverse of `timerSeacastJson`. -/
 def timerSeacastOf (f : String) (xs : Json) : Except String TimerSeacast := do
   match f, ← xs.getArr? with
@@ -258,6 +262,24 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
   | "chunkOf", #[a] => do
     let a ← mid a
     return chunkJson <$> Node61.chunkOf (m := R) a
+  -- §4.1's upkeep: the node's types, its JOIN, its candidates and pushers, and its uplink
+  | "runsType", #[t] => do
+    let t ← typeId t
+    return Json.bool <$> NodeSeacast.runsType (m := R) t
+  | "ourJoin", #[t] => do
+    let t ← typeId t
+    return joinJson <$> NodeSeacast.ourJoin (m := R) t
+  | "candidates", #[t, fam, c, d] => do
+    let t ← typeId t; let fam ← intOf fam; let c ← nat c; let d ← direction d
+    return natsJson <$> NodeSeacast.candidates (m := R) t fam c d
+  | "inPushers", #[t, fam, c] => do
+    let t ← typeId t; let fam ← intOf fam; let c ← nat c
+    return natsJson <$> NodeSeacast.inPushers (m := R) t fam c
+  | "outPushees", #[t, fam, c] => do
+    let t ← typeId t; let fam ← intOf fam; let c ← nat c
+    return natsJson <$> NodeSeacast.outPushees (m := R) t fam c
+  | "uplinkClass", #[] => do
+    return uplinkClassJson <$> NodeSeacast.uplinkClass (m := R)
   | _, _ => throw s!"not a form of SEACAST's questions, or not its arguments: {form} {(Json.arr args).compress}"
 
 /-- The question run over a tape of these rows, each read as a record's tape entry is under seacast.md. The
@@ -341,6 +363,14 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "chunkOf" =>
     let z (n : Nat) := String.ofList (List.replicate n '0')
     p s!"[\"{z 64}\", 0, 0, \"{String.ofList (List.replicate 64 'b')}\", \"{z 112}\"]"
+  -- §4.1's upkeep's six, each refused by its reader's own check: a peer twice in a list of peers, a JOIN's array
+  -- with another tag, an uplink class outside the two
+  | "runsType" => p "1"
+  | "ourJoin" => p "[\"graft\",\"payload\",\"ALL\",0,\"FORWARD\",1]"
+  | "candidates" => p "[2,2]"
+  | "inPushers" => p "[3,3]"
+  | "outPushees" => p "[4,4]"
+  | "uplinkClass" => p "\"SLOW\""
   | _ => throw s!"no wrong answer for the form {form}"
 
 /-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row
@@ -352,9 +382,10 @@ def refusalOf (form q : String) : String :=
 
 /-- The labels of SEACAST's question forms, one row each, in the order of `tools/forms-seacast-examples.tsv`: the checker's
 own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). The first 44 are the
-file's at spec 287d575; the next 18 cover the methods of `NodeSeacast` and `SeacastLater` that had no row; the last 4
+file's at spec 287d575; the next 18 cover the methods of `NodeSeacast` and `SeacastLater` that had no row; the next 4
 are the questions §4.5's serving adds: `own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as
-`on_want` asks them. -/
+`on_want` asks them; the last 6 are §4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`,
+`out_pushees` and `uplink_class`. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -368,7 +399,9 @@ def labels : List String :=
    "forwardNode", "pushRebuiltNode", "sendHaveNode", "serveStandingNode", "owedMissingNode", "repairVerdictNode",
    "noteClaimNode", "knownInScopeNode",
    -- §4.5's serving: two of SEACAST's questions, and two of seacast-lite.md's that on_want asks
-   "ownId", "admittedGroup", "resolve", "chunkOf"]
+   "ownId", "admittedGroup", "resolve", "chunkOf",
+   -- §4.1's upkeep: the six questions its relations ask
+   "runsType", "ourJoin", "candidates", "inPushers", "outPushees", "uplinkClass"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)
