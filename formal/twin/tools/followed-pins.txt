@@ -15,6 +15,7 @@ row node.py Node._override may_ask = Node._override.<locals>.may_ask (tuple)
   node.py Node._override.<locals>.index_ask 2ebef5cebf42949b3c7e19c66dc6d60da95c05bc6f59f37ac71094658cb0f60a
   node.py Node._override.<locals>.may_ask 190d76512ec06450a77b0c82c5a8eb9c6e127ab8548df7dde3df556671afc82a
 row node.py Node._seacast on_want = Node._seacast.<locals>.on_want (subscript)
+  node.py GroupIndex 09d38a134f5e82250e0ca0299ff020b0edbd0887df7a3822a03e6c0a639d29b8
   node.py GroupIndex.__init__ 6db1e1158532b2c32705bf508794bf55df4bcf63f9e3a6a318711b08fa5c42db
   node.py Node._namespace.<locals>.group_index 3a4f7dc95bb59da5b0b5669d514ed618fb652d6929e70bdc53e1c6aba91ca3d1
   node.py Node._namespace.<locals>.resolve 7cab43ea13209965c155f9cea004d42d18e7f0353dcfa66badcef012a67ae147

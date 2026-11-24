@@ -2206,10 +2206,13 @@ def observers_self_test():
     Planted faults: the handling off (the observer's read logged), the hand-over off (the document's reads missing,
     its write a stop), the stop off (writes let through), each failing its cases. Through iface_of's wrapper, a timer
     the observer arms stops, and a question it asks runs bare; the control hides the mode from the wrapper, and
-    fails both. Through the simulator's own `after` (sim_guard), a timer the observer arms stops, and one the document's
-    function arms after the hand-over reaches the simulator; the guard off and the hand-over off each fail theirs. An
-    observer's own call of a second observed name stays in the caller's mode through that name's layer and document
-    function: a read there unlogged, a write a stop in the caller's words; the hand-over unbound fails both."""
+    fails both. A question's and a traced name's own call runs bare; their control hides the mode, and must show what
+    it then is, the record's question: one row on the tape, and the traced name counted asked; a stop planted before
+    that call must not pass for it. Through the simulator's own `after` (sim_guard), a timer the observer arms
+    stops, and one the document's function arms after the hand-over reaches the simulator; the guard off and the
+    hand-over off each fail theirs. An observer's own call of a second observed name stays in the caller's mode
+    through that name's layer and document function: a read there unlogged, a write a stop in the caller's words;
+    the hand-over unbound fails both."""
     sys.path.insert(0, str(HERE.parents[2] / "toy"))
     import bits as B                    # noqa: E402: the toy's, beside this repository's documents
     import wire as Wm                   # noqa: E402
@@ -2521,13 +2524,13 @@ def observers_self_test():
     print(f"observers self-test, its planted fault (the handling off), by the logged read: "
           f"{'the callee read of stop_pull logged in its 2 cases, ok' if not not_logged else 'not logged  <-- FAIL'}")
 
-    def through_iface(kind, hidden=False):
+    def through_iface(kind, hidden=False, stop_first=False):
         """An observer's own call, through iface_of's wrapper as the node wraps a toy's binding of a question, of `kind`
         "question" (a question, not traced) or "traced" (a traced name, which the wrapper counts), in a record entered
         by `observe`. The callee reads stop_pull. Its answer, the open record's tape, the wrapper's counts (its
         "observer" bucket, tr.bare) and the record's reads and writes, with the observer's calls and unlogged reads.
         `hidden`: the mode hidden from the wrapper (the control), which then takes the call for the record's
-        question."""
+        question. `stop_first`: the control's planted fault, a stop before the call."""
         tr = object.__new__(Tracer3)
         tr.Wm, tr.doc_seacast, tr.bare, tr.calls = Wm, True, Counter(), {}
         tr.traced = ("probe_q",) if kind == "traced" else ()
@@ -2553,6 +2556,8 @@ def observers_self_test():
 
             def layer(doc):
                 def check_completion(g):
+                    if stop_first:
+                        raise SystemExit("planted: a stop before the observer's call")
                     answers.append(w(g))
                     return doc(g)
                 return check_completion
@@ -2572,16 +2577,31 @@ def observers_self_test():
     ]
     for c in iface_cases:
         case(*c)
-    failed = []
-    for kind, c in zip(("question", "traced"), iface_cases):
-        try:
-            got = through_iface(kind, hidden=True)
-        except SystemExit as e:
-            got = f"stop: {e}"
-        failed.append(got != c[2])
-    bad += not all(failed)
-    print(f"observers self-test, its control for iface_of's wrapper (the mode hidden from it): "
-          f"{'fails its 2 cases, ok' if all(failed) else f'passes {failed.count(False)}  <-- FAIL'}")
+    def hidden_outcome(kind, got):
+        """The mode hidden from the wrapper, as it must show: the call taken for the record's question, one row on the
+        tape, and a traced name counted "asked" once for the record's function (x), a question counted nowhere."""
+        return (isinstance(got, dict) and got.get("tape") == 1
+                and got.get("counted") == ({"asked": {"x": 1}} if kind == "traced" else {}))
+
+    def hidden_runs(stop_first):
+        shown = []
+        for kind in ("question", "traced"):
+            try:
+                got = through_iface(kind, hidden=True, stop_first=stop_first)
+            except SystemExit as e:
+                got = f"stop: {e}"
+            shown.append(hidden_outcome(kind, got))
+        return shown
+    shown = hidden_runs(False)
+    bad += not all(shown)
+    said = ("one tape row in its 2 cases, the traced name counted asked, ok" if all(shown)
+            else f"not so in {shown.count(False)}  <-- FAIL")
+    print(f"observers self-test, its control for iface_of's wrapper (the mode hidden from it): {said}")
+    planted = hidden_runs(True)
+    bad += any(planted)
+    said = ("not taken for the hidden outcome in its 2 cases, ok" if not any(planted)
+            else f"taken in {planted.count(True)}  <-- FAIL")
+    print(f"observers self-test, the control's planted fault (a stop before the hidden call): {said}")
     return bad
 
 

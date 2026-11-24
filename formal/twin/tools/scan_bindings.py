@@ -38,8 +38,8 @@ Each function bound has a class:
   its result, or nothing where the document's function returns nothing (a least fixpoint over both documents:
   `return f(...)` of a function that returns nothing returns nothing). `message_id`'s cache is an observer by name
   (it skips the call on a hit). The test is a reading of the syntax, not a proof. What it can miss: an effect in a
-  form it does not read as one. In followed code, `e = self._have[g]; e |= g` passes, and the toy's bitmaps (`Bits`)
-  join in place in `__ior__`. The code that a row's observer verdict rests on beyond its own body is pinned by its
+  form it does not read as one. In followed code, `sum(node.draw_stream)` passes, and it exhausts an iterator the
+  node shares. The code that a row's observer verdict rests on beyond its own body is pinned by its
   source (`--followed`, `--pins`), and a change there fails check.sh's scope step until the row is read again.
 - **layer**: it holds the earlier binding and fails the test (the reason is given); one that passes it where it
   may name and bind a draw's slot (DRAWS: `choice`, `sample_without_replacement`, `shuffled`) is marked a swapped
@@ -78,7 +78,9 @@ READONLY_METHODS = {"get", "keys", "values", "items", "copy", "count", "index", 
                     "union", "intersection", "difference", "symmetric_difference", "__contains__", "__len__",
                     "__iter__", "__getitem__"}
 # the builtins taken as reads of what they are handed: any other builtin handed a table denies (setattr, map, ...).
-# What this can miss: a builtin that runs what it is handed; `sorted(g, key=node.consume_draw)` passes
+# In followed code, a callable one is handed to run must be one the test reads, `next` must advance the function's own
+# iterator, and the name must be no local one (Scanner.builtin_runs, binds_name). What this can miss: a builtin that
+# exhausts or runs what it is handed in another way; `sum(node.draw_stream)` passes
 READONLY_BUILTINS = {"len", "list", "tuple", "set", "frozenset", "dict", "sorted", "reversed", "iter", "next",
                      "enumerate", "zip", "sum", "min", "max", "any", "all", "isinstance", "bool", "int", "float", "str",
                      "repr", "hash", "id", "type", "abs", "round", "range", "callable", "bytes", "hasattr"}
@@ -92,7 +94,7 @@ BY_NAME = {"message_id": "a cache: it skips the call on a hit"}     # observers 
 DRAWS = ("choice", "sample_without_replacement", "shuffled")
 # the pure operations a followed body may call, as (the name called on, the attribute): each reads only what it is
 # handed and changes nothing. An entry is added by a dated amendment to the known answer that names its reason
-PURE_CALLS = {("int", "from_bytes")}    # a new int from the bytes handed
+PURE_CALLS = {("int", "from_bytes")}    # a new int from the bytes handed (where the function binds no `int` itself)
 NS_ALIASES = {}                         # file name -> the names that file binds to the namespace (`nsc = nc.ns`)
 NS_FILE = [None]                        # the file whose aliases is_ns reads: the one scanned, or the one followed into
 
@@ -633,8 +635,13 @@ class Scanner:
                # a call of no kind the follow reads ("call"); a followed call's answer under the test ("answer"); and
                # the kinds it reads: its own new objects ("fresh"), a toy class's constructor ("ctor": its guard,
                # "ctor-guard", and its __init__, "ctor-init"), a listed pure operation ("pure"), its file's own function
-               # ("module-fn")
+               # ("module-fn"); an augmented assignment to a name not its own new object ("aug"); a constructor's
+               # class body beyond its plain statements ("ctor-body") and an __init__ that binds its receiver's name
+               # ("ctor-self"); a builtin handed a callable it runs ("callback") or `next` on an iterator not its own
+               # ("iterator"); and a builtin's or a pure operation's name bound locally, or a table's method that a toy
+               # class defines as more than a read ("spelling")
                "effect", "call", "answer", "fresh", "ctor", "ctor-guard", "ctor-init", "pure", "module-fn",
+               "aug", "ctor-body", "ctor-self", "callback", "iterator", "spelling",
                # and the swapped draw's test: a draw's slot called in the layer's own code, outside its stand-in
                "draw-call")
 
@@ -719,22 +726,88 @@ class Scanner:
         """Whether a store's object is the followed function's own new object: a name bound only to one."""
         return isinstance(e, ast.Name) and e.id in scope.fresh
 
+    @staticmethod
+    def binds_name(name, scope):
+        """Whether the function, or a function around it, binds `name` (a parameter, a local, a capture, a local
+        function): a builtin's spelling is then no builtin."""
+        s = scope
+        while s is not None:
+            if name in s.bound or name in s.captures or name in s.funcs:
+                return True
+            s = s.parent
+        return False
+
+    def builtin_runs(self, call, scope):
+        """Followed code's call of a builtin taken as a read: why it may do more than read, or None. A callable it is
+        handed to run (a `key=`, `iter(f, sentinel)`'s first argument) must be a lambda or a local function (read as
+        the function's own code) or a builtin taken as a read; `next` must advance the function's own new iterator
+        (a name bound only to a new object, `iter(…)` made there, or a generator expression)."""
+        f = call.func.id
+        if "callback" not in self.off:
+            run = [k.value for k in call.keywords if k.arg == "key"]
+            if f == "iter" and len(call.args) == 2:
+                run.append(call.args[0])
+            for r in run:
+                if not (isinstance(r, ast.Lambda) or (isinstance(r, ast.Name) and (
+                        scope.lookup(r.id, "funcs") is not None
+                        or (r.id in READONLY_BUILTINS and not self.binds_name(r.id, scope))))):
+                    return f"hands {ast.unparse(r)[:40]} to {f}, which runs it unfollowed"
+        if f == "next" and call.args and "iterator" not in self.off:
+            it = call.args[0]
+            if not ((isinstance(it, ast.Name) and it.id in scope.fresh) or isinstance(it, ast.GeneratorExp)
+                    or (isinstance(it, ast.Call) and isinstance(it.func, ast.Name) and it.func.id == "iter"
+                        and not self.binds_name("iter", scope))):
+                return (f"advances {ast.unparse(it)[:40]} by next, which the follow cannot establish as its own new "
+                        f"iterator")
+        return None
+
+    @staticmethod
+    def plain_class_stmt(m):
+        """A statement of a followed constructor's class body that makes nothing the guard does not read: a docstring,
+        a `def` (its own guard reads it), `__slots__ = …`, or constants assigned to names that are no dunder name.
+        An `__init__` or a `__setattr__` assigned, a decorated `__init__`, any other statement: no."""
+        if isinstance(m, ast.Expr) and isinstance(m.value, ast.Constant) and isinstance(m.value.value, str):
+            return True
+        if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return m.name != "__init__" or not m.decorator_list
+        if isinstance(m, (ast.Assign, ast.AnnAssign)) and m.value is not None:
+            names = [x for t in (m.targets if isinstance(m, ast.Assign) else [m.target])
+                     for x in (t.elts if isinstance(t, ast.Tuple) else [t])]
+            if not all(isinstance(x, ast.Name) for x in names):
+                return False
+            if [x.id for x in names] == ["__slots__"]:
+                return True
+            values = m.value.elts if isinstance(m.value, ast.Tuple) else [m.value]
+            return (not any(x.id.startswith("__") and x.id.endswith("__") for x in names)
+                    and all(isinstance(v, ast.Constant) for v in values))
+        return False
+
     def constructor(self, c, name, seen):
         """A toy class's constructor, called in followed code: why it may do more than make a new object, or None.
         Refused: a class with a decorator (a dataclass's default_factory among them), a base, a keyword (a metaclass),
         or any method defined by `def` but its __init__: __new__, __post_init__ and __init_subclass__ among them, and
         every method a store, a mutator or an operator on the new object would run unfollowed (__setattr__,
-        __setitem__, append, …). The guard reads the class's `def` statements alone. Else its own __init__, if it has
-        one, is followed by the same test, with its receiver taken to be the new object.
+        __setitem__, append, …). Refused too: a class body with any other statement but a docstring, `__slots__` and
+        constants assigned to names that are no dunder name (plain_class_stmt): an `__init__` bound to a lambda, an
+        assigned `__setattr__ = hook`, a decorated `__init__`; and a second `def __init__`, of which Python runs the
+        last. Else its own __init__, if it has one, is followed by
+        the same test, with its receiver taken to be the new object; an `__init__` that binds its receiver's name
+        (`self = shared`) is refused. The class's own source is pinned beside its __init__'s (`followed`).
 
-        What it can miss: a statement of the class body that is no `def`: an `__init__` bound to a lambda that
-        clears `node.pending` passes, and so does an assigned `__setattr__ = hook`. And a receiver that is not the
-        new object: `self = shared` in `__init__`, then `self.count = 1`, passes."""
+        What it can miss: which class a name is. A class made in the enclosing function under the name of one of
+        the file's classes is read as the file's: one whose `__init__` clears `node.pending` passes."""
         if "ctor-guard" not in self.off and (
                 c.decorator_list or c.bases or c.keywords
                 or any(isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name != "__init__"
                        for m in c.body)):
             return f"calls {c.name}, a class whose making the follow does not read"
+        if "ctor-body" not in self.off and (
+                not all(self.plain_class_stmt(m) for m in c.body)
+                or sum(isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name == "__init__"
+                       for m in c.body) > 1):     # the follow reads the first __init__, Python runs the last
+            return f"calls {c.name}, a class whose making the follow does not read"
+        if self.walked_now is not None:
+            self.walked_now.append(c)   # the class's own source is pinned beside its __init__'s
         init = next((m for m in c.body if isinstance(m, ast.FunctionDef) and m.name == "__init__"), None)
         if init is None or "ctor-init" in self.off:
             return None
@@ -744,6 +817,10 @@ class Scanner:
         seen.add(key)
         inner = self.own_scope(init, f"{c.name}.__init__", Scope(c, c.name, None))
         ps = params_of(init)[0]
+        if ps and "ctor-self" not in self.off and any(
+                isinstance(x, ast.Name) and x.id == ps[0] and isinstance(x.ctx, (ast.Store, ast.Del))
+                for x in ast.walk(init)):
+            return f"rebinds {ps[0]} in {c.name}.__init__, which the follow then cannot establish as the new object"
         if ps:
             inner.fresh.add(ps[0])      # self: the object being made
         why = self.names_and_writes(init, inner, name, None, seen)
@@ -852,6 +929,12 @@ class Scanner:
                 # object, the store's immediate object a name bound only to one
                 return (f"{'deletes' if isinstance(n.ctx, ast.Del) else 'writes'} {ast.unparse(n)[:60]}, which the "
                         f"follow cannot establish as its own new object")
+            if (self.depth and "aug" not in self.off and isinstance(n, ast.AugAssign)
+                    and isinstance(n.target, ast.Name) and n.target.id not in scope.fresh):
+                # followed code: `x op= v` may change x's object in place (a bitmap's `__ior__`, a list's `+=`), so x
+                # must be the function's own new object (`n = 0; n += 1` is: both its stores make one)
+                return (f"augments {n.target.id} in place, which the follow cannot establish as its own new "
+                        f"object")
             if not isinstance(n, ast.Call):
                 continue
             k = self.called_name(n.func, scope, held)
@@ -869,7 +952,8 @@ class Scanner:
             if isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS and "mutate" not in self.off:
                 if self.ns_rooted(n.func.value, scope, bare=True):
                     return f"mutates {ast.unparse(n.func.value)[:60]} by {n.func.attr}"
-            if (isinstance(n.func, ast.Attribute) and n.func.attr not in MUTATORS | self.reads
+            reads = self.reads_anywhere if "spelling" not in self.off else self.reads    # a toy class's own method
+            if (isinstance(n.func, ast.Attribute) and n.func.attr not in MUTATORS | reads    # of the name: no read
                     and "mutate" not in self.off and self.ns_rooted(n.func.value, scope, bare=True)):
                 return (f"calls {n.func.attr} on {ast.unparse(n.func.value)[:60]}, which the test does not establish "
                         f"as a read")
@@ -890,7 +974,11 @@ class Scanner:
                     if self.depth and "call" not in self.off:
                         return f"calls {n.func.id}, a namespace name the follow does not read"
                     continue            # a namespace function (named, and so checked, above)
-                elif f is None and n.func.id in READONLY_BUILTINS:
+                elif f is None and n.func.id in READONLY_BUILTINS and not (
+                        self.depth and "spelling" not in self.off and self.binds_name(n.func.id, scope)):
+                    why = self.builtin_runs(n, scope) if self.depth else None
+                    if why:
+                        return why
                     continue            # a builtin taken as a read (any other is unfollowed, below)
                 elif self.depth and n.func.id not in scope.bound and not scope.shadowed(n.func.id):
                     g = self.globals.get((self.path.name, n.func.id))
@@ -932,8 +1020,9 @@ class Scanner:
                 if isinstance(f, ast.Attribute) and f.attr in self.reads_anywhere:
                     continue            # a read method, which no toy class defines as more than a read
                 if (isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name)
-                        and (f.value.id, f.attr) in PURE_CALLS and "pure" not in self.off):
-                    continue            # a listed pure operation
+                        and (f.value.id, f.attr) in PURE_CALLS and "pure" not in self.off
+                        and not ("spelling" not in self.off and self.binds_name(f.value.id, scope))):
+                    continue            # a listed pure operation, its receiver's name no local one
                 return f"calls {ast.unparse(f)[:60]}, which the follow cannot establish as a read"
         return None
 
@@ -2651,6 +2740,147 @@ def fail_closed_self_test(report):
                        c == "layer" and why != want, f"got {c} ({why})")
 
 
+# forms the follow read as reads until they were refused, each in a question a layer calls: the question's name, the
+# reason's words, and the clause whose control turns the layer back into an observer
+CARRIED_CASES = {
+    "aug": ("augments e in place, which the follow cannot establish as its own new object", "aug"),
+    "augp": ("augments asks in place, which the follow cannot establish as its own new object", "aug"),
+    "sorted": ("hands node.consume_draw to sorted, which runs it unfollowed", "callback"),
+    "next": ("advances node.draw_stream by next, which the follow cannot establish as its own new iterator",
+             "iterator"),
+    "int": ("calls int.from_bytes, which the follow cannot establish as a read", "spelling"),
+    "bname": ("calls sorted, which the follow cannot establish as a read", "spelling"),
+    "lam": ("calls Shared, a class whose making the follow does not read", "ctor-body"),
+    "selfreb": ("rebinds self in Made2.__init__, which the follow then cannot establish as the new object",
+                "ctor-self"),
+    "hook": ("calls Hooked2, a class whose making the follow does not read", "ctor-body"),
+    "twoinit": ("calls TwoInit, a class whose making the follow does not read", "ctor-body"),
+    "tget": ("calls get on ns['tbl'], which the test does not establish as a read", "spelling"),
+}
+CARRIED = '''\
+def hook(self, k, v):
+    object.__setattr__(self, k, v)
+
+
+class Shared:
+    __init__ = lambda self, node: node.pending.clear()
+
+
+class Made2:
+    def __init__(self, shared):
+        self = shared
+        self.count = 1
+
+
+class Hooked2:
+    __setattr__ = hook
+
+    def __init__(self, a):
+        self.a = a
+
+
+class TwoInit:
+    def __init__(self, a):
+        self.a = a
+
+    def __init__(self, node):
+        node.pending.clear()
+
+
+class OneInit:
+    def __init__(self, a):
+        self.a = a
+
+
+class Table:
+    def get(self, k):
+        self.hits = k
+        return k
+
+
+class Node:
+    def plant(self, ns):
+        node = self
+
+        def q_aug(g):
+            e = self._have[g]
+            e |= g
+
+        def q_augp(asks):
+            asks += [1]
+
+        def q_sorted(g):
+            return sorted(g, key=node.consume_draw)
+
+        def q_next(g):
+            return next(node.draw_stream)
+
+        def q_int(g, int=node):
+            return int.from_bytes(g, "big")
+
+        def q_bname(g, sorted=node.consume_draw):
+            return sorted(g)
+
+        def q_lam(g):
+            return Shared(node)
+
+        def q_selfreb(g):
+            return Made2(node)
+
+        def q_hook(g):
+            return Hooked2(g)
+
+        def q_tget(g):
+            return ns["tbl"].get(g)
+
+        def q_twoinit(g):
+            return TwoInit(node)
+
+        def q_oneinit(g):
+            return OneInit(node)
+'''
+CARRIED_OBSERVERS = ("oneinit",)       # the refusals' narrowness: each an observer as it stands
+_ALL = (*CARRIED_CASES, *CARRIED_OBSERVERS)
+CARRIED += ("        ns.update(" + ", ".join(f"q_{p}=q_{p}" for p in _ALL) + ")\n"
+            + "        " + ", ".join(f"d_{p}" for p in _ALL) + " = "
+            + ", ".join(f'ns["c_{p}"]' for p in _ALL) + "\n")
+for _p in _ALL:
+    CARRIED += f'''
+        def c_{_p}(x):
+            ns["q_{_p}"](x)
+            return d_{_p}(x)
+'''
+CARRIED += "        ns.update(" + ", ".join(f"c_{p}=c_{p}" for p in _ALL) + ")\n"
+
+
+def carried_self_test(report):
+    """The carried forms' cases (CARRIED_CASES), each a layer refused by its own words, each with its control: its
+    clause off, an observer; and CARRIED_OBSERVERS, observers as they stand. It sets the name sets itself; self_test
+    restores them."""
+    layers = {f"c_{p}" for p in _ALL}
+    for s, v in ((QUESTIONS_DOC, {f"q_{p}" for p in _ALL}),
+                 (QUESTIONS_Seacast, {f"q_{p}" for p in _ALL}), (TRACED, set()), (TRACED_Seacast, set()),
+                 (DEFS_DOC, layers), (RETURNS_DOC, layers), (CALLABLES, layers), (FNS_DOC, {}), (FNS_Seacast, {})):
+        s.clear()
+        s.update(v)
+
+    def got(rows, name):
+        r = [r for r in rows if r["name"] == name and r["form"] == "update-keyword"]
+        return (r[0]["class"], r[0].get("why", "")) if len(r) == 1 else (f"{len(r)} rows", "")
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "carried.py").write_text(CARRIED)
+        rows = scan(d).rows
+        for p, (words, clause) in CARRIED_CASES.items():
+            want = f"{words}, in q_{p}"
+            c, why = got(rows, f"c_{p}")
+            report(f"carried: c_{p} a layer, \"…{want[-70:]}\"", c == "layer" and why == want, f"got {c} ({why})")
+            c, why = got(scan(d, off=(clause,)).rows, f"c_{p}")
+            report(f"control: c_{p} with {clause} off an observer", c == "observer", f"got {c} ({why})")
+        for p in CARRIED_OBSERVERS:
+            c, why = got(rows, f"c_{p}")
+            report(f"carried: c_{p} an observer", c == "observer", f"got {c} ({why})")
+
+
 def self_test():
     bad = 0
 
@@ -2743,6 +2973,7 @@ def self_test():
         report("control: the same row an observer in WRAPPERS, none counted", other == 0, f"got {other}: {out}")
         follow_self_test(report)
         fail_closed_self_test(report)
+        carried_self_test(report)
     finally:
         for s, v in zip(sets + more, saved + saved_more):
             s.clear()
@@ -2766,9 +2997,9 @@ def followed(sc):
     What it can miss: code the test reads for every row alike and does not walk for one. on_want calls
     `e.has(gi.index)`, and the toy's `has` methods are read once for all rows (toy_reads), so a change there that
     the test still takes as a read moves no pinned hash. (One it no longer takes as a read takes `has` out of the
-    reads: each row that calls it is then no observer, and the pin names it as no longer such a row.) And the
-    statements of a class around a followed `__init__` that are no `def`: on_want's row pins
-    `GroupIndex.__init__`, not the class, so an assigned `__setattr__` in its body moves no pin."""
+    reads: each row that calls it is then no observer, and the pin names it as no longer such a row.) A followed
+    constructor's class is pinned by its whole source beside its `__init__`: on_want's row pins `GroupIndex` and
+    `GroupIndex.__init__`."""
     rows = {}
     for r, bodies in sc.followed:
         key = f"row {r['file']} {r['in']} {r['name']} = {r['value']['qual']} ({r['form']})"
