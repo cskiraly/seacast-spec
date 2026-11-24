@@ -246,6 +246,18 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
   | "knownInScopeNode", #[g] => do
     let g ← Replay.groupKey g
     return natJson <$> NodeSeacast.knownInScopeNode (m := R) g
+  | "ownId", #[] => do
+    return Json.str <$> NodeSeacast.ownId (m := R)
+  | "admittedGroup", #[p, g] => do
+    let p ← nat p; let g ← Replay.groupKey g
+    return Json.bool <$> NodeSeacast.admittedGroup (m := R) p g
+  -- seacast-lite.md's two questions as on_want asks them: an ask's key, and an id
+  | "resolve", #[a] => do
+    let a ← key a
+    return optJson keyJson <$> Node61.resolve (m := R) a
+  | "chunkOf", #[a] => do
+    let a ← mid a
+    return chunkJson <$> Node61.chunkOf (m := R) a
   | _, _ => throw s!"not a form of SEACAST's questions, or not its arguments: {form} {(Json.arr args).compress}"
 
 /-- The question run over a tape of these rows, each read as a record's tape entry is under seacast.md. The
@@ -321,6 +333,10 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "owedMissingNode" => p "0"
   | "repairVerdictNode" => p "\"repaired\""
   | "knownInScopeNode" => p "[\"-\",1]"
+  | "ownId" => p "7"
+  | "admittedGroup" => p "\"true\""
+  | "resolve" => p "5"
+  | "chunkOf" => p "[1]"
   | _ => throw s!"no wrong answer for the form {form}"
 
 /-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row
@@ -332,7 +348,9 @@ def refusalOf (form q : String) : String :=
 
 /-- The labels of SEACAST's question forms, one row each, in the order of `tools/forms-seacast-examples.tsv`: the checker's
 own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). The first 44 are the
-file's at spec 287d575; the last 18 cover the methods of `NodeSeacast` and `SeacastLater` that had no row. -/
+file's at spec 287d575; the next 18 cover the methods of `NodeSeacast` and `SeacastLater` that had no row; the last 4
+are the questions §4.5's serving adds: `own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as
+`on_want` asks them. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -344,7 +362,9 @@ def labels : List String :=
    "afterSeacast (reconsider)", "afterSeacast (ask_sample)", "afterSeacast (resample)", "releaseWantedGroups", "shuffledPeers",
    "order", "probeWaitingOrder", "claimsOrder", "ownInterest", "windowRelease",
    "forwardNode", "pushRebuiltNode", "sendHaveNode", "serveStandingNode", "owedMissingNode", "repairVerdictNode",
-   "noteClaimNode", "knownInScopeNode"]
+   "noteClaimNode", "knownInScopeNode",
+   -- §4.5's serving: two of SEACAST's questions, and two of seacast-lite.md's that on_want asks
+   "ownId", "admittedGroup", "resolve", "chunkOf"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)

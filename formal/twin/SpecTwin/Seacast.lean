@@ -4,6 +4,7 @@ import SpecTwin.Seacast.Codecs
 import SpecTwin.Seacast.Relations
 import SpecTwin.Seacast.Announce
 import SpecTwin.Seacast.Probe
+import SpecTwin.Seacast.Serve
 import SpecTwin.Seacast.Decode
 import SpecTwin.Seacast.Receive
 import SpecTwin.Seacast.Sample

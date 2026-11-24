@@ -8,7 +8,8 @@ The lists:
 - COVERED: seacast.md's functions the twin transcribes, each a record of its own. The 66 that the cycle's 71
   call, main's `fill` and `serve_standing`, then `on_pace_tick` and `on_block_installed`, which seacast.md
   redefines and the twin serves in their v2 forms, then `joined` and `drop_wants_beyond`, which v0.11.1 adds on
-  `on_holding`'s path and `fill`'s.
+  `on_holding`'s path and `fill`'s, then §4.5's serving: `index_bound`, `our_interest_for`, `outside`, §4.10's
+  `route_want`, and `on_want`.
 - KEPT: seacast-lite.md's functions that a record under seacast.md may name: those seacast-lite.md keeps all the way down
   under v2 (trace3.py's `seacast_kept` over the toy's two documents), less §7.1's window and less NODE_OWN's names.
   `gen.py --check` computes the rule and compares.
@@ -16,7 +17,7 @@ The lists:
   its own code, with the helper's qualified name in the toy (`held`, §8's interface).
 - REPLACEABLE: the traced names a node may run as something else (a fault, a variant). At such a node the name is a
   question, and the nodes line names it. They are the names a toy's wrapper changes the behaviour of, and
-  `on_iwant`, which a withholder replaces.
+  `on_iwant` and `on_want`, which a withholder replaces.
 - REPLACEABLE_WHOLE: the names replaceable only in a trace of the whole state (a directed set's), never in a cell's.
 - CUT: seacast.md's functions the twin does not transcribe this cycle: a question at every node.
 - OWN: the twin's tables, seacast-lite.md's (schema.py) and then seacast.md's (schema_seacast.py), by the names a trace
@@ -56,7 +57,8 @@ COVERED = [
     "forward", "on_validated", "defer", "on_chunk", "on_holding", "on_offer",
     "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
     "on_pace_tick", "on_block_installed",
-    "joined", "drop_wants_beyond"]
+    "joined", "drop_wants_beyond",
+    "index_bound", "our_interest_for", "outside", "route_want", "on_want"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
@@ -81,7 +83,8 @@ REPLACEABLE = [
     "choose",               # --answers-first other than off and on
     "publish",              # --source-offers off and late
     "known_in_scope",       # the hand cases that rebind it (toy/*_known.py)
-    "on_iwant"]             # a withholder's (check.py's withholders, silent, cap-wait)
+    "on_iwant",             # a withholder's (check.py's withholders, silent, cap-wait)
+    "on_want"]              # a withholder's, the hoarders' filters, --alarm-wait
 
 REPLACEABLE_WHOLE = ["validate_chunk"]
 
@@ -97,13 +100,13 @@ FOREIGN = ["known_id", "chunks"]
 
 QUESTIONS = [
     # the globals that covered functions load, classed as questions: each is answered from the tape
-    "accepted", "admitted", "after", "authenticable", "bid_group", "block_of", "choice", "close_promises_of_group",
-    "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
-    "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room", "high_custody",
-    "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id", "open_group",
-    "open_link", "open_sampling_link", "payload_of", "penalise", "release", "release_wanted_groups", "reserve",
-    "route_next", "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of",
-    "type_of_group", "valid_have", "wake", "wants_family",
+    "accepted", "admitted", "admitted_group", "after", "authenticable", "bid_group", "block_of", "choice",
+    "chunk_of", "close_promises_of_group", "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for",
+    "enqueue", "expired", "families", "families_with_duty", "floor_candidates", "floor_links", "group_bits",
+    "has_room", "high_custody", "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting",
+    "node_id", "open_group", "open_link", "open_sampling_link", "own_id", "payload_of", "penalise", "release",
+    "release_wanted_groups", "reserve", "resolve", "route_next", "sample_without_replacement", "seen", "send",
+    "shuffled", "start", "store", "type_of", "type_of_group", "valid_have", "wake", "wants_family",
     # the callables of a type's parameters (`T.params`)
     "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
     # the object type's functions, which covered functions call on a type

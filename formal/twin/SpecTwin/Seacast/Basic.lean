@@ -59,8 +59,8 @@ def IBits.toBits? : IBits → Option Bits
   | .ofNat a => some a
   | .negSucc _ => none
 
-/-- A type's 24 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
-`REPAIR_TO`, which are questions), and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
+/-- A type's 25 constant parameters: §1.1's `TypeParams` less its three functions (`DECODE_AT_K`, `DECODE_LATER`,
+`REPAIR_TO`, which are questions) and less `MAX_RELATIONS`, which only §6.3's `relation_room` reads, and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
 `REPAIR_REASK`). `SAMPLE_OUTSTANDING` is no type's but the node's (`ConstsSeacast`). Each is optional: the toy gives
 its payload and row types no `SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT`
 (`toy/node.py:1231-1243`, `toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it
@@ -87,6 +87,8 @@ structure TypeParams where
   COVER_HIGH : Option Nat := none
   ROUTE_HOPS : Option Nat := none
   FORWARD_LIMIT : Option Float := none
+  /-- The most indices a group of the type has, before its count is known (§4.5's `index_bound`); at least 1. -/
+  MAX_INDICES : Option Nat := none
   /-- Present and none in this version (§1.5): the nodes line refuses any other value. -/
   EVIDENCE : Option (Option TypeId) := none
   /-- The repair sample's steps `[(S1, L1), …]`, or none (§4.6's `repair_verdict`). -/
@@ -180,6 +182,11 @@ class NodeSeacast (m : Type → Type) where
   groupOf : Block → Descriptor → m Group
   /-- `node_id(p)`: the peer's node id, as the hex of its bytes -/
   nodeId : Peer → m Hex
+  /-- `own_id()` (§3): the node's own id, as the hex of its bytes -/
+  ownId : m Hex
+  /-- `admitted_group(p, g)` (§3, §4.5): a group named in p's WANT is within p's own limit of unknown groups named in
+  WANTs; a group the node has opened always is -/
+  admittedGroup : Peer → Group → m Bool
   /-- `interest_satisfied(g)` -/
   interestSatisfied : Group → m Bool
   /-- `valid_have(h)` for a whole `Have` (§8.2's limits) -/
@@ -284,6 +291,8 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   blockOf a := f (blockOf a)
   groupOf a b := f (groupOf a b)
   nodeId a := f (nodeId a)
+  ownId := f ownId
+  admittedGroup a b := f (admittedGroup a b)
   interestSatisfied a := f (interestSatisfied a)
   validHaveSeacast a := f (validHaveSeacast a)
   mergeWaiting a b := f (mergeWaiting a b)

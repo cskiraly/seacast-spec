@@ -1,6 +1,7 @@
 import SpecTwin.Replay
 import SpecTwin.Seacast.Sample
 import SpecTwin.Seacast.Kept
+import SpecTwin.Seacast.Serve
 import SpecTwin.Seacast.Manifest
 
 /-! # Replaying a record of a trace under seacast.md
@@ -153,7 +154,7 @@ def announceWidthOf : Json → Except String AnnounceWidth
   | j => throw s!"not an announce width: {j.compress}"
 
 /-- One type's parameters in a nodes entry's `types` map, `{NAME: value, ...}` (`TypeParams`). A natural number is
-not negative, and `M` is not 0. A boolean is JSON's. A float is its 64-bit word and finite, and `SERVE_LIMIT` and
+not negative, and neither `M` nor `MAX_INDICES` is 0. A boolean is JSON's. A float is its 64-bit word and finite, and `SERVE_LIMIT` and
 `FORWARD_LIMIT` may be +∞. `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"` and `"NONE"`. `EVIDENCE` is present
 only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`, one step or more. A parameter the type does not have is left out, and
 its read is the toy's `AttributeError`; a missing member and `null` differ. -/
@@ -178,6 +179,10 @@ def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
     | "SAMPLE_COVER" => p := { p with SAMPLE_COVER := some (← n) }
     | "COVER_HIGH" => p := { p with COVER_HIGH := some (← n) }
     | "ROUTE_HOPS" => p := { p with ROUTE_HOPS := some (← n) }
+    | "MAX_INDICES" =>
+      let k ← n
+      if k == 0 then throw s!"types: {t}: MAX_INDICES: 0, where a group of a type has at least one index"
+      p := { p with MAX_INDICES := some k }
     | "SYMMETRIC" => p := { p with SYMMETRIC := some (← b) }
     | "EAGER" => p := { p with EAGER := some (← b) }
     | "REPAIR_BUDGET" => p := { p with REPAIR_BUDGET := some (← b) }
@@ -243,7 +248,7 @@ def callNamesSeacast : List String :=
    "wants_family", "duty_for", "route_next", "block_of", "group_of", "node_id", "interest_satisfied",
    "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
    "open_sampling_link", "choice", "own_interest", "window_release", "send_have", "serve_standing", "owed_missing",
-   "repair_verdict", "note_claim", "known_in_scope"]
+   "repair_verdict", "note_claim", "known_in_scope", "own_id", "admitted_group"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
@@ -370,6 +375,8 @@ instance : NodeSeacast R where
   blockOf g := askCall "block_of" [Json.str g] blockKey
   groupOf b h := askCall "group_of" [blockJson b, descriptorJson h] Replay.groupKey
   nodeId p := askCall "node_id" [(p : Json)] hex
+  ownId := askCall "own_id" [] hex
+  admittedGroup p g := askCall "admitted_group" [(p : Json), Json.str g] boolOf
   interestSatisfied g := askCall "interest_satisfied" [Json.str g] boolOf
   validHaveSeacast h := askCall "valid_have" [haveJson h] boolOf
   mergeWaiting p h := askCall "merge_waiting" [(p : Json), haveJson h] boolOf
@@ -552,6 +559,15 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "ask_custodian", #[g, i] => do exec (askCustodian (← Replay.groupKey g) (← nat i)) (retIs r.ret boolOf)
     | "repair_verdict", #[g] => do exec (repairVerdict (← Replay.groupKey g)) (retIs r.ret repairVerdictOf)
     | "owed_missing", #[g] => do exec (owedMissing (← Replay.groupKey g)) (retIs r.ret boolOf)
+    -- §4.5's serving, and §4.10's routed request
+    | "index_bound", #[g] => do exec (indexBound (← Replay.groupKey g)) (retIs r.ret nat)
+    | "our_interest_for", #[p, g] => do exec (ourInterestFor (← nat p) (← Replay.groupKey g)) (retIs r.ret intOf)
+    | "outside", #[p, g, i, b] => do
+      exec (outside (← nat p) (← Replay.groupKey g) (← nat i) (← boolOf b)) (retIs r.ret boolOf)
+    | "route_want", #[p, g, i, h] => do
+      exec (routeWant (← nat p) (← Replay.groupKey g) (← nat i) (← nat h)) (retIs r.ret boolOf)
+    | "on_want", #[p, asks] => do          -- the answers, narrow, compared in order
+      exec (onWant (← nat p) (← (← arr asks).mapM askSeacastOf)) fun v => do return v == (← (← arr r.ret).mapM chunkN)
     -- fill, §4.6's completion, decoding and claims, filter_entry
     | "push_rebuilt_as_source", #[g, items] => do
       exec (pushRebuiltAsSource (← Replay.groupKey g) (← pairs "index and chunk" nat chunkN items)) none_

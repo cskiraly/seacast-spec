@@ -250,6 +250,17 @@ def sbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
 #guard failsWith "nodes: types: no payload type: " (line2 (entry [("types", some (Json.mkObj []))]))
 #guard failsWith "nodes: types: payload: M: "
   (line2 (entry [("types", some (Json.mkObj [("payload", Json.mkObj [("M", jn 0)])]))]))
+-- `MAX_INDICES` (§4.5's `index_bound`): present, a count read; absent, none, whose read crashes; 0 and a boolean refused
+def maxIndices (v : Json) : Json := Json.mkObj [("payload", Json.mkObj [("MAX_INDICES", v)])]
+#guard (match line2 (entry [("types", some (maxIndices (jn 8192)))]) with
+  | .ok l => l.all fun (_, cfg) => ((cfg.types.lookup "payload").bind (·.MAX_INDICES)) == some 8192
+  | .error _ => false)
+#guard (match line2 (entry) with
+  | .ok l => l.all fun (_, cfg) => ((cfg.types.lookup "payload").bind (·.MAX_INDICES)) == none
+  | .error _ => false)
+#guard failsWith "nodes: types: payload: MAX_INDICES: 0, where a group of a type has at least one index"
+  (line2 (entry [("types", some (maxIndices (jn 0)))]))
+#guard failsWith "nodes: types: payload: MAX_INDICES: " (line2 (entry [("types", some (maxIndices (Json.bool true)))]))
 
 /-! ## The dispatch -/
 
@@ -262,7 +273,8 @@ def sbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
 #guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
-#guard fnsSeacast.length == 70                                                  -- v0.11.1's joined, drop_wants_beyond
+#guard fnsSeacast.length == 75                                                  -- v0.11.1's joined, drop_wants_beyond;
+                                                                                --   §4.5's serving, §4.10's route_want
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused

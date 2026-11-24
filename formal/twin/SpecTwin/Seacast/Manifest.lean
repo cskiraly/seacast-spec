@@ -19,7 +19,8 @@ def covered : List String :=
    "owed_missing", "push_rebuilt_as_source", "push_rebuilt", "fill", "arm", "check_completion", "defer_on_claim",
    "reconsider", "decode_group", "claims_close", "note_claim", "filter_entry", "forward", "on_validated", "defer",
    "on_chunk", "on_holding", "on_offer", "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
-   "on_pace_tick", "on_block_installed", "joined", "drop_wants_beyond"]
+   "on_pace_tick", "on_block_installed", "joined", "drop_wants_beyond", "index_bound", "our_interest_for", "outside",
+   "route_want", "on_want"]
 
 /-- `seacast-lite.md`'s functions a record under `seacast.md` may name, kept all the way down. -/
 def kept : List String :=
@@ -37,7 +38,7 @@ def nodeOwn : List (String × String) :=
 /-- The traced names a node may run as something else: a question there. -/
 def replaceable : List String :=
   ["forward", "push_rebuilt", "send_have", "serve_standing", "owed_missing", "filter_entry", "repair_verdict",
-   "decode_group", "note_claim", "choose", "publish", "known_in_scope", "on_iwant"]
+   "decode_group", "note_claim", "choose", "publish", "known_in_scope", "on_iwant", "on_want"]
 
 /-- The names replaceable only in a trace of the whole state. -/
 def replaceableWhole : List String :=
@@ -65,15 +66,16 @@ def foreign : List String :=
 
 /-- The names the replay of a trace under `seacast.md` reads as questions, answered from the tape. -/
 def questions : List String :=
-  ["accepted", "admitted", "after", "authenticable", "bid_group", "block_of", "choice", "close_promises_of_group",
-   "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue", "expired", "families",
-   "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room", "high_custody",
-   "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id", "open_group",
-   "open_link", "open_sampling_link", "payload_of", "penalise", "release", "release_wanted_groups", "reserve",
-   "route_next", "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
-   "valid_have", "wake", "wants_family", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "cross", "decode",
-   "derived_interest", "family", "header_of", "index_count", "project", "threshold", "verify", "group_of",
-   "open_group_source", "own_interest", "gossip_put", "mesh_has", "gossip_remove_group"]
+  ["accepted", "admitted", "admitted_group", "after", "authenticable", "bid_group", "block_of", "choice", "chunk_of",
+   "close_promises_of_group", "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for", "enqueue",
+   "expired", "families", "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room",
+   "high_custody", "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id",
+   "open_group", "open_link", "open_sampling_link", "own_id", "payload_of", "penalise", "release",
+   "release_wanted_groups", "reserve", "resolve", "route_next", "sample_without_replacement", "seen", "send",
+   "shuffled", "start", "store", "type_of", "type_of_group", "valid_have", "wake", "wants_family", "DECODE_AT_K",
+   "DECODE_LATER", "REPAIR_TO", "cross", "decode", "derived_interest", "family", "header_of", "index_count", "project",
+   "threshold", "verify", "group_of", "open_group_source", "own_interest", "gossip_put", "mesh_has",
+   "gossip_remove_group"]
 
 /-- The questions that no covered function loads, each with its reason. -/
 def questionsUnloaded : List (String × String) :=
