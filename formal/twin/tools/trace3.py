@@ -1273,6 +1273,22 @@ def forms_self_test():
          "SystemExit: trace3: node 3: type row: MAX_INDICES is no natural above 0"),
         ("a MAX_RELATIONS of True", lambda: prm(MAX_RELATIONS=True),
          "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of 2^53+1, which a float rounds", lambda: prm(MAX_RELATIONS=2 ** 53 + 1),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of the int 10^400, beyond any float", lambda: prm(MAX_RELATIONS=10 ** 400),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of 0.5", lambda: prm(MAX_RELATIONS=0.5),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of 2^53, written as its word", lambda: prm(MAX_RELATIONS=2 ** 53),
+         {"MAX_RELATIONS": 4845873199050653696}),
+        ("a MAX_RELATIONS of -0.0, written as its own word", lambda: prm(MAX_RELATIONS=-0.0),
+         {"MAX_RELATIONS": 9223372036854775808}),
+        ("a MAX_RELATIONS of the float 1e400, which is +inf", lambda: prm(MAX_RELATIONS=1e400),
+         {"MAX_RELATIONS": 9218868437227405312}),
+        ("a START_DELAY of 2^53+1, which a float rounds", lambda: prm(START_DELAY=2 ** 53 + 1),
+         "SystemExit: trace3: node 3: type row: START_DELAY is no finite number"),
+        ("a START_DELAY of the int 10^400, beyond any float", lambda: prm(START_DELAY=10 ** 400),
+         "SystemExit: trace3: node 3: type row: START_DELAY is no finite number"),
         ("SAMPLE_OUTSTANDING, the node's since v0.11.1, as a type's", lambda: prm(SAMPLE_OUTSTANDING=4),
          "SystemExit: trace3: node 3: type row: SAMPLE_OUTSTANDING is a parameter the tracer does not know"),
     ]
@@ -4351,6 +4367,17 @@ class Tracer3(Tracer):
     TYPE_FUNCTIONS = ("DECODE_AT_K", "DECODE_LATER", "REPAIR_TO")
     ANNOUNCE_WIDTHS = ("ALL_JOINED", "SAMPLE", "NONE")
 
+    @staticmethod
+    def float_exact(v):
+        """Whether v is a number a float's word holds exactly: no bool, an int or a float, and float(v) == v. An int
+        above 2^53 that a float rounds is not, nor one too large for any float (OverflowError); nor a NaN."""
+        if isinstance(v, bool) or not isinstance(v, (int, float)):
+            return False
+        try:
+            return float(v) == v
+        except OverflowError:
+            return False
+
     def type_params(self, nd, tid, prm):
         """One type's parameters, each in its form (types_seacast); a parameter of no listed kind stops the tracer, so
         that a new one is given its form before a trace holds it."""
@@ -4374,12 +4401,12 @@ class Tracer3(Tracer):
                     stop(name, v, "no boolean")
                 out[name] = v
             elif name in self.TYPE_COUNTS:
-                if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v) or (
+                if not self.float_exact(v) or math.isnan(v) or (
                         math.isinf(v) and v < 0) or (math.isfinite(v) and (v < 0 or v != int(v))):
                     stop(name, v, "no count nor +inf")
                 out[name] = fbits(v)
             elif name in self.TYPE_FLOATS:
-                if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v) or (
+                if not self.float_exact(v) or math.isnan(v) or (
                         math.isinf(v) and not (v > 0 and name in self.TYPE_UNBOUNDED)):
                     stop(name, v, "no finite number" + (" nor +inf" if name in self.TYPE_UNBOUNDED else ""))
                 out[name] = fbits(v)

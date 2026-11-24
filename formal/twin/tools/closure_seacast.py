@@ -84,6 +84,11 @@ TYPE_ATTRS_Seacast = ("name", "id", "params") + TYPE_CALLS_Seacast
 # a field read off a comprehension's target over one of them is a value, not one of the type's functions
 MESSAGE_TABLES = {"owed_relations": "schema_seacast's kind relations: the JOINs, GRAFTs and PRUNEs a full queue "
                                     "refused, in order, each a wire message"}
+# the wire message classes whose fields a function may read by a parameter annotated with one, each with its reason.
+# Python does not enforce an annotation, and a document may add any class with Container among its bases; a class not
+# listed here is no wire message to the tell
+MESSAGE_CLASSES = {"Graft": "§2's GRAFT: its family is a FamilyId field (on_graft's gr)",
+                   "Prune": "§2's PRUNE: its family is a FamilyId field (on_prune's pr)"}
 FIELD_OFF = [False]     # the self-test's control: no read is a wire message's field
 
 COMPS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
@@ -122,6 +127,23 @@ def _walruses(comp, out):
     for n in ast.walk(comp):
         if isinstance(n, ast.NamedExpr) and isinstance(n.target, ast.Name):
             out.add(n.target.id)
+
+
+def _bound_in(fn, name, own=None):
+    """Whether `name` is bound anywhere in fn, nested scopes too, other than by `own` (one of fn's parameters): a
+    store or delete of it (an assignment, a for's or comprehension's target, a walrus, del), an argument (fn's, a
+    lambda's, a nested def's), an except's name, an import's name, a nested def's or class's name. A binding in a
+    nested scope may not shadow the read; it is refused all the same. A match, global and nonlocal are STOPS."""
+    for m in ast.walk(fn):
+        if m is own or m is fn:
+            continue
+        if ((isinstance(m, ast.Name) and m.id == name and not isinstance(m.ctx, ast.Load))
+                or (isinstance(m, ast.arg) and m.arg == name)
+                or (isinstance(m, ast.ExceptHandler) and m.name == name)
+                or (isinstance(m, ast.alias) and (m.asname or m.name).split(".")[0] == name)
+                or (isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and m.name == name)):
+            return True
+    return False
 
 
 def _comp_binds(comp):
@@ -301,42 +323,43 @@ def _parents(fn):
 
 
 def _message_class(rd, c):
-    """A class of the documents that is a wire message: Container among its bases."""
-    c = rd.classes.get(c)
+    """A class of the documents that is a wire message: listed in MESSAGE_CLASSES, with Container among its bases."""
+    c = rd.classes.get(c) if c in MESSAGE_CLASSES else None
     return c is not None and any(isinstance(b, ast.Name) and b.id == "Container" for b in c.bases)
 
 
 def message_field(rd, fn, n, par):
     """Whether `X.a`, a read of one of the type's function names that is not a call, is a field of a wire message,
-    in one of two cases. (i) X is a parameter of fn annotated with a class of the documents that has Container among
-    its bases and declares `a` in its body, and fn binds X nowhere else (no store, and no lambda's, comprehension's or
-    nested function's X). (ii) X is the plain-name target of a comprehension around the read, over a subscript of a
-    table in MESSAGE_TABLES that fn does not bind, and the read is in that comprehension's element or in its binding
-    generator's conditions. Any other such read is one the check cannot follow."""
+    in one of two cases. (i) X is a parameter of fn annotated with a class of MESSAGE_CLASSES that the documents
+    define with Container among its bases and that declares `a` in its body, and fn binds X nowhere else, nested
+    scopes too (_bound_in). (ii) At the first comprehension around the read whose generators bind X, exactly one
+    generator binds X, its target is the plain name X, its iterable subscripts a table of MESSAGE_TABLES that fn binds
+    nowhere (_bound_in), and the read is in the comprehension's element or in that generator's conditions; a read in
+    a later generator is refused. Any other such read is one the check cannot follow."""
     x = n.value
     if FIELD_OFF[0] or not isinstance(x, ast.Name):
         return False
-    child, up = n, par.get(id(n))
+    below, child, up = None, n, par.get(id(n))
     while up is not None and up is not fn:
         if isinstance(up, COMPS):
-            names = [{t.id for t in ast.walk(g.target) if isinstance(t, ast.Name)} for g in up.generators]
-            if any(x.id in s for s in names):
-                g = next((g for g in up.generators if isinstance(g.target, ast.Name) and g.target.id == x.id), None)
-                inside = g is not None and (child in (getattr(up, "elt", None), getattr(up, "key", None),
-                                                      getattr(up, "value", None)) or child in g.ifs)
-                it = g.iter if g is not None else None
-                return bool(inside and isinstance(it, ast.Subscript) and isinstance(it.value, ast.Name)
-                            and it.value.id in MESSAGE_TABLES
-                            and not any(isinstance(m, ast.Name) and m.id == it.value.id
-                                        and not isinstance(m.ctx, ast.Load) for m in ast.walk(fn)))
+            gens = [g for g in up.generators
+                    if any(isinstance(t, ast.Name) and t.id == x.id for t in ast.walk(g.target))]
+            if gens:
+                g = gens[0]
+                where = (any(child is e for e in (getattr(up, "elt", None), getattr(up, "key", None),
+                                                  getattr(up, "value", None)))
+                         or (child is g and any(below is c for c in g.ifs)))
+                it = g.iter
+                return bool(len(gens) == 1 and isinstance(g.target, ast.Name) and where
+                            and isinstance(it, ast.Subscript) and isinstance(it.value, ast.Name)
+                            and it.value.id in MESSAGE_TABLES and not _bound_in(fn, it.value.id))
         elif isinstance(up, ast.Lambda) and x.id in _arg_names(up.args):
             return False
-        child, up = up, par.get(id(up))
+        below, child, up = child, up, par.get(id(up))
     a = next((a for a in fn.args.posonlyargs + fn.args.args + fn.args.kwonlyargs if a.arg == x.id), None)
     if a is None or not isinstance(a.annotation, ast.Name) or not _message_class(rd, a.annotation.id):
         return False
-    if any((isinstance(m, ast.Name) and m.id == x.id and not isinstance(m.ctx, ast.Load))
-           or (isinstance(m, ast.arg) and m.arg == x.id and m is not a) for m in ast.walk(fn)):
+    if _bound_in(fn, x.id, own=a):
         return False
     return any(isinstance(s, ast.AnnAssign) and isinstance(s.target, ast.Name) and s.target.id == n.attr
                for s in rd.classes[a.annotation.id].body)
@@ -659,7 +682,9 @@ def self_test(N, m, schema_values, type_functions):
     ]
     # the tell of a wire message's field (message_field): two that pass, then the reads it cannot follow
     cls = ("class Container:\n    pass\n\nclass Graft(Container):\n    family: int\n    colour: int\n\n"
-           "class Bare(Container):\n    colour: int\n\nclass ObjectType:\n    family: int\n\n")
+           "class Prune(Container):\n    colour: int\n\nclass LocalType(Container):\n    family: Callable\n\n"
+           "class ObjectType:\n    family: int\n\n")
+    ret = "    return {m.family for m in owed_relations[p]}\n"
     odd = "a read of the type's function family that is not a call, in c: "
     tell = [
         ("the tell: gr: Graft, a wire message, its family field", "def c(p, gr: Graft):\n    return gr.family\n",
@@ -671,8 +696,8 @@ def self_test(N, m, schema_values, type_functions):
         ("the tell: gr: Graft, rebound", "def c(p, gr: Graft):\n    gr = q(p)\n    return gr.family\n",
          [odd + "return gr.family"]),
         ("the tell: gr, not annotated", "def c(p, gr):\n    return gr.family\n", [odd + "return gr.family"]),
-        ("the tell: gr: Bare, a wire message that declares no family", "def c(p, gr: Bare):\n    return gr.family\n",
-         [odd + "return gr.family"]),
+        ("the tell: pr: Prune, a listed wire message that declares no family",
+         "def c(p, pr: Prune):\n    return pr.family\n", [odd + "return pr.family"]),
         ("the tell: a comprehension over links(T), not a listed table",
          "def c(T):\n    return {m.family for m in links(T)}\n", [odd + "{m.family for m in links(T)}"]),
         ("the tell: a read outside the comprehension over owed_relations",
@@ -680,6 +705,37 @@ def self_test(N, m, schema_values, type_functions):
         ("the tell: owed_relations bound in the function",
          "def c(p):\n    owed_relations = links(p)\n    return {m.family for m in owed_relations[p]}\n",
          [odd + "{m.family for m in owed_relations[p]}"]),
+        ("the tell: a read in the binding generator's condition",
+         "def c(p):\n    return {m.colour for m in owed_relations[p] if m.family}\n", []),
+        ("the tell: a read in a later generator's condition",
+         "def c(p, o):\n    return {k for m in owed_relations[p] for k in o if m.family}\n",
+         [odd + " for k in o if m.family"]),
+        ("the tell: a second generator binds m too",
+         "def c(p, o):\n    return {m.family for m in owed_relations[p] for m in o}\n",
+         [odd + "{m.family for m in owed_relations[p] for m in o}"]),
+        ("the tell: owed_relations a parameter", "def c(p, owed_relations):\n" + ret,
+         [odd + "{m.family for m in owed_relations[p]}"]),
+        ("the tell: owed_relations a lambda's argument",
+         "def c(p):\n    return (lambda owed_relations: {m.family for m in owed_relations[p]})(p)\n",
+         [odd + "{m.family for m in owed_relations[p]}"]),
+        ("the tell: owed_relations an except's name",
+         "def c(p):\n    try:\n        q(p)\n    except E as owed_relations:\n        pass\n" + ret,
+         [odd + "{m.family for m in owed_relations[p]}"]),
+        ("the tell: owed_relations an import's name", "def c(p):\n    import links as owed_relations\n" + ret,
+         [odd + "{m.family for m in owed_relations[p]}"]),
+        ("the tell: gr: Graft, an except's name",
+         "def c(p, gr: Graft):\n    try:\n        q(p)\n    except E as gr:\n        pass\n    return gr.family\n",
+         [odd + "return gr.family"]),
+        ("the tell: gr: Graft, an import's name", "def c(p, gr: Graft):\n    import links as gr\n    return gr.family\n",
+         [odd + "return gr.family"]),
+        ("the tell: gr: Graft, a nested def's name",
+         "def c(p, gr: Graft):\n    def gr():\n        pass\n    return gr.family\n", [odd + "return gr.family"]),
+        ("the tell: x: LocalType, a Container class not in MESSAGE_CLASSES",
+         "def c(p, x: LocalType):\n    return x.family\n", [odd + "return x.family"]),
+        ("the tell: a lambda's m in the comprehension's element",
+         "def c(p):\n    return {(lambda m: m.family)(p) for m in owed_relations[p]}\n", [odd + "lambda m: m.family"]),
+        ("the tell: gr: Graft, a lambda's argument elsewhere",
+         "def c(p, gr: Graft):\n    f = lambda gr: 0\n    return gr.family\n", [odd + "return gr.family"]),
     ]
     cases += [(what, "types", synth(cls + src, ["c"]), want) for what, src, want in tell]
 
@@ -737,7 +793,7 @@ def self_test(N, m, schema_values, type_functions):
             [cases[15][0]])
     control("the tell of a wire message's field off",
             [w for w, k, a, want in cases if k == "types" and a[0] is not None and run(k, a, field_off=True) != want],
-            [tell[0][0], tell[1][0], tell[7][0]])     # the cases with a read the tell passes
+            [tell[0][0], tell[1][0], tell[7][0], tell[9][0]])     # the cases with a read the tell passes
     # the documents as they are, with the lists as they are: no finding
     found, lines = check(real[True], m, schema_values, type_functions)
     ok = not found
