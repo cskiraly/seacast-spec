@@ -4,6 +4,8 @@
     python3 scan_bindings.py TOYDIR             the rows, one per line
     python3 scan_bindings.py TOYDIR --json      the rows as JSON lines, each with its bound function's source hash
     python3 scan_bindings.py TOYDIR --lists     the lists the rows give, beside trace3.py's hand-kept ones
+    python3 scan_bindings.py TOYDIR --followed  the code each observer verdict rests on beyond its row's own body
+    python3 scan_bindings.py TOYDIR --pins FILE that code against FILE's (followed-pins.txt): a line per difference
     python3 scan_bindings.py --self-test        one planted binding per form, each reported; each form's reader off
                                                 in turn, its row missing; a changed body, its row's hash alone moved
 
@@ -24,7 +26,7 @@ Each function bound has a class:
   binds under v2 alone) and no traced function but the earlier binding; it assigns, deletes or mutates no table,
   through its own aliases too, following the local functions, lambdas and node methods it calls with the tables it
   hands them; on a table, or on what a table's method returns, it calls only the methods that read it, and it hands
-  a table to no call the test cannot follow (a builtin but those that only read, `len`, `sorted`, ...); the functions
+  a table to no call the test cannot follow (a builtin but those it takes as reads, `len`, `sorted`, ...); the functions
   and lambdas made inside it are read as its own code; it rebinds no namespace name (a scalar too: a layer
   that changes a node constant around the call, as the peer promise's `filter_entry` sets PROMISE, is a changing
   layer); and it calls the earlier binding once on every path (branches, `try`, `with`, loops walked; a statement
@@ -33,7 +35,10 @@ Each function bound has a class:
   with its own parameters unchanged (a handler's, a pattern's or a walrus's name counts) and nothing more, returning
   its result, or nothing where the document's function returns nothing (a least fixpoint over both documents:
   `return f(...)` of a function that returns nothing returns nothing). `message_id`'s cache is an observer by name
-  (it skips the call on a hit). What the test cannot establish is not an observer: an unknown effect denies.
+  (it skips the call on a hit). The test is a reading of the syntax, not a proof. What it can miss: an effect in a
+  form it does not read as one. In followed code, `e = self._have[g]; e |= g` passes, and the toy's bitmaps (`Bits`)
+  join in place in `__ior__`. The code that a row's observer verdict rests on beyond its own body is pinned by its
+  source (`--followed`, `--pins`), and a change there fails check.sh's scope step until the row is read again.
 - **layer**: it holds the earlier binding and fails the test (the reason is given); one that passes it where it
   may name and bind a draw's slot (DRAWS: `choice`, `sample_without_replacement`, `shuffled`) is marked a swapped
   draw, which the tracer re-wraps while it is bound;
@@ -65,12 +70,13 @@ FORMS = ("subscript", "tuple", "update-keyword", "update-dict", "locals-export",
 MUTATORS = {"add", "append", "appendleft", "extend", "extendleft", "insert", "pop", "popleft", "popitem", "remove",
             "discard", "clear", "update", "setdefault", "sort", "reverse", "__setitem__", "__delitem__", "set", "unset",
             "difference_update", "intersection_update", "symmetric_difference_update"}
-# the methods that only read a table (a dict, a set, a list, a deque): any other call on a table, or on what one of
-# its methods returns, is one the test cannot establish as a read, and denies
+# the methods that only read a dict, a set, a list or a deque, taken as reads of a table: any other call on a
+# table, or on what one of its methods returns, is one the test cannot establish as a read, and denies
 READONLY_METHODS = {"get", "keys", "values", "items", "copy", "count", "index", "issubset", "issuperset", "isdisjoint",
                     "union", "intersection", "difference", "symmetric_difference", "__contains__", "__len__",
                     "__iter__", "__getitem__"}
-# the builtins that only read what they are handed: any other builtin handed a table denies (setattr, map, ...)
+# the builtins taken as reads of what they are handed: any other builtin handed a table denies (setattr, map, ...).
+# What this can miss: a builtin that runs what it is handed; `sorted(g, key=node.consume_draw)` passes
 READONLY_BUILTINS = {"len", "list", "tuple", "set", "frozenset", "dict", "sorted", "reversed", "iter", "next",
                      "enumerate", "zip", "sum", "min", "max", "any", "all", "isinstance", "bool", "int", "float", "str",
                      "repr", "hash", "id", "type", "abs", "round", "range", "callable", "bytes", "hasattr"}
@@ -114,6 +120,33 @@ def ns_key(e):
 def first_line(fn):
     """The line Python gives the function's code (co_firstlineno): the first decorator's, else the def's."""
     return min([d.lineno for d in getattr(fn, "decorator_list", ())] + [fn.lineno])
+
+
+SOURCES = {}        # a function's or lambda's node, by id -> (its file or document, its qualified name, the source)
+KEPT = []           # every tree named in SOURCES, kept, so that no id is reused
+
+
+def name_bodies(tree, label, src):
+    """Each function and lambda of a tree, named for the followed code's listing: its file or document, its qualified
+    name (Python's __qualname__; a lambda `<lambda>`; a second of a name in one scope numbered #2) and its source."""
+    KEPT.append(tree)
+    stack = [(tree, "", {})]
+    while stack:
+        node, prefix, counts = stack.pop()
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Lambda)):
+            n = getattr(node, "name", "<lambda>")
+            counts[n] = counts.get(n, 0) + 1
+            q = prefix + n + (f"#{counts[n]}" if counts[n] > 1 else "")
+            SOURCES[id(node)] = (label, q, src)
+            prefix, counts = q + ("." if isinstance(node, ast.ClassDef) else ".<locals>."), {}
+        stack.extend((c, prefix, counts) for c in reversed(list(ast.iter_child_nodes(node))))
+
+
+def body_of(node):
+    """A walked body's file or document, its qualified name and its source's sha256 (a body no tree named: "?")."""
+    label, qual, src = SOURCES.get(id(node), ("?", f"{getattr(node, 'name', '<lambda>')}@{node.lineno}", None))
+    seg = (ast.get_source_segment(src, node) or "") if src is not None else ast.unparse(node)
+    return label, qual, hashlib.sha256(seg.encode()).hexdigest()
 
 
 class Func:
@@ -185,6 +218,10 @@ class Scanner:
         self.attr_captures = {}     # (file, attribute) -> the namespace name a node attribute was assigned from
         self.traced, self.questions = TRACED, QUESTIONS_DOC
         self.exempt = ()            # the slots the observer test lets a layer name and bind (observer_test)
+        self.walked_now = None      # the bodies the running observer test walks (names_and_writes)
+        self.observed = []          # the bodies walked by a row's tests that gave an observer verdict (row)
+        self.followed = []          # (row, {(file or document, qualified name): sha256}) of each row whose observer
+        #                             verdict rests on code beyond its own body
         self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
         self.imports = {}           # (file, local name) -> (module file, name), or (module file, None) for a module
         self.collect = None         # the pre-pass (scan): every binding's function by name, None where a value
@@ -201,6 +238,7 @@ class Scanner:
         """A module's own functions and methods, and its imports of the toy's other modules (path's siblings)."""
         src = path.read_text()
         tree = ast.parse(src)
+        name_bodies(tree, path.name, src)
         mod = Scope(tree, "", None)
         toy = {p.name for p in path.parent.glob("*.py")}
         aliases = set()                     # the names this file binds to the namespace, read as `ns` in it
@@ -278,6 +316,7 @@ class Scanner:
     def scan_file(self, path):
         src = path.read_text()
         tree = ast.parse(src)
+        name_bodies(tree, path.name, src)
         self.src, self.path = src, path
         NS_FILE[0] = path.name
         if self.collect is not None:        # the pre-pass: each node's parent, for a computed key's loop
@@ -507,6 +546,7 @@ class Scanner:
             else:
                 r["holds"] = held
                 docs = ("seacast",) if r["seacast_only"] else ("seacast-lite.md", "seacast")     # the documents it runs under
+                self.observed = []
                 split = self.closure_split(fn, name, held, docs)
                 if split is not None:       # its class per branch on a closure value (the node's, read later), each
                                             #   branch's per document where the two differ
@@ -525,6 +565,12 @@ class Scanner:
                     else:                   # an observer under one, not the other
                         r["class"] = "per-document"
                         r["by_document"] = {d: "observer" if w is None else f"layer ({w})" for d, w in by.items()}
+                bodies = {}
+                for b in self.observed:
+                    label, qual, sha = body_of(b)
+                    bodies[(label, qual)] = sha
+                if set(bodies) - {body_of(fn.node)[:2]}:
+                    self.followed.append((r, bodies))
         self.rows.append(r)
 
     def in_seacast(self, scope, line):
@@ -580,7 +626,8 @@ class Scanner:
                # (off: refused by name, as before); a draw, a name with a binding the scan does not read, and the
                # layer's own name in what it follows are each refused
                "follow", "draw", "unread", "own-name",
-               # fail-closed followed code: a store or mutator on what the followed function did not make ("effect");
+               # followed code, refused where the follow does not read it as one of its kinds, in the forms it reads:
+               # a store or mutator on what the followed function did not make ("effect");
                # a call of no kind the follow reads ("call"); a followed call's answer under the test ("answer"); and
                # the kinds it reads: its own new objects ("fresh"), a toy class's constructor ("ctor": its guard,
                # "ctor-guard", and its __init__, "ctor-init"), a listed pure operation ("pure"), its file's own function
@@ -675,7 +722,10 @@ class Scanner:
         Refused: a class with a decorator (a dataclass's default_factory among them), a base, a keyword (a metaclass),
         or any method but its __init__: __new__, __post_init__ and __init_subclass__ among them, and every method a
         store, a mutator or an operator on the new object would run unfollowed (__setattr__, __setitem__, append, …).
-        Else its own __init__, if it has one, is followed by the same test, with its receiver a new object."""
+        Else its own __init__, if it has one, is followed by the same test, with its receiver a new object.
+
+        What it can miss: an `__init__` that is no `def` of the class; one bound to a lambda that clears
+        `node.pending` passes."""
         if "ctor-guard" not in self.off and (
                 c.decorator_list or c.bases or c.keywords
                 or any(isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name != "__init__"
@@ -739,7 +789,14 @@ class Scanner:
         else:
             self.returns = RETURNS_DOC if name in DEFS_DOC else RETURNS_Seacast
         own = self.own_scope(fn.node, fn.qual, fn.scope)
-        return self.names_and_writes(fn.node, own, name, held, set()) or self.paths(fn.node, own, name, held)
+        self.walked_now = []
+        try:
+            why = self.names_and_writes(fn.node, own, name, held, set()) or self.paths(fn.node, own, name, held)
+        finally:
+            walked, self.walked_now = self.walked_now, None
+        if why is None and not exempt:      # an observer verdict: the bodies it rests on (the followed code's listing)
+            self.observed += walked
+        return why
 
     def table_arg(self, call, scope):
         return next((a for a in list(call.args) + [k.value for k in call.keywords]
@@ -753,6 +810,8 @@ class Scanner:
         (`follow`), by this same test; named in any other way, it is refused as before. In what is followed
         (`self.depth` > 0), a document function it calls is followed too, and a `global` or `nonlocal`, and the
         layer's own name, are refused."""
+        if self.walked_now is not None:
+            self.walked_now.append(node)
         calls = {id(c.func) for c in ast.walk(node) if isinstance(c, ast.Call)}    # the functions called directly
         for n in ast.walk(node):
             k = None
@@ -828,7 +887,7 @@ class Scanner:
                         return f"calls {n.func.id}, a namespace name the follow does not read"
                     continue            # a namespace function (named, and so checked, above)
                 elif f is None and n.func.id in READONLY_BUILTINS:
-                    continue            # a builtin that only reads (any other is unfollowed, below)
+                    continue            # a builtin taken as a read (any other is unfollowed, below)
                 elif self.depth and n.func.id not in scope.bound and not scope.shadowed(n.func.id):
                     g = self.globals.get((self.path.name, n.func.id))
                     if g is not None and "." not in g.qual and "module-fn" not in self.off:
@@ -1329,6 +1388,8 @@ class Scanner:
                                   decorator_list=[], returns=None, type_comment=None, type_params=[])
             ast.copy_location(alt, node)
             ast.fix_missing_locations(alt)
+            KEPT.append(alt)                # the branch is the function's own body, by its name and source
+            SOURCES[id(alt)] = SOURCES.get(id(node), ("?", f"{node.name}@{node.lineno}", None))
             f2 = Func(alt, fn.qual, fn.scope, self.src, self.path)
             h = self.held(f2, name)
             by = {d: "own" if h is None else ("observer" if self.observer_test(f2, name, h, d) is None else "layer")
@@ -1409,8 +1470,12 @@ def load_names(toy):
     import trace3 as T                  # noqa: E402
     sys.path.insert(0, str(Path(toy).resolve()))
     import node as N                    # noqa: E402: the pinned toy's
-    doc = {d.name: d for d in ast.parse(N.SPEC_SRC).body if isinstance(d, ast.FunctionDef)}
-    v2 = {d.name: d for d in ast.parse(N.generate(N.DOC2)).body if isinstance(d, ast.FunctionDef)}
+    doc_src, v2_src = N.SPEC_SRC, N.generate(N.DOC2)
+    doc_tree, v2_tree = ast.parse(doc_src), ast.parse(v2_src)
+    name_bodies(doc_tree, "seacast-lite.md", doc_src)
+    name_bodies(v2_tree, "seacast.md", v2_src)
+    doc = {d.name: d for d in doc_tree.body if isinstance(d, ast.FunctionDef)}
+    v2 = {d.name: d for d in v2_tree.body if isinstance(d, ast.FunctionDef)}
     DEFS_DOC.update(doc)
     DEFS_Seacast.update(v2)
     FNS_DOC.update(doc)
@@ -2682,6 +2747,66 @@ def self_test():
     return 1 if bad else 0
 
 
+PINS_HEAD = ["# The code each observer verdict rests on beyond the row's own body, by its source's sha256: written",
+             "# by `scan_bindings.py TOYDIR --followed`. check.sh's scope step compares it (`--pins`): after a",
+             "# difference, read the row again, then write this file anew."]
+
+
+def followed(sc):
+    """The followed code's listing: each row whose observer verdict, under some document or in some branch, rests on
+    code beyond the row's own body (a followed question or traced function, a function or method it calls), and
+    every body its observer tests walked, its own among them, by its file or document, its qualified name and its
+    source's sha256. A change in one of these bodies, of a kind the test does not read, may leave the row an
+    observer that is no longer one; the pin (`pins`) makes the change fail until the row is read again.
+
+    What it can miss: code the test reads for every row alike and does not walk for one. on_want calls
+    `e.has(gi.index)`, and the toy's `has` methods are read once for all rows (toy_reads), so a change there moves
+    no pin."""
+    rows = {}
+    for r, bodies in sc.followed:
+        key = f"row {r['file']} {r['in']} {r['name']} = {r['value']['qual']} ({r['form']})"
+        rows.setdefault(key, {}).update(bodies)
+    out = list(PINS_HEAD)
+    for key in sorted(rows):
+        out.append(key)
+        out += [f"  {label} {qual} {sha}" for (label, qual), sha in sorted(rows[key].items())]
+    return out
+
+
+def pins(sc, path):
+    """The differences between the followed code's listing and a pinned one, one line each naming its row; and how
+    many rows the listing holds."""
+    def blocks(lines):
+        out, cur = {}, None
+        for x in lines:
+            if not x or x.startswith("#"):
+                continue
+            if x.startswith("row "):
+                cur = out.setdefault(x, {})
+            else:
+                label, qual, sha = x.split()
+                cur[(label, qual)] = sha
+        return out
+    now, was = blocks(followed(sc)), blocks(Path(path).read_text().splitlines())
+    diffs = []
+    for row in sorted(set(now) | set(was)):
+        if row not in was:
+            diffs.append(f"pins: {row}: its observer verdict rests on code beyond its own body, and it is not pinned")
+        elif row not in now:
+            diffs.append(f"pins: {row}: pinned, and no longer a row whose observer verdict rests on code beyond it")
+        else:
+            for k in sorted(set(now[row]) | set(was[row])):
+                b = " ".join(k)
+                if k not in was[row]:
+                    diffs.append(f"pins: {row}: {b} walked, not pinned")
+                elif k not in now[row]:
+                    diffs.append(f"pins: {row}: {b} pinned, not walked")
+                elif now[row][k] != was[row][k]:
+                    diffs.append(f"pins: {row}: {b} changed (pinned {was[row][k][:12]}, now {now[row][k][:12]}): "
+                                 f"read the row again")
+    return diffs, len(now)
+
+
 def main(argv):
     if argv == ["--self-test"]:
         return self_test()
@@ -2699,6 +2824,17 @@ def main(argv):
         print("\n".join(out))
         print(f"{other} differences from trace3.py's lists" if other else "the lists as trace3.py's")
         return 1 if other else 0
+    elif "--followed" in argv[1:]:
+        print("\n".join(followed(sc)))
+    elif "--pins" in argv[1:]:
+        if argv.index("--pins") + 1 >= len(argv):
+            print(__doc__, file=sys.stderr)
+            return 2
+        f = argv[argv.index("--pins") + 1]
+        diffs, n = pins(sc, f)
+        print("\n".join(diffs + [f"pins: {len(diffs)} differences from {f}" if diffs
+                                 else f"pins: the followed code of {n} rows as pinned"]))
+        return 1 if diffs else 0
     else:
         for r in sc.rows:
             print(line(r))

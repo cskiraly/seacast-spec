@@ -43,8 +43,10 @@
 #             of runSeacast, and runSeacast has no case the manifest does not cover but respond; two controls refused. And
 #             SEACAST's questions, both ways: each name of the manifest's QUESTIONS is read by an askCall or a case of
 #             the tape reader, and each name the twin asks or reads as a call under seacast.md is a question, a
-#             covered or cut function, or the replay's own (keys, order); three controls refused
-#   mutants   every mutant's text stands in the twin once (--places), and each type-checks alone against the build
+#             covered or cut function, or the replay's own (keys, order); three controls refused. And the code each
+#             observer verdict of the scan rests on beyond its row's own body, as tools/followed-pins.txt pins it; a
+#             control with one byte changed in a function a row rests on refused, naming that row alone
+#   mutants  every mutant's text stands in the twin once (--places), and each type-checks alone against the build
 #   screen    every cell's header and nodes line, under both documents, read by the replay; a nodes line without a
 #             constant refused
 #   cells     `none`, traced and replayed: its digest is golden.txt's (the tracer perturbs nothing)
@@ -674,6 +676,32 @@ print(f"the {len(asked_seacast)} names the twin asks or reads as calls under sea
 EOF
   [ $? = 0 ] || no "a question of seacast.md the twin does not read, a name the twin asks that the manifest does not list, or the questions' controls (scope.txt)"
   sed 's/^/  /' "$OUT/scope.txt"
+  # the code each observer verdict of the scan rests on beyond its row's own body (scan_bindings.py --followed), body
+  # by body as tools/followed-pins.txt pins it: a change fails here until the row is read again and the file written anew
+  $PY "$T/scan_bindings.py" "$TOY" --pins "$T/followed-pins.txt" > "$OUT/pins.txt" 2>&1; local prc=$?
+  if [ "$prc" = 0 ] && tail -n 1 "$OUT/pins.txt" | grep -q -x -E 'pins: the followed code of [0-9]+ rows as pinned'; then
+    echo "  $(tail -n 1 "$OUT/pins.txt" | cut -c7-) (pins.txt)"
+  else no "the code an observer verdict rests on is not as tools/followed-pins.txt pins it: read each row named again, then write the file anew (pins.txt)"; fi
+  # its control: one byte changed in a function on_want's row rests on, in a copy of the toy (resolve's `==` made `!=`,
+  # a change of behaviour the observer test does not read): the pin fails, naming on_want's row and resolve alone
+  local pc="$OUT/pins-control"
+  rm -rf "$pc"; mkdir -p "$pc"
+  cp -r "$TOY" "$pc/toy" && cp "$(dirname "$TOY")/seacast-lite.md" "$(dirname "$TOY")/seacast.md" "$pc/" \
+    && $PY - "$pc/toy/node.py" <<'EOF'
+import sys
+from pathlib import Path
+p = Path(sys.argv[1])
+s = p.read_text()
+old = 'if gi is None or ns["state"][gi.group] == INVALID:'
+assert s.count(old) == 1, s.count(old)
+p.write_text(s.replace(old, old.replace("==", "!=")))
+EOF
+  $PY "$T/scan_bindings.py" "$pc/toy" --pins "$T/followed-pins.txt" > "$pc/pins.txt" 2>&1; local crc=$?
+  if [ "$crc" = 1 ] && [ "$(grep -c '^pins: row ' "$pc/pins.txt")" = 1 ] \
+     && grep -q -E '^pins: row node\.py Node\._seacast on_want = .*: node\.py Node\._namespace\.<locals>\.resolve changed ' "$pc/pins.txt" \
+     && [ "$(tail -n 1 "$pc/pins.txt")" = "pins: 1 differences from $T/followed-pins.txt" ]; then
+    echo "  control, one byte changed in resolve, which on_want's row rests on: that row alone named, as it must be"
+  else no "the pin did not name on_want's row alone for one byte changed in resolve (pins-control/pins.txt)"; fi
 }
 s_mutants() {
   $PY "$T/mutants3.py" --places --twin "$OUT/twin" > "$OUT/mutants-places.txt" 2>&1 || no "a mutant's text does not stand in the twin (mutants-places.txt)"

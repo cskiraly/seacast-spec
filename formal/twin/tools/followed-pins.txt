@@ -1,0 +1,24 @@
+# The code each observer verdict rests on beyond the row's own body, by its source's sha256: written
+# by `scan_bindings.py TOYDIR --followed`. check.sh's scope step compares it (`--pins`): after a
+# difference, read the row again, then write this file anew.
+row node.py Node._alarm serve_standing = Node._alarm.<locals>.serve_standing (subscript)
+  node.py Node._alarm.<locals>.serve_standing 361a499969d6182cc11327871c5ca9a11cabadc9acc411fba81ff52ff4f1dcbe
+  node.py Node._seacast.<locals>.type_of_group 01f2bb757a201779779a321c87639a9346e19e00bb222f24304da3b237de0876
+  sample_cap_known.py setup.<locals>.<lambda> 0e481f22057468f612f586adc31b8661db39bbea443b1f8156386b3b5e3cbdd0
+row node.py Node._hoard_column defer_on_claim = Node._hoard_column.<locals>.defer_on_claim (subscript)
+  node.py Node._hidden 3f0717a30ecfe271f04332277784636546cd89f5204b0da2adeed63035e7f8f9
+  node.py Node._hoard_column.<locals>.defer_on_claim 068d8841cfaff489b5b7b15a2187a25faaa1e885daec9d3922c3c5b556f348f5
+row node.py Node._override add_offer = Node._override.<locals>.add_offer (tuple)
+  node.py Node._override.<locals>.add_offer d4f06a200cc4cf63d240774a739e3eeae1ff3ad647576aec20d19165252b7189
+  node.py Node._override.<locals>.index_ask 2ebef5cebf42949b3c7e19c66dc6d60da95c05bc6f59f37ac71094658cb0f60a
+row node.py Node._override may_ask = Node._override.<locals>.may_ask (tuple)
+  node.py Node._override.<locals>.index_ask 2ebef5cebf42949b3c7e19c66dc6d60da95c05bc6f59f37ac71094658cb0f60a
+  node.py Node._override.<locals>.may_ask 190d76512ec06450a77b0c82c5a8eb9c6e127ab8548df7dde3df556671afc82a
+row node.py Node._seacast on_want = Node._seacast.<locals>.on_want (subscript)
+  node.py GroupIndex.__init__ 6db1e1158532b2c32705bf508794bf55df4bcf63f9e3a6a318711b08fa5c42db
+  node.py Node._namespace.<locals>.group_index 3a4f7dc95bb59da5b0b5669d514ed618fb652d6929e70bdc53e1c6aba91ca3d1
+  node.py Node._namespace.<locals>.resolve 7cab43ea13209965c155f9cea004d42d18e7f0353dcfa66badcef012a67ae147
+  node.py Node._seacast.<locals>.on_want 08875935dfeb7bf70a930f337696321c6cab134fb2138553a46967c3375fecba
+  node.py Node._seacast.<locals>.type_of_group 01f2bb757a201779779a321c87639a9346e19e00bb222f24304da3b237de0876
+  node.py parse_id 238459f2fb33079b4451c25482e7bc5389347155d3bd138143d79c7ec4de8088
+  seacast.md probe_of_claim 6f551cf1013bc10dc63be2d19124fa2edf14e6e6eb0e7dcdbb262a61c8199341
