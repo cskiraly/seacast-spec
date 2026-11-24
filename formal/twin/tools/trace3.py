@@ -2453,6 +2453,81 @@ def observers_self_test():
         case(*c)
     fault("the stop off: the bare calls' writes let through", F.OBSERVER_STOP, bare_cases[1::2])
     fault("the handling off: the bare calls' reads logged", OBSERVE, bare_cases[0::2])
+    # the handling off, read by the logged read itself and not by the counters: the callee's read of stop_pull is the
+    # record's
+    not_logged = 0
+    OBSERVE[0] = False
+    try:
+        for c in bare_cases[0::2]:
+            got = c[1]()
+            not_logged += not (isinstance(got, dict) and got["read"] == ["received", "stop_pull"])
+    finally:
+        OBSERVE[0] = True
+    bad += not_logged
+    print(f"observers self-test, its planted fault (the handling off), by the logged read: "
+          f"{'the callee read of stop_pull logged in its 2 cases, ok' if not not_logged else 'not logged  <-- FAIL'}")
+
+    def through_iface(kind, hidden=False):
+        """An observer's own call, through iface_of's wrapper as the node wraps a toy's binding of a question, of `kind`
+        "question" (a question, not traced) or "traced" (a traced name, which the wrapper counts), in a record entered
+        by `observe`. The callee reads stop_pull. Its answer, the open record's tape, the wrapper's counts (its
+        "observer" bucket, tr.bare) and the record's reads and writes, with the observer's calls and unlogged reads.
+        `hidden`: the mode hidden from the wrapper (the control), which then takes the call for the record's
+        question."""
+        tr = object.__new__(Tracer3)
+        tr.Wm, tr.doc_seacast, tr.bare, tr.calls = Wm, True, Counter(), {}
+        tr.traced = ("probe_q",) if kind == "traced" else ()
+        nd = type("Node", (), {})()
+        nd.id, nd.cfg = 1, {}
+        st = {"depth": 1, "ext": 0, "cur": {"tape": [], "fn": "x"}, "node": 1, "supp": 0}
+        answers = []
+
+        class Hidden:                   # the record, its observer not shown
+            observer = None
+
+            def __init__(self, r):
+                self.r = r
+
+            def __getattr__(self, a):
+                return getattr(self.r, a)
+
+        def make(ns, rec):
+            def q(g):
+                return ns["stop_pull"][g]
+            w = tr.iface_of(nd, st, Hidden(rec) if hidden else rec, (), {}, lambda: None, lambda: None, "probe_q", q,
+                            lambda r, *a: [list(a), None])
+
+            def layer(doc):
+                def check_completion(g):
+                    answers.append(w(g))
+                    return doc(g)
+                return check_completion
+            return layer(ns[name]), lambda: {
+                "answer": answers, "tape": len(st["cur"]["tape"]), "bare": sum(tr.bare.values()),
+                "counted": {b: n for b, n in tr.calls.get("probe_q", tr.zero_calls()).items() if n}}
+        return recorded(doc_src, make)
+    iface_cases = [
+        ("an observer's own call of a question through iface_of's wrapper: bare, its read unlogged, no tape row",
+         lambda: through_iface("question"),
+         {"read": ["received"], "wrote": ["stop_pull"], "calls": [1], "unlogged": [1], "answer": [False], "tape": 0,
+          "bare": 0, "counted": {}}),
+        ("an observer's own call of a traced name through iface_of's wrapper: the same, counted in its observer bucket",
+         lambda: through_iface("traced"),
+         {"read": ["received"], "wrote": ["stop_pull"], "calls": [1], "unlogged": [1], "answer": [False], "tape": 0,
+          "bare": 0, "counted": {"observer": 1}}),
+    ]
+    for c in iface_cases:
+        case(*c)
+    failed = []
+    for kind, c in zip(("question", "traced"), iface_cases):
+        try:
+            got = through_iface(kind, hidden=True)
+        except SystemExit as e:
+            got = f"stop: {e}"
+        failed.append(got != c[2])
+    bad += not all(failed)
+    print(f"observers self-test, its control for iface_of's wrapper (the mode hidden from it): "
+          f"{'fails its 2 cases, ok' if all(failed) else f'passes {failed.count(False)}  <-- FAIL'}")
     return bad
 
 

@@ -82,10 +82,27 @@ BY_NAME = {"message_id": "a cache: it skips the call on a hit"}     # observers 
 # the draws a layer may swap (trace3.py's DRAWS, held to it by lists): a layer that passes the observer test where
 # it may name and bind these slots is a swapped draw
 DRAWS = ("choice", "sample_without_replacement", "shuffled")
+# the pure operations a followed body may call, as (the name called on, the attribute): each reads only what it is
+# handed and changes nothing. An entry is added by a dated amendment to the known answer that names its reason
+PURE_CALLS = {("int", "from_bytes")}    # a new int from the bytes handed
+NS_ALIASES = {}                         # file name -> the names that file binds to the namespace (`nsc = nc.ns`)
+NS_FILE = [None]                        # the file whose aliases is_ns reads: the one scanned, or the one followed into
+
+
+def own_nodes(node):
+    """The nodes of a function's (or lambda's) own scope: its body, less the bodies of the functions, lambdas and
+    classes made in it, which are yielded themselves (their names are bound in it)."""
+    todo = list(node.body) if isinstance(node.body, list) else [node.body]
+    while todo:
+        n = todo.pop()
+        yield n
+        if not isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
+            todo.extend(ast.iter_child_nodes(n))
 
 
 def is_ns(e):
-    return (isinstance(e, ast.Name) and e.id == "ns") or (isinstance(e, ast.Attribute) and e.attr == "ns")
+    return ((isinstance(e, ast.Name) and (e.id == "ns" or e.id in NS_ALIASES.get(NS_FILE[0], ())))
+            or (isinstance(e, ast.Attribute) and e.attr == "ns"))
 
 
 def ns_key(e):
@@ -104,6 +121,7 @@ class Func:
     def __init__(self, node, qual, scope, src, path):
         self.node, self.qual, self.scope, self.path = node, qual, scope, path
         self.line = first_line(node)
+        self.static = False                     # a static method: its first parameter is no receiver
         seg = ast.get_source_segment(src, node) or ""
         self.sha = hashlib.sha256(seg.encode()).hexdigest()
 
@@ -117,15 +135,32 @@ class Scope:
         self.captures = {}          # local name -> the namespace name it was assigned from
         self.params_objs = set()    # local names bound to an Obj() or a .params
         self.order = []             # (statement index, local name) for locals() exports, in order of definition
+        self.rebound = set()        # local names last bound to something the scan does not read as a function
+        self.fresh = set()          # (followed code) local names bound only to a new object: a display, a
+        #                             comprehension, a new container, a toy class's constructor; `self` in __init__
+        self.bound = set()          # (followed code) every name the function binds: a call of one is no module's
 
     def lookup(self, name, attr):
         s = self
         while s is not None:
+            if attr == "funcs" and name in s.rebound:
+                return None         # rebound after its def (rq = wrap(rq)), or a decorated def: not read
             d = getattr(s, attr)
             if name in d:
                 return d[name]
             s = s.parent
         return None
+
+    def shadowed(self, name):
+        """Whether the nearest scope that binds `name` binds it to what the scan does not read as a function."""
+        s = self
+        while s is not None:
+            if name in s.rebound:
+                return True
+            if name in s.funcs:
+                return False
+            s = s.parent
+        return False
 
     def is_param_obj(self, name):
         s = self
@@ -157,6 +192,10 @@ class Scanner:
         #                             holds the computed keys' (which may bind any name)
         self.depth = 0              # the observer test's depth: 0 in the layer's own code, more in what it follows
         self.doc = None             # the document the observer test runs under
+        self.classes = {}           # (file, class name) -> its ClassDef: a module's own classes (a constructor)
+        self.all_classes = []       # every class of the toy, one made inside a function too
+        self.reads_anywhere = set() # the read methods a followed body may call on anything: READONLY_METHODS and
+        #                             toy_reads, less a name a toy class defines with a body that does more than read
 
     def prepass(self, path):
         """A module's own functions and methods, and its imports of the toy's other modules (path's siblings)."""
@@ -164,6 +203,17 @@ class Scanner:
         tree = ast.parse(src)
         mod = Scope(tree, "", None)
         toy = {p.name for p in path.parent.glob("*.py")}
+        aliases = set()                     # the names this file binds to the namespace, read as `ns` in it
+        for n in ast.walk(tree):
+            if isinstance(n, ast.Assign) and "ns-alias" not in self.skip:
+                for t in n.targets:
+                    pairs = (list(zip(t.elts, n.value.elts)) if isinstance(t, ast.Tuple) and isinstance(n.value, ast.Tuple)
+                             and len(t.elts) == len(n.value.elts) else [(t, n.value)])
+                    aliases |= {tt.id for tt, vv in pairs if isinstance(tt, ast.Name) and tt.id != "ns"
+                                and ((isinstance(vv, ast.Name) and vv.id == "ns")
+                                     or (isinstance(vv, ast.Attribute) and vv.attr == "ns"))}
+        NS_ALIASES[path.name] = aliases
+        self.all_classes.extend(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef))
         for n in ast.walk(tree):            # node attributes assigned from the namespace (self._doc_x = ns["x"])
             if isinstance(n, ast.Assign):
                 for t in n.targets:
@@ -176,12 +226,18 @@ class Scanner:
                             self.attr_captures[(path.name, tt.attr)] = ns_key(vv)
         for st in tree.body:
             if isinstance(st, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                self.globals[(path.name, st.name)] = Func(st, st.name, mod, src, path)
+                if not st.decorator_list or "decorated" in self.skip:   # a decorated function: not read
+                    self.globals[(path.name, st.name)] = Func(st, st.name, mod, src, path)
             elif isinstance(st, ast.ClassDef):
+                self.classes[(path.name, st.name)] = st
                 for m in st.body:
                     if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        static = [d for d in m.decorator_list if isinstance(d, ast.Name) and d.id == "staticmethod"]
+                        if len(static) < len(m.decorator_list) and "decorated" not in self.skip:
+                            continue        # a method decorated with anything but staticmethod: not read
                         q = f"{st.name}.{m.name}"
-                        self.globals[(path.name, q)] = Func(m, q, Scope(st, st.name, mod), src, path)
+                        f = self.globals[(path.name, q)] = Func(m, q, Scope(st, st.name, mod), src, path)
+                        f.static = bool(static) and "static" not in self.skip    # (its reader off: a receiver)
             elif isinstance(st, ast.ImportFrom) and not st.level and f"{st.module}.py" in toy:
                 for a in st.names:
                     self.imports[(path.name, a.asname or a.name)] = (f"{st.module}.py", a.name)
@@ -199,6 +255,8 @@ class Scanner:
             f = scope.lookup(value.id, "funcs")
             if f is not None:
                 return f
+            if scope.shadowed(value.id):
+                return None
             f = self.globals.get((here, value.id))
             if f is not None:
                 return f
@@ -221,13 +279,14 @@ class Scanner:
         src = path.read_text()
         tree = ast.parse(src)
         self.src, self.path = src, path
+        NS_FILE[0] = path.name
         if self.collect is not None:        # the pre-pass: each node's parent, for a computed key's loop
             self.parents = {id(c): p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
         for cls in tree.body:       # a class's methods by name, for the observer test's call following
             if isinstance(cls, ast.ClassDef):
                 for m in cls.body:
-                    if isinstance(m, ast.FunctionDef):
-                        self.methods[(path.name, cls.name, m.name)] = m
+                    if isinstance(m, ast.FunctionDef) and (not m.decorator_list or "decorated" in self.skip):
+                        self.methods[(path.name, cls.name, m.name)] = m     # (a decorated one: not followed)
         self.seacast_methods, self.seacast_lines = self.seacast_only(tree)
         self.body(tree.body, Scope(tree, "", None), cls=None)
 
@@ -259,6 +318,10 @@ class Scanner:
             if not isinstance(scope.node, (ast.Module, ast.ClassDef)):
                 scope.funcs[st.name] = f
                 scope.order.append((st.lineno, st.name))
+                if st.decorator_list and "decorated" not in self.skip:
+                    scope.rebound.add(st.name)      # what the decorator returns is not this body
+                else:
+                    scope.rebound.discard(st.name)
             inner = Scope(st, qual, scope)
             self.body(st.body, inner, cls=None)
             return
@@ -301,6 +364,14 @@ class Scanner:
         for kw in call.keywords:
             if kw.arg is not None and "update-keyword" not in self.skip:
                 self.row(call, "update-keyword", kw.arg, kw.value, scope)
+            elif kw.arg is None and "update-starred" not in self.skip:     # ns.update(**d)
+                d = kw.value
+                if isinstance(d, ast.Dict) and all(isinstance(k, ast.Constant) and isinstance(k.value, str)
+                                                   for k in d.keys):
+                    for k, v in zip(d.keys, d.values):      # a literal's keys, as update-dict's
+                        self.row(call, "update-dict", k.value, v, scope)
+                else:                                       # any other: a key the scan cannot name
+                    self.row(call, "computed-key", f"<**{ast.unparse(d)[:60]}>", None, scope, via="update")
         for a in call.args:
             if isinstance(a, ast.Dict):     # a dict's keys read here alone (its reader off: no row of it at all)
                 if "update-dict" in self.skip:
@@ -369,8 +440,12 @@ class Scanner:
                         scope.captures[tt.id] = self.attr_captures[(self.path.name, vv.attr)]   # x = self._doc_x
                     if isinstance(vv, ast.Lambda):
                         scope.funcs[tt.id] = Func(vv, f"{scope.qual}.<locals>.<lambda>", scope, self.src, self.path)
+                        scope.rebound.discard(tt.id)
                     elif isinstance(vv, (ast.Name, ast.Attribute)) and self.resolve(vv, scope) is not None:
                         scope.funcs[tt.id] = self.resolve(vv, scope)    # another name of a function (x = topic_peers)
+                        scope.rebound.discard(tt.id)
+                    elif "rebound" not in self.skip:
+                        scope.rebound.add(tt.id)    # bound to what the scan does not read as a function (rq = wrap(rq))
                     if ((isinstance(vv, ast.Call) and isinstance(vv.func, ast.Name) and vv.func.id == "Obj")
                             or (isinstance(vv, ast.Attribute) and vv.attr == "params")):
                         scope.params_objs.add(tt.id)
@@ -504,7 +579,15 @@ class Scanner:
                # the follow: a question or traced function the layer calls is followed by the same test
                # (off: refused by name, as before); a draw, a name with a binding the scan does not read, and the
                # layer's own name in what it follows are each refused
-               "follow", "draw", "unread", "own-name")
+               "follow", "draw", "unread", "own-name",
+               # fail-closed followed code: a store or mutator on what the followed function did not make ("effect");
+               # a call of no kind the follow reads ("call"); a followed call's answer under the test ("answer"); and
+               # the kinds it reads: its own new objects ("fresh"), a toy class's constructor ("ctor": its guard,
+               # "ctor-guard", and its __init__, "ctor-init"), a listed pure operation ("pure"), its file's own function
+               # ("module-fn")
+               "effect", "call", "answer", "fresh", "ctor", "ctor-guard", "ctor-init", "pure", "module-fn",
+               # and the swapped draw's test: a draw's slot called in the layer's own code, outside its stand-in
+               "draw-call")
 
     def is_held(self, n, held):
         return isinstance(n, ast.Call) and ast.unparse(n.func) == held
@@ -544,7 +627,102 @@ class Scanner:
                         s.captures[tt.id] = s.lookup(v.id, "captures")
                     elif self.ns_rooted(v, s, bare=True):     # a row or a field of a table: an alias into it
                         s.captures[tt.id] = "<table>"
+        # for followed code: every name its own scope binds, and those bound only to a new object (each store of the
+        # name an assignment of one; a parameter, a loop's or a with's target, a walrus is none). A parameter anywhere
+        # in it, a nested function's or lambda's too, is never fresh
+        params = {a.arg for a in ast.walk(node) if isinstance(a, ast.arg)}
+        stores, new = {}, {}
+        for n in own_nodes(node):
+            if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del)):
+                stores[n.id] = stores.get(n.id, 0) + 1
+            elif isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                stores[n.name] = stores.get(n.name, 0) + 1
+            if isinstance(n, (ast.Assign, ast.AnnAssign)) and n.value is not None:
+                for t in (n.targets if isinstance(n, ast.Assign) else [n.target]):
+                    if isinstance(t, ast.Name) and self.new_object(n.value):
+                        new[t.id] = new.get(t.id, 0) + 1
+            if isinstance(n, ast.AugAssign) and isinstance(n.target, ast.Name):
+                new[n.target.id] = new.get(n.target.id, 0) + 1     # x += …: the same object
+        s.bound = set(stores) | params
+        if "fresh" not in self.off:
+            s.fresh = {k for k, c in new.items() if c == stores.get(k)} - params
+        if self.depth:                      # followed code's own functions and named lambdas, each bound once (3b)
+            for n in own_nodes(node):
+                if (isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and not n.decorator_list
+                        and stores.get(n.name) == 1):
+                    s.funcs[n.name] = Func(n, f"{qual}.<locals>.{n.name}", s, self.src, self.path)
+                elif (isinstance(n, ast.Assign) and len(n.targets) == 1 and isinstance(n.targets[0], ast.Name)
+                      and isinstance(n.value, ast.Lambda) and stores.get(n.targets[0].id) == 1):
+                    s.funcs[n.targets[0].id] = Func(n.value, f"{qual}.<locals>.<lambda>", s, self.src, self.path)
         return s
+
+    def new_object(self, v):
+        """Whether an expression makes a new object: a display, a comprehension, a constant, a new container from a
+        builtin, or a toy class's constructor (which the call itself is checked as, rule 3)."""
+        if isinstance(v, (ast.List, ast.Dict, ast.Set, ast.Tuple, ast.ListComp, ast.DictComp, ast.SetComp,
+                          ast.GeneratorExp, ast.Constant, ast.JoinedStr)):
+            return True
+        return (isinstance(v, ast.Call) and isinstance(v.func, ast.Name)
+                and (v.func.id in ("list", "dict", "set", "tuple", "frozenset", "sorted", "bytearray")
+                     or (self.path.name, v.func.id) in self.classes))
+
+    def own_object(self, e, scope):
+        """Whether a store's object is the followed function's own new object: a name bound only to one."""
+        return isinstance(e, ast.Name) and e.id in scope.fresh
+
+    def constructor(self, c, name, seen):
+        """A toy class's constructor, called in followed code: why it may do more than make a new object, or None.
+        Refused: a class with a decorator (a dataclass's default_factory among them), a base, a keyword (a metaclass),
+        or any method but its __init__: __new__, __post_init__ and __init_subclass__ among them, and every method a
+        store, a mutator or an operator on the new object would run unfollowed (__setattr__, __setitem__, append, …).
+        Else its own __init__, if it has one, is followed by the same test, with its receiver a new object."""
+        if "ctor-guard" not in self.off and (
+                c.decorator_list or c.bases or c.keywords
+                or any(isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name != "__init__"
+                       for m in c.body)):
+            return f"calls {c.name}, a class whose making the follow does not read"
+        init = next((m for m in c.body if isinstance(m, ast.FunctionDef) and m.name == "__init__"), None)
+        if init is None or "ctor-init" in self.off:
+            return None
+        key = ("ctor", id(init))
+        if key in seen:
+            return None
+        seen.add(key)
+        inner = self.own_scope(init, f"{c.name}.__init__", Scope(c, c.name, None))
+        ps = params_of(init)[0]
+        if ps:
+            inner.fresh.add(ps[0])      # self: the object being made
+        why = self.names_and_writes(init, inner, name, None, seen)
+        return f"{why}, in {c.name}.__init__" if why else None
+
+    def in_bound_draw(self, call, layer):
+        """Whether a call of a draw's slot is inside a function the layer binds into a draw's slot (a swapped draw's
+        stand-in, which hands later draws to the slot's earlier binding), and not in the layer's own code."""
+        parents = {id(c): p for p in ast.walk(layer) for c in ast.iter_child_nodes(p)}
+        p, fn = parents.get(id(call)), None
+        while p is not None and p is not layer:
+            if isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)):
+                fn = p
+                break
+            p = parents.get(id(p))
+        if fn is None:
+            return False
+        for a in ast.walk(layer):
+            if isinstance(a, ast.Assign) and any(isinstance(t, ast.Subscript) and is_ns(t.value) and ns_key(t) in DRAWS
+                                                 for t in a.targets):
+                if a.value is fn or (isinstance(a.value, ast.Name) and getattr(fn, "name", None) == a.value.id):
+                    return True
+        return False
+
+    def read_methods_anywhere(self):
+        """READONLY_METHODS less a name some toy class defines (decorated or not) with a body that does more than
+        read, and toy_reads: the read methods followed code may call on any object."""
+        defs = {}
+        for c in self.all_classes:
+            for m in c.body:
+                if isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    defs.setdefault(m.name, []).append(m)
+        return {m for m in READONLY_METHODS if all(self.only_reads(d) for d in defs.get(m, ()))} | self.toy_reads()
 
     def observer_test(self, fn, name, held, doc, exempt=()):
         """None for an observer, or why it is not one, under one document's namespace ("seacast-lite.md" or "seacast": its
@@ -600,13 +778,23 @@ class Scanner:
                 for tt in (t.elts if isinstance(t, ast.Tuple) else [t]):
                     clause = "delete" if isinstance(n, ast.Delete) else "assign"
                     if (isinstance(tt, ast.Subscript) and is_ns(tt.value) and ns_key(tt) in self.exempt
-                            and clause == "assign"):
-                        continue        # an exempt slot bound (a swapped draw's)
+                            and clause == "assign" and not self.depth):
+                        continue        # an exempt slot bound (a swapped draw's), in the layer's own code alone
                     if clause not in self.off and self.ns_rooted(tt, scope):
                         return f"{'deletes' if clause == 'delete' else 'writes'} {ast.unparse(tt)[:60]}"
+            if (self.depth and "effect" not in self.off and isinstance(n, (ast.Attribute, ast.Subscript))
+                    and isinstance(n.ctx, (ast.Store, ast.Del)) and not self.own_object(n.value, scope)):
+                # followed code: an attribute or a subscript stored or deleted, in any statement (an assignment, an
+                # augmented one, a del, a for's or a with's target, a nested or starred target), only on its own new
+                # object, the store's immediate object a name bound only to one
+                return (f"{'deletes' if isinstance(n.ctx, ast.Del) else 'writes'} {ast.unparse(n)[:60]}, which the "
+                        f"follow cannot establish as its own new object")
             if not isinstance(n, ast.Call):
                 continue
             k = self.called_name(n.func, scope, held)
+            if (k in DRAWS and k in self.exempt and not self.depth and "draw-call" not in self.off
+                    and not self.in_bound_draw(n, node)):
+                return f"calls the draw {k}"    # the swapped draw's test: a slot bound, and called only by its stand-in
             if k is not None and k != name and (k not in self.exempt or self.depth) and "follow" not in self.off:
                 q = k in self.questions and "question" not in self.off
                 t = k in self.traced and "traced" not in self.off
@@ -622,6 +810,12 @@ class Scanner:
                     and "mutate" not in self.off and self.ns_rooted(n.func.value, scope, bare=True)):
                 return (f"calls {n.func.attr} on {ast.unparse(n.func.value)[:60]}, which the test does not establish "
                         f"as a read")
+            if self.depth and isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS:
+                if "effect" not in self.off and not (isinstance(n.func.value, ast.Name)
+                                                     and n.func.value.id in scope.fresh):
+                    return (f"mutates {ast.unparse(n.func.value)[:60]} by {n.func.attr}, which the follow cannot "
+                            f"establish as its own new object")
+                continue                # its own new object's (or the clause off)
             if self.is_held(n, held):
                 continue
             callee, clause = None, None
@@ -630,9 +824,20 @@ class Scanner:
                 if f is not None:       # a local function or lambda, followed
                     callee, clause = (f.node, f.scope, f.qual), "local-fn"
                 elif f is None and scope.lookup(n.func.id, "captures") is not None:
+                    if self.depth and "call" not in self.off:
+                        return f"calls {n.func.id}, a namespace name the follow does not read"
                     continue            # a namespace function (named, and so checked, above)
                 elif f is None and n.func.id in READONLY_BUILTINS:
                     continue            # a builtin that only reads (any other is unfollowed, below)
+                elif self.depth and n.func.id not in scope.bound and not scope.shadowed(n.func.id):
+                    g = self.globals.get((self.path.name, n.func.id))
+                    if g is not None and "." not in g.qual and "module-fn" not in self.off:
+                        callee, clause = (g.node, g.scope, g.qual), "local-fn"     # its file's own function
+                    elif (self.path.name, n.func.id) in self.classes and "ctor" not in self.off:
+                        why = self.constructor(self.classes[(self.path.name, n.func.id)], name, seen)
+                        if why:
+                            return why
+                        continue        # a new object of a toy class
             elif (isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name)
                   and n.func.value.id in ("self", "node")):
                 m = self.methods.get((self.path.name, "Node", n.func.attr))
@@ -646,7 +851,7 @@ class Scanner:
                 params = params_of(callee[0])[0][1 if clause == "node-method" else 0:]     # after the receiver
                 tables = {p for p, a in zip(params, n.args) if self.ns_rooted(a, scope, bare=True)}
                 tables |= {kw.arg for kw in n.keywords if kw.arg and self.ns_rooted(kw.value, scope, bare=True)}
-                key = (id(callee[0]), frozenset(tables))
+                key = (id(callee[0]), frozenset(tables), self.depth > 0)   # walked again where followed
                 if key in seen:
                     continue
                 seen.add(key)
@@ -654,10 +859,19 @@ class Scanner:
                 why = self.names_and_writes(callee[0], inner, name, held, seen)
                 if why:
                     return f"{why}, in {getattr(callee[0], 'name', '?')}"
-            elif "unfollowed" not in self.off:
+            elif "unfollowed" not in self.off and self.table_arg(n, scope) is not None:
                 a = self.table_arg(n, scope)
-                if a is not None:
-                    return f"hands {ast.unparse(a)[:40]} to {ast.unparse(n.func)[:40]}, which the test does not follow"
+                return f"hands {ast.unparse(a)[:40]} to {ast.unparse(n.func)[:40]}, which the test does not follow"
+            elif self.depth and "call" not in self.off:     # followed code: a call of no kind the follow reads
+                f = n.func
+                if k is not None and k == name:
+                    continue            # the layer's own name: refused by name (own-name)
+                if isinstance(f, ast.Attribute) and f.attr in self.reads_anywhere:
+                    continue            # a read method, which no toy class defines as more than a read
+                if (isinstance(f, ast.Attribute) and isinstance(f.value, ast.Name)
+                        and (f.value.id, f.attr) in PURE_CALLS and "pure" not in self.off):
+                    continue            # a listed pure operation
+                return f"calls {ast.unparse(f)[:60]}, which the follow cannot establish as a read"
         return None
 
     def loop_keys(self, at, name):
@@ -673,6 +887,10 @@ class Scanner:
                 at_ = [None] if isinstance(t, ast.Name) and t.id == k else \
                     [j for j, e in enumerate(t.elts) if isinstance(e, ast.Name) and e.id == k] \
                     if isinstance(t, (ast.Tuple, ast.List)) else []
+                if at_ and "loop-rebind" not in self.skip and any(
+                        isinstance(x, ast.Name) and x.id == k and isinstance(x.ctx, ast.Store)
+                        for b in p.body for x in ast.walk(b)):
+                    return None             # the body binds the variable again: the key at the binding is unknown
                 if at_:
                     j = at_[0]
                     out = []
@@ -737,19 +955,20 @@ class Scanner:
             return None if "unread" in self.off else f"names {k}, which has no binding or definition the scan reads"
         for body, parent, f, qual in targets:
             ps, kwo, _, _ = params_of(body)
-            if f is not None and isinstance(f.scope.node, ast.ClassDef):
+            if f is not None and isinstance(f.scope.node, ast.ClassDef) and not f.static:
                 ps = ps[1:]                 # a method bound by `self.m`: its parameters after the receiver
             tables = {ps[i] for i in pos if i < len(ps)} | (set(kws) & set(ps + kwo))
-            inner = self.own_scope(body, qual, parent, tables)
-            saved = self.path
+            saved, saved_ns = self.path, NS_FILE[0]
             if f is not None:
-                self.path = f.path          # its file's methods and node attributes
+                self.path = f.path          # its file's methods, node attributes and aliases of the namespace
+                NS_FILE[0] = f.path.name
             self.depth += 1
             try:
+                inner = self.own_scope(body, qual, parent, tables)
                 why = self.names_and_writes(body, inner, name, None, seen)   # the held binding is the layer's alone
             finally:
                 self.depth -= 1
-                self.path = saved
+                self.path, NS_FILE[0] = saved, saved_ns
             if why:
                 return f"{why}, in {k}"
         return None
@@ -777,7 +996,9 @@ class Scanner:
                 return True
             if isinstance(e, ast.Call):
                 if not isinstance(e.func, ast.Attribute):
-                    break               # a function's result: not a table's
+                    if self.answer_of_followed(e, scope):
+                        return True     # a followed call's answer: under the test as a table is
+                    break               # any other function's result: not a table's
                 e = e.func.value
             else:
                 e = e.value
@@ -785,6 +1006,14 @@ class Scanner:
             k = scope.lookup(e.id, "captures")
             return k is not None and k not in self.questions | self.traced | CALLABLES
         return bare and isinstance(top, ast.Subscript) and is_ns(top.value)
+
+    def answer_of_followed(self, call, scope):
+        """Whether a call is one the follow reads (a question's, a traced function's, or in followed code a document
+        function's), so that its answer is under the test as a table is."""
+        if "answer" in self.off or "follow" in self.off:
+            return False
+        k = self.called_name(call.func, scope, None)
+        return k is not None and (k in self.questions or k in self.traced or (self.depth and k in CALLABLES))
 
     def toy_reads(self):
         """The names of TOY_READS that the toy's classes define, each definition only reading."""
@@ -1197,6 +1426,9 @@ def load_names(toy):
     # question registry for v2 is read
     seacast_bound = {r["name"] for r in scan(toy).rows if r["seacast_only"]}
     QUESTIONS_Seacast.update(questions_of(v2, set(doc) | set(v2)) & seacast_bound)
+    # and the manifest's questions that are namespace names (not the type's functions and parameters, attributes)
+    QUESTIONS_Seacast.update(set(T.manifest_seacast.QUESTIONS) - set(T.TYPE_QUESTIONS_Seacast)
+                             - set(T.Tracer3.TYPE_FUNCTIONS))
     TRACED.update(T.BLOCK)
     TRACED_V2_KEPT.update(n for n in T.seacast_kept(T.BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in T.SEC71)
     TRACED_Seacast.update(TRACED_V2_KEPT, T.manifest_seacast.COVERED)    # under v2 the kept names and SEACAST's covered ones
@@ -1205,6 +1437,7 @@ def load_names(toy):
 
 def scan(toy, skip=(), off=()):
     files = sorted(Path(toy).glob("*.py"))
+    NS_ALIASES.clear()
     pre = Scanner(skip, off)            # the pre-pass: every binding of every name, before any row is classed, so that
     pre.collect = {}                    #   the observer test can follow a name through all of them, in any file
     for f in files:
@@ -1214,9 +1447,12 @@ def scan(toy, skip=(), off=()):
         pre.scan_file(f)
     sc = Scanner(skip, off)
     sc.bound_by = pre.collect
+    if "pre-methods" not in skip:       # every file's methods, before any row: a follow into any file finds them
+        sc.methods = dict(pre.methods)
     for f in files:                     # every module's own functions and imports first, then the bindings
         sc.prepass(f)
     sc.reads = READONLY_METHODS | sc.toy_reads()
+    sc.reads_anywhere = sc.read_methods_anywhere()
     for f in files:
         sc.scan_file(f)
     return sc
@@ -1815,15 +2051,17 @@ class Node:
 '''
 # each observer, and with the follow off a layer
 FOLLOW_OBSERVERS = ("f_o1", "f_o2", "f_o3")
-# each layer: the clause whose refusal makes it one (off, an observer), and the end of its reason
+# each layer: the clause whose refusal makes it one (off, an observer), and the end of its reason. Where followed code's
+# fail-closed clause (effect, call) refuses it too, both are named: the first alone off, it is still a layer, by the
+# second
 FOLLOW_LAYERS = {
-    "f_l1": ("assign", "writes ns['tbl'][g], in wq"),               # (l1) a callee that writes a table
-    "f_l2": ("unfollowed", "which the test does not follow, in uq"),    # (l2) one that hands a table to a call
+    "f_l1": (("assign", "effect"), "writes ns['tbl'][g], in wq"),   # (l1) a callee that writes a table
+    "f_l2": (("unfollowed", "call"), "which the test does not follow, in uq"),  # (l2) one that hands a table to a call
     "f_l3": ("draw", "names the draw choice, in dq"),               # (l3) one that asks a draw
     "f_l3b": ("draw", "names the draw choice"),                     # (l3) a layer that names one itself
-    "f_l4": ("assign", "writes seen[g], in tr_w"),                  # (l4) a traced callee whose document code writes
-    "f_l4b": ("mutate", "by pop, in tr_rb"),                        # (l4) one whose document code reads, a binding not
-    "f_l5": ("mutate", "by clear, in deep2, in deep1"),             # (l5) the write two calls deep
+    "f_l4": (("assign", "effect"), "writes seen[g], in tr_w"),      # (l4) a traced callee whose document code writes
+    "f_l4b": (("mutate", "effect"), "by pop, in tr_rb"),            # (l4) one whose document code reads, a binding not
+    "f_l5": (("mutate", "effect"), "by clear, in deep2, in deep1"), # (l5) the write two calls deep
     "f_l6": ("unread", "which the toy binds to a value the scan does not read as a function"),  # (l6) a value
     "f_l6b": ("unread", "which has no binding or definition the scan reads"),                   # (l6) no binding
     "f_own": ("own-name", "names f_own, the layer's own name, in ownq"),     # (l7) the layer's own name followed
@@ -1869,8 +2107,14 @@ def follow_self_test(report):
         for name, (clause, end) in FOLLOW_LAYERS.items():
             c, why = got(rows, name)
             report(f"the follow: {name} a layer, \"…{end}\"", c == "layer" and why.endswith(end), f"got {c} ({why})")
-            c, why = got(scan(d, off=(clause,)).rows, name)
-            report(f"control: {name} with the clause {clause} off an observer", c == "observer", f"got {c} ({why})")
+            clauses = clause if isinstance(clause, tuple) else (clause,)
+            c, why = got(scan(d, off=clauses).rows, name)
+            report(f"control: {name} with the clause{'s' if len(clauses) > 1 else ''} {' and '.join(clauses)} off an "
+                   f"observer", c == "observer", f"got {c} ({why})")
+            if len(clauses) > 1:        # the old clause alone off: the fail-closed one still refuses it
+                c, why = got(scan(d, off=clauses[:1]).rows, name)
+                report(f"the follow: {name} with {clauses[0]} alone off still a layer, by {clauses[1]}",
+                       c == "layer" and ("cannot establish" in why), f"got {c} ({why})")
         (Path(d) / "setter.py").write_text(FOLLOW_UNNAMED)
         c, why = got(scan(d).rows, "f_o1")
         report("the follow: a computed key the scan cannot name, f_o1 a layer", c == "layer" and
@@ -1884,6 +2128,458 @@ def follow_self_test(report):
         c, why = got(scan(d).rows, "f_o1")
         report("the follow: a loop's literal key binds rq to a writer, f_o1 a layer", c == "layer" and
                why.endswith("by clear, in rq"), f"got {c} ({why})")
+        (Path(d) / "setter.py").unlink()
+
+        def mark(rows, name):
+            r = [r for r in rows if r["name"] == name and r["form"] == "update-keyword"]
+            return r[0].get("swapped_draw", False) if len(r) == 1 else f"{len(r)} rows"
+        # (l3b) calls a draw in its own code and binds no stand-in: no swapped draw (the tracer would re-wrap it)
+        report("the follow: f_l3b, a layer that calls a draw itself, is no swapped draw", mark(rows, "f_l3b") is False,
+               f"got {mark(rows, 'f_l3b')}")
+        m = mark(scan(d, off=("draw-call",)).rows, "f_l3b")
+        report("control: f_l3b with the clause draw-call off a swapped draw", m is True, f"got {m}")
+
+
+# fail-closed followed code: each reviewer's probe (r2n), planted where a question's binding or a document function
+# the follow reads holds it. FC_DOC is the document's code, FC the toy's
+FC_DOC = '''\
+def tr_chain(g):
+    return tr_w2(g)
+
+
+def tr_w2(g):
+    seen[g] = True
+    return True
+'''
+FC = '''\
+def mod_fn(b):
+    return b[0]
+
+
+class Made:
+    def __init__(self, a, b):
+        self.a = a
+        self.b = b
+
+
+REGISTRY = []
+
+
+class Registered:
+    def __init__(self, a):
+        self.a = a
+        REGISTRY.append(self)
+
+
+class Hooked:
+    def __init__(self, a):
+        self.a = a
+
+    def __setattr__(self, k, v):
+        REGISTRY.append(v)
+
+
+class WithNew:
+    def __new__(cls, a):
+        return object.__new__(cls)
+
+
+@dataclass
+class Data:
+    a: int = 0
+
+
+class Node:
+    @staticmethod
+    def m_static(xs):
+        xs.clear()
+
+    def plant(self, ns):
+        node = self
+        hp = ns["hp"]
+        nsx = node.ns
+
+        def q_timer(g):
+            node.sim.after(1.0, g)
+
+        def q_rng(g):
+            return node.sim.floor_rng.random() < g
+
+        def q_field(g):
+            self._seen.add(g)
+
+        def q_store(g):
+            node.count += 1
+
+        def q_target(g):
+            for node.last in g:
+                pass
+
+        def q_nested(g):
+            [a, (b, node.held)] = g
+
+        def q_hook(g):
+            return Hooked(g)
+
+        def q_arg(asks):
+            asks.clear()
+
+        def q_helper(g):
+            return hp(g)
+
+        def q_loop(g):
+            for lane in node.queues.values():
+                lane.clear()
+
+        def q_cond(g, c=True):
+            (node.a if c else node.b).append(g)
+
+        q_default = lambda g, t=ns["tbl"]: t.pop(g, None)
+
+        def q_star(g):
+            def inner(*xs):
+                xs[0].clear()
+            inner(ns["tbl"])
+
+        def q_global(g):
+            global counter
+            return g
+
+        def q_fresh(g):
+            out = []
+            out.append(Made(g, 1))
+            out.append(int.from_bytes(g, "little"))
+            out.append(mod_fn(g))
+            return out
+
+        def q_reg(g):
+            return Registered(g)
+
+        def q_new(g):
+            return WithNew(g)
+
+        def q_data(g):
+            return Data(g)
+
+        def q_any(g):
+            return ns["tbl"].get(g)
+
+        def q_upd(g):
+            return ns["tbl"].get(g)
+
+        def q_upd_w(g):
+            ns["tbl"][g] = 1
+
+        def q_alias(g):
+            return ns["tbl"].get(g)
+
+        def q_alias_w(g):
+            ns["tbl"][g] = 1
+
+        def q_reb(g):
+            return ns["tbl"].get(g)
+        q_reb = wrap(q_reb)
+
+        @wrap
+        def q_dec(g):
+            return ns["tbl"].get(g)
+
+        def q_shadow(g):
+            def mk():
+                pool = []
+                return pool
+            pool.append(g)
+        ns.update(q_shadow=q_shadow, q_target=q_target, q_nested=q_nested, q_hook=q_hook)
+        ns.update(q_timer=q_timer, q_rng=q_rng, q_field=q_field, q_store=q_store, q_arg=q_arg, q_helper=q_helper,
+                  q_loop=q_loop, q_cond=q_cond, q_default=q_default, q_star=q_star, q_global=q_global,
+                  q_fresh=q_fresh, q_reg=q_reg, q_new=q_new, q_data=q_data, q_any=q_any, q_upd=q_upd,
+                  q_alias=q_alias, q_reb=q_reb, q_dec=q_dec)
+        ns["q_any"] = some_value
+        ns.update(**{"q_upd": q_upd_w})
+        nsx["q_alias"] = q_alias_w
+        ns["q_static"] = self.m_static
+        ns["tog"] = lambda g: ns["types"].get(g)
+        d_timer, d_rng, d_field, d_store, d_arg = ns["c_timer"], ns["c_rng"], ns["c_field"], ns["c_store"], ns["c_arg"]
+        d_helper, d_loop, d_cond, d_default = ns["c_helper"], ns["c_loop"], ns["c_cond"], ns["c_default"]
+        d_star, d_global, d_fresh, d_reg, d_new = ns["c_star"], ns["c_global"], ns["c_fresh"], ns["c_reg"], ns["c_new"]
+        d_data, d_any, d_upd, d_alias, d_reb = ns["c_data"], ns["c_any"], ns["c_upd"], ns["c_alias"], ns["c_reb"]
+        d_reb2, d_dec, d_static, d_result, d_doc = ns["c_reb2"], ns["c_dec"], ns["c_static"], ns["c_result"], ns["c_doc"]
+        d_shadow, d_target, d_nested, d_hook = ns["c_shadow"], ns["c_target"], ns["c_nested"], ns["c_hook"]
+
+        def c_shadow(x):
+            ns["q_shadow"](x)
+            return d_shadow(x)
+
+        def c_target(x):
+            ns["q_target"](x)
+            return d_target(x)
+
+        def c_nested(x):
+            ns["q_nested"](x)
+            return d_nested(x)
+
+        def c_hook(x):
+            ns["q_hook"](x)
+            return d_hook(x)
+
+        def c_timer(x):
+            ns["q_timer"](x)
+            return d_timer(x)
+
+        def c_rng(x):
+            ns["q_rng"](x)
+            return d_rng(x)
+
+        def c_field(x):
+            ns["q_field"](x)
+            return d_field(x)
+
+        def c_store(x):
+            ns["q_store"](x)
+            return d_store(x)
+
+        def c_arg(x):
+            ns["q_arg"](x)
+            return d_arg(x)
+
+        def c_helper(x):
+            ns["q_helper"](x)
+            return d_helper(x)
+
+        def c_loop(x):
+            ns["q_loop"](x)
+            return d_loop(x)
+
+        def c_cond(x):
+            ns["q_cond"](x)
+            return d_cond(x)
+
+        def c_default(x):
+            ns["q_default"](x)
+            return d_default(x)
+
+        def c_star(x):
+            ns["q_star"](x)
+            return d_star(x)
+
+        def c_global(x):
+            ns["q_global"](x)
+            return d_global(x)
+
+        def c_fresh(x):
+            ns["q_fresh"](x)
+            return d_fresh(x)
+
+        def c_reg(x):
+            ns["q_reg"](x)
+            return d_reg(x)
+
+        def c_new(x):
+            ns["q_new"](x)
+            return d_new(x)
+
+        def c_data(x):
+            ns["q_data"](x)
+            return d_data(x)
+
+        def c_any(x):
+            ns["q_any"](x)
+            return d_any(x)
+
+        def c_upd(x):
+            ns["q_upd"](x)
+            return d_upd(x)
+
+        def c_alias(x):
+            ns["q_alias"](x)
+            return d_alias(x)
+
+        def c_reb(x):
+            ns["q_reb"](x)
+            return d_reb(x)
+
+        def c_reb2(x):
+            ns["q_reb2"](x)
+            return d_reb2(x)
+
+        def c_dec(x):
+            ns["q_dec"](x)
+            return d_dec(x)
+
+        def c_static(x):
+            ns["q_static"](ns["tbl"])
+            return d_static(x)
+
+        def c_result(x):
+            ns["tog"](x).params.DECODE_LATER(x)
+            return d_result(x)
+
+        def c_doc(x):
+            ns["tr_chain"](x)
+            return d_doc(x)
+        ns.update(c_timer=c_timer, c_rng=c_rng, c_field=c_field, c_store=c_store, c_arg=c_arg, c_helper=c_helper,
+                  c_loop=c_loop, c_cond=c_cond, c_default=c_default, c_star=c_star, c_global=c_global,
+                  c_fresh=c_fresh, c_reg=c_reg, c_new=c_new, c_data=c_data, c_any=c_any, c_upd=c_upd,
+                  c_alias=c_alias, c_reb=c_reb, c_reb2=c_reb2, c_dec=c_dec, c_static=c_static, c_result=c_result,
+                  c_doc=c_doc, c_shadow=c_shadow, c_target=c_target, c_nested=c_nested, c_hook=c_hook)
+
+    def plant2(self, ns):
+        def q_reb2(g):
+            return ns["tbl"].get(g)
+        q_reb2 = wrap(q_reb2)
+        ns.update({k: v for k, v in locals().items() if callable(v) and k not in ("self", "ns")})
+'''
+# each layer: the end of its reason, and its control: the clauses off (off) or the readers skipped (skip) under which
+# it reads an observer
+FC_LAYERS = {
+    # F1's three, Codex and Fable: a timer, a draw stream, a node field; a field stored; a mutable argument
+    "c_timer": ("calls node.sim.after, which the follow cannot establish as a read, in q_timer", {"off": ("call",)}),
+    "c_rng": ("calls node.sim.floor_rng.random, which the follow cannot establish as a read, in q_rng",
+              {"off": ("call",)}),
+    "c_field": ("mutates self._seen by add, which the follow cannot establish as its own new object, in q_field",
+                {"off": ("effect",)}),
+    "c_store": ("writes node.count, which the follow cannot establish as its own new object, in q_store",
+                {"off": ("effect",)}),
+    "c_arg": ("mutates asks by clear, which the follow cannot establish as its own new object, in q_arg",
+              {"off": ("effect",)}),
+    # the inventory (F2, F3, F5): ns.update(**{…}), an alias of the namespace, a rebinding to a call's result (bound,
+    # and exported by locals()), a decorator
+    "c_upd": ("writes ns['tbl'][g], in q_upd", {"skip": ("update-starred",)}),
+    "c_alias": ("writes ns['tbl'][g], in q_alias", {"skip": ("ns-alias",)}),
+    "c_reb": ("names q_reb, which the toy binds to a value the scan does not read as a function", {"skip": ("rebound",)}),
+    "c_reb2": ("names q_reb2, which the toy binds to a value the scan does not read as a function",
+               {"skip": ("rebound",)}),
+    "c_dec": ("names q_dec, which the toy binds to a value the scan does not read as a function",
+              {"skip": ("decorated",)}),
+    # F11's: a captured helper, a loop's target, a conditional receiver, a default, *args, a static method, a result,
+    # "any" unread, global, a document function reached from a followed one
+    "c_helper": ("calls hp, a namespace name the follow does not read, in q_helper", {"off": ("call",)}),
+    "c_loop": ("mutates lane by clear, which the follow cannot establish as its own new object, in q_loop",
+               {"off": ("effect",)}),
+    "c_cond": ("by append, which the follow cannot establish as its own new object, in q_cond", {"off": ("effect",)}),
+    "c_default": ("mutates t by pop, which the follow cannot establish as its own new object, in q_default",
+                  {"off": ("effect",)}),
+    "c_star": ("mutates xs[0] by clear, which the follow cannot establish as its own new object, in inner, in q_star",
+               {"off": ("effect",)}),
+    "c_result": ("calls DECODE_LATER on ns['tog'](x).params, which the test does not establish as a read",
+                 {"off": ("answer",)}),
+    "c_any": ("names q_any, which the toy binds to a value the scan does not read as a function", {"off": ("unread",)}),
+    "c_global": ("declares global counter, in q_global", {"off": ("assign",)}),
+    "c_doc": ("writes seen[g], in tr_w2, in tr_chain", {"off": ("assign", "effect")}),
+    # a name a nested function binds to a new object is not the followed function's own: its free `pool` is no fresh one
+    "c_shadow": ("mutates pool by append, which the follow cannot establish as its own new object, in q_shadow",
+                 {"off": ("effect",)}),
+    # a store in a for's target, and in a nested list target
+    "c_target": ("writes node.last, which the follow cannot establish as its own new object, in q_target",
+                 {"off": ("effect",)}),
+    "c_nested": ("writes node.held, which the follow cannot establish as its own new object, in q_nested",
+                 {"off": ("effect",)}),
+    # a toy class's constructor (fv-67's guards): an __init__ with an effect, a __new__, a decorated class
+    "c_reg": ("mutates REGISTRY by append, which the follow cannot establish as its own new object, in "
+              "Registered.__init__, in q_reg", {"off": ("ctor-init",)}),
+    "c_new": ("calls WithNew, a class whose making the follow does not read, in q_new", {"off": ("ctor-guard",)}),
+    "c_data": ("calls Data, a class whose making the follow does not read, in q_data", {"off": ("ctor-guard",)}),
+    # a class whose __setattr__ runs at its __init__'s store: refused by the guard; with it off, __init__'s own store on
+    # self passes and the hook is not followed (the guard is what refuses it)
+    "c_hook": ("calls Hooked, a class whose making the follow does not read, in q_hook", {"off": ("ctor-guard",)}),
+}
+# the fresh object: an observer, and with each allowance off a layer (the allowance is what passes it)
+FC_FRESH = {"fresh": "mutates out by append", "ctor": "calls Made", "pure": "calls int.from_bytes",
+            "module-fn": "calls mod_fn"}
+# whole-scan cases, each in a file of its own beside FC: (file, text, the reader whose skip makes c_fresh an observer)
+FC_UNNAMED = {
+    "a computed key by **": ("star.py", "def setter(ns, extra):\n    ns.update(**extra)\n", "update-starred"),
+    "a loop that binds its variable": ("loopkey.py", 'def setter(ns, w):\n    for k in ("harmless",):\n'
+                                       '        k = "q_fresh"\n        ns[k] = w\n', "loop-rebind"),
+}
+# file order: a layer in one file follows a binding in another that calls self.m, a method of that other file
+FO_LAYER = '''\
+class Node:
+    def plant_a(self, ns):
+        d_fo = ns["c_fo"]
+
+        def c_fo(x):
+            ns["q_fo"](x)
+            return d_fo(x)
+        ns.update(c_fo=c_fo)
+'''
+FO_BINDING = '''\
+class Node:
+    def m_fo(self, g):
+        self.ns["tbl"].clear()
+
+    def plant_z(self, ns):
+        def q_fo(g):
+            self.m_fo(g)
+        ns.update(q_fo=q_fo)
+'''
+
+
+def fail_closed_self_test(report):
+    """Fail-closed followed code's cases (FC), each with its control. It sets the name sets itself; self_test
+    restores them."""
+    layers = set(FC_LAYERS) | {"c_fresh", "c_static"}
+    qs = {n for n in ("timer", "rng", "field", "store", "arg", "helper", "loop", "cond", "default", "star", "global",
+                      "fresh", "reg", "new", "data", "any", "upd", "alias", "reb", "reb2", "dec", "static", "shadow",
+                      "target", "nested", "hook")}
+    qs = {f"q_{n}" for n in qs} | {"tog"}
+    doc = {d.name: d for d in ast.parse(FC_DOC).body}
+    for s, v in ((QUESTIONS_DOC, qs), (QUESTIONS_Seacast, qs), (TRACED, {"tr_chain"}), (TRACED_Seacast, {"tr_chain"}),
+                 (DEFS_DOC, layers | set(doc)), (RETURNS_DOC, layers | set(doc)), (CALLABLES, layers | set(doc)),
+                 (FNS_DOC, doc), (FNS_Seacast, {})):
+        s.clear()
+        s.update(v)
+
+    def got(rows, name):
+        r = [r for r in rows if r["name"] == name and r["form"] == "update-keyword"]
+        return (r[0]["class"], r[0].get("why", "")) if len(r) == 1 else (f"{len(r)} rows", "")
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "fc.py").write_text(FC)
+        rows = scan(d).rows
+        for name, (end, ctl) in FC_LAYERS.items():
+            c, why = got(rows, name)
+            report(f"fail-closed: {name} a layer, \"…{end[-70:]}\"", c == "layer" and why.endswith(end),
+                   f"got {c} ({why})")
+            c, why = got(scan(d, **ctl).rows, name)
+            report(f"control: {name} with {ctl} an observer", c == "observer", f"got {c} ({why})")
+        c, why = got(rows, "c_static")       # a static method: its first parameter is the table handed, no receiver
+        report("fail-closed: c_static a layer, \"mutates xs by clear, in q_static\"",
+               c == "layer" and why == "mutates xs by clear, in q_static", f"got {c} ({why})")
+        c, why = got(scan(d, skip=("static",)).rows, "c_static")
+        report("control: c_static with the static reader off, xs no table (another reason)",
+               c == "layer" and why != "mutates xs by clear, in q_static", f"got {c} ({why})")
+        c, why = got(rows, "c_fresh")
+        report("fail-closed: c_fresh an observer (its own list, a toy constructor, int.from_bytes, its file's function)",
+               c == "observer", f"got {c} ({why})")
+        for clause, start in FC_FRESH.items():
+            c, why = got(scan(d, off=(clause,)).rows, "c_fresh")
+            report(f"control: c_fresh with the allowance {clause} off a layer, \"{start}…\"",
+                   c == "layer" and why.startswith(start), f"got {c} ({why})")
+        for what, (fname, text, reader) in FC_UNNAMED.items():
+            (Path(d) / fname).write_text(text)
+            c, why = got(scan(d).rows, "c_fresh")
+            report(f"fail-closed: {what}, c_fresh a layer", c == "layer" and
+                   why == "names q_fresh, and the toy binds a computed key the scan cannot name", f"got {c} ({why})")
+            c, why = got(scan(d, skip=(reader,)).rows, "c_fresh")
+            report(f"control: {what}, its reader {reader} off, c_fresh an observer", c == "observer", f"got {c} ({why})")
+            (Path(d) / fname).unlink()
+    for s, v in ((QUESTIONS_DOC, {"q_fo"}), (QUESTIONS_Seacast, {"q_fo"}), (TRACED, set()), (TRACED_Seacast, set()),
+                 (DEFS_DOC, {"c_fo"}), (RETURNS_DOC, {"c_fo"}), (CALLABLES, {"c_fo"}), (FNS_DOC, {}),
+                 (FNS_Seacast, {})):
+        s.clear()
+        s.update(v)
+    want = "mutates self.ns['tbl'] by clear, in m_fo, in q_fo"
+    for first, second in (("a.py", "z.py"), ("z.py", "a.py")):     # the layer's file scanned first, then last
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / first).write_text(FO_LAYER)
+            (Path(d) / second).write_text(FO_BINDING)
+            c, why = got(scan(d).rows, "c_fo")
+            report(f"fail-closed: file order, the layer in {first}, the method in {second}: \"…{want}\"",
+                   c == "layer" and why == want, f"got {c} ({why})")
+            if first == "a.py":
+                c, why = got(scan(d, skip=("pre-methods",)).rows, "c_fo")
+                report("control: the pre-pass's method map off, the method in the later file not followed",
+                       c == "layer" and why != want, f"got {c} ({why})")
 
 
 def self_test():
@@ -1977,6 +2673,7 @@ def self_test():
         out, other = lists(type("S", (), {"rows": [dict(row, **{"class": "observer"})]}), T)
         report("control: the same row an observer in WRAPPERS, none counted", other == 0, f"got {other}: {out}")
         follow_self_test(report)
+        fail_closed_self_test(report)
     finally:
         for s, v in zip(sets + more, saved + saved_more):
             s.clear()
