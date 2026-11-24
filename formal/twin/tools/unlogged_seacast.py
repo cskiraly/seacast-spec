@@ -4,10 +4,14 @@ through without logging it.
 
     python3 unlogged_seacast.py TOYDIR OUT.jsonl.gz [directed_seacast.py's arguments ...]
 
-The run is directed_seacast.py's, but every fifth assignment to an entry through a view, inside a record, is made
-in the toy's container and not logged (unlogged3.py's fault, for SEACAST's nodes). The tracer must stop, with a
-non-zero exit code and a line that says the log does not account for the state after the call. If it writes its
-trace to the end, the check of the log checks nothing under SEACAST.
+The run is directed_seacast.py's, but every fifth assignment `view[k] = v` to an entry (a view's `__setitem__` at a
+table's last level), inside a record, is made in the toy's container and not logged (unlogged3.py's fault, for
+SEACAST's nodes). No other write through a view is touched: a deletion, `pop`, `setdefault`, `add` and the rest are
+logged as always. The tracer must stop, with a non-zero exit code and a line that says the log does not account for
+the state before the call. The log's `rest` is read after the call, so an unlogged write to an entry the call never
+logged shows there as if it had been there before, and the comparison with the tables at the call's start fails.
+(The line for the state after the call is for an unlogged write that changes a logged one.) If the tracer writes
+its trace to the end, the check of the log checks nothing under SEACAST.
 
 What the control cannot show: a fault on an entry the call read before writing it shows as that entry's changed
 value and is recorded as the write it is, so that fault alone does not stop the tracer. It stops at the first fault

@@ -21,9 +21,11 @@ method of the enclosing class (`self.m`, `node.m`).
 
 Each function bound has a class:
 - **observer**: it holds the earlier binding of its name (a closure variable assigned from `ns[name]` before it, or
-  a node attribute so assigned, `self._doc_x = ns["x"]`) and passes the observer test: its code names no question
+  a node attribute so assigned, `self._doc_x = ns["x"]`) and passes the observer test: its code names a question
   (trace3.py's TAPE, and seacast.md's: the names its functions call that no document defines and that the toy
-  binds under v2 alone) and no traced function but the earlier binding; it assigns, deletes or mutates no table,
+  binds under v2 alone) or a traced function other than the earlier binding only in a direct call, and the body
+  each such call reaches is read by the same test (on_want's layer calls `probe_of_claim` and `resolve`); it
+  assigns, deletes or mutates no table,
   through its own aliases too, following the local functions, lambdas and node methods it calls with the tables it
   hands them; on a table, or on what a table's method returns, it calls only the methods that read it, and it hands
   a table to no call the test cannot follow (a builtin but those it takes as reads, `len`, `sorted`, ...); the functions
@@ -720,12 +722,14 @@ class Scanner:
     def constructor(self, c, name, seen):
         """A toy class's constructor, called in followed code: why it may do more than make a new object, or None.
         Refused: a class with a decorator (a dataclass's default_factory among them), a base, a keyword (a metaclass),
-        or any method but its __init__: __new__, __post_init__ and __init_subclass__ among them, and every method a
-        store, a mutator or an operator on the new object would run unfollowed (__setattr__, __setitem__, append, …).
-        Else its own __init__, if it has one, is followed by the same test, with its receiver a new object.
+        or any method defined by `def` but its __init__: __new__, __post_init__ and __init_subclass__ among them, and
+        every method a store, a mutator or an operator on the new object would run unfollowed (__setattr__,
+        __setitem__, append, …). The guard reads the class's `def` statements alone. Else its own __init__, if it has
+        one, is followed by the same test, with its receiver taken to be the new object.
 
-        What it can miss: an `__init__` that is no `def` of the class; one bound to a lambda that clears
-        `node.pending` passes."""
+        What it can miss: a statement of the class body that is no `def`: an `__init__` bound to a lambda that
+        clears `node.pending` passes, and so does an assigned `__setattr__ = hook`. And a receiver that is not the
+        new object: `self = shared` in `__init__`, then `self.count = 1`, passes."""
         if "ctor-guard" not in self.off and (
                 c.decorator_list or c.bases or c.keywords
                 or any(isinstance(m, (ast.FunctionDef, ast.AsyncFunctionDef)) and m.name != "__init__"
@@ -2760,8 +2764,11 @@ def followed(sc):
     observer that is no longer one; the pin (`pins`) makes the change fail until the row is read again.
 
     What it can miss: code the test reads for every row alike and does not walk for one. on_want calls
-    `e.has(gi.index)`, and the toy's `has` methods are read once for all rows (toy_reads), so a change there moves
-    no pin."""
+    `e.has(gi.index)`, and the toy's `has` methods are read once for all rows (toy_reads), so a change there that
+    the test still takes as a read moves no pinned hash. (One it no longer takes as a read takes `has` out of the
+    reads: each row that calls it is then no observer, and the pin names it as no longer such a row.) And the
+    statements of a class around a followed `__init__` that are no `def`: on_want's row pins
+    `GroupIndex.__init__`, not the class, so an assigned `__setattr__` in its body moves no pin."""
     rows = {}
     for r, bodies in sc.followed:
         key = f"row {r['file']} {r['in']} {r['name']} = {r['value']['qual']} ({r['form']})"
