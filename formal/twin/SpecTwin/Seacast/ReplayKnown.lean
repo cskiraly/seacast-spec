@@ -723,10 +723,11 @@ and exactly the branch labels it was written for, in order:
   backoff that runs out exactly now (not counted, and deleted), the slice `cs[:n]` at `n` = 0 and -1;
 - `relation_room` at a type with parameters but no `MAX_RELATIONS` (`param`'s missing-field arm);
 - the parameters the Python leaves unread, each at a type that lacks it, so that a read would raise: `MAX_RELATIONS`
-  where the pair is held (`payload`), and `M` where no family has duty (`bare`), beside `M`'s `AttributeError` where
-  one does;
-- the owed messages: a JOIN of the record's own type skipped before its type is read, a GRAFT of the type counted, a
-  GRAFT of another type not counted, and a PRUNE of the type counted;
+  where the pair is held (`payload`), and `M` where no family has duty (`bare`, which lacks `M` alone), beside `M`'s
+  `AttributeError` where one does;
+- the owed messages: a JOIN of the record's own type not counted, a GRAFT of the type counted, with `answer` false and
+  with it true, a GRAFT of another type not counted, and a PRUNE of the type counted. That a JOIN's type is not read
+  is the audit's: a record holds no read of a message's fields;
 - symmetric upkeep at each of its places: below the floor, between the floor and the cap (the repair alone), and at
   the cap with a draw of 2 and of 0; and a symmetric PRUNE with a backoff, ending both ways with two backoffs;
 - each `KeyError` of a missing JOIN sent, as the Python raises it. The toy reaches none of them, since `links(T)`
@@ -734,8 +735,10 @@ and exactly the branch labels it was written for, in order:
 
 Several must fail: a wrong return, a question out of order, `type_of` answered once where the Python asks it twice,
 the six questions' answers that their readers refuse by their own checks, and a draw of a negative count at the
-symmetric cap, which the twin refuses with a crash of its own (no tracer writes that record: the draw's arguments are
-written as naturals).
+symmetric cap, which the twin refuses with a crash of its own. No tracer writes that record faithfully: the draw's
+encoder raises `TypeError` on the negative count before the tape entry is written, so the tracer writes the call as
+raising `TypeError` and the trace ends stopped. A record beside it names the twin's crash as its raise, so that the
+judge holds where the crash comes: after `families_with_duty` and `in_pushers`, with the tape used up.
 
 What a record shows, and what it does not: as in §4.5's records, the replay holds the twin to the record's questions
 in order, its return or raise, its writes and the cells it read. It does not show how many times a cell was read, in
@@ -747,13 +750,17 @@ the traces carry them.
 The link is peer 4, the family 0 and the colour 0. Five types have parameters: `row`, one way, with a limit of 2
 pairs and a backoff of 1.0; `column`, symmetric, with no limit (+∞, the toy's default) and no backoff; `payload`, with
 parameters but no `MAX_RELATIONS`; `sym`, symmetric, with a floor below its cap and a `D_OUT` above both, and a
-backoff of 1.0; and `bare`, with parameters but no `M`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and `D_OUT_MAX`
-at 12, 8, 8 and 12 for its three types (toy/node.py:1235, :1285, :1330); the records take smaller values, which
-§1.1's class allows, so that their lists stay short, and the twin reads each from the context the same way at any
-value. `sym`'s `D_OUT` above its `F_HI` is outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table) and outside every
-type of the toy's: it is there so that the draw at the cap can be asked with 0, and with a negative count in the one
-that must fail. Each record is a state the toy's store and tables can make at the record's parameters. A record's time
-is 0 unless it says otherwise. -/
+backoff of 1.0; and `bare`, with `row`'s parameters but no `M`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and
+`D_OUT_MAX` at 12, 8, 8 and 12 for its three types (toy/node.py:1235, :1285, :1330); the records take smaller values,
+which §1.1's class allows, so that their lists stay short, and the twin reads each from the context the same way at
+any value. Two symmetric types are outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table), as no type of the toy's
+is: `column`, whose `D_OUT` is below its floor, and `sym`, whose `D_OUT` is above its cap, so that the draw at the cap
+can be asked with 0, and with a negative count in the one that must fail.
+
+Each record is a seeded state: a store and tables that the toy's code can hold at the record's parameters. Not every
+one is reached by the toy's events (a JOIN of `row` with interest ALL, two backoffs at times that one `PRUNE_BACKOFF`
+cannot leave together, pairs of families with no history); a record claims a way the toy reaches it only where its
+comment gives one. A record's time is 0 unless it says otherwise. -/
 
 namespace Upkeep
 
@@ -766,7 +773,7 @@ def inf : Float := Float.ofBits 9218868437227405312
 backoff of 1.0; `column`: symmetric, M = 1, a floor and a cap of 3, 1 out, no limit and no backoff; `payload`: no
 `MAX_RELATIONS`; `sym`: symmetric, M = 1, a floor of 1 and a cap of 2, so that one pusher sits between them, a
 `D_OUT` of 3 above the cap, so that the draw at the cap can be 0 or negative, no limit, and a backoff of 1.0; `bare`:
-one way, with no `M` -/
+`row`'s parameters with no `M`, so that an `AttributeError` there can come only from a read of `M` -/
 def params2 : TypeId → Option TypeParams := fun T =>
   if T == "row" then
     some { M := some 1, SYMMETRIC := some false, F_LO := some 1, F_HI := some 1, D_OUT := some 1,
@@ -778,7 +785,9 @@ def params2 : TypeId → Option TypeParams := fun T =>
   else if T == "sym" then
     some { M := some 1, SYMMETRIC := some true, F_LO := some 1, F_HI := some 2, D_OUT := some 3,
            PRUNE_BACKOFF := some 1.0, MAX_RELATIONS := some inf }
-  else if T == "bare" then some { SYMMETRIC := some false }
+  else if T == "bare" then
+    some { SYMMETRIC := some false, F_LO := some 1, F_HI := some 1, D_OUT := some 1, D_OUT_FAST := some 2,
+           D_OUT_MAX := some 1, PRUNE_BACKOFF := some 1.0, MAX_RELATIONS := some 2.0 }
   else none
 
 def replay2 (l : String) : Except String (Array String × Nat) := do
@@ -877,7 +886,8 @@ def raisesKey (T : String) : List (String × String) :=
     ["relation_room"])
   [below]
 -- at time 2.0: a backoff run out at 1.0 and one that runs out exactly now are not counted, nor an owed JOIN of the
--- type (skipped before its type is read), nor an owed GRAFT of another type; one pair counted, below the limit
+-- type, nor an owed GRAFT of another type; one pair counted, below the limit. That the JOIN's type is not read is
+-- the audit's: the record holds no read of a message's fields
 #guard takes2 (rec2 "relation_room" (args "row")
     [rc "push_in" 4 "row" "[0]" 2, rd "backoff" (ptfk 4 "row" 3 0 "IN") f1, rd "backoff" (ptfk 4 "row" 5 1 "OUT") f2,
      rd "owed_relations" "[4]" s!"[{jnT "row" "ALL" "FORWARD"}, [\"graft\", \"column\", 6, 0, \"OUT\", false]]"]
@@ -891,6 +901,11 @@ def raisesKey (T : String) : List (String × String) :=
 -- an owed GRAFT of the type is counted: with one pair pushed to us, two pairs, at the limit
 #guard takes2 (rec2 "relation_room" (args "row")
     [rc "push_in" 4 "row" "[0]" 2, rd "owed_relations" "[4]" "[[\"graft\", \"row\", 6, 0, \"OUT\", false]]"]
+    (room 4 "row") [] [] (ret "false") ["relation_room"])
+  [atLimit]
+-- and an owed GRAFT of the type that answers yes (`answer` true) is counted the same
+#guard takes2 (rec2 "relation_room" (args "row")
+    [rc "push_in" 4 "row" "[0]" 2, rd "owed_relations" "[4]" "[[\"graft\", \"row\", 6, 0, \"OUT\", true]]"]
     (room 4 "row") [] [] (ret "false") ["relation_room"])
   [atLimit]
 -- a type with parameters but no MAX_RELATIONS: AttributeError, from the missing field, where the pair is not held
@@ -1276,11 +1291,18 @@ def j1 : String := rec2 "on_join" s!"[4, {jnT "row" "DECLARED" "NONE"}]" [rd "jo
     (ret "null") ["on_prune", "joined", "relation_room"])
 -- a draw of a negative count at the symmetric cap (sym: 2 pushers, F_HI 2, D_OUT 3, so 2 - 3 = -1), where the
 -- Python's draw raises ValueError: the twin's question cannot carry the count, and the twin crashes with a name of its
--- own. No tracer writes this record (the draw's arguments are written as naturals); it is written here by hand
+-- own. No tracer writes this record faithfully (the draw's encoder raises TypeError on the negative count, so the
+-- tracer writes the call as raising TypeError and stops); it is written here by hand
 #guard fails2 ("the Python raises ValueError; the twin: crash: twin: sample_without_replacement of a negative " ++
     "count")
   (rec2 "maintain_relations" "[\"sym\"]" [] [] [] [dutyQ "sym" "[0]", inQ "sym" "[5, 6]"]
     [("raises", "\"ValueError\"")] ["maintain_relations"])
+-- where that crash comes: the same input with the twin's crash named as the raise ("twin"), so that the judge holds
+-- the tape used up after families_with_duty and in_pushers, the functions reached, the state and the footprint. Not a
+-- record of the Python's; it locates the must-fail above
+#guard takes2 (rec2 "maintain_relations" "[\"sym\"]" [] [] [] [dutyQ "sym" "[0]", inQ "sym" "[5, 6]"]
+    [("raises", "\"twin\"")] ["maintain_relations"])
+  ["raises: twin"]
 -- and the six questions' answers that their readers refuse by their own checks, each in a record that passes
 -- otherwise: a number for a bool, a JOIN's array with another tag, a peer twice in each list of peers, an uplink
 -- class outside the two
