@@ -533,6 +533,8 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._peer_promise.<locals>.fill", 1170): ("fill", OBSERVER),
           ("node.py", "Node._seacast.<locals>.check_completion", 1721): ("check_completion", OBSERVER),
           ("node.py", "Node._seacast.<locals>.fill", 1756): ("fill", OBSERVER),
+          # --alarm-wait's count before the call: type_of_group, which it asks, only reads (scan_bindings.py's follow)
+          ("node.py", "Node._alarm.<locals>.serve_standing", 422): ("serve_standing", OBSERVER),
           # swapped draws: the floor's draw on sim.floor_rng; the probed index's on a stream of its own
           ("node.py", "Node._seacast.<locals>.keep_floor", 1686): ("keep_floor", SWAPPED_DRAW),
           ("node.py", "Node._seacast.<locals>.defer_on_claim", 1775): ("defer_on_claim", SWAPPED_DRAW),
@@ -549,7 +551,6 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1149): ("push_rebuilt", CHANGING),
           ("node.py", "Node._seacast.<locals>.<lambda>", 1808): ("push_rebuilt", CHANGING),            # --fault hoard's
           ("node.py", "Node._seacast.<locals>.push_rebuilt", 1810): ("push_rebuilt", CHANGING),        # hoardcol's
-          ("node.py", "Node._alarm.<locals>.serve_standing", 422): ("serve_standing", CHANGING),  # asks type_of_group
           ("node.py", "Node._seacast.<locals>.serve_standing", 1841): ("serve_standing", CHANGING),
           ("node.py", "Node._repair_bias.<locals>.repair_verdict", 471): ("repair_verdict", CHANGING),
           ("node.py", "Node._faults.<locals>.forward", 1106): ("forward", CHANGING),              # a silent node's
@@ -2335,7 +2336,10 @@ def observers_self_test():
         rec.clear()
         rec.on, rec.tape = True, []
         try:
-            observe(rec, ob, top, (g,), {}, lambda: None, lambda: None)
+            if ob is not None:
+                observe(rec, ob, top, (g,), {}, lambda: None, lambda: None)
+            else:                           # the handling off (a planted fault): the chain called as the record's
+                top(g)
         finally:
             rec.on = False
         reads, _, writes = rec.footprint()
@@ -2411,6 +2415,44 @@ def observers_self_test():
         case(*c)
     fault("the hand-over unbound: the other name's hand-over ends the caller's mode", HANDOVER_BOUND,
           [reads_bound, writes_bound])
+
+    def bare(kind, write):
+        """The scan's follow (scan_bindings.py): an observer's own call, bare in its mode, of what the scan now
+        follows instead of refusing: `kind` "question", a toy's binding of a question (iface_of runs one bare inside
+        an observer); "traced", a traced name's document function with no layer at this node (sec61's wrapper runs
+        it bare there). The callee reads stop_pull, and with `write` writes it through the view: its read unlogged,
+        the record's log the document function's alone; its write a stop in the observer's words, which is what
+        stops a trace where the scan's follow passed a callee that writes."""
+        body = "    x = stop_pull[g]\n" + ("    stop_pull[g] = True\n" if write else "") + "    return x\n"
+        src = doc_src + "def probe(g):\n" + body
+
+        def make(ns, rec):
+            def q(g):
+                x = ns["stop_pull"][g]
+                if write:
+                    ns["stop_pull"][g] = True
+                return x
+            callee = ns["probe"] if kind == "traced" else q
+
+            def layer(doc):
+                def check_completion(g):
+                    callee(g)
+                    return doc(g)
+                return check_completion
+            return layer(ns[name]), lambda: {}
+        return recorded(src, make)
+    bare_cases = []
+    for kind, what in (("question", "a question"), ("traced", "a traced function")):
+        bare_cases.append((f"an observer's own bare call of {what} that only reads: unlogged, the record's log the "
+                           f"document function's", lambda kind=kind: bare(kind, False),
+                           {"read": ["received"], "wrote": ["stop_pull"], "calls": [1], "unlogged": [1]}))
+        bare_cases.append((f"an observer's own bare call of {what} that writes through the view: a stop, the "
+                           f"observer's words", lambda kind=kind: bare(kind, True),
+                           stops(" over check_completion writes stop_pull[\"", ": an observer changes no table")))
+    for c in bare_cases:
+        case(*c)
+    fault("the stop off: the bare calls' writes let through", F.OBSERVER_STOP, bare_cases[1::2])
+    fault("the handling off: the bare calls' reads logged", OBSERVE, bare_cases[0::2])
     return bad
 
 

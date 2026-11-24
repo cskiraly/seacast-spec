@@ -152,6 +152,11 @@ class Scanner:
         self.exempt = ()            # the slots the observer test lets a layer name and bind (observer_test)
         self.globals = {}           # (file, name or Class.method) -> Func: the modules' functions and methods
         self.imports = {}           # (file, local name) -> (module file, name), or (module file, None) for a module
+        self.collect = None         # the pre-pass (scan): every binding's function by name, None where a value
+        self.bound_by = {}          # its result, for the observer test's follow: name -> [Func or None]; None's key
+        #                             holds the computed keys' (which may bind any name)
+        self.depth = 0              # the observer test's depth: 0 in the layer's own code, more in what it follows
+        self.doc = None             # the document the observer test runs under
 
     def prepass(self, path):
         """A module's own functions and methods, and its imports of the toy's other modules (path's siblings)."""
@@ -216,6 +221,8 @@ class Scanner:
         src = path.read_text()
         tree = ast.parse(src)
         self.src, self.path = src, path
+        if self.collect is not None:        # the pre-pass: each node's parent, for a computed key's loop
+            self.parents = {id(c): p for p in ast.walk(tree) for c in ast.iter_child_nodes(p)}
         for cls in tree.body:       # a class's methods by name, for the observer test's call following
             if isinstance(cls, ast.ClassDef):
                 for m in cls.body:
@@ -406,6 +413,12 @@ class Scanner:
         if via:
             r["via"] = via
         r["seacast_only"] = self.in_seacast(scope, at.lineno)
+        if self.collect is not None:        # the pre-pass: the binding's function (or None, a value), by name
+            keys = [name] if form != "computed-key" else self.loop_keys(at, name)
+            for k in keys if keys is not None else [None]:      # None: a key the scan cannot name
+                self.collect.setdefault(k, []).append(fn)
+            self.rows.append(r)
+            return
         if fn is None:
             r["value"] = ast.unparse(value)[:80] if value is not None else None
             r["class"] = "value"
@@ -487,7 +500,11 @@ class Scanner:
     # -- the observer test ------------------------------------------------------------------------------------
     # the observer test, clause by clause; each clause can be switched off (`self.off`), for the self-test's controls
     CLAUSES = ("question", "traced", "assign", "delete", "mutate", "unfollowed", "local-fn", "node-method", "twice",
-               "branch", "arguments", "result", "rebind", "by-name")
+               "branch", "arguments", "result", "rebind", "by-name",
+               # the follow: a question or traced function the layer calls is followed by the same test
+               # (off: refused by name, as before); a draw, a name with a binding the scan does not read, and the
+               # layer's own name in what it follows are each refused
+               "follow", "draw", "unread", "own-name")
 
     def is_held(self, n, held):
         return isinstance(n, ast.Call) and ast.unparse(n.func) == held
@@ -536,6 +553,7 @@ class Scanner:
         self.exempt = exempt
         if name in BY_NAME and "by-name" not in self.off:
             return None
+        self.doc, self.depth = doc, 0
         self.questions = QUESTIONS_Seacast if doc == "seacast" else QUESTIONS_DOC
         self.traced = TRACED_Seacast if doc == "seacast" else TRACED
         if doc == "seacast":                     # SEACAST's namespace: its own function of the name, else seacast-lite.md's
@@ -553,18 +571,26 @@ class Scanner:
         """Why the code names a question or a traced function, or writes, deletes or mutates a table, following the
         local functions and node methods it calls (with the tables it hands them); or None. The functions and lambdas
         defined inside it are read as its own code, whether or not they run: a closure needs no argument to reach a
-        table."""
+        table. A question or a traced function the code calls directly is not refused by its name but followed
+        (`follow`), by this same test; named in any other way, it is refused as before. In what is followed
+        (`self.depth` > 0), a document function it calls is followed too, and a `global` or `nonlocal`, and the
+        layer's own name, are refused."""
+        calls = {id(c.func) for c in ast.walk(node) if isinstance(c, ast.Call)}    # the functions called directly
         for n in ast.walk(node):
             k = None
             if isinstance(n, ast.Subscript) and is_ns(n.value):
                 k = ns_key(n)
             elif isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load) and n.id != held:
                 k = scope.lookup(n.id, "captures")
-            if k is not None and k != name and k not in self.exempt:
-                if k in self.questions and "question" not in self.off:
-                    return f"names the question {k}"
-                if k in self.traced and "traced" not in self.off:
-                    return f"names the traced function {k}"
+            if k is not None and self.depth and k == name and "own-name" not in self.off:
+                return f"names {k}, the layer's own name"
+            if k is not None and k != name and (k not in self.exempt or self.depth):
+                q = k in self.questions and "question" not in self.off
+                t = k in self.traced and "traced" not in self.off
+                if (q or t) and ("follow" in self.off or id(n) not in calls):   # a direct call: followed at the call
+                    return f"names the question {k}" if q else f"names the traced function {k}"
+            if isinstance(n, (ast.Global, ast.Nonlocal)) and self.depth and "assign" not in self.off:
+                return f"declares {type(n).__name__.lower()} {', '.join(n.names)}"
             targets = []
             if isinstance(n, (ast.Assign, ast.Delete)):
                 targets = n.targets
@@ -580,6 +606,15 @@ class Scanner:
                         return f"{'deletes' if clause == 'delete' else 'writes'} {ast.unparse(tt)[:60]}"
             if not isinstance(n, ast.Call):
                 continue
+            k = self.called_name(n.func, scope, held)
+            if k is not None and k != name and (k not in self.exempt or self.depth) and "follow" not in self.off:
+                q = k in self.questions and "question" not in self.off
+                t = k in self.traced and "traced" not in self.off
+                if q or t or (self.depth and k in CALLABLES):
+                    why = self.follow(k, n, scope, name, held, seen)
+                    if why:
+                        return why
+                    continue
             if isinstance(n.func, ast.Attribute) and n.func.attr in MUTATORS and "mutate" not in self.off:
                 if self.ns_rooted(n.func.value, scope, bare=True):
                     return f"mutates {ast.unparse(n.func.value)[:60]} by {n.func.attr}"
@@ -624,6 +659,112 @@ class Scanner:
                 if a is not None:
                     return f"hands {ast.unparse(a)[:40]} to {ast.unparse(n.func)[:40]}, which the test does not follow"
         return None
+
+    def loop_keys(self, at, name):
+        """The names a computed key `<k>` binds, when `k` is the variable of a `for` around the binding that runs
+        over a literal tuple or list of strings (or of tuples, `k` in the same place of each); else None."""
+        k = name[1:-1]
+        if not k.isidentifier():
+            return None
+        p = self.parents.get(id(at))
+        while p is not None:
+            if isinstance(p, ast.For) and isinstance(p.iter, (ast.Tuple, ast.List)):
+                t = p.target
+                at_ = [None] if isinstance(t, ast.Name) and t.id == k else \
+                    [j for j, e in enumerate(t.elts) if isinstance(e, ast.Name) and e.id == k] \
+                    if isinstance(t, (ast.Tuple, ast.List)) else []
+                if at_:
+                    j = at_[0]
+                    out = []
+                    for e in p.iter.elts:
+                        if j is not None:
+                            e = e.elts[j] if isinstance(e, (ast.Tuple, ast.List)) and j < len(e.elts) else None
+                        if not (isinstance(e, ast.Constant) and isinstance(e.value, str)):
+                            return None
+                        out.append(e.value)
+                    return out
+            if isinstance(p, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)) or \
+                    (isinstance(p, (ast.For, ast.comprehension)) and k in
+                     {n.id for n in ast.walk(p.target) if isinstance(n, ast.Name)}):
+                return None                 # bound by a loop the scan does not read, or outside the function
+            p = self.parents.get(id(p))
+        return None
+
+    def called_name(self, f, scope, held):
+        """The namespace name a call's function is (`ns["x"](...)`, or a local `x` captured from `ns["x"]`, or in a
+        document's code a global `x`), or None: a local function, the held binding, anything else."""
+        if isinstance(f, ast.Subscript) and is_ns(f.value):
+            k = ns_key(f)
+        elif isinstance(f, ast.Name) and f.id != held and scope.lookup(f.id, "funcs") is None:
+            k = scope.lookup(f.id, "captures")
+        else:
+            return None
+        return k if isinstance(k, str) and not k.startswith("<") else None
+
+    def follow(self, k, call, scope, name, held, seen):
+        """Why the question, traced function or (in what is followed) document function `k`, which the code calls
+        directly, is not one that only reads by this same test; or None. It is read through the documents' function
+        of that name (seacast.md's under seacast.md, else seacast-lite.md's), and through every binding of the name
+        in the toy's files (the pre-pass, `self.bound_by`), each with the tables the call hands it, transitively;
+        each once per name and tables handed. Refused: a draw (DRAWS); a name the toy binds to a value the scan does
+        not read as a function, or that has neither a binding nor a definition; any name at all where the toy binds
+        a computed key the scan cannot name (it may bind this one); and a table handed through * or **, where the
+        parameter it reaches is not known."""
+        if k in DRAWS and "draw" not in self.off:
+            return f"names the draw {k}"
+        if self.bound_by.get(None) and "unread" not in self.off:
+            return f"names {k}, and the toy binds a computed key the scan cannot name"
+        if ((any(isinstance(a, ast.Starred) for a in call.args) or any(kw.arg is None for kw in call.keywords))
+                and self.table_arg(call, scope) is not None and "unfollowed" not in self.off):
+            return f"hands a table to {k} through * or **"
+        pos = frozenset(i for i, a in enumerate(call.args) if self.ns_rooted(a, scope, bare=True))
+        kws = frozenset(kw.arg for kw in call.keywords if kw.arg and self.ns_rooted(kw.value, scope, bare=True))
+        key = ("follow", k, pos, kws)
+        if key in seen:
+            return None
+        seen.add(key)
+        targets = []
+        d = (FNS_Seacast.get(k) or FNS_DOC.get(k)) if self.doc == "seacast" else FNS_DOC.get(k)
+        if d is not None:
+            targets.append((d, self.doc_scope(d), None, d.name))
+        for f in self.bound_by.get(k, ()):
+            if f is None:
+                if "unread" not in self.off:
+                    return f"names {k}, which the toy binds to a value the scan does not read as a function"
+                continue
+            targets.append((f.node, f.scope, f, f.qual))
+        if not targets:
+            return None if "unread" in self.off else f"names {k}, which has no binding or definition the scan reads"
+        for body, parent, f, qual in targets:
+            ps, kwo, _, _ = params_of(body)
+            if f is not None and isinstance(f.scope.node, ast.ClassDef):
+                ps = ps[1:]                 # a method bound by `self.m`: its parameters after the receiver
+            tables = {ps[i] for i in pos if i < len(ps)} | (set(kws) & set(ps + kwo))
+            inner = self.own_scope(body, qual, parent, tables)
+            saved = self.path
+            if f is not None:
+                self.path = f.path          # its file's methods and node attributes
+            self.depth += 1
+            try:
+                why = self.names_and_writes(body, inner, name, None, seen)   # the held binding is the layer's alone
+            finally:
+                self.depth -= 1
+                self.path = saved
+            if why:
+                return f"{why}, in {k}"
+        return None
+
+    @staticmethod
+    def doc_scope(d):
+        """The scope a document's function is read in: each global it loads (not its own parameter or local, not a
+        builtin) is a namespace name, as `ns[...]` is in the toy's code, so its tables are tables and its questions,
+        traced and document functions are named."""
+        local = {a.arg for a in ast.walk(d) if isinstance(a, ast.arg)}
+        local |= {n.id for n in ast.walk(d) if isinstance(n, ast.Name) and isinstance(n.ctx, (ast.Store, ast.Del))}
+        s = Scope(d, "", None)
+        s.captures = {n.id: n.id for n in ast.walk(d) if isinstance(n, ast.Name) and isinstance(n.ctx, ast.Load)
+                      and n.id not in local and n.id not in BUILTIN_NAMES}
+        return s
 
     def ns_rooted(self, e, scope, bare=False):
         """Whether an expression reaches into a namespace name: `ns[...]` itself or anything under it, or anything
@@ -989,6 +1130,8 @@ class Scanner:
 QUESTIONS_DOC, QUESTIONS_Seacast, TRACED, TRACED_Seacast, CALLABLES = set(), set(), set(), set(), set()
 TRACED_V2_KEPT = set()      # TRACED_Seacast's kept names alone: seacast-lite.md's lists (WRAPPERS, REPLACEABLE) are of these
 DEFS_DOC, DEFS_Seacast, RETURNS_DOC, RETURNS_Seacast = set(), set(), set(), set()
+FNS_DOC, FNS_Seacast = {}, {}   # each document's top-level functions, name -> its def: what the observer test follows
+#                                 when a layer calls a traced function (Scanner.follow)
 BUILTIN_NAMES = set(dir(__import__("builtins")))
 
 
@@ -1041,6 +1184,8 @@ def load_names(toy):
     v2 = {d.name: d for d in ast.parse(N.generate(N.DOC2)).body if isinstance(d, ast.FunctionDef)}
     DEFS_DOC.update(doc)
     DEFS_Seacast.update(v2)
+    FNS_DOC.update(doc)
+    FNS_Seacast.update(v2)
     CALLABLES.update(doc, v2)
     RETURNS_DOC.update(returning(doc))
     RETURNS_Seacast.update(returning({**doc, **v2}))
@@ -1059,8 +1204,16 @@ def load_names(toy):
 
 
 def scan(toy, skip=(), off=()):
-    sc = Scanner(skip, off)
     files = sorted(Path(toy).glob("*.py"))
+    pre = Scanner(skip, off)            # the pre-pass: every binding of every name, before any row is classed, so that
+    pre.collect = {}                    #   the observer test can follow a name through all of them, in any file
+    for f in files:
+        pre.prepass(f)
+    pre.reads = READONLY_METHODS | pre.toy_reads()
+    for f in files:
+        pre.scan_file(f)
+    sc = Scanner(skip, off)
+    sc.bound_by = pre.collect
     for f in files:                     # every module's own functions and imports first, then the bindings
         sc.prepass(f)
     sc.reads = READONLY_METHODS | sc.toy_reads()
@@ -1550,6 +1703,188 @@ PASSES = ("c_arms", "c_plain", "c_none", "message_id", "c_reads", "c_has")
 # again: no construction value, so no class per branch (each a layer, whole)
 NOT_SPLIT = ("c_effect", "c_global", "c_sibling", "c_param")
 
+# The follow's cases: (o) observers whose callees only read; (l) layers whose callees do not. The questions are
+# rq, rq2, wq, uq, dq, deep1, deep2, ownq, vq, nq and choice (a draw); the traced names tr_r, tr_w, tr_rb, whose
+# document code is FOLLOW_DOC's
+FOLLOW_DOC = '''\
+def tr_r(g):
+    return mine.get(g) is not None and g in seen
+
+
+def tr_w(g):
+    seen[g] = True
+    return True
+
+
+def tr_rb(g):
+    return g in seen
+'''
+FOLLOW = '''\
+class Node:
+    def plant(self, ns):
+        def rq(g):
+            return ns["tbl"].get(g)
+
+        def rq2(g):
+            return ns["rq"](g) is not None
+
+        def wq(g):
+            ns["tbl"][g] = 1
+
+        def uq(g):
+            foreign(ns["tbl"])
+
+        def dq(g):
+            return ns["choice"]([g])
+
+        def choice(xs):
+            return xs[0]
+
+        def deep1(g):
+            return ns["deep2"](g)
+
+        def deep2(g):
+            ns["tbl"].clear()
+
+        def ownq(g):
+            return ns["f_own"](g)
+
+        def tr_rb(g):
+            ns["tbl"].pop(g)
+            return True
+        ns.update(rq=rq, rq2=rq2, wq=wq, uq=uq, dq=dq, choice=choice, deep1=deep1, deep2=deep2, ownq=ownq,
+                  tr_rb=tr_rb)
+        ns["vq"] = some_value
+        d_o1, d_o2, d_o3, d_l1, d_l2 = ns["f_o1"], ns["f_o2"], ns["f_o3"], ns["f_l1"], ns["f_l2"]
+        d_l3, d_l3b, d_l4, d_l4b, d_l5 = ns["f_l3"], ns["f_l3b"], ns["f_l4"], ns["f_l4b"], ns["f_l5"]
+        d_l6, d_l6b, d_own = ns["f_l6"], ns["f_l6b"], ns["f_own"]
+
+        def f_o1(x):
+            ns["rq"](x)
+            return d_o1(x)
+
+        def f_o2(x):
+            ns["tr_r"](x)
+            return d_o2(x)
+
+        def f_o3(x):
+            ns["rq2"](x)
+            return d_o3(x)
+
+        def f_l1(x):
+            ns["wq"](x)
+            return d_l1(x)
+
+        def f_l2(x):
+            ns["uq"](x)
+            return d_l2(x)
+
+        def f_l3(x):
+            ns["dq"](x)
+            return d_l3(x)
+
+        def f_l3b(x):
+            ns["choice"]([x])
+            return d_l3b(x)
+
+        def f_l4(x):
+            ns["tr_w"](x)
+            return d_l4(x)
+
+        def f_l4b(x):
+            ns["tr_rb"](x)
+            return d_l4b(x)
+
+        def f_l5(x):
+            ns["deep1"](x)
+            return d_l5(x)
+
+        def f_l6(x):
+            ns["vq"](x)
+            return d_l6(x)
+
+        def f_l6b(x):
+            ns["nq"](x)
+            return d_l6b(x)
+
+        def f_own(x):
+            ns["ownq"](x)
+            return d_own(x)
+        ns.update(f_o1=f_o1, f_o2=f_o2, f_o3=f_o3, f_l1=f_l1, f_l2=f_l2, f_l3=f_l3, f_l3b=f_l3b, f_l4=f_l4,
+                  f_l4b=f_l4b, f_l5=f_l5, f_l6=f_l6, f_l6b=f_l6b, f_own=f_own)
+'''
+# each observer, and with the follow off a layer
+FOLLOW_OBSERVERS = ("f_o1", "f_o2", "f_o3")
+# each layer: the clause whose refusal makes it one (off, an observer), and the end of its reason
+FOLLOW_LAYERS = {
+    "f_l1": ("assign", "writes ns['tbl'][g], in wq"),               # (l1) a callee that writes a table
+    "f_l2": ("unfollowed", "which the test does not follow, in uq"),    # (l2) one that hands a table to a call
+    "f_l3": ("draw", "names the draw choice, in dq"),               # (l3) one that asks a draw
+    "f_l3b": ("draw", "names the draw choice"),                     # (l3) a layer that names one itself
+    "f_l4": ("assign", "writes seen[g], in tr_w"),                  # (l4) a traced callee whose document code writes
+    "f_l4b": ("mutate", "by pop, in tr_rb"),                        # (l4) one whose document code reads, a binding not
+    "f_l5": ("mutate", "by clear, in deep2, in deep1"),             # (l5) the write two calls deep
+    "f_l6": ("unread", "which the toy binds to a value the scan does not read as a function"),  # (l6) a value
+    "f_l6b": ("unread", "which has no binding or definition the scan reads"),                   # (l6) no binding
+    "f_own": ("own-name", "names f_own, the layer's own name, in ownq"),     # (l7) the layer's own name followed
+}
+# a computed key the scan cannot name may bind any question: every follow refused; the control, its key the
+# variable of a loop over literal names, which are not followed names
+FOLLOW_UNNAMED = '''\
+def setter(ns, k):
+    ns[k] = lambda g: None
+'''
+FOLLOW_NAMED = '''\
+def setter(ns):
+    for k in ("a_name", "b_name"):
+        ns[k] = lambda g: None
+'''
+
+
+def follow_self_test(report):
+    """The follow's cases (FOLLOW), each with its planted fault (a clause off). It sets the name
+    sets itself; self_test restores them."""
+    qs = {"rq", "rq2", "wq", "uq", "dq", "deep1", "deep2", "ownq", "vq", "nq", "choice"}
+    doc = {d.name: d for d in ast.parse(FOLLOW_DOC).body}
+    rows_ = {f"f_{c}" for c in ("o1", "o2", "o3", "l1", "l2", "l3", "l3b", "l4", "l4b", "l5", "l6", "l6b", "own")}
+    for s, v in ((QUESTIONS_DOC, qs), (QUESTIONS_Seacast, qs), (TRACED, set(doc)), (TRACED_Seacast, set(doc)),
+                 (DEFS_DOC, rows_ | set(doc)), (RETURNS_DOC, rows_ | set(doc)), (CALLABLES, rows_ | set(doc)),
+                 (FNS_DOC, doc), (FNS_Seacast, {})):
+        s.clear()
+        s.update(v)
+
+    def got(rows, name):
+        r = [r for r in rows if r["name"] == name and r["form"] == "update-keyword"]
+        return (r[0]["class"], r[0].get("why", "")) if len(r) == 1 else (f"{len(r)} rows", "")
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "follow.py").write_text(FOLLOW)
+        rows = scan(d).rows
+        no_follow = scan(d, off=("follow",)).rows
+        for name in FOLLOW_OBSERVERS:
+            c, why = got(rows, name)
+            report(f"the follow: {name} an observer (its callee only reads)", c == "observer", f"got {c} ({why})")
+            c, why = got(no_follow, name)
+            report(f"control: {name} with the follow off a layer, by name", c == "layer" and why.startswith("names "),
+                   f"got {c} ({why})")
+        for name, (clause, end) in FOLLOW_LAYERS.items():
+            c, why = got(rows, name)
+            report(f"the follow: {name} a layer, \"…{end}\"", c == "layer" and why.endswith(end), f"got {c} ({why})")
+            c, why = got(scan(d, off=(clause,)).rows, name)
+            report(f"control: {name} with the clause {clause} off an observer", c == "observer", f"got {c} ({why})")
+        (Path(d) / "setter.py").write_text(FOLLOW_UNNAMED)
+        c, why = got(scan(d).rows, "f_o1")
+        report("the follow: a computed key the scan cannot name, f_o1 a layer", c == "layer" and
+               why == "names rq, and the toy binds a computed key the scan cannot name", f"got {c} ({why})")
+        (Path(d) / "setter.py").write_text(FOLLOW_NAMED)
+        c, why = got(scan(d).rows, "f_o1")
+        report("control: the computed key a loop's over literal names, f_o1 an observer", c == "observer",
+               f"got {c} ({why})")
+        (Path(d) / "setter.py").write_text(FOLLOW_NAMED.replace('"b_name"', '"rq"').replace(
+            "lambda g: None", "lambda g: ns['tbl'].clear()"))
+        c, why = got(scan(d).rows, "f_o1")
+        report("the follow: a loop's literal key binds rq to a writer, f_o1 a layer", c == "layer" and
+               why.endswith("by clear, in rq"), f"got {c} ({why})")
+
 
 def self_test():
     bad = 0
@@ -1580,6 +1915,8 @@ def self_test():
                moved == [("subscript", "a", 7)] and set(before) == set(after), f"moved {moved}")
     sets = (QUESTIONS_DOC, QUESTIONS_Seacast, TRACED, TRACED_Seacast, DEFS_DOC, RETURNS_DOC)
     saved = [set(s) for s in sets]
+    more = (CALLABLES, FNS_DOC, FNS_Seacast)       # the follow's cases set these too (follow_self_test)
+    saved_more = [type(s)(s) for s in more]
     names = set(BREAKS) | set(PASSES) | set(NOT_SPLIT) | {"c_closed", "c_seacastq", "c_doc"}
     for s, v in zip(sets, ({"askq"}, {"askq", "seacastq"}, {"trf"}, {"trf"}, names,
                            names - {"c_none", "message_id"})):
@@ -1639,8 +1976,9 @@ def self_test():
         T.WRAPPERS = {"trf": "Node.p.<locals>.trf"}
         out, other = lists(type("S", (), {"rows": [dict(row, **{"class": "observer"})]}), T)
         report("control: the same row an observer in WRAPPERS, none counted", other == 0, f"got {other}: {out}")
+        follow_self_test(report)
     finally:
-        for s, v in zip(sets, saved):
+        for s, v in zip(sets + more, saved + saved_more):
             s.clear()
             s.update(v)
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
