@@ -3,7 +3,8 @@ writers (trace3.py's questions_enc_seacast, type_enc_seacast, param_enc_seacast,
 (`choice` has four, and `send` has a row for each kind of message it takes), and seacast-lite.md's three questions in
 the forms v2 asks them; then 18 more forms the twin reads: SEACAST's `after` (one row per timer), release_wanted_groups,
 window_release, a draw of peers, an order, the two levels whose order is asked (probe_waiting[g], claims), interest's
-miss, and the eight names a node can replace (asked_enc_seacast), 62 rows in all. Each line is the twin's form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
+miss, and the eight names a node can replace (asked_enc_seacast); then the four questions §4.5's on_want asks
+(own_id, admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc), 66 rows in all. Each line is the twin's form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
 
@@ -98,6 +99,11 @@ class Join(Have):
     pass
 
 
+class WantIndex:                        # an ask by index, as the toy's wire module has it (Tracer3.key tells it apart)
+    def __init__(self, group, index):
+        self.group, self.index = group, index
+
+
 class Interest(dict):                  # the toy's ALL fixture (node.py's `_seacast`): every index for any group
     def __missing__(self, g):
         return NS(v=-1)
@@ -156,6 +162,8 @@ def rows(f0, d, w=None):
         w = trace3.Tracer3.__new__(trace3.Tracer3)
     if not hasattr(w, "doc_seacast"):        # a bare writer: this one, or trace3's self-test's planted one
         w.doc_seacast = True                 # timer_args writes SEACAST's three timers under v2 alone
+    if not hasattr(w, "Wm"):
+        w.Wm = NS(WantIndex=WantIndex)       # resolve's ask: Tracer3.key reads the wire module's class
     G, idx, slot, ROOT, MID = f0
     assert idx == 0 and MID.startswith(G + "00000000"), f0
     g, root = bytes.fromhex(G), bytes.fromhex(ROOT)
@@ -181,6 +189,7 @@ def rows(f0, d, w=None):
     pm = {t.id: w.param_enc_seacast(t) for t in (P, COL, ROW)}
     swr_a, swr_r = w.swr_seacast()
     asked = w.asked_enc_seacast()
+    look = w.lookups_enc()
     ts = {t.name: t for t in trace3.schema_seacast.python_tables_seacast(F, w.key, trace3.fbits, w.rel_msg)}
     g2 = hashlib.sha256(b"group" + (2).to_bytes(4, "little")).digest()     # a second group, made up here
     after = lambda r, delay, fn, *args: [w.after_row(delay, fn, *args), None]   # noqa: E731: install's encoder
@@ -254,6 +263,13 @@ def rows(f0, d, w=None):
         ("repairVerdictNode", "repair_verdict", asked["repair_verdict"], "REPAIRED", (g,), {}),
         ("noteClaimNode", "note_claim", asked["note_claim"], None, (4, g), {}),
         ("knownInScopeNode", "known_in_scope", asked["known_in_scope"], bits(5), (g,), {}),
+        # §4.5's on_want: its own id, the admission of p's group, an ask by index resolved to the first chunk's id, and
+        # that id's chunk (CALLS' writers take the arguments and the answer apart)
+        ("ownId", "own_id", q["own_id"], nid, (), {}),
+        ("admittedGroup", "admitted_group", q["admitted_group"], True, (4, g), {}),
+        ("resolve", "resolve", lambda r, a: [look["resolve"][0](a), look["resolve"][1](r)], fa.mid,
+         (WantIndex(g, 0),), {}),
+        ("chunkOf", "chunk_of", lambda r, m: [look["chunk_of"][0](m), look["chunk_of"][1](r)], fa, (fa.mid,), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 

@@ -535,6 +535,9 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._seacast.<locals>.fill", 1756): ("fill", OBSERVER),
           # --alarm-wait's count before the call: type_of_group, which it asks, only reads (scan_bindings.py's follow)
           ("node.py", "Node._alarm.<locals>.serve_standing", 422): ("serve_standing", OBSERVER),
+          # the invariants' count of the asks on_want leaves unanswered, by reason, before the call: what it asks
+          # (resolve, and probe_of_claim, which reads) changes nothing (scan_bindings.py's follow)
+          ("node.py", "Node._seacast.<locals>.on_want", 1729): ("on_want", OBSERVER),
           # swapped draws: the floor's draw on sim.floor_rng; the probed index's on a stream of its own
           ("node.py", "Node._seacast.<locals>.keep_floor", 1686): ("keep_floor", SWAPPED_DRAW),
           ("node.py", "Node._seacast.<locals>.defer_on_claim", 1775): ("defer_on_claim", SWAPPED_DRAW),
@@ -561,6 +564,10 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191): ("filter_entry", CHANGING),
           ("node.py", "Node._writer_variants.<locals>.choose", 1049): ("choose", CHANGING),
           ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 439): ("decode_group", CHANGING),
+          ("node.py", "Node._hoard_column.<locals>.on_want", 260): ("on_want", CHANGING),         # a hoarder's filter
+          ("node.py", "Node._alarm.<locals>.on_want", 403): ("on_want", CHANGING),              # --alarm-wait's
+          ("node.py", "Node._seacast.<locals>.<lambda>", 1795): ("on_want", CHANGING),          # a withholder's
+          ("node.py", "Node._seacast.<locals>.on_want", 1825): ("on_want", CHANGING),           # hoardcol's filter
           # bound during a call: publish's announce under --source-offers off and late
           ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 997): ("announce", DURING_CALL),
           ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1015): ("announce", DURING_CALL)}
@@ -1246,10 +1253,12 @@ def forms_self_test():
          "SystemExit: trace3: node 3: type row: EVIDENCE is an evidence type"),
         ("a parameter the tracer does not know", lambda: prm(NEW_ONE=1),
          "SystemExit: trace3: node 3: type row: NEW_ONE is a parameter the tracer does not know"),
-        ("MAX_RELATIONS +inf and MAX_INDICES 8192, checked and not written", lambda: prm(
-            M=1, MAX_RELATIONS=math.inf, MAX_INDICES=8192), {"M": 1}),
+        ("MAX_RELATIONS +inf, checked and not written; MAX_INDICES 8192, written", lambda: prm(
+            M=1, MAX_RELATIONS=math.inf, MAX_INDICES=8192), {"M": 1, "MAX_INDICES": 8192}),
         ("a MAX_INDICES of 0", lambda: prm(MAX_INDICES=0),
-         "SystemExit: trace3: node 3: type row: MAX_INDICES is no count of at least 1"),
+         "SystemExit: trace3: node 3: type row: MAX_INDICES is no natural above 0"),
+        ("a MAX_INDICES of True", lambda: prm(MAX_INDICES=True),
+         "SystemExit: trace3: node 3: type row: MAX_INDICES is no natural above 0"),
         ("a MAX_RELATIONS of True", lambda: prm(MAX_RELATIONS=True),
          "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count of at least 1 nor +inf"),
         ("SAMPLE_OUTSTANDING, the node's since v0.11.1, as a type's", lambda: prm(SAMPLE_OUTSTANDING=4),
@@ -3645,6 +3654,9 @@ class Tracer3(Tracer):
             "block_of": lambda r, g: [[g_(g)], bytes(r).hex()],
             "group_of": lambda r, block, h: [[self.block(block), self.hdr_seacast(h)], bytes(r).hex()],
             "node_id": lambda r, p: [[n(p)], bytes(r).hex()],
+            # §4.5's: on_want's admission of p's group, and our_interest_for's own id (its DERIVED case)
+            "admitted_group": lambda r, p, g: [[n(p), g_(g)], boolean(r)],
+            "own_id": lambda r: [[], bytes(r).hex()],
             "interest_satisfied": lambda r, g: [[g_(g)], boolean(r)],
             "merge_waiting": lambda r, p, h: [[n(p), self.have_msg_seacast(h)], boolean(r)],
             "deferred_offers": lambda r, p, h: [[n(p), self.have_msg_seacast(h)], self.none_listed(r)],
@@ -4113,6 +4125,14 @@ class Tracer3(Tracer):
             raise TypeError(f"trace3: {what} is not a boolean: {x!r}")
         return x
 
+    def lookups_enc(self):
+        """§4.5's two lookups, asked by on_want under both documents, in CALLS' form (arguments, answer): resolve(a),
+        an ask by its key, answered by an id's hex or null; chunk_of(mid), by the id's hex, answered by a chunk as the
+        twin reads one. install's table of the tape's calls and the forms rows (forms_seacast_examples.py) both
+        write them by these."""
+        return {"resolve": (lambda a: [self.key(a)], lambda r: None if r is None else r.hex()),
+                "chunk_of": (lambda mid: [mid.hex()], self.chunk)}
+
     def ask_seacast(self, a):
         """An ask of a SEACAST IWANT: [key, standing, hops, probe]. A plain ask (a WantIndex, whose class holds the three
         as false, 0 and false) or a structured id (which carries none) is [key, false, 0, false]."""
@@ -4281,7 +4301,9 @@ class Tracer3(Tracer):
         return set(cls.TYPE_NATS) | set(cls.TYPE_BOOLS) | set(cls.TYPE_FLOATS) | {"ANNOUNCE_EXTRA", "EVIDENCE",
                                                                                   "REPAIR_SAMPLE"}
 
-    TYPE_NATS = ("M", "F_LO", "F_HI", "D_OUT", "D_OUT_FAST", "D_OUT_MAX", "SAMPLE_COVER", "COVER_HIGH", "ROUTE_HOPS")
+    TYPE_NATS = ("M", "F_LO", "F_HI", "D_OUT", "D_OUT_FAST", "D_OUT_MAX", "SAMPLE_COVER", "COVER_HIGH", "ROUTE_HOPS",
+                 "MAX_INDICES")
+    TYPE_POSITIVE = ("M", "MAX_INDICES")    # naturals above 0: a type has one or more objects, a group one or more indices
     # §1.1's parameters the tracer checks and does not write: no function on the twin's lists reads them, and the
     # closure rule's schema (params_schema) leaves them out, so a covered function that read one would stop the
     # tracer. Each: (its bound's test, the words of a value outside it, why it is not written)
@@ -4289,10 +4311,7 @@ class Tracer3(Tracer):
         "MAX_RELATIONS": (lambda v: (isinstance(v, float) and math.isinf(v) and v > 0)
                           or (not isinstance(v, bool) and isinstance(v, int) and v >= 1),
                           "no count of at least 1 nor +inf",
-                          "read by relation_room alone (§6.3), on none of the twin's lists"),
-        "MAX_INDICES": (lambda v: not isinstance(v, bool) and isinstance(v, int) and v >= 1,
-                        "no count of at least 1",
-                        "read by index_bound alone (§4.5), on none of the twin's lists")}
+                          "read by relation_room alone (§6.3), on none of the twin's lists")}
     TYPE_BOOLS = ("SYMMETRIC", "EAGER", "REPAIR_BUDGET", "REPAIR_REASK")
     TYPE_FLOATS = ("PRUNE_BACKOFF", "START_DELAY", "SAMPLE_RETRY", "SAMPLE_RETRY2", "DEFER_WINDOW", "SAMPLE_WAIT",
                    "SERVE_LIMIT", "FORWARD_LIMIT")
@@ -4315,8 +4334,8 @@ class Tracer3(Tracer):
                     stop(name, v, words)
                 continue
             if name in self.TYPE_NATS:
-                if isinstance(v, bool) or not isinstance(v, int) or v < 0 or (name == "M" and v == 0):
-                    stop(name, v, "no natural" + (" above 0" if name == "M" else ""))
+                if isinstance(v, bool) or not isinstance(v, int) or v < 0 or (name in self.TYPE_POSITIVE and v == 0):
+                    stop(name, v, "no natural" + (" above 0" if name in self.TYPE_POSITIVE else ""))
                 out[name] = v
             elif name in self.TYPE_BOOLS:
                 if not isinstance(v, bool):
@@ -4713,8 +4732,7 @@ class Tracer3(Tracer):
             "close_promises_of_group": (lambda g: [g.hex()], tr.nothing),
             "discard_queued": (lambda g: [g.hex()], tr.nothing),
             "discard_paced": (lambda g: [g.hex()], tr.nothing),
-            "resolve": (lambda a: [key(a)], lambda r: None if r is None else r.hex()),
-            "chunk_of": (lambda mid: [mid.hex()], tr.chunk),
+            **tr.lookups_enc(),     # resolve and chunk_of (forms_seacast_examples.py makes their rows by these)
             "handle_graft_prune": (lambda p, frame: [int(p)], tr.no_prunes),
             # decode_group's and push_rebuilt's
             "decode_and_reencode": (lambda cg, d: [tr.store_group(cg), tr.descriptor(d)], tr.rebuilt),

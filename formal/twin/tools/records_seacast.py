@@ -331,6 +331,15 @@ TABLE = {
     # v0.11.1's two, on on_holding's path and fill's: [p, T] and [g]
     "joined": ("p, T", lambda tr, p, T: [peer(tr, p), type_id(T)], boolean),
     "drop_wants_beyond": ("g", g_only, none),
+    # §4.5's serving and §4.10's route_want: on_want's asks as askSeacastOf reads them, its answers narrow, in order
+    "index_bound": ("g", g_only, nat),
+    "our_interest_for": ("p, g", p_g, bits_int),
+    "outside": ("p, g, i, routed", lambda tr, p, g, i, routed: [peer(tr, p), group(g), tr.nat(i),
+                                                                tr.flag(routed, "outside's routed")], boolean),
+    "route_want": ("p, g, i, hops", lambda tr, p, g, i, hops: [peer(tr, p), group(g), tr.nat(i), tr.nat(hops)],
+                   boolean),
+    "on_want": ("p, asks", lambda tr, p, asks: [peer(tr, p), [tr.ask_seacast(a) for a in asks]],
+                lambda tr, r: [tr.chunk(f) for f in r]),
 }
 
 if set(TABLE) != set(manifest_seacast.COVERED):
@@ -477,6 +486,8 @@ def stand_in():
         "resample": (one(g, 1, 4, True), None), "sample": (one(g, Bits(6)), None),
         "on_pace_tick": (one(), None), "on_block_installed": (one(root), None),
         "joined": (one(4, T), True), "drop_wants_beyond": (one(g), None),
+        "index_bound": (one(g), 4), "our_interest_for": (one(4, g), Bits(-1)), "outside": (one(4, g, 1, True), False),
+        "route_want": (one(4, g, 1, 2), True), "on_want": (one(4, [ask, flagged, f.mid]), [f]),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_seacast: the check's stubs are not the table's names: "
