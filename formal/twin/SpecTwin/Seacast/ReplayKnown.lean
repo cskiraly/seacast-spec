@@ -753,9 +753,10 @@ parameters but no `MAX_RELATIONS`; `sym`, symmetric, with a floor below its cap 
 backoff of 1.0; and `bare`, with `row`'s parameters but no `M`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and
 `D_OUT_MAX` at 12, 8, 8 and 12 for its three types (toy/node.py:1235, :1285, :1330); the records take smaller values,
 which §1.1's class allows, so that their lists stay short, and the twin reads each from the context the same way at
-any value. Two symmetric types are outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table), as no type of the toy's
-is: `column`, whose `D_OUT` is below its floor, and `sym`, whose `D_OUT` is above its cap, so that the draw at the cap
-can be asked with 0, and with a negative count in the one that must fail.
+any value. Two symmetric types are outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table), which the toy's `payload`,
+the only type the toy makes symmetric, meets at 6 ≤ 8 < 12: `column`, whose `D_OUT` is below its floor, and `sym`,
+whose `D_OUT` is above its cap, so that the draw at the cap can be asked with 0, and with a negative count in the one
+that must fail.
 
 Each record is a seeded state: a store and tables that the toy's code can hold at the record's parameters. Not every
 one is reached by the toy's events (a JOIN of `row` with interest ALL, two backoffs at times that one `PRUNE_BACKOFF`
@@ -773,7 +774,8 @@ def inf : Float := Float.ofBits 9218868437227405312
 backoff of 1.0; `column`: symmetric, M = 1, a floor and a cap of 3, 1 out, no limit and no backoff; `payload`: no
 `MAX_RELATIONS`; `sym`: symmetric, M = 1, a floor of 1 and a cap of 2, so that one pusher sits between them, a
 `D_OUT` of 3 above the cap, so that the draw at the cap can be 0 or negative, no limit, and a backoff of 1.0; `bare`:
-`row`'s parameters with no `M`, so that an `AttributeError` there can come only from a read of `M` -/
+`row`'s parameters with no `M`, so that among the parameters §4.1's upkeep reads, an `AttributeError` there can come
+only from a read of `M`; `bare` lacks the type's other parameters too, and the judge matches a raise by its class -/
 def params2 : TypeId → Option TypeParams := fun T =>
   if T == "row" then
     some { M := some 1, SYMMETRIC := some false, F_LO := some 1, F_HI := some 1, D_OUT := some 1,
