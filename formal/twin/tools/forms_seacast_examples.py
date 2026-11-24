@@ -4,7 +4,9 @@ writers (trace3.py's questions_enc_seacast, type_enc_seacast, param_enc_seacast,
 the forms v2 asks them; then 18 more forms the twin reads: SEACAST's `after` (one row per timer), release_wanted_groups,
 window_release, a draw of peers, an order, the two levels whose order is asked (probe_waiting[g], claims), interest's
 miss, and the eight names a node can replace (asked_enc_seacast); then the four questions §4.5's on_want asks
-(own_id, admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc), 66 rows in all. Each line is the twin's form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
+(own_id, admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc); then the six §4.1's upkeep
+asks (runs_type, our_join, candidates, in_pushers, out_pushees, uplink_class), 72 rows in all. Each line is the twin's
+form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
 
@@ -270,6 +272,13 @@ def rows(f0, d, w=None):
         ("resolve", "resolve", lambda r, a: [look["resolve"][0](a), look["resolve"][1](r)], fa.mid,
          (WantIndex(g, 0),), {}),
         ("chunkOf", "chunk_of", lambda r, m: [look["chunk_of"][0](m), look["chunk_of"][1](r)], fa, (fa.mid,), {}),
+        # §4.1's upkeep: the node's types, its JOIN, its candidates and pushers, its uplink
+        ("runsType", "runs_type", q["runs_type"], True, ("column",), {}),
+        ("ourJoin", "our_join", q["our_join"], join, (COL,), {}),
+        ("candidates", "candidates", q["candidates"], [2, 4], (COL, 3, 0, "BOTH"), {}),
+        ("inPushers", "in_pushers", q["in_pushers"], [2, 7], (COL, 3, 0), {}),
+        ("outPushees", "out_pushees", q["out_pushees"], [4], (COL, 3, 0), {}),
+        ("uplinkClass", "uplink_class", q["uplink_class"], "HOME", (), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 

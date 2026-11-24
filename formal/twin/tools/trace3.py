@@ -1253,14 +1253,26 @@ def forms_self_test():
          "SystemExit: trace3: node 3: type row: EVIDENCE is an evidence type"),
         ("a parameter the tracer does not know", lambda: prm(NEW_ONE=1),
          "SystemExit: trace3: node 3: type row: NEW_ONE is a parameter the tracer does not know"),
-        ("MAX_RELATIONS +inf, checked and not written; MAX_INDICES 8192, written", lambda: prm(
-            M=1, MAX_RELATIONS=math.inf, MAX_INDICES=8192), {"M": 1, "MAX_INDICES": 8192}),
+        ("MAX_RELATIONS +inf and MAX_INDICES 8192, both written", lambda: prm(
+            M=1, MAX_RELATIONS=math.inf, MAX_INDICES=8192),
+         {"M": 1, "MAX_INDICES": 8192, "MAX_RELATIONS": 9218868437227405312}),
+        ("a MAX_RELATIONS of 3, written as 3.0's word", lambda: prm(MAX_RELATIONS=3), {"MAX_RELATIONS": fbits(3.0)}),
+        ("a MAX_RELATIONS of 0, an empty link's, written as 0.0's word", lambda: prm(MAX_RELATIONS=0),
+         {"MAX_RELATIONS": 0}),
+        ("a MAX_RELATIONS of NaN", lambda: prm(MAX_RELATIONS=math.nan),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of -1", lambda: prm(MAX_RELATIONS=-1),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of -inf", lambda: prm(MAX_RELATIONS=-math.inf),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
+        ("a MAX_RELATIONS of 2.5", lambda: prm(MAX_RELATIONS=2.5),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
         ("a MAX_INDICES of 0", lambda: prm(MAX_INDICES=0),
          "SystemExit: trace3: node 3: type row: MAX_INDICES is no natural above 0"),
         ("a MAX_INDICES of True", lambda: prm(MAX_INDICES=True),
          "SystemExit: trace3: node 3: type row: MAX_INDICES is no natural above 0"),
         ("a MAX_RELATIONS of True", lambda: prm(MAX_RELATIONS=True),
-         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count of at least 1 nor +inf"),
+         "SystemExit: trace3: node 3: type row: MAX_RELATIONS is no count nor +inf"),
         ("SAMPLE_OUTSTANDING, the node's since v0.11.1, as a type's", lambda: prm(SAMPLE_OUTSTANDING=4),
          "SystemExit: trace3: node 3: type row: SAMPLE_OUTSTANDING is a parameter the tracer does not know"),
     ]
@@ -3606,6 +3618,20 @@ class Tracer3(Tracer):
             raise TypeError(f"trace3: an object type that is not its id: {t!r}")
         return t
 
+    @staticmethod
+    def direction_word(d):
+        """A relation's direction: "OUT", "IN" or "BOTH", the toy's strings (directionJson)."""
+        if not isinstance(d, str) or d not in schema_seacast.DIRECTIONS:
+            raise TypeError(f"trace3: not a direction: {d!r}")
+        return d
+
+    @staticmethod
+    def uplink_word(u):
+        """§4.1's uplink class: "FAST" or "HOME" (uplinkClassOf)."""
+        if not isinstance(u, str) or u not in ("FAST", "HOME"):
+            raise TypeError(f"trace3: not an uplink class: {u!r}")
+        return u
+
     def msg_seacast(self, m):
         """A message `send` takes: a HAVE, a WANT or a relation message (the twin's msgSeacastJson)."""
         kind = type(m).__name__
@@ -3629,8 +3655,8 @@ class Tracer3(Tracer):
                          f"chunk: {x!r}")
 
     def questions_enc_seacast(self, Have):
-        """Under SEACAST, the namespace's questions that seacast.md adds (25 of the 37; the other twelve are the object
-        types' and their parameters', type_enc_seacast), each as [arguments, answer]; and valid_have, shuffled and
+        """Under SEACAST, the namespace's questions that seacast.md adds, but for the object types' and their
+        parameters' (type_enc_seacast) and the lookups' (lookups_enc), each as [arguments, answer]; and valid_have, shuffled and
         admitted in their SEACAST forms beside seacast-lite.md's (a SEACAST HAVE; an (index, chunk) pair or a record as a member;
         a HAVE as a holding). `Have` is the node's HAVE class."""
         t, g_, n, i_ = self.tid, (lambda g: g.hex()), self.nat, self.integer
@@ -3657,6 +3683,13 @@ class Tracer3(Tracer):
             # §4.5's: on_want's admission of p's group, and our_interest_for's own id (its DERIVED case)
             "admitted_group": lambda r, p, g: [[n(p), g_(g)], boolean(r)],
             "own_id": lambda r: [[], bytes(r).hex()],
+            # §4.1's upkeep (FormsRows' askOf): the node's types, its JOIN, its candidates and pushers, its uplink
+            "runs_type": lambda r, tid: [[self.type_word(tid)], boolean(r)],
+            "our_join": lambda r, T: [[t(T)], self.rel_msg(r, "join")],
+            "candidates": lambda r, T, fam, c, d: [[t(T), i_(fam), n(c), self.direction_word(d)], peers(r)],
+            "in_pushers": lambda r, T, fam, c: [[t(T), i_(fam), n(c)], peers(r)],
+            "out_pushees": lambda r, T, fam, c: [[t(T), i_(fam), n(c)], peers(r)],
+            "uplink_class": lambda r: [[], self.uplink_word(r)],
             "interest_satisfied": lambda r, g: [[g_(g)], boolean(r)],
             "merge_waiting": lambda r, p, h: [[n(p), self.have_msg_seacast(h)], boolean(r)],
             "deferred_offers": lambda r, p, h: [[n(p), self.have_msg_seacast(h)], self.none_listed(r)],
@@ -4275,8 +4308,8 @@ class Tracer3(Tracer):
     def types_seacast(self, nd, ns):
         """The nodes entry's `types` under SEACAST: each object type `type_of_group` can answer at the node (the node's
         types, and the payload's, its answer for any other group), by id, with its parameters (seacast.md
-        §6.3): naturals as numbers, booleans, floats as their 64-bit words (SERVE_LIMIT and FORWARD_LIMIT may be
-        +inf, every other float finite), ANNOUNCE_EXTRA as its word, EVIDENCE as null alone, REPAIR_SAMPLE as null
+        §6.3): naturals as numbers, booleans, floats as their 64-bit words (SERVE_LIMIT, FORWARD_LIMIT and
+        MAX_RELATIONS may be +inf, MAX_RELATIONS a count where finite, every other float finite), ANNOUNCE_EXTRA as its word, EVIDENCE as null alone, REPAIR_SAMPLE as null
         or its [S, L] steps. A parameter the type lacks is left out, and the twin's read of it is the toy's
         AttributeError; the three functions (DECODE_AT_K, DECODE_LATER, REPAIR_TO) are questions on the tape."""
         tys = dict(getattr(nd, "_types", None) or {})
@@ -4306,16 +4339,15 @@ class Tracer3(Tracer):
     TYPE_POSITIVE = ("M", "MAX_INDICES")    # naturals above 0: a type has one or more objects, a group one or more indices
     # §1.1's parameters the tracer checks and does not write: no function on the twin's lists reads them, and the
     # closure rule's schema (params_schema) leaves them out, so a covered function that read one would stop the
-    # tracer. Each: (its bound's test, the words of a value outside it, why it is not written)
-    TYPE_UNWRITTEN = {
-        "MAX_RELATIONS": (lambda v: (isinstance(v, float) and math.isinf(v) and v > 0)
-                          or (not isinstance(v, bool) and isinstance(v, int) and v >= 1),
-                          "no count of at least 1 nor +inf",
-                          "read by relation_room alone (§6.3), on none of the twin's lists")}
+    # tracer. Each: (its bound's test, the words of a value outside it, why it is not written). None now.
+    TYPE_UNWRITTEN = {}
     TYPE_BOOLS = ("SYMMETRIC", "EAGER", "REPAIR_BUDGET", "REPAIR_REASK")
     TYPE_FLOATS = ("PRUNE_BACKOFF", "START_DELAY", "SAMPLE_RETRY", "SAMPLE_RETRY2", "DEFER_WINDOW", "SAMPLE_WAIT",
-                   "SERVE_LIMIT", "FORWARD_LIMIT")
-    TYPE_UNBOUNDED = ("SERVE_LIMIT", "FORWARD_LIMIT")       # may be +inf, as STRIPE_UPLINK may
+                   "SERVE_LIMIT", "FORWARD_LIMIT", "MAX_RELATIONS")
+    TYPE_UNBOUNDED = ("SERVE_LIMIT", "FORWARD_LIMIT", "MAX_RELATIONS")     # may be +inf, as STRIPE_UPLINK may
+    # floats that count (§6.3's MAX_RELATIONS, an int in the document, +inf the toy's no limit): a finite value is
+    # integral and at least 0; 0 is a link that may carry no pair (relation_limit_known.py's empty link)
+    TYPE_COUNTS = ("MAX_RELATIONS",)
     TYPE_FUNCTIONS = ("DECODE_AT_K", "DECODE_LATER", "REPAIR_TO")
     ANNOUNCE_WIDTHS = ("ALL_JOINED", "SAMPLE", "NONE")
 
@@ -4341,6 +4373,11 @@ class Tracer3(Tracer):
                 if not isinstance(v, bool):
                     stop(name, v, "no boolean")
                 out[name] = v
+            elif name in self.TYPE_COUNTS:
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v) or (
+                        math.isinf(v) and v < 0) or (math.isfinite(v) and (v < 0 or v != int(v))):
+                    stop(name, v, "no count nor +inf")
+                out[name] = fbits(v)
             elif name in self.TYPE_FLOATS:
                 if isinstance(v, bool) or not isinstance(v, (int, float)) or math.isnan(v) or (
                         math.isinf(v) and not (v > 0 and name in self.TYPE_UNBOUNDED)):

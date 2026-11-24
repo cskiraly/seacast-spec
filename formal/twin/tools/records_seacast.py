@@ -340,6 +340,14 @@ TABLE = {
                    boolean),
     "on_want": ("p, asks", lambda tr, p, asks: [peer(tr, p), [tr.ask_seacast(a) for a in asks]],
                 lambda tr, r: [tr.chunk(f) for f in r]),
+    # §4.1's relations and §6.3's limit on them: the messages in relation's form, as send_relation's and send_join's
+    "relation_room": ("p, T, fam, c", lambda tr, p, T, fam, c: [peer(tr, p), type_id(T), tr.integer(fam), tr.nat(c)],
+                      boolean),
+    "graft": ("q, T, fam, c, d", relation_args, none),
+    "on_prune": ("p, pr", lambda tr, p, pr: [peer(tr, p), tr.rel_msg(pr, "prune")], none),
+    "on_graft": ("p, gr", lambda tr, p, gr: [peer(tr, p), tr.rel_msg(gr, "graft")], none),
+    "maintain_relations": ("T", lambda tr, T: [type_id(T)], none),
+    "on_join": ("p, j", lambda tr, p, j: [peer(tr, p), tr.rel_msg(j, "join")], none),
 }
 
 if set(TABLE) != set(manifest_seacast.COVERED):
@@ -452,6 +460,7 @@ def stand_in():
     rec = NS(id=7, families=[3, 40], high=False)
     join = NS(object_type="column", interest="DERIVED", custody_count=4, duty="FORWARD", colours=1)
     graft = NS(object_type="column", family=5, colour=0, direction="OUT", answer=False)
+    prune = NS(object_type="column", family=5, colour=0, direction="IN")
     one = lambda *a, **k: [(a, k)]      # noqa: E731
     stubs = {
         "colour_of": (one(g, 1), 0), "send_relation": (one(4, graft), None), "send_join": (one(4, join), None),
@@ -488,6 +497,9 @@ def stand_in():
         "joined": (one(4, T), True), "drop_wants_beyond": (one(g), None),
         "index_bound": (one(g), 4), "our_interest_for": (one(4, g), Bits(-1)), "outside": (one(4, g, 1, True), False),
         "route_want": (one(4, g, 1, 2), True), "on_want": (one(4, [ask, flagged, f.mid]), [f]),
+        "relation_room": (one(4, T, 5, 0), True), "graft": (one(7, T, 5, 0, "IN"), None),
+        "on_prune": (one(4, prune), None), "on_graft": (one(4, graft), None),
+        "maintain_relations": (one(T), None), "on_join": (one(4, join), None),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_seacast: the check's stubs are not the table's names: "

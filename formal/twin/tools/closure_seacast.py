@@ -80,6 +80,11 @@ CONTEXT_REASONS_Seacast = {("now", "value"): "the record's clock, a number; it i
 TYPE_CALLS_Seacast = ("cross", "decode", "derived_interest", "family", "header_of", "index_count", "project", "threshold",
                  "verify")
 TYPE_ATTRS_Seacast = ("name", "id", "params") + TYPE_CALLS_Seacast
+# the tables whose entries are wire messages (§2's classes with Container among their bases), each with its reason;
+# a field read off a comprehension's target over one of them is a value, not one of the type's functions
+MESSAGE_TABLES = {"owed_relations": "schema_seacast's kind relations: the JOINs, GRAFTs and PRUNEs a full queue "
+                                    "refused, in order, each a wire message"}
+FIELD_OFF = [False]     # the self-test's control: no read is a wire message's field
 
 COMPS = (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)
 STOPS = tuple(getattr(ast, k) for k in ("Global", "Nonlocal", "ClassDef", "AsyncFunctionDef", "Await", "AsyncFor",
@@ -150,6 +155,7 @@ class Reading:
         self.skip_annotations = annotations
         self.drop = frozenset(drop)
         self.defs = {}
+        self.classes = {}               # the documents' top-level classes, seacast.md's over seacast-lite.md's
         for src in (p_src, seacast_src):
             tree = ast.parse(src)
             tables = {}
@@ -159,6 +165,8 @@ class Reading:
             for d in tree.body:
                 if isinstance(d, ast.FunctionDef):
                     self.defs[d.name] = (d, tables.get((d.name, d.lineno)))
+                elif isinstance(d, ast.ClassDef):
+                    self.classes[d.name] = d
         self._loads = {}
 
     def loads(self, name):
@@ -292,6 +300,48 @@ def _parents(fn):
     return p
 
 
+def _message_class(rd, c):
+    """A class of the documents that is a wire message: Container among its bases."""
+    c = rd.classes.get(c)
+    return c is not None and any(isinstance(b, ast.Name) and b.id == "Container" for b in c.bases)
+
+
+def message_field(rd, fn, n, par):
+    """Whether `X.a`, a read of one of the type's function names that is not a call, is a field of a wire message,
+    in one of two cases. (i) X is a parameter of fn annotated with a class of the documents that has Container among
+    its bases and declares `a` in its body, and fn binds X nowhere else (no store, and no lambda's, comprehension's or
+    nested function's X). (ii) X is the plain-name target of a comprehension around the read, over a subscript of a
+    table in MESSAGE_TABLES that fn does not bind, and the read is in that comprehension's element or in its binding
+    generator's conditions. Any other such read is one the check cannot follow."""
+    x = n.value
+    if FIELD_OFF[0] or not isinstance(x, ast.Name):
+        return False
+    child, up = n, par.get(id(n))
+    while up is not None and up is not fn:
+        if isinstance(up, COMPS):
+            names = [{t.id for t in ast.walk(g.target) if isinstance(t, ast.Name)} for g in up.generators]
+            if any(x.id in s for s in names):
+                g = next((g for g in up.generators if isinstance(g.target, ast.Name) and g.target.id == x.id), None)
+                inside = g is not None and (child in (getattr(up, "elt", None), getattr(up, "key", None),
+                                                      getattr(up, "value", None)) or child in g.ifs)
+                it = g.iter if g is not None else None
+                return bool(inside and isinstance(it, ast.Subscript) and isinstance(it.value, ast.Name)
+                            and it.value.id in MESSAGE_TABLES
+                            and not any(isinstance(m, ast.Name) and m.id == it.value.id
+                                        and not isinstance(m.ctx, ast.Load) for m in ast.walk(fn)))
+        elif isinstance(up, ast.Lambda) and x.id in _arg_names(up.args):
+            return False
+        child, up = up, par.get(id(up))
+    a = next((a for a in fn.args.posonlyargs + fn.args.args + fn.args.kwonlyargs if a.arg == x.id), None)
+    if a is None or not isinstance(a.annotation, ast.Name) or not _message_class(rd, a.annotation.id):
+        return False
+    if any((isinstance(m, ast.Name) and m.id == x.id and not isinstance(m.ctx, ast.Load))
+           or (isinstance(m, ast.arg) and m.arg == x.id and m is not a) for m in ast.walk(fn)):
+        return False
+    return any(isinstance(s, ast.AnnAssign) and isinstance(s.target, ast.Name) and s.target.id == n.attr
+               for s in rd.classes[a.annotation.id].body)
+
+
 def _context_kind(n, up, par):
     if isinstance(up, ast.Attribute) and up.value is n:
         top = par.get(id(up))
@@ -354,6 +404,8 @@ def groups(rd, m, context_over=("COVERED", "KEPT")):
                 up = par.get(id(n))
                 if isinstance(up, ast.Call) and up.func is n:
                     tcalls.setdefault(n.attr, set()).add(f)
+                elif message_field(rd, fn, n, par):
+                    continue            # a wire message's field: a value, not the type's function
                 else:
                     todd.append(f"a read of the type's function {n.attr} that is not a call, in {f}: "
                                 f"{ast.unparse(up)[:60]}")
@@ -605,10 +657,42 @@ def self_test(N, m, schema_values, type_functions):
          synth("def c(p, x):\n    return p in mesh == x\n", ["c"]),
          ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
     ]
+    # the tell of a wire message's field (message_field): two that pass, then the reads it cannot follow
+    cls = ("class Container:\n    pass\n\nclass Graft(Container):\n    family: int\n    colour: int\n\n"
+           "class Bare(Container):\n    colour: int\n\nclass ObjectType:\n    family: int\n\n")
+    odd = "a read of the type's function family that is not a call, in c: "
+    tell = [
+        ("the tell: gr: Graft, a wire message, its family field", "def c(p, gr: Graft):\n    return gr.family\n",
+         []),
+        ("the tell: a comprehension over owed_relations[p], its family field",
+         "def c(p):\n    return {m.family for m in owed_relations[p]}\n", []),
+        ("the tell: T: ObjectType, a class without Container among its bases",
+         "def c(p, T: ObjectType):\n    return T.family\n", [odd + "return T.family"]),
+        ("the tell: gr: Graft, rebound", "def c(p, gr: Graft):\n    gr = q(p)\n    return gr.family\n",
+         [odd + "return gr.family"]),
+        ("the tell: gr, not annotated", "def c(p, gr):\n    return gr.family\n", [odd + "return gr.family"]),
+        ("the tell: gr: Bare, a wire message that declares no family", "def c(p, gr: Bare):\n    return gr.family\n",
+         [odd + "return gr.family"]),
+        ("the tell: a comprehension over links(T), not a listed table",
+         "def c(T):\n    return {m.family for m in links(T)}\n", [odd + "{m.family for m in links(T)}"]),
+        ("the tell: a read outside the comprehension over owed_relations",
+         "def c(p):\n    return [m.family for m in owed_relations[p]] + [m.family]\n", [odd + "[m.family]"]),
+        ("the tell: owed_relations bound in the function",
+         "def c(p):\n    owed_relations = links(p)\n    return {m.family for m in owed_relations[p]}\n",
+         [odd + "{m.family for m in owed_relations[p]}"]),
+    ]
+    cases += [(what, "types", synth(cls + src, ["c"]), want) for what, src, want in tell]
 
-    def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False):
+    def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False, field_off=False):
         """A case's findings. `stub`: every check replaced by one that finds nothing, the case's input made as it
-        is otherwise (the control of the planted cases)."""
+        is otherwise (the control of the planted cases). `field_off`: no read is a wire message's field."""
+        FIELD_OFF[0] = field_off
+        try:
+            return run1(kind, arg, ann, visit, over, stub)
+        finally:
+            FIELD_OFF[0] = False
+
+    def run1(kind, arg, ann, visit, over, stub):
         none = lambda *a, **k: ([], [])       # noqa: E731
         if kind in ("enum", "consts", "attrs"):
             f = {"enum": enum_check, "consts": consts_keys_check,
@@ -651,6 +735,9 @@ def self_test(N, m, schema_values, type_functions):
     control("a context check over COVERED alone",
             [w for w, k, a, want in cases if k == "context" and run(k, a, over=("COVERED",)) != want],
             [cases[15][0]])
+    control("the tell of a wire message's field off",
+            [w for w, k, a, want in cases if k == "types" and a[0] is not None and run(k, a, field_off=True) != want],
+            [tell[0][0], tell[1][0], tell[7][0]])     # the cases with a read the tell passes
     # the documents as they are, with the lists as they are: no finding
     found, lines = check(real[True], m, schema_values, type_functions)
     ok = not found
