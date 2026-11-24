@@ -253,10 +253,10 @@ class NodeSeacast (m : Type → Type) where
   wireSize : Peer → QEntry → m Nat
   /-- `offers_in(e)` (§3): the offers entry e carries, each a group and its bitmap, in order; none for no entry -/
   offersIn : Option QEntry → m (List (Group × Bits))
-  -- The eight names of the 71 that a node can replace, by a binding of its own that changes what the function
-  -- does, and that have a call site inside the replayed closure: where the node's line names one as replaced, the
-  -- Python asks the node, and the twin asks this question in place of the document's body, as `seacast-lite.md`'s
-  -- `forwardNode` is.
+  -- The nine names that a node can replace, by a binding of its own that changes what the function does, and that
+  -- have a call site inside the replayed closure: eight of the 71, and `filter_entry`, which §4.11's `next_to_send`
+  -- calls. Where the node's line names one as replaced, the Python asks the node, and the twin asks this question in
+  -- place of the document's body, as `seacast-lite.md`'s `forwardNode` is.
   /-- `forward(f, from_peer, axes)` as the node binds it -/
   forwardNode : ChunkF → Peer → Option (List GI) → m Unit
   /-- `push_rebuilt(g, new)` as the node binds it -/
@@ -273,6 +273,8 @@ class NodeSeacast (m : Type → Type) where
   noteClaimNode : Peer → Group → m Unit
   /-- `known_in_scope(g)` as the node binds it -/
   knownInScopeNode : Group → m Bits
+  /-- `filter_entry(p, entry)` as the node binds it: what of the entry still goes, or none -/
+  filterEntryNode : Peer → QEntry → m (Option QEntry)
 
 namespace NodeSeacast
 
@@ -346,6 +348,7 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   repairVerdictNode a := f (repairVerdictNode a)
   noteClaimNode a b := f (noteClaimNode a b)
   knownInScopeNode a := f (knownInScopeNode a)
+  filterEntryNode a b := f (filterEntryNode a b)
 
 instance {m : Type → Type} {σ : Type} [Monad m] [NodeSeacast m] : NodeSeacast (StateT σ m) :=
   lift (m := m) (n := StateT σ m) fun x => monadLift x

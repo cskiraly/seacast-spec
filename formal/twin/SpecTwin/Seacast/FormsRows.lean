@@ -71,6 +71,14 @@ def timerSeacastOf (f : String) (xs : Json) : Except String TimerSeacast := do
 /-- The form of a row's name: `send (a HAVE)` is `send`. -/
 def formOf (name : String) : String := (name.splitOn " (").headD name
 
+/-- An entry a question returns, written back for its row's answer: none as `null`, and an entry with no control as
+`[chunk or null, null, solicited]`, its chunk narrow (`chunkJson`). The twin has no writer of a control, so an entry
+with control is written as a text that no row's answer can be. -/
+def entryBack : Option QEntry → Json
+  | none => .null
+  | some { chunk := c, control := none, solicited := s } => Json.arr #[optJson chunkJson c, .null, .bool s]
+  | some _ => Json.str "an entry with control, which the forms check does not write back"
+
 /-- A form's question, asked with the arguments read from its row; its answer written back in the row's form. An
 order's question also takes the members the twin holds: the row's answer, reversed, so that only a permutation of
 them passes. -/
@@ -233,6 +241,9 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
     let e ← optOf (qentry · .seacast) e
     return (fun l => Json.arr (l.map fun (g, b) => Json.arr #[Json.str g, (b : Json)]).toArray) <$>
       NodeSeacast.offersIn (m := R) e
+  | "filterEntryNode", #[p, e] => do
+    let p ← nat p; let e ← qentry e .seacast
+    return entryBack <$> NodeSeacast.filterEntryNode (m := R) p e
   | "forwardNode", #[f, p, axes] => do
     let f ← chunkF f; let p ← nat p; let axes ← optOf giList axes
     return unitJson <$> NodeSeacast.forwardNode (m := R) f p axes
@@ -386,6 +397,11 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
     | _ => throw s!"popOwedAnswer: not a chunk: {ans.compress}"
   | "wireSize" => p "[\"-\",1]"
   | "offersIn" => p s!"[[\"{String.ofList (List.replicate 63 'a')}\",1]]"
+  -- the entry `filter_entry` returns where the node replaces it: its chunk with a sixth member, refused by the
+  -- chunk's reader, which takes it narrow
+  | "filterEntryNode" => match ans with
+    | .arr #[.arr c, ctrl, sol] => pure (Json.arr #[Json.arr (c.push Json.null), ctrl, sol])
+    | _ => throw s!"filterEntryNode: not an entry with a chunk: {ans.compress}"
   | _ => throw s!"no wrong answer for the form {form}"
 
 /-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row
@@ -400,8 +416,9 @@ checker's own list, so that a file with a row missing, twice or relabelled is re
 the file's at spec 287d575; the next 17 cover the methods of `NodeSeacast` that had no row (an 18th, `SeacastLater`'s
 `window_release`, went when the twin transcribed §4.11's window); the next 4 are the questions §4.5's serving adds:
 `own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as `on_want` asks them; the next 6 are
-§4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`, `out_pushees` and `uplink_class`; the last 3 are
-§4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`. -/
+§4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`, `out_pushees` and `uplink_class`; the next 3 are
+§4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`; the last is `filter_entry` as the node binds it, which
+`next_to_send` asks where the node's line names it as replaced. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -419,7 +436,9 @@ def labels : List String :=
    -- §4.1's upkeep: the six questions its relations ask
    "runsType", "ourJoin", "candidates", "inPushers", "outPushees", "uplinkClass",
    -- §4.11's writer: the three questions next_to_send and noted ask
-   "popOwedAnswer", "wireSize", "offersIn"]
+   "popOwedAnswer", "wireSize", "offersIn",
+   -- and filter_entry, which next_to_send asks where the node replaces it
+   "filterEntryNode"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)

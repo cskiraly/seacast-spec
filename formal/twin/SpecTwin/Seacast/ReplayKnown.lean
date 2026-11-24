@@ -1356,12 +1356,15 @@ emits them:
 - `next_to_send`'s ways out: urgent, owed offers alone, nothing (`leave_line`), nothing where `with_owed` filters
   every bit (so `noted` is not called), `WAIT`, a chunk the filter drops (its room back, and a second turn),
   control (no `wire_size` asked, no room taken), a chunk at `SOURCE_OFFERS = PUBLISH` (`origin_written`) and without
-  it, an owed answer enqueued, and owed answers where `has_room` says no.
+  it, an owed answer enqueued, and owed answers where `has_room` says no;
+- `next_to_send` at a node whose line replaces `filter_entry`, which it asks: the entry returned with its chunk, the
+  question carrying the call's log of `sent_to`, and the entry dropped (its room back, and a second turn).
 
 Several must fail: a wrong return of `acquire_room` at the boundary and of `next_to_send`, `wire_size` asked for a
 control entry, a question out of order in the line, `window_release` taped as a question (it is the twin's own now),
-the three new questions' answers that their readers refuse by their own checks, and two `sent` cells that its reader
-refuses.
+the three new questions' answers that their readers refuse by their own checks, two `sent` cells that its reader
+refuses, and `filter_entry`'s question taped at a node that has not replaced it, asked of another entry, and answered
+with a wide chunk.
 
 What a record shows, and what it does not, is as in the sections above: the questions in order, the return, the writes
 and the cells read, not how many times a cell was read or in what order. The questions' own reads are left out.
@@ -1393,6 +1396,21 @@ def takes3 (l : String) (marks : List String) (c : Consts := c0) (c2' : ConstsSe
 
 def fails3 (pre : String) (l : String) (c : Consts := c0) (c2' : ConstsSeacast := c3) : Bool :=
   match replay3 l c c2' with
+  | .error e => e.startsWith pre
+  | .ok _ => false
+
+/-- The same at a node whose line replaces `filter_entry` (`--promise-mode peer`'s, say), which `next_to_send` then
+asks (seacast.md:3091) -/
+def replay3r (l : String) : Except String (Array String × Nat) := do
+  runSeacast c0 c3 params ["filter_entry"] traced (← record (← Json.parse l) docSeacast) []
+
+def takes3r (l : String) (marks : List String) : Bool :=
+  match replay3r l with
+  | .ok (ms, 0) => ms.toList == marks
+  | _ => false
+
+def fails3r (pre : String) (l : String) : Bool :=
+  match replay3r l with
   | .error e => e.startsWith pre
   | .ok _ => false
 
@@ -1652,6 +1670,41 @@ def nWait : String := rec2 "next_to_send" "[5]"
   [lNothingOwed, "choose: the first", lNobody, lRoom, "filter_entry: cancelled", lNobody,
    ntsWay "nothing left of the entry, again", lNothingOwed, "leave_line: not in line", ntsWay "nothing"]
   (c := cCancel)
+/-- `filter_entry(p, entry)` asked of the node: the entry as handed over, and what of it the node returns -/
+def feQ (e ans : String) (log : String := "") : String := s!"[\"filter_entry\", [5, {e}], {ans}{log}]"
+-- at a node that replaces filter_entry, the chunk filling the window exactly: the question in the document's place,
+-- its code run at the node, outside `reached`; its read and write of sent_to are the call's log, and the write is
+-- the record's too. The rest is the record above's, with no filter_entry label
+def nAsked : String := rec2 "next_to_send" "[5]"
+  (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "1800", wl "null", sentR "null", owRow "null"])
+  [oaS, owS] [inF "3000", qR "normal" "[]", sentToR "8", sentR s!"[{f1}, 1200]"]
+  [wireQ eC 1200, feQ eC eC s!", \{\"cr\": [{sentToR "null"}], \"cw\": [{sentToR "8"}]}", afterQ f1, owedKeysQ "[]",
+   offersQ eC "[]"]
+  (ret eC)
+  ["acquire_room", "choose", "front", "next_to_send", "noted", "own_chunk", "queue_owed_relations", "track_in_flight",
+   "wake_front", "with_owed"] (t := f1)
+#guard takes3r nAsked [lNothingOwed, "choose: the first", lNoRoom, lRoom, ntsWay "a chunk", "noted: no offers"]
+-- at a node that replaces filter_entry, the node's filter_entry drops the entry: its room back, and a second turn,
+-- which finds nothing
+def nDropped : String := rec2 "next_to_send" "[5]"
+  (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "null", wl "null", owRow "null"]) [oaS, owS]
+  [inF "null", qR "normal" "[]"] [wireQ eC 1200, feQ eC "null"] (ret "null")
+  ["acquire_room", "choose", "free_room", "front", "leave_line", "next_to_send", "own_chunk", "queue_owed_relations",
+   "wake_front"]
+#guard takes3r nDropped [lNothingOwed, "choose: the first", lNobody, lRoom, lNobody,
+  ntsWay "nothing left of the entry, again", lNothingOwed, "leave_line: not in line", ntsWay "nothing"]
+-- at a node that replaces filter_entry, the node's filter_entry returns the entry with its chunk cleared (the
+-- document's returns None there; a node's own need not): its room back, and the entry, holding nothing, is not None
+-- (an `Entry` has no `__bool__`), so it goes on as control does. `with_owed` finds it empty and gives None, of which
+-- `noted` asks `offers_in`, and nothing is returned
+#guard takes3r (rec2 "next_to_send" "[5]"
+    (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "null", wl "null", owRow "null"]) [oaS, owS]
+    [inF "null", qR "normal" "[]"]
+    [wireQ eC 1200, feQ eC "[null, null, false]", owedKeysQ "[]", offersQ "null" "[]"]
+    (ret "null")
+    ["acquire_room", "choose", "free_room", "front", "next_to_send", "noted", "own_chunk", "queue_owed_relations",
+     "wake_front", "with_owed"])
+  [lNothingOwed, "choose: the first", lNobody, lRoom, lNobody, ntsWay "control", "noted: no offers"]
 -- control: at the head it goes at once; no wire_size, no room
 def nControl : String := rec2 "next_to_send" "[5]"
   (start ++ [qR "urgent" "[]", qR "normal" s!"[{ePr}]", owRow "null"]) [oaS, owS]
@@ -1705,10 +1758,22 @@ def nAnswer : String := rec2 "next_to_send" "[5]"
     (ret "null") ["window_release"])
 #guard fails3 "not a send's key: " (rec2 "window_release" s!"[5, {gq}, 3]" [rd "sent" s!"[[5, {gq}]]" "null"] [] []
     [] (ret "null") ["window_release"])
+-- filter_entry's question at a node that has not replaced it: the twin runs the document's, and the next question it
+-- asks (track_in_flight's timer) finds the question on the tape. With the call's log, the log is checked first: the
+-- document's code has written sent_to already, where the log's read has none
+#guard fails3 "tape: after(0.500000, SpecTwin.Timer.windowTimeout" nDropped
+#guard fails3 "tape: SpecTwin.Replay.Entry.call" nAsked
+-- the question asked of another entry (solicited, where the record's is not)
+#guard fails3r "tape: filter_entry[5, "
+  (nAsked.replace s!"[\"filter_entry\", [5, {eC}]" s!"[\"filter_entry\", [5, {eA}]")
+-- its answer's chunk wide, which the entry's reader refuses
+#guard fails3r "tape: filter_entry: its answer: a chunk here is narrow"
+  (nAsked.replace s!"[5, {eC}], {eC}" s!"[5, {eC}], [[{gq}, 3, 1, \"{root}\", \"{id3}\", 1], null, false]")
 -- and the records these are made from pass as they are
 #guard takes3 nWait [lNothingOwed, "choose: the first", lInLine, ntsWay "in line"] &&
   takes3 nControl [lNothingOwed, "choose: control at the head", ntsWay "control", "noted: no offers"] &&
-  takes3 nAnswer [lNothingOwed, ntsWay "an owed answer enqueued", "choose: the first", lInLine, ntsWay "in line"]
+  takes3 nAnswer [lNothingOwed, ntsWay "an owed answer enqueued", "choose: the first", lInLine, ntsWay "in line"] &&
+  takes3r nAsked [lNothingOwed, "choose: the first", lNoRoom, lRoom, ntsWay "a chunk", "noted: no offers"]
 
 end Window
 

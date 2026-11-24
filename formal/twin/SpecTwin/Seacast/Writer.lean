@@ -20,7 +20,8 @@ purpose:
   `out and out.chunk` is an entry with a chunk.
 - **The entry in hand is a value:** read from its lane, popped (the lane written whole), filtered and returned.
 - **`pop_owed_answer` and `wire_size`** are `NodeSeacast`'s questions; `has_room` and `enqueue` are the node's
-  (`Node61`). `noted` asks `offers_in`.
+  (`Node61`). `noted` asks `offers_in`. `filter_entry` is asked too where the node's line names it as replaced
+  (`filterEntryCall`).
 - **The return** is `seacast-lite.md`'s `Next`: an entry, nothing (`None`), or `WAIT`. -/
 
 namespace SpecTwin.Seacast
@@ -28,6 +29,12 @@ namespace SpecTwin.Seacast
 open SpecTwin Node61 Tables
 
 variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m]
+
+/-- A call `filter_entry(p, entry)` as the node binds the name: a question where the node's line names it as
+replaced, the document's otherwise -/
+def filterEntryCall (p : Peer) (entry : QEntry) : M2 m (Option QEntry) := do
+  if (← read).base.replaced.contains "filter_entry" then NodeSeacast.filterEntryNode p entry
+  else Seacast.filterEntry p entry
 
 /-- One turn of `next_to_send(p)` -/
 def turn (p : Peer) : M2 m Turn := do
@@ -72,7 +79,7 @@ def turn (p : Peer) : M2 m Turn := do
   let lane := (← lane? p .normal).getD []                     -- `q.normal.pop(k)`
   if k ≥ lane.length then crash "IndexError: pop index out of range (next_to_send)"
   setLane p .normal (lane.eraseIdx k)
-  let out ← Seacast.filterEntry p entry                       -- [c8, c12], and stale asks
+  let out ← filterEntryCall p entry                           -- [c8, c12], and stale asks
   -- `if need and not (out and out.chunk): free_room(need)`: the chunk did not leave, the room goes back
   if need != 0 && !(out.any (·.chunk.isSome)) then Seacast.freeRoom need
   match out with

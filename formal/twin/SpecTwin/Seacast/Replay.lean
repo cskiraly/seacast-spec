@@ -265,7 +265,7 @@ def callNamesSeacast : List String :=
    "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
    "open_sampling_link", "choice", "own_interest", "send_have", "serve_standing", "owed_missing", "repair_verdict",
    "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join", "candidates", "in_pushers",
-   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in"]
+   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in", "filter_entry"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
@@ -484,6 +484,13 @@ instance : NodeSeacast R where
   repairVerdictNode g := askCall "repair_verdict" [Json.str g] repairVerdictOf
   noteClaimNode p g := askCall "note_claim" [(p : Json), Json.str g] nothing
   knownInScopeNode g := askCall "known_in_scope" [Json.str g] nat
+  -- §4.11's: the entry, handed over and returned, compared by its value in SEACAST's form, as `wire_size`'s
+  filterEntryNode p e :=
+    askCallBy "filter_entry" s!"[{p}, {reprStr e}]"
+      (fun a => match a with
+        | .arr #[q, x] => q == (p : Json) && (match qentry x .seacast with | .ok e' => e' == e | .error _ => false)
+        | _ => false)
+      (optOf (qentry · .seacast))
 
 /-! ## One record -/
 
