@@ -45,7 +45,8 @@ CLOSURE_ALIASES = {
     "hdr": "desc, a view, under the name seacast.md's code gives it",
     "chunk_id": "message_id, a traced function, under the name seacast.md's code gives it (chunk_id = message_id)"}
 # the nodes entry's constants under v2, as trace3.py's install writes them: trace61's four, the client's three limits,
-# MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and SEACAST's five
+# MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and
+# SEACAST's six
 NODES_LINE_Seacast = (
     "IWANT_WINDOW", "RETRY_SLACK", "PROMISE", "PARK_TTL",
     "MAX_IHAVE_MESSAGES", "MAX_IHAVE_LENGTH", "MAX_PENDING_GROUPS", "MAX_PLAIN_CHUNKS",
@@ -53,13 +54,14 @@ NODES_LINE_Seacast = (
     "UNIT", "MAX_CHUNKS", "MAX_SEGMENT_SIZE", "HEARTBEAT", "GOSSIP_FACTOR",
     "D_LAZY", "PACED", "HAVE_TTL", "GOSSIP_RETRANSMISSION", "DESCRIPTOR_IN_CHUNK", "PUSH_TTL", "R", "R_NODE",
     "GUARD_GRACE", "UPLINK", "STRIPE_UPLINK", "W", "WINDOW_TIMEOUT", "SOURCE_OFFERS",
-    "ANSWERS_FIRST", "MERGE_HOLDINGS", "ASK_UPLINK", "SAMPLE_OUTSTANDING", "SERVE_BUDGET")
+    "ANSWERS_FIRST", "MERGE_HOLDINGS", "ASK_UPLINK", "SAMPLE_OUTSTANDING", "SERVE_BUDGET", "W_BYTES")
 # the toy's enumerations (node.py's namespace and _seacast): each label a string equal to its name, but the two bitmaps,
-# given as ("Bits", their int)
+# given as ("Bits", their int), and next_to_send's WAIT, an object of a class of its own, given as ("object", the
+# class's name, the object's repr)
 ENUMS_Seacast = dict({k: k for k in (
     "ACCEPT", "REJECT", "DEFER", "COLLECTING", "DECODING", "COMPLETE", "INVALID", "REPAIRED", "ASKED", "NOT_REPAIRED",
     "ACK", "PUBLISH", "ALL", "DERIVED", "DECLARED", "FORWARD", "NONE", "IN", "OUT", "BOTH", "ALL_JOINED", "SAMPLE",
-    "FAST", "HOME")}, EVERY_INDEX=("Bits", -1), EMPTY=("Bits", 0))
+    "FAST", "HOME")}, EVERY_INDEX=("Bits", -1), EMPTY=("Bits", 0), WAIT=("object", "_Wait", "WAIT"))
 # the builtins a covered function may load: functions of their arguments alone. Any other builtin (getattr, globals,
 # vars, print, ...) is in no class: it reaches state or effects by another way than a view
 PURE_BUILTINS_Seacast = (
@@ -585,7 +587,10 @@ def enum_check(ns):
             out.append(f"{k} is not in the namespace")
             continue
         v = ns[k]
-        if isinstance(want, tuple):
+        if isinstance(want, tuple) and want[0] == "object":
+            if not (type(v).__name__ == want[1] and repr(v) == want[2]):
+                out.append(f"{k} is {type(v).__name__} {v!r}, not {want[1]} {want[2]}")
+        elif isinstance(want, tuple):
             ok = type(v).__name__ == want[0] and getattr(v, "v", None) == want[1]
             have = f"{type(v).__name__}({getattr(v, 'v', '?')})" if hasattr(v, "v") else repr(v)
             if not ok:
@@ -635,7 +640,8 @@ def self_test(N, m, schema_values, type_functions):
 
     tf_without_repair = tuple(x for x in type_functions if x != "REPAIR_TO")
     Bits = N.Bits
-    good_ns = {k: (Bits(v[1]) if isinstance(v, tuple) else v) for k, v in ENUMS_Seacast.items()}
+    good_ns = {k: (getattr(N, k) if v[0] == "object" else Bits(v[1])) if isinstance(v, tuple) else v
+               for k, v in ENUMS_Seacast.items()}         # an object's value: the toy's own (node.py's WAIT)
     good_consts = dict.fromkeys(NODES_LINE_Seacast, 0)
 
     def tobj(extra=(), drop=()):
@@ -721,6 +727,9 @@ def self_test(N, m, schema_values, type_functions):
         ("p in mesh == x: mesh the left side of == too", "context",
          synth("def c(p, x):\n    return p in mesh == x\n", ["c"]),
          ["mesh (value) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
+        # (last, as the controls below name cases[1], cases[7] and cases[15] by their place)
+        ("enum_check, WAIT bound to the string 'WAIT'", "enum", dict(good_ns, WAIT="WAIT"),
+         ["WAIT is str 'WAIT', not _Wait WAIT"]),
     ]
     # the tell of a wire message's field (message_field): two that pass, then the reads it cannot follow
     # the pinned Graft, as MESSAGE_CLASSES has it; cls0, the classes without it, for the cases that bring their own

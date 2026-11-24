@@ -1334,4 +1334,382 @@ def j1 : String := rec2 "on_join" s!"[4, {jnT "row" "DECLARED" "NONE"}]" [rd "jo
 
 end Upkeep
 
+/-! ## §4.11's window, in bytes, and the writer: `wake_front`, `write_waits`, `acquire_room`, `leave_line`,
+`track_in_flight`, `window_release`, `window_timeout`, `noted`, `free_room` and `next_to_send`
+
+Hand-written records, each written from the Python's order of reads and questions (seacast.md:3016-3098, and
+seacast-lite.md's `front`, which they call), and each passing with "fewer" 0 and exactly the branch labels it was
+written for, in order. A function's labels come after those of the functions it calls before it ends, as the twin
+emits them:
+- one per branch label of the ten, and `front`'s;
+- the window's boundaries: `in_flight` at exactly `W_BYTES` and one below in `wake_front`; `acquire_room` filling the
+  window exactly, one byte over, and an empty window taking a chunk larger than `W_BYTES`; `free_room` ending at
+  `W_BYTES` exactly, and at 0, where the count's entry goes; the window off (`W_BYTES` none, the toy's `inf`);
+- the line: a writer mid-write passed over and the next one woken; `acquire_room` with a writer that can write ahead
+  of p, with p at the front, with p behind a writer mid-write, and with p in line already and still no room;
+  `leave_line` with p alone in line and with another behind it;
+- `track_in_flight`'s second copy, its room back at once and no timer; `window_release` and `window_timeout` giving
+  back the send's own bytes; `window_timeout` stale, with nothing in flight, and with `planned` holding the group,
+  where `origin_acked` runs;
+- `noted` with None, with no offers, with offers ORed into what p was offered, and with a group named twice, whose
+  second read is the twin's own write;
+- `next_to_send`'s ways out: urgent, owed offers alone, nothing (`leave_line`), nothing where `with_owed` filters
+  every bit (so `noted` is not called), `WAIT`, a chunk the filter drops (its room back, and a second turn),
+  control (no `wire_size` asked, no room taken), a chunk at `SOURCE_OFFERS = PUBLISH` (`origin_written`) and without
+  it, an owed answer enqueued, and owed answers where `has_room` says no.
+
+Several must fail: a wrong return of `acquire_room` at the boundary and of `next_to_send`, `wire_size` asked for a
+control entry, a question out of order in the line, `window_release` taped as a question (it is the twin's own now),
+the three new questions' answers that their readers refuse by their own checks, and two `sent` cells that its reader
+refuses.
+
+What a record shows, and what it does not, is as in the sections above: the questions in order, the return, the writes
+and the cells read, not how many times a cell was read or in what order. The questions' own reads are left out.
+
+The window is `W_BYTES` = 3000, two chunks of 1200 bytes and not a third (the toy's is `W` slots of `CHUNK_BYTES`).
+The writer is peer 5, and peer 6 waits beside it where a record says so. The chunk is `chunk3`, narrow, index 3 of
+`g`. A record's time is 0 unless it says otherwise. Each record is a seeded state that the toy's code can hold; a
+record claims a way the toy reaches it only where its comment gives one. -/
+
+namespace Window
+
+open Serve (rd arrL quoted tablesIn)
+open Upkeep (rec2 f1 f2 f3 sc)
+
+/-- `W_BYTES` = 3000 -/
+def c3 : ConstsSeacast := { c2 with W_BYTES := some 3000 }
+/-- `SOURCE_OFFERS = PUBLISH`, and card 8 (`CANCEL`) on -/
+def cPub : Consts := { c0 with SOURCE_OFFERS_PUBLISH := true }
+def cCancel : Consts := { c0 with CANCEL := true }
+
+def replay3 (l : String) (c : Consts := c0) (c2' : ConstsSeacast := c3) : Except String (Array String × Nat) := do
+  runSeacast c c2' params [] traced (← record (← Json.parse l) docSeacast) []
+
+/-- The record passes, with no read of the Python's left unmade, through these branch labels in order -/
+def takes3 (l : String) (marks : List String) (c : Consts := c0) (c2' : ConstsSeacast := c3) : Bool :=
+  match replay3 l c c2' with
+  | .ok (ms, 0) => ms.toList == marks
+  | _ => false
+
+def fails3 (pre : String) (l : String) (c : Consts := c0) (c2' : ConstsSeacast := c3) : Bool :=
+  match replay3 l c c2' with
+  | .error e => e.startsWith pre
+  | .ok _ => false
+
+/-- The window's count and line, as one entry each -/
+def inF (v : String) : String := rd "in_flight" "[\"count\"]" v
+def wl (v : String) : String := rd "waiters" "[\"line\"]" v
+def wrQ (p : Nat) (b : Bool) : String := s!"[\"writing\", [{p}], {b}]"
+def wakeQ (p : Nat) : String := s!"[\"wake\", [{p}], null]"
+/-- `sent[(5, g, 3)]`, and the timer `after(WINDOW_TIMEOUT, window_timeout, key, at)`, 0.5 s as its word -/
+def key3 : String := s!"[5, {gq}, 3]"
+def sentR (v : String) : String := rd "sent" s!"[{key3}]" v
+def half : String := "4602678819172646912"
+def afterQ (at_ : String) : String := s!"[\"after\", [{half}, \"window_timeout\", [{key3}, {at_}]], null]"
+def plannedR (v : String) : String := rd "planned" s!"[{gq}]" v
+def offR (v : String) : String := rd "offered_to" s!"[5, {gq}]" v
+def offersQ (e ans : String) : String := s!"[\"offers_in\", [{e}], {ans}]"
+def gb (b : Nat) : String := s!"[{gq}, {b}]"
+
+def lNoRoom : String := "wake_front: no room"
+def lNobody : String := "wake_front: nobody in line can write"
+def lPassed : String := "front: a writer mid-write passed"
+def lRoom : String := "acquire_room: room"
+def lInLine : String := "acquire_room: in line"
+def lNothingOwed : String := "queue_owed_relations: nothing owed"
+
+/-- The window's functions reached below a release: `free_room` and `wake_front`, and `front` where there is room -/
+def freed : List String := ["free_room", "front", "wake_front"]
+
+/-! ### wake_front -/
+
+-- no room: in_flight at exactly W_BYTES; front is not asked
+#guard takes3 (rec2 "wake_front" "[]" [inF "3000"] [] [] [] (ret "null") ["wake_front"]) [lNoRoom]
+-- one below: room, and nobody in line
+#guard takes3 (rec2 "wake_front" "[]" [inF "2999", wl "null"] [] [] [] (ret "null") ["front", "wake_front"]) [lNobody]
+-- nobody in line can write: the one there is mid-write (front's generator ends)
+#guard takes3 (rec2 "wake_front" "[]" [inF "null", wl "[5]"] [] [] [wrQ 5 true] (ret "null") ["front", "wake_front"])
+  [lPassed, lNobody]
+-- a writer mid-write passed over: the next in line is woken
+#guard takes3 (rec2 "wake_front" "[]" [inF "1200", wl "[5, 6]"] [] [] [wrQ 5 true, wrQ 6 false, wakeQ 6] (ret "null")
+    ["front", "wake_front"])
+  [lPassed]
+-- the first in line woken; the one behind it is not asked
+#guard takes3 (rec2 "wake_front" "[]" [inF "1200", wl "[5, 6]"] [] [] [wrQ 5 false, wakeQ 5] (ret "null")
+    ["front", "wake_front"])
+  []
+-- the window off (W_BYTES none, the toy's inf): no count is too many
+#guard takes3 (rec2 "wake_front" "[]" [inF "1000000", wl "[5]"] [] [] [wrQ 5 false, wakeQ 5] (ret "null")
+    ["front", "wake_front"]) [] (c2' := c2)
+
+/-! ### write_waits -/
+
+-- p is not in line: nothing (the toy calls it at each write that does not complete, run.py's send buffer of 1)
+#guard takes3 (rec2 "write_waits" "[5]" [wl "[6]"] [] [] [] (ret "null") ["write_waits"]) ["write_waits: not in line"]
+#guard takes3 (rec2 "write_waits" "[5]" [wl "null"] [] [] [] (ret "null") ["write_waits"]) ["write_waits: not in line"]
+-- p in line and mid-write: the line skips it and wakes the next
+#guard takes3 (rec2 "write_waits" "[5]" [wl "[5, 6]", inF "null"] [] [] [wrQ 5 true, wrQ 6 false, wakeQ 6] (ret "null")
+    ["front", "wake_front", "write_waits"])
+  [lPassed]
+-- p in line, and no room: nobody is woken
+#guard takes3 (rec2 "write_waits" "[5]" [wl "[5]", inF "3000"] [] [] [] (ret "null") ["wake_front", "write_waits"])
+  [lNoRoom]
+
+/-! ### free_room -/
+
+-- 1200 back from a full window, and nobody in line
+#guard takes3 (rec2 "free_room" "[1200]" [inF "3000", wl "null"] [] [inF "1800"] [] (ret "null") freed) [lNobody]
+-- back to 0: the count's entry goes, and the first in line is woken
+#guard takes3 (rec2 "free_room" "[1200]" [inF "1200", wl "[5]"] [] [inF "null"] [wrQ 5 false, wakeQ 5] (ret "null")
+    freed)
+  []
+-- ending at W_BYTES exactly (an empty window took more): still no room
+#guard takes3 (rec2 "free_room" "[1200]" [inF "4200"] [] [inF "3000"] [] (ret "null") ["free_room", "wake_front"])
+  [lNoRoom]
+
+/-! ### acquire_room -/
+
+-- filling the window exactly: 1800 + 1200 = W_BYTES, nobody in line; no room left for the next
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "1800", wl "null"] [] [inF "3000"] [] (ret "true")
+    ["acquire_room", "front", "wake_front"])
+  [lNoRoom, lRoom]
+-- one byte over: p joins the line, and front is not asked (`and` short-circuits)
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "1801", wl "null"] [] [wl "[5]"] [] (ret "false")
+    ["acquire_room"])
+  [lInLine]
+-- an empty window takes a chunk over W_BYTES (`or in_flight == 0`)
+#guard takes3 (rec2 "acquire_room" "[5, 4000]" [inF "null", wl "null"] [] [inF "4000"] [] (ret "true")
+    ["acquire_room", "front", "wake_front"])
+  ["acquire_room: an empty window, over W_BYTES", lNoRoom, lRoom]
+-- room, but a writer that can write is ahead of p: p joins the line behind it
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "null", wl "[6]"] [] [wl "[6, 5]"] [wrQ 6 false] (ret "false")
+    ["acquire_room", "front"])
+  [lInLine]
+-- p at the front: it leaves the line, takes the room, and the next in line is woken
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "null", wl "[5, 6]"] [] [wl "[6]", inF "1200"]
+    [wrQ 5 false, wrQ 6 false, wakeQ 6] (ret "true") ["acquire_room", "front", "wake_front"])
+  [lRoom]
+-- p behind a writer mid-write: p goes first; the other stays in line and still cannot write
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "null", wl "[6, 5]"] [] [wl "[6]", inF "1200"]
+    [wrQ 6 true, wrQ 5 false, wrQ 6 true] (ret "true") ["acquire_room", "front", "wake_front"])
+  [lPassed, lPassed, lNobody, lRoom]
+-- p in line already, and still no room: it keeps its place, nothing written
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "2000", wl "[6, 5]"] [] [] [] (ret "false") ["acquire_room"])
+  [lInLine]
+-- the window off: any count fits
+#guard takes3 (rec2 "acquire_room" "[5, 1200]" [inF "1000000", wl "null"] [] [inF "1001200"] [] (ret "true")
+    ["acquire_room", "front", "wake_front"])
+  [lNobody, lRoom] (c2' := c2)
+
+/-! ### leave_line -/
+
+#guard takes3 (rec2 "leave_line" "[5]" [wl "[6]"] [] [] [] (ret "null") ["leave_line"]) ["leave_line: not in line"]
+-- p leaves; the one behind it is woken
+#guard takes3 (rec2 "leave_line" "[5]" [wl "[5, 6]", inF "null"] [] [wl "[6]"] [wrQ 6 false, wakeQ 6] (ret "null")
+    ["front", "leave_line", "wake_front"])
+  ["leave_line: left the line"]
+-- p alone in line: the line's entry goes
+#guard takes3 (rec2 "leave_line" "[5]" [wl "[5]", inF "null"] [] [wl "null"] [] (ret "null")
+    ["front", "leave_line", "wake_front"])
+  [lNobody, "leave_line: left the line"]
+
+/-! ### track_in_flight -/
+
+-- the first copy: the room travels with it, and its timer is armed with the send's time
+#guard takes3 (rec2 "track_in_flight" s!"[5, {chunk3}, 1200]" [sentR "null"] [] [sentR s!"[{f1}, 1200]"] [afterQ f1]
+    (ret "null") ["track_in_flight"] (t := f1))
+  []
+-- a second copy while the first is in flight: its room back at once, the first's entry and timer kept
+#guard takes3 (rec2 "track_in_flight" s!"[5, {chunk3}, 1200]" [sentR s!"[{f1}, 1200]", inF "2400", wl "null"] []
+    [inF "1200"] [] (ret "null") (freed ++ ["track_in_flight"]) (t := f2))
+  [lNobody, "track_in_flight: a second copy"]
+
+/-! ### window_release -/
+
+-- the send's own bytes come back (900, not a chunk's 1200)
+#guard takes3 (rec2 "window_release" s!"[5, {gq}, 3]" [sentR s!"[{f1}, 900]", inF "3000", wl "null"] []
+    [sentR "null", inF "2100"] [] (ret "null") (freed ++ ["window_release"]))
+  [lNobody, "window_release: a send released"]
+-- nothing in flight under the key: a holding of a chunk we did not send, or one released before
+#guard takes3 (rec2 "window_release" s!"[5, {gq}, 3]" [sentR "null"] [] [] [] (ret "null") ["window_release"])
+  ["window_release: nothing in flight"]
+
+/-! ### window_timeout -/
+
+-- the send's own timer: released, its room back; the group not planned
+#guard takes3 (rec2 "window_timeout" s!"[{key3}, {f1}]" [sentR s!"[{f1}, 1200]", inF "1200", wl "null", plannedR "null"]
+    [] [sentR "null", inF "null"] [] (ret "null") (freed ++ ["window_timeout"]) (t := f3))
+  [lNobody, "window_timeout: released"]
+-- a group we plan: origin_acked(g, 3) runs, here with chunk 3 acknowledged before (origin[g] holds bit 3)
+#guard takes3 (rec2 "window_timeout" s!"[{key3}, {f1}]"
+    [sentR s!"[{f1}, 1200]", inF "1200", wl "null", plannedR "true", rd "origin" s!"[{gq}]" "8"] []
+    [sentR "null", inF "null"] [] (ret "null") (freed ++ ["origin_acked", "window_timeout"]) (t := f3))
+  [lNobody, "origin_acked: acknowledged before", "window_timeout: released"]
+-- stale: a later send under the key (at 2.0), whose own timer is still to come
+#guard takes3 (rec2 "window_timeout" s!"[{key3}, {f1}]" [sentR s!"[{f2}, 1200]"] [] [] [] (ret "null")
+    ["window_timeout"] (t := f3))
+  ["window_timeout: stale"]
+-- nothing in flight: a holding released it first
+#guard takes3 (rec2 "window_timeout" s!"[{key3}, {f1}]" [sentR "null"] [] [] [] (ret "null") ["window_timeout"]
+    (t := f3))
+  ["window_timeout: nothing in flight"]
+
+/-! ### noted -/
+
+/-- Entries: a pushed chunk; an answer; an IHAVE of g's indices 3 and 4; the same as two bitmaps of g; a PRUNE of
+SEACAST's relations -/
+def eC : String := s!"[{chunk3}, null, false]"
+def eA : String := s!"[{chunk3}, null, true]"
+def eI : String := s!"[null, [[\"ihave\", [[\"bits\", {gq}, 24]]]], false]"
+def eI2 : String := s!"[null, [[\"ihave\", [[\"bits\", {gq}, 8], [\"bits\", {gq}, 16]]]], false]"
+def ePr : String := "[null, [[\"prune\", [[\"prune\", \"row\", 0, 0, \"IN\"]]]], false]"
+
+-- None (with_owed found nothing): offers_in(None) is []
+#guard takes3 (rec2 "noted" "[5, null]" [] [] [] [offersQ "null" "[]"] (ret "null") ["noted"]) ["noted: no offers"]
+-- an entry with no offers
+#guard takes3 (rec2 "noted" s!"[5, {eC}]" [] [] [] [offersQ eC "[]"] (ret eC) ["noted"]) ["noted: no offers"]
+-- offers ORed into what p was offered: 1 | 24
+#guard takes3 (rec2 "noted" s!"[5, {eI}]" [offR "1"] [] [offR "25"] [offersQ eI s!"[{gb 24}]"] (ret eI) ["noted"]) []
+-- a group named twice ORs twice: the second read is the twin's own write
+#guard takes3 (rec2 "noted" s!"[5, {eI2}]" [offR "null"] [] [offR "24"] [offersQ eI2 s!"[{gb 8}, {gb 16}]"] (ret eI2)
+    ["noted"])
+  []
+
+/-! ### next_to_send -/
+
+def qR (l v : String) : String := rd "queue" s!"[5, \"{l}\"]" v
+def relsR : String := rd "owed_relations" "[5]" "null"
+def oaS : String := sc "owed_answers" "[5]"
+def owS : String := sc "owed" "[5]"
+def owRow (v : String) : String := rd "owed" "[5]" v
+def owedR (v : String) : String := rd "owed" s!"[5, {gq}]" v
+def recvR (v : String) : String := rd "received" s!"[{gq}]" v
+def sentToR (v : String) : String := rd "sent_to" s!"[5, {gq}]" v
+def wireQ (e : String) (n : Nat) : String := s!"[\"wire_size\", [5, {e}], {n}]"
+/-- `list(owed[p])` in `with_owed` (seacast-lite.md:1916): the row's keys in the node's order -/
+def owedKeysQ (ks : String) : String := s!"[\"keys\", \"owed\", [5], {ks}]"
+/-- Each turn's start: no owed relations, and no owed answers -/
+def start : List String := [relsR]
+def ntsWay (w : String) : String := s!"next_to_send: {w}"
+
+-- urgent: an IHAVE, first, with its offers noted; the normal lane not read
+#guard takes3 (rec2 "next_to_send" "[5]" (start ++ [qR "urgent" s!"[{eI}]", owRow "null", offR "null"]) [oaS, owS]
+    [qR "urgent" "[]", offR "24"] [owedKeysQ "[]", offersQ eI s!"[{gb 24}]"] (ret eI)
+    ["next_to_send", "noted", "queue_owed_relations", "with_owed"])
+  [lNothingOwed, ntsWay "urgent"]
+-- owed offers alone: both lanes empty, an IHAVE of what is owed
+#guard takes3 (rec2 "next_to_send" "[5]"
+    (start ++ [qR "urgent" "[]", qR "normal" "[]", owRow "true", owedR "24", rd "pushed" s!"[5, {gq}]" "null",
+      rd "peer_has" s!"[5, {gq}]" "null", offR "null"]) [oaS, owS]
+    [owedR "null", offR "24"] [owedKeysQ s!"[{gq}]", offersQ eI s!"[{gb 24}]"] (ret eI)
+    ["next_to_send", "noted", "queue_owed_relations", "with_owed"])
+  [lNothingOwed, ntsWay "owed offers alone"]
+-- nothing: both lanes empty, nothing owed; p leaves the line (not in it)
+#guard takes3 (rec2 "next_to_send" "[5]" (start ++ [qR "urgent" "[]", qR "normal" "[]", owRow "null", wl "null"])
+    [oaS, owS] [] [] (ret "null") ["leave_line", "next_to_send", "queue_owed_relations"])
+  [lNothingOwed, "leave_line: not in line", ntsWay "nothing"]
+-- nothing, where with_owed filters every bit (p holds what is owed): noted is not called
+#guard takes3 (rec2 "next_to_send" "[5]"
+    (start ++ [qR "urgent" "[]", qR "normal" "[]", owRow "true", owedR "24", rd "pushed" s!"[5, {gq}]" "null",
+      rd "peer_has" s!"[5, {gq}]" "[24, 3, false, false]", wl "null"]) [oaS, owS]
+    [owedR "null"] [owedKeysQ s!"[{gq}]"] (ret "null")
+    ["leave_line", "next_to_send", "queue_owed_relations", "with_owed"])
+  [lNothingOwed, "leave_line: not in line", ntsWay "nothing"]
+-- WAIT: a chunk not ours (received), the first; 1200 bytes do not fit beside 2000; p joins the line
+def nWait : String := rec2 "next_to_send" "[5]"
+  (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "2000", wl "null"]) [oaS]
+  [wl "[5]"] [wireQ eC 1200] (ret "\"WAIT\"")
+  ["acquire_room", "choose", "next_to_send", "own_chunk", "queue_owed_relations"]
+#guard takes3 nWait [lNothingOwed, "choose: the first", lInLine, ntsWay "in line"]
+-- a chunk, filling the window exactly; SOURCE_OFFERS not PUBLISH: origin_written is not called
+#guard takes3 (rec2 "next_to_send" "[5]"
+    (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "1800", wl "null", sentToR "null",
+      sentR "null", owRow "null"]) [oaS, owS]
+    [inF "3000", qR "normal" "[]", sentToR "8", sentR s!"[{f1}, 1200]"]
+    [wireQ eC 1200, afterQ f1, owedKeysQ "[]", offersQ eC "[]"]
+    (ret eC)
+    ["acquire_room", "choose", "filter_entry", "front", "next_to_send", "noted", "own_chunk", "queue_owed_relations",
+     "track_in_flight", "wake_front", "with_owed"] (t := f1))
+  [lNothingOwed, "choose: the first", lNoRoom, lRoom, "filter_entry: sent", ntsWay "a chunk", "noted: no offers"]
+-- a chunk at SOURCE_OFFERS = PUBLISH: origin_written runs at its first write (here not a group we publish)
+#guard takes3 (rec2 "next_to_send" "[5]"
+    (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "null", wl "null", sentToR "null",
+      sentR "null", rd "origin" s!"[{gq}]" "null", owRow "null"]) [oaS, owS]
+    [inF "1200", qR "normal" "[]", sentToR "8", sentR s!"[{f1}, 1200]"]
+    [wireQ eC 1200, afterQ f1, owedKeysQ "[]", offersQ eC "[]"]
+    (ret eC)
+    ["acquire_room", "choose", "filter_entry", "front", "next_to_send", "noted", "origin_written", "own_chunk",
+     "queue_owed_relations", "track_in_flight", "wake_front", "with_owed"] (t := f1))
+  [lNothingOwed, "choose: the first", lNobody, lRoom, "filter_entry: sent", "origin_written: not a group we publish",
+   ntsWay "a chunk", "noted: no offers"] (c := cPub)
+-- a chunk the filter drops (card 8: p holds it): its room back, and a second turn, which finds nothing
+#guard takes3 (rec2 "next_to_send" "[5]"
+    (start ++ [qR "urgent" "[]", qR "normal" s!"[{eC}]", recvR "8", inF "null", wl "null",
+      rd "peer_has" s!"[5, {gq}]" "[8, 3, false, false]", owRow "null"]) [oaS, owS]
+    [inF "null", qR "normal" "[]"] [wireQ eC 1200] (ret "null")
+    ["acquire_room", "choose", "filter_entry", "free_room", "front", "leave_line", "next_to_send", "own_chunk",
+     "queue_owed_relations", "wake_front"])
+  [lNothingOwed, "choose: the first", lNobody, lRoom, "filter_entry: cancelled", lNobody,
+   ntsWay "nothing left of the entry, again", lNothingOwed, "leave_line: not in line", ntsWay "nothing"]
+  (c := cCancel)
+-- control: at the head it goes at once; no wire_size, no room
+def nControl : String := rec2 "next_to_send" "[5]"
+  (start ++ [qR "urgent" "[]", qR "normal" s!"[{ePr}]", owRow "null"]) [oaS, owS]
+  [qR "normal" "[]"] [owedKeysQ "[]", offersQ ePr "[]"] (ret ePr)
+  ["choose", "filter_entry", "next_to_send", "noted", "queue_owed_relations", "with_owed"]
+#guard takes3 nControl [lNothingOwed, "choose: control at the head", ntsWay "control", "noted: no offers"]
+-- an owed answer enqueued (has_room says yes): the normal lane then holds it, as the Python reads it after enqueue;
+-- its 1200 bytes do not fit beside 2000
+def nAnswer : String := rec2 "next_to_send" "[5]"
+  (start ++ [rd "owed_answers" s!"[5, {gq}]" "8", qR "urgent" "[]", qR "normal" s!"[{eA}]", inF "2000", wl "null"])
+  [oaS] [wl "[5]"]
+  ["[\"has_room\", [5], true]", s!"[\"pop_owed_answer\", [5], {chunk3}]",
+   s!"[\"enqueue\", [5, [\"entry\", {eA}], false], true]", wireQ eA 1200]
+  (ret "\"WAIT\"") ["acquire_room", "choose", "next_to_send", "own_chunk", "queue_owed_relations"]
+#guard takes3 nAnswer [lNothingOwed, ntsWay "an owed answer enqueued", "choose: the first", lInLine, ntsWay "in line"]
+-- owed answers, and has_room says no: nothing is popped
+#guard takes3 (rec2 "next_to_send" "[5]"
+    (start ++ [rd "owed_answers" s!"[5, {gq}]" "8", qR "urgent" "[]", qR "normal" "[]", owRow "null", wl "null"])
+    [oaS, owS] [] ["[\"has_room\", [5], false]"] (ret "null") ["leave_line", "next_to_send", "queue_owed_relations"])
+  [lNothingOwed, "leave_line: not in line", ntsWay "nothing"]
+
+/-! ### The ones that must fail -/
+
+-- acquire_room's wrong return at the boundary: the window filled exactly is room
+#guard fails3 "return value: " (rec2 "acquire_room" "[5, 1200]" [inF "1800", wl "null"] [] [inF "3000"] []
+    (ret "false") ["acquire_room", "front", "wake_front"])
+-- next_to_send's wrong return: nothing where it waits
+#guard fails3 "return value: " (nWait.replace "\"ret\": \"WAIT\"" "\"ret\": null")
+-- wire_size asked for a control entry
+#guard fails3 "tape: owed[5]'s groups, of [] asked, SpecTwin.Replay.Entry.call \"wire_size\""
+  (nControl.replace s!"[{owedKeysQ "[]"}, {offersQ ePr "[]"}]"
+    s!"[{wireQ ePr 0}, {owedKeysQ "[]"}, {offersQ ePr "[]"}]")
+-- a question out of order: writing(6) logged before writing(5)
+#guard fails3 "tape: writing[5] asked" (rec2 "wake_front" "[]" [inF "1200", wl "[5, 6]"] [] []
+    [wrQ 6 false, wrQ 5 true, wakeQ 6] (ret "null") ["front", "wake_front"])
+-- window_release taped as a question: the twin runs it as its own now, so no reader takes it
+#guard fails3 "not a question of the block: [\"window_release\""
+  (rec2 "track_in_flight" s!"[5, {chunk3}, 1200]" [sentR "null"] [] [sentR s!"[{f1}, 1200]"]
+    [afterQ f1, s!"[\"window_release\", [5, {gq}, 3], null]"] (ret "null") ["track_in_flight"] (t := f1))
+-- the three questions' answers that their readers refuse: a wide chunk, a negative size, a group of 63 digits
+#guard fails3 "tape: pop_owed_answer: its answer: a chunk here is narrow"
+  (nAnswer.replace s!"[\"pop_owed_answer\", [5], {chunk3}]"
+    s!"[\"pop_owed_answer\", [5], [{gq}, 3, 1, \"{root}\", \"{id3}\", 1]]")
+#guard fails3 "tape: wire_size: its answer: Natural number expected"
+  (nWait.replace (wireQ eC 1200) s!"[\"wire_size\", [5, {eC}], [\"-\", 1]]")
+#guard fails3 "tape: offers_in: its answer: not a group key: "
+  (rec2 "noted" s!"[5, {eI}]" [offR "1"] [] [offR "25"]
+    [offersQ eI s!"[[\"{String.ofList (List.replicate 63 'a')}\", 24]]"] (ret eI) ["noted"])
+-- sent's cells that its reader refuses: bytes not a natural number, and a key of two members
+#guard fails3 "Natural number expected" (rec2 "window_release" s!"[5, {gq}, 3]" [sentR s!"[{f1}, 900.5]"] [] [] []
+    (ret "null") ["window_release"])
+#guard fails3 "not a send's key: " (rec2 "window_release" s!"[5, {gq}, 3]" [rd "sent" s!"[[5, {gq}]]" "null"] [] []
+    [] (ret "null") ["window_release"])
+-- and the records these are made from pass as they are
+#guard takes3 nWait [lNothingOwed, "choose: the first", lInLine, ntsWay "in line"] &&
+  takes3 nControl [lNothingOwed, "choose: control at the head", ntsWay "control", "noted: no offers"] &&
+  takes3 nAnswer [lNothingOwed, ntsWay "an owed answer enqueued", "choose: the first", lInLine, ntsWay "in line"]
+
+end Window
+
 end SpecTwin.Seacast.ReplayKnown

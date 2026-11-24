@@ -7,9 +7,9 @@ This file is written whole by `tools/gen/gen.py` from `gen/schema.py` and `gen/s
 entry there per table, and `gen.py --check` compares it byte for byte. Do not edit it: change the schema,
 or the generator.
 
-How an entry and a level are read from a record (`cell`, `val`, `level`), and how a state is looked up, changed
-and listed entry by entry (`valueAt`, `put`, `drop`, `entries`, `under`, `covers`). The kinds of value (`Val`)
-and the parsers of keys are in `ReplayBase.lean`, written by hand. -/
+How an entry and a level are read from a record (`cell`, `val`, `level`, and under a document, `cellIn` and
+`levelIn`), and how a state is looked up, changed and listed entry by entry (`valueAt`, `put`, `drop`, `entries`,
+`under`, `covers`). The kinds of value (`Val`) and the parsers of keys are in `ReplayBase.lean`, written by hand. -/
 
 namespace SpecTwin.Replay
 
@@ -104,6 +104,13 @@ def cell (table : String) (path : Json) : Except String Cell := do
   | "served_hb", #[p] => return .servedHb (← nat p)
   | _, _ => throw s!"not an entry of §6.1's tables: {table}{path.compress}"
 
+/-- An entry of a record under document `f`: a table that `seacast.md` writes otherwise and a record names by
+`seacast-lite.md`'s name (`trace` in the schema) is read under `seacast.md` alone; every other, as `cell` reads it. -/
+def cellIn (f : Form) (table : String) (path : Json) : Except String Cell := do
+  match f, table, ← path.getArr? with
+  | .seacast, "sent", #[k] => return .sentSeacast (← sendKey k)
+  | _, _, _ => cell table path
+
 /-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the
 document whose forms a lane and a peer's holding take (`laneEntries`, `haveEntry`). -/
 def val (c : Cell) (j : Json) (f : Form := .lite) : Except String (Option Val) := do
@@ -185,6 +192,9 @@ def val (c : Cell) (j : Json) (f : Form := .lite) : Except String (Option Val) :
     let l ← giList j
     if l.isEmpty then throw "an empty list of groups and indices as a value"
     return some (.gis l)
+  | .sentSeacast _ =>
+    let (t, n) ← sendRec j
+    return some (.sendrec t n)
   | .tiedRow _ | .tiedPeerRow .. | .queueRow _ | .owedRow _ | .plannedRow _ =>
     if j == .bool true then return some .flag else throw s!"not a row's presence: {j.compress}"
 
@@ -283,6 +293,13 @@ def level (j : Json) : Except String Level := do
   | "forwarded", #[] => return .forwarded
   | "served_hb", #[] => return .servedHb
   | _, _ => throw s!"not a level of §6.1's tables: {j.compress}"
+
+/-- A level read as a whole in a record under document `f`, as `cellIn` reads an entry. -/
+def levelIn (f : Form) (j : Json) : Except String Level := do
+  let #[.str table, pre] ← j.getArr? | throw s!"not a level: {j.compress}"
+  match f, table, ← pre.getArr? with
+  | .seacast, "sent", #[] => return .sentSeacast
+  | _, _, _ => level j
 
 /-- An entry's value in a state: none where it is missing or empty. -/
 def valueAt (s : State) : Cell → Option Val
@@ -432,6 +449,7 @@ def valueAt (s : State) : Cell → Option Val
   | .servedHb p => match s.servedHb.getD p 0 with
     | 0 => none
     | n => some (.count n)
+  | .sentSeacast k => (s.sentSeacast.get? k).map fun (t, n) => .sendrec t.toBits n
 
 /-- A state with one more entry: how a record's `reads` become the twin's state. -/
 def put (s : State) (c : Cell) (v : Val) : Except String State :=
@@ -516,6 +534,7 @@ def put (s : State) (c : Cell) (v : Val) : Except String State :=
   | .heldSamples b, .gis l => pure { s with heldSamples := s.heldSamples.insert b l }
   | .forwarded p T, .count n => pure { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).insert T n) }
   | .servedHb p, .count n => pure { s with servedHb := s.servedHb.insert p n }
+  | .sentSeacast k, .sendrec t n => pure { s with sentSeacast := s.sentSeacast.insert k (Float.ofBits t, n) }
   | c, v => throw s!"not a value of {reprStr c}: {reprStr v}"
 
 /-- A state without an entry: how a record's erasing write is applied. -/
@@ -600,6 +619,7 @@ def drop (s : State) : Cell → State
   | .heldSamples b => { s with heldSamples := s.heldSamples.erase b }
   | .forwarded p T => { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).erase T) }
   | .servedHb p => { s with servedHb := s.servedHb.erase p }
+  | .sentSeacast k => { s with sentSeacast := s.sentSeacast.erase k }
 
 /-- Every entry a state holds, empty ones left out: what two states are compared by. -/
 def entries (s : State) : List (Cell × Val) :=
@@ -684,6 +704,7 @@ def entries (s : State) : List (Cell × Val) :=
     ++ s.heldSamples.toList.map (fun (b, _) => .heldSamples b)
     ++ s.forwarded.toList.flatMap (fun (p, m) => m.toList.map fun (T, _) => .forwarded p T)
     ++ s.servedHb.toList.map (fun (p, _) => .servedHb p)
+    ++ s.sentSeacast.toList.map (fun (k, _) => .sentSeacast k)
   all.filterMap fun c => (valueAt s c).map fun v => (c, v)
 
 /-- Whether a level read as a whole holds an entry. -/
@@ -785,6 +806,7 @@ def under (c : Cell) (l : Level) : Bool :=
   | .heldSamples, .heldSamples _ => true
   | .forwarded, .forwarded .. => true
   | .servedHb, .servedHb _ => true
+  | .sentSeacast, .sentSeacast _ => true
   | _, _ => false
 
 /-- Whether a level holds another: itself, or a table's whole against one of its rows. -/

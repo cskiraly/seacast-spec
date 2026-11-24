@@ -1,5 +1,6 @@
 import SpecTwin.Replay
 import SpecTwin.Seacast.Sample
+import SpecTwin.Seacast.Writer
 import SpecTwin.Seacast.Kept
 import SpecTwin.Seacast.Serve
 import SpecTwin.Seacast.Upkeep
@@ -25,13 +26,12 @@ import SpecTwin.Seacast.Manifest
   one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
 - **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `Seacast/Manifest.lean`). It runs
-  SEACAST's functions (`fnsSeacast`, 81 with §4.1's relations) by their Python names, hands a record of one of
-  `seacast-lite.md`'s functions that v2 keeps, or of the node's own `held` (`keptSeacast`), to `Replay.run`, runs the
-  three that take another form under v2 (`keptFormsSeacast`) in their v2 forms (`Seacast/Kept.lean`), and refuses
-  every other name,
-  among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
-  `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
-  replaces is refused, as `run` refuses one. -/
+  SEACAST's functions (`fnsSeacast`, 91 with §4.1's relations and §4.11's window and writer) by their Python names,
+  hands a record of one of `seacast-lite.md`'s functions that v2 keeps, or of the node's own `held` (`keptSeacast`), to
+  `Replay.run`, runs the three that take another form under v2 (`keptFormsSeacast`) in their v2 forms
+  (`Seacast/Kept.lean`), and refuses every other name, among them the ones v2 redefines and this cycle does not
+  cover (`on_frame`, `on_heartbeat`). A record of a name the node's line replaces is refused, as `run` refuses
+  one. -/
 
 namespace SpecTwin.Seacast
 
@@ -255,16 +255,17 @@ def member {α} [BEq α] (what : String) (xs : List α) (x : α) : Except String
 /-! ## SEACAST's tape entries -/
 
 /-- SEACAST's questions whose entries are calls as they are. `sample_without_replacement` and
-`push_rebuilt` are `seacast-lite.md`'s `call` names already. -/
+`push_rebuilt` are `seacast-lite.md`'s `call` names already. `pop_owed_answer` is a call here, its answer a chunk
+written narrow, where `seacast-lite.md`'s reader takes it as an entry of its own. -/
 def callNamesSeacast : List String :=
   ["type_of_group", "type_of", "index_count", "threshold", "verify", "decode", "header_of", "project", "cross",
    "family", "derived_interest", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "send", "links", "link_cover",
    "cover_candidates", "floor_candidates", "floor_links", "high_custody", "families", "families_with_duty",
    "wants_family", "duty_for", "route_next", "block_of", "group_of", "node_id", "interest_satisfied",
    "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
-   "open_sampling_link", "choice", "own_interest", "window_release", "send_have", "serve_standing", "owed_missing",
-   "repair_verdict", "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join",
-   "candidates", "in_pushers", "out_pushees", "uplink_class"]
+   "open_sampling_link", "choice", "own_interest", "send_have", "serve_standing", "owed_missing", "repair_verdict",
+   "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join", "candidates", "in_pushers",
+   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
@@ -457,6 +458,22 @@ instance : NodeSeacast R where
   claimsOrder gs := do
     permOf "claims' keys" gs (← askCall "keys" [Json.str "claims", Json.arr #[]] (groupList "keys of claims"))
   ownInterest g := askCall "own_interest" [Json.str g] intOf
+  -- §4.11's writer: the owed answer's chunk, narrow; an entry's bytes on the wire; the offers an entry carries. An
+  -- entry in a question is compared by its value, read in SEACAST's form (`qentry`)
+  popOwedAnswer p := askCall "pop_owed_answer" [(p : Json)] chunkN
+  wireSize p e :=
+    askCallBy "wire_size" s!"[{p}, {reprStr e}]"
+      (fun a => match a with
+        | .arr #[q, x] => q == (p : Json) && (match qentry x .seacast with | .ok e' => e' == e | .error _ => false)
+        | _ => false)
+      nat
+  offersIn e :=
+    askCallBy "offers_in" s!"[{reprStr e}]"
+      (fun a => match a, e with
+        | .arr #[.null], none => true
+        | .arr #[x], some e => match qentry x .seacast with | .ok e' => e' == e | .error _ => false
+        | _, _ => false)
+      (pairs "group and bits" Replay.groupKey nat)
   -- the names a node's line can give as replaced: asked where it does, the document's body run elsewhere
   forwardNode f p axes :=
     askCall "forward" [chunkJson f, (p : Json), optJson (fun l => Json.arr (l.map giJson).toArray) axes] nothing
@@ -468,10 +485,6 @@ instance : NodeSeacast R where
   noteClaimNode p g := askCall "note_claim" [(p : Json), Json.str g] nothing
   knownInScopeNode g := askCall "known_in_scope" [Json.str g] nat
 
-/-- The functions that the 71 call and this cycle leaves out: a question at every node until transcribed. -/
-instance : SeacastLater R where
-  windowRelease p g i := askCall "window_release" [(p : Json), Json.str g, (i : Json)] nothing
-
 /-! ## One record -/
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name and that take another form under v2: the two
@@ -481,8 +494,10 @@ def keptFormsSeacast : List String := ["on_pace_tick", "on_block_installed", "re
 
 /-- SEACAST's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
 the 66, main's `fill` and `serve_standing`, v0.11.1's `joined` and `drop_wants_beyond`, §4.5's serving
-(`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`), and §4.1's relations with §6.3's limit
-(`relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `on_join`): 81. -/
+(`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`), §4.1's relations with §6.3's limit
+(`relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `on_join`), and §4.11's window and writer
+(`wake_front`, `write_waits`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`,
+`noted`, `free_room`, `next_to_send`): 91. -/
 def fnsSeacast : List String := Manifest.covered.filter (!keptFormsSeacast.contains ·)
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
@@ -638,6 +653,25 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "resample", #[g, i, q, b] => do
       exec (resample (← Replay.groupKey g) (← nat i) (← nat q) (← boolOf b)) none_
     | "sample", #[g, b] => do exec (sample (← Replay.groupKey g) (← nat b)) none_
+    -- §4.11's window and writer: a chunk narrow, an entry in SEACAST's form, a time as its word
+    | "wake_front", #[] => do exec Seacast.wakeFront none_
+    | "write_waits", #[p] => do exec (Seacast.writeWaits (← nat p)) none_
+    | "free_room", #[n] => do exec (Seacast.freeRoom (← nat n)) none_
+    | "acquire_room", #[p, n] => do exec (Seacast.acquireRoom (← nat p) (← nat n)) (retIs r.ret boolOf)
+    | "leave_line", #[p] => do exec (Seacast.leaveLine (← nat p)) none_
+    | "track_in_flight", #[p, f, n] => do exec (Seacast.trackInFlight (← nat p) (← chunkN f) (← nat n)) none_
+    | "window_release", #[p, g, i] => do
+      exec (Seacast.windowRelease (← nat p) (← Replay.groupKey g) (← nat i)) none_
+    | "window_timeout", #[k, t] => do exec (Seacast.windowTimeout (← sendKey k) (← floatOf t)) none_
+    | "noted", #[p, e] => do
+      exec (Seacast.noted (← nat p) (← optOf (qentry · .seacast) e)) (retIs r.ret (optOf (qentry · .seacast)))
+    | "next_to_send", #[p] => do           -- an entry, `"WAIT"` or null
+      exec (Seacast.nextToSend (← nat p)) fun v => do
+        let want : Next ← match r.ret with
+          | .str "WAIT" => pure .wait
+          | .null => pure .nothing
+          | j => .entry <$> qentry j .seacast
+        return v == want
     -- seacast-lite.md's two that call SEACAST's functions, in their v2 forms
     | "on_pace_tick", #[] => do exec onPaceTick none_
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_

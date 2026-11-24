@@ -246,6 +246,13 @@ class NodeSeacast (m : Type → Type) where
   claimsOrder : List Group → m (List Group)
   /-- `own_interest(g)`: `interest[g]`'s default, read where the table has no entry for g, which stores nothing -/
   ownInterest : Group → m IBits
+  /-- `pop_owed_answer(p)` (§4.1): the chunk of p's owed answer that goes next, taken out of `owed_answers[p]` (its
+  `cw` on the tape) -/
+  popOwedAnswer : Peer → m ChunkF
+  /-- `wire_size(p, e)` (§4.11): the bytes entry e's chunk takes on the wire to p, as the links will charge them -/
+  wireSize : Peer → QEntry → m Nat
+  /-- `offers_in(e)` (§3): the offers entry e carries, each a group and its bitmap, in order; none for no entry -/
+  offersIn : Option QEntry → m (List (Group × Bits))
   -- The eight names of the 71 that a node can replace, by a binding of its own that changes what the function
   -- does, and that have a call site inside the replayed closure: where the node's line names one as replaced, the
   -- Python asks the node, and the twin asks this question in place of the document's body, as `seacast-lite.md`'s
@@ -266,12 +273,6 @@ class NodeSeacast (m : Type → Type) where
   noteClaimNode : Peer → Group → m Unit
   /-- `known_in_scope(g)` as the node binds it -/
   knownInScopeNode : Group → m Bits
-
-/-- The functions of the 89 left out of this cycle that the 71 call. Until each is transcribed, its
-instance is a question on the tape. -/
-class SeacastLater (m : Type → Type) where
-  /-- `window_release(p, g, i)` (§4.11) -/
-  windowRelease : Peer → Group → Nat → m Unit
 
 namespace NodeSeacast
 
@@ -334,6 +335,9 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   probeWaitingOrder a b := f (probeWaitingOrder a b)
   claimsOrder a := f (claimsOrder a)
   ownInterest a := f (ownInterest a)
+  popOwedAnswer a := f (popOwedAnswer a)
+  wireSize a b := f (wireSize a b)
+  offersIn a := f (offersIn a)
   forwardNode a b c := f (forwardNode a b c)
   pushRebuiltNode a b := f (pushRebuiltNode a b)
   sendHaveNode a b := f (sendHaveNode a b)
@@ -350,11 +354,6 @@ instance {m : Type → Type} {ρ : Type} [Monad m] [NodeSeacast m] : NodeSeacast
 
 end NodeSeacast
 
-instance {m : Type → Type} {σ : Type} [Monad m] [SeacastLater m] : SeacastLater (StateT σ m) where
-  windowRelease p g i := monadLift (SeacastLater.windowRelease (m := m) p g i)
-instance {m : Type → Type} {ρ : Type} [Monad m] [SeacastLater m] : SeacastLater (ReaderT ρ m) where
-  windowRelease p g i := monadLift (SeacastLater.windowRelease (m := m) p g i)
-
 /-- SEACAST's node-wide constants this cycle reads that `seacast-lite.md`'s `Consts` lacks. Two of SEACAST's
 constants are `Consts`' own fields, read there, so that v2 and the kept functions it calls read one value:
 `SOURCE_OFFERS` is `SOURCE_OFFERS_PUBLISH` (whether it is `PUBLISH`), and `IWANT_WINDOW` is the effective window,
@@ -370,6 +369,9 @@ structure ConstsSeacast where
   /-- §4.5's answers to one peer in a heartbeat, across groups, that the budget counts; none for no limit (the
   toy's `math.inf`), else at least 1 -/
   SERVE_BUDGET : Option Nat
+  /-- §4.11's window, in bytes (`W * CHUNK_BYTES`); none where the window is off (card 14 off: the toy's
+  `math.inf`). The nodes line carries the value the node holds. -/
+  W_BYTES : Option Nat := none
   deriving Repr, Inhabited
 
 /-- What a call of SEACAST's code reads that does not change during it: `seacast-lite.md`'s context, SEACAST's constants, and

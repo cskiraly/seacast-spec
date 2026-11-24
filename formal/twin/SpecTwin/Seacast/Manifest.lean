@@ -20,12 +20,14 @@ def covered : List String :=
    "reconsider", "decode_group", "claims_close", "note_claim", "filter_entry", "forward", "on_validated", "defer",
    "on_chunk", "on_holding", "on_offer", "ask_scale", "own_chunk", "pick", "choose", "ask_sample", "resample", "sample",
    "on_pace_tick", "on_block_installed", "joined", "drop_wants_beyond", "index_bound", "our_interest_for", "outside",
-   "route_want", "on_want", "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join"]
+   "route_want", "on_want", "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join",
+   "wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
+   "window_timeout", "noted", "next_to_send"]
 
 /-- `seacast-lite.md`'s functions a record under `seacast.md` may name, kept all the way down. -/
 def kept : List String :=
   ["K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
-   "committed_descriptor", "drop_beyond", "drop_group", "drop_offer", "drop_stale_waits", "drop_tie", "expand",
+   "committed_descriptor", "drop_beyond", "drop_group", "drop_offer", "drop_stale_waits", "drop_tie", "expand", "front",
    "group_id", "group_key", "guard_fails", "have_bits", "last_resort", "least_recently_tried", "ledger", "may_ask",
    "message_id", "on_iwant", "outstanding", "over_ihave_limits", "owe", "parked", "promise_due", "rarest", "respond",
    "retry_offer", "segment_length", "tie", "tie_room", "tied_to_root", "untried", "valid_descriptor", "valid_id",
@@ -38,7 +40,7 @@ def nodeOwn : List (String × String) :=
 /-- The traced names a node may run as something else: a question there. -/
 def replaceable : List String :=
   ["forward", "push_rebuilt", "send_have", "serve_standing", "owed_missing", "filter_entry", "repair_verdict",
-   "decode_group", "note_claim", "choose", "publish", "known_in_scope", "on_iwant", "on_want"]
+   "decode_group", "note_claim", "choose", "publish", "known_in_scope", "on_iwant", "on_want", "acquire_room"]
 
 /-- The names replaceable only in a trace of the whole state. -/
 def replaceableWhole : List String :=
@@ -46,7 +48,7 @@ def replaceableWhole : List String :=
 
 /-- `seacast.md`'s functions not transcribed this cycle: a question at every node. -/
 def cut : List String :=
-  ["window_release"]
+  []
 
 /-- The twin's tables, `seacast-lite.md`'s and then `seacast.md`'s, by the names a trace gives them. -/
 def own : List String :=
@@ -73,14 +75,16 @@ def questions : List String :=
    "node_id", "open_group", "open_link", "open_sampling_link", "our_join", "out_pushees", "own_id", "payload_of",
    "penalise", "release", "release_wanted_groups", "reserve", "resolve", "route_next", "runs_type",
    "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
-   "uplink_class", "valid_have", "wake", "wants_family", "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "cross", "decode",
-   "derived_interest", "family", "header_of", "index_count", "project", "threshold", "verify", "group_of",
-   "open_group_source", "own_interest", "gossip_put", "mesh_has", "gossip_remove_group"]
+   "uplink_class", "valid_have", "wake", "wants_family", "pop_owed_answer", "wire_size", "offers_in", "DECODE_AT_K",
+   "DECODE_LATER", "REPAIR_TO", "cross", "decode", "derived_interest", "family", "header_of", "index_count", "project",
+   "threshold", "verify", "group_of", "open_group_source", "own_interest", "writing", "gossip_put", "mesh_has",
+   "gossip_remove_group"]
 
 /-- The questions that no covered function loads, each with its reason. -/
 def questionsUnloaded : List (String × String) :=
   [("group_of", "loaded by seacast.md's code outside COVERED, on publish's path"),
    ("open_group_source", "loaded by seacast.md's code outside COVERED, on publish's path"),
-   ("own_interest", "interest's miss, asked as a question")]
+   ("own_interest", "interest's miss, asked as a question"),
+   ("writing", "asked by seacast-lite.md's front, a kept function the twin runs as its own")]
 
 end SpecTwin.Seacast.Manifest

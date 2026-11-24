@@ -179,12 +179,13 @@ def asks (form : Form) (line f : String) : Bool :=
 
 /-- SEACAST's constants beyond `seacast-lite.md`'s 31, which a v2 entry's `consts` holds besides. -/
 def constNamesSeacast : List String :=
-  ["ANSWERS_FIRST", "ASK_UPLINK", "MERGE_HOLDINGS", "SAMPLE_OUTSTANDING", "SERVE_BUDGET"]
+  ["ANSWERS_FIRST", "ASK_UPLINK", "MERGE_HOLDINGS", "SAMPLE_OUTSTANDING", "SERVE_BUDGET", "W_BYTES"]
 
-/-- A v2 entry's `consts`: `seacast-lite.md`'s 31 and SEACAST's five, exactly. `ANSWERS_FIRST` and `MERGE_HOLDINGS` are
+/-- A v2 entry's `consts`: `seacast-lite.md`'s 31 and SEACAST's six, exactly. `ANSWERS_FIRST` and `MERGE_HOLDINGS` are
 JSON's booleans; `ASK_UPLINK` is a float as its 64-bit word, finite and not negative; `SAMPLE_OUTSTANDING` is a
 JSON integer of at least 1; `SERVE_BUDGET` is one too, or `null` for no limit (the toy's `math.inf`, written as a
-limit the client does not set is). -/
+limit the client does not set is); `W_BYTES` (§4.11's window in bytes) is a natural number, 0 among them, as
+`seacast-lite.md`'s `W` is, or `null` where the window is off (the toy's `math.inf`). -/
 def constsSeacast (j : Json) : Except String (Consts × Seacast.ConstsSeacast) := do
   members "consts" j (constNames ++ constNamesSeacast) (constNames ++ constNamesSeacast)
   let .ok kvs := j.getObj? | throw "consts: not an object"
@@ -213,8 +214,13 @@ def constsSeacast (j : Json) : Except String (Consts × Seacast.ConstsSeacast) :
       if n ≥ 1 then pure (some n)
       else throw s!"consts: SERVE_BUDGET is null or a natural number, at least 1: {sb.compress}"
     | _, .error _ => throw s!"consts: SERVE_BUDGET is null or a natural number, at least 1: {sb.compress}"
+  let wb ← j.getObjVal? "W_BYTES"
+  let wBytes : Option Nat ← match wb, wb.getNat? with
+    | .null, _ => pure none
+    | _, .ok n => pure (some n)
+    | _, .error _ => throw s!"consts: W_BYTES is null or a natural number: {wb.compress}"
   return (c, { ANSWERS_FIRST := ← b "ANSWERS_FIRST", ASK_UPLINK := up, MERGE_HOLDINGS := ← b "MERGE_HOLDINGS",
-               SAMPLE_OUTSTANDING := sampleOutstanding, SERVE_BUDGET := serveBudget })
+               SAMPLE_OUTSTANDING := sampleOutstanding, SERVE_BUDGET := serveBudget, W_BYTES := wBytes })
 
 /-- A v2 entry's `chains`: an object from a traced name to the layers the node runs under it, outermost first, each
 a qualified name of the toy, or `doc` for the document's own function. -/

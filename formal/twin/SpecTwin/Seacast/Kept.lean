@@ -29,7 +29,7 @@ namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [SeacastLater m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m]
 
 /-- The turns of `on_pace_tick`'s loop under v2, at most `fuel`: seacast-lite.md's, with SEACAST's `send_gossip`. -/
 def paceTurns : Nat → M2 m Unit

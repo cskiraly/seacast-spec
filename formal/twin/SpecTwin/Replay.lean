@@ -135,7 +135,7 @@ The parsers of keys and of values are `ReplayBase.lean`'s; of an entry, its valu
 def cells (what : String) (j : Json) (f : Form := .lite) : Except String (List (Cell × Option Val)) := do
   let l ← (← arr j).mapM fun e => do
     let #[.str table, path, v] ← e.getArr? | throw s!"not an entry of {what}: {e.compress}"
-    let c ← cell table path
+    let c ← cellIn f table path
     return (c, ← val c v f)
   nodup what (l.map (·.1))
   return l
@@ -442,7 +442,7 @@ def record (j : Json) (doc : Doc := {}) : Except String Record := do
   if !(tables.all touched.contains && touched.all tables.contains) then
     throw s!"tables: not the tables the reads, scans and writes name: {tablesJ.compress}"
   let args ← args.getArr?
-  let scans ← (← arr scans).mapM level
+  let scans ← (← arr scans).mapM (levelIn doc.form)
   nodup "scans" scans
   let reads ← cells "reads" reads doc.form
   -- the rest: entries the call did not read, each with its value before the call

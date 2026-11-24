@@ -38,6 +38,7 @@ inductive Val where
   | verdict (v : Option Bool)             -- `probe_ok`'s verdict: true, false, or a stored None
   | indices (l : List Nat)                -- indices in order (`rsample`); empty is no value
   | gis (l : List GI)                     -- groups and indices in order (`held_samples`); empty is no value
+  | sendrec (t : UInt64) (n : Nat)        -- a send's time, as its bits, and its bytes (§4.11's `sent`)
   deriving BEq, Repr
 
 /-! ## Reading a record: strictly, so that an altered field cannot pass by wrapping or collapsing -/
@@ -312,6 +313,12 @@ def lineKey (j : Json) : Except String LineKey :=
 def sendKey (j : Json) : Except String SendKey := do
   let #[p, g, i] ← j.getArr? | throw s!"not a send's key: {j.compress}"
   return (← nat p, ← groupKey g, ← nat i)
+
+/-- A send's time and its bytes under seacast.md (§4.11's `sent[key] = (now, need)`): `[time, bytes]`, the time as
+its 64-bit word, finite, and the bytes a natural number. -/
+def sendRec (j : Json) : Except String (UInt64 × Nat) := do
+  let #[t, n] ← j.getArr? | throw s!"not a send's time and bytes: {j.compress}"
+  return (← bits64 t, ← nat n)
 
 /-- The pace queue's one entry's name in a record's path: `"jobs"`. -/
 def paceKey (j : Json) : Except String PaceKey :=

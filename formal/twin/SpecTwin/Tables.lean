@@ -169,6 +169,8 @@ class TablesWhole (m : Type → Type) where
   allForwarded : m (List (Peer × List (Seacast.TypeId × Nat)))
   /-- every `served_hb` -/
   allServedHb : m (List (Peer × Nat))
+  /-- every `sent` under seacast.md -/
+  allSentSeacast : m (List (SendKey × Float × Nat))
 
 /-- §6.1's own state (§8.1), as its code uses it. A missing entry reads as empty, and reading allocates nothing. -/
 class Tables (m : Type → Type) extends TablesWhole m where
@@ -566,6 +568,12 @@ class Tables (m : Type → Type) extends TablesWhole m where
   servedHbCount : Peer → m Nat
   /-- `served_hb[p] += 1` -/
   setServedHb : Peer → Nat → m Unit
+  /-- `sent.get(key)`, `key in sent`, `sent.pop(key, None)`: the send's time and bytes -/
+  sentSeacast? : SendKey → m (Option (Float × Nat))
+  /-- `sent[key] = (now, need)` -/
+  setSentSeacast : SendKey → Float × Nat → m Unit
+  /-- `del sent[key]`, `sent.pop(key, None)` -/
+  eraseSentSeacast : SendKey → m Unit
 
 namespace Tables
 
@@ -578,7 +586,7 @@ export TablesWhole (allAskedAt allTriedAll allTried allOffers allOfferedAll allO
   allRebuilt allInterest allKnownAt allStandingAll allRoutedStandingAll allReconsiderAt allDeferred allDutyAt allWaited
   allProbe allProbed allProbeAsk allProbeSent allProbeOk allRsample allRsampleStep allRsampleAskedAll allRsampleFinal
   allServedAll allOfferedToAll allProbeServedAll allProbeAnswersAll allProbeWaitingAll allSampledFrom
-  allSamplesInFlight allHeldSamples allForwarded allServedHb)
+  allSamplesInFlight allHeldSamples allForwarded allServedHb allSentSeacast)
 
 /-- The interface over the twin's `State`, with a note of each access. -/
 @[instance_reducible]
@@ -1022,6 +1030,13 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     modify fun s => { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).insert T n) }
   servedHbCount p := do note (.read (.servedHb p)); return (← get).servedHb.getD p 0
   setServedHb p n := do note (.write (.servedHb p)); modify fun s => { s with servedHb := s.servedHb.insert p n }
+  sentSeacast? k := do note (.read (.sentSeacast k)); return (← get).sentSeacast.get? k
+  setSentSeacast k sr := do
+    note (.write (.sentSeacast k))
+    modify fun s => { s with sentSeacast := s.sentSeacast.insert k sr }
+  eraseSentSeacast k := do
+    note (.write (.sentSeacast k))
+    modify fun s => { s with sentSeacast := s.sentSeacast.erase k }
   allAskedAt := do
     let l := (← get).askedAt.toList
     note (.scan .askedAt (l.map fun (a, _) => .askedAt a))
@@ -1306,6 +1321,10 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     let l := (← get).servedHb.toList
     note (.scan .servedHb (l.map fun (p, _) => .servedHb p))
     return l
+  allSentSeacast := do
+    let l := (← get).sentSeacast.toList
+    note (.scan .sentSeacast (l.map fun (k, _) => .sentSeacast k))
+    return l
 
 /-- The interface through a monad transformer. -/
 abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α) : Tables n where
@@ -1506,6 +1525,9 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   setForwarded p T n := f (setForwarded p T n)
   servedHbCount p := f (servedHbCount p)
   setServedHb p n := f (setServedHb p n)
+  sentSeacast? k := f (sentSeacast? k)
+  setSentSeacast k sr := f (setSentSeacast k sr)
+  eraseSentSeacast k := f (eraseSentSeacast k)
   allAskedAt := f allAskedAt
   allTriedAll := f allTriedAll
   allTried a := f (allTried a)
@@ -1577,6 +1599,7 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   allHeldSamples := f allHeldSamples
   allForwarded := f allForwarded
   allServedHb := f allServedHb
+  allSentSeacast := f allSentSeacast
 
 instance instReaderT {m : Type → Type} {ρ : Type} [Monad m] [Tables m] : Tables (ReaderT ρ m) :=
   lift (m := m) (n := ReaderT ρ m) fun x => monadLift x

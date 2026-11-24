@@ -88,8 +88,8 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
 #guard fails (hdSeacast (sortBy (· < ·) ("announce" :: traced43))) == []
 #guard fails (hdSeacast (sortBy (· < ·) ("on_frame" :: traced43)))
   == ["header: traced names that seacast.md's manifest does not list: on_frame"]
-#guard fails (hdSeacast (sortBy (· < ·) ("window_release" :: traced43)))
-  == ["header: traced holds window_release, which is cut at every node"]
+#guard Manifest.cut.isEmpty                                      -- window_release is §4.11's, transcribed
+#guard fails (hdSeacast (sortBy (· < ·) ("window_release" :: traced43))) == []
 #guard fails (hdLite [("traced", strs (sortBy (· < ·) ("on_frame" :: traced43)))]) == []   -- not seacast-lite.md's check
 
 -- B4, --only under v2
@@ -120,14 +120,15 @@ def consts31 : List (String × Json) :=
     else if k == "SOURCE_OFFERS" then (k, Json.str "ACK")
     else (k, jn 1)
 
-/-- SEACAST's five: `SAMPLE_OUTSTANDING` 4, as the toy's, and `SERVE_BUDGET` null, no limit. -/
-def seacastFive : List (String × Json) :=
+/-- SEACAST's six: `SAMPLE_OUTSTANDING` 4, as the toy's, and `SERVE_BUDGET` and `W_BYTES` null, no limit and no
+window. -/
+def seacastSix : List (String × Json) :=
   [("ANSWERS_FIRST", Json.bool false), ("ASK_UPLINK", word0), ("MERGE_HOLDINGS", Json.bool false),
-   ("SAMPLE_OUTSTANDING", jn 4), ("SERVE_BUDGET", Json.null)]
+   ("SAMPLE_OUTSTANDING", jn 4), ("SERVE_BUDGET", Json.null), ("W_BYTES", Json.null)]
 
-/-- The 36 with these members put in their place (a member given as `none` left out). -/
-def consts36 (change : List (String × Option Json) := []) : Json :=
-  Json.mkObj ((consts31 ++ seacastFive).filterMap fun (k, v) =>
+/-- The 37 with these members put in their place (a member given as `none` left out). -/
+def consts37 (change : List (String × Option Json) := []) : Json :=
+  Json.mkObj ((consts31 ++ seacastSix).filterMap fun (k, v) =>
     match change.lookup k with
     | some (some w) => some (k, w)
     | some none => none
@@ -138,7 +139,7 @@ def payload : Json := Json.mkObj [("payload", Json.mkObj [])]
 /-- C1's entry, with these members put in its place (a member given as `none` left out). -/
 def entry (change : List (String × Option Json) := []) : Json :=
   let base : List (String × Json) :=
-    [("n", Json.arr #[jn 0, jn 1]), ("consts", consts36), ("replaced", strs []), ("types", payload),
+    [("n", Json.arr #[jn 0, jn 1]), ("consts", consts37), ("replaced", strs []), ("types", payload),
      ("chains", Json.mkObj [])]
   Json.mkObj (base.filterMap fun (k, v) =>
     match change.lookup k with
@@ -160,19 +161,19 @@ def chains (l : List (String × List String)) : Json := Json.mkObj (l.map fun (k
   | .error _ => false)
 
 -- C2, the constants under v2
-#guard failsWith "nodes: consts: no ANSWERS_FIRST" (line2 (entry [("consts", some (consts36 [("ANSWERS_FIRST", none)]))]))
+#guard failsWith "nodes: consts: no ANSWERS_FIRST" (line2 (entry [("consts", some (consts37 [("ANSWERS_FIRST", none)]))]))
 #guard failsWith "nodes: consts: ASK_UPLINK is a finite float, not negative: "            -- −1.0
-  (line2 (entry [("consts", some (consts36 [("ASK_UPLINK", some (jn 13830554455654793216))]))]))
+  (line2 (entry [("consts", some (consts37 [("ASK_UPLINK", some (jn 13830554455654793216))]))]))
 #guard failsWith "nodes: consts: ASK_UPLINK is a finite float, not negative: "            -- +∞
-  (line2 (entry [("consts", some (consts36 [("ASK_UPLINK", some (jn 9218868437227405312))]))]))
+  (line2 (entry [("consts", some (consts37 [("ASK_UPLINK", some (jn 9218868437227405312))]))]))
 #guard failsWith "nodes: consts: ANSWERS_FIRST is true or false: "
-  (line2 (entry [("consts", some (consts36 [("ANSWERS_FIRST", some (jn 1))]))]))
-#guard (match line2 (entry [("consts", some (consts36 [("ASK_UPLINK", some (jn 4607182418800017408)),
+  (line2 (entry [("consts", some (consts37 [("ANSWERS_FIRST", some (jn 1))]))]))
+#guard (match line2 (entry [("consts", some (consts37 [("ASK_UPLINK", some (jn 4607182418800017408)),
                                                         ("MERGE_HOLDINGS", some (Json.bool true))]))]) with   -- 1.0
   | .ok ((_, cfg) :: _) => cfg.c2.ASK_UPLINK == 1.0 && cfg.c2.MERGE_HOLDINGS && !cfg.c2.ANSWERS_FIRST
   | _ => false)
 #guard failsWith "nodes: consts: not a member of it: ANSWERS_FIRST"                       -- under seacast-lite.md
-  (nodesLine (Json.arr #[Json.mkObj [("n", Json.arr #[jn 0]), ("consts", consts36), ("replaced", strs [])]]))
+  (nodesLine (Json.arr #[Json.mkObj [("n", Json.arr #[jn 0]), ("consts", consts37), ("replaced", strs [])]]))
 #guard passes
   (nodesLine (Json.arr #[Json.mkObj [("n", Json.arr #[jn 0]), ("consts", Json.mkObj consts31), ("replaced", strs [])]]))
 
@@ -182,11 +183,11 @@ def js (s : String) : Json := match Json.parse s with
   | .ok j => j
   | .error _ => Json.str s!"unparsed: {s}"
 def soIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
-  line2 (entry [("consts", some (consts36 [("SAMPLE_OUTSTANDING", some (js v))]))])
+  line2 (entry [("consts", some (consts37 [("SAMPLE_OUTSTANDING", some (js v))]))])
 def sbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
-  line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", some (js v))]))])
-#guard failsWith "nodes: consts: no SAMPLE_OUTSTANDING" (line2 (entry [("consts", some (consts36 [("SAMPLE_OUTSTANDING", none)]))]))
-#guard failsWith "nodes: consts: no SERVE_BUDGET" (line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", none)]))]))
+  line2 (entry [("consts", some (consts37 [("SERVE_BUDGET", some (js v))]))])
+#guard failsWith "nodes: consts: no SAMPLE_OUTSTANDING" (line2 (entry [("consts", some (consts37 [("SAMPLE_OUTSTANDING", none)]))]))
+#guard failsWith "nodes: consts: no SERVE_BUDGET" (line2 (entry [("consts", some (consts37 [("SERVE_BUDGET", none)]))]))
 #guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "0")
 #guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "4.0")
 #guard failsWith "nodes: consts: SAMPLE_OUTSTANDING is a natural number, at least 1: " (soIs "true")
@@ -198,8 +199,26 @@ def sbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
 #guard (match soIs "1" with
   | .ok ((_, cfg) :: _) => cfg.c2.SAMPLE_OUTSTANDING == 1 && cfg.c2.SERVE_BUDGET == none
   | _ => false)
-#guard (match line2 (entry [("consts", some (consts36 [("SERVE_BUDGET", some (jn 3))]))]) with
+#guard (match line2 (entry [("consts", some (consts37 [("SERVE_BUDGET", some (jn 3))]))]) with
   | .ok ((_, cfg) :: _) => cfg.c2.SAMPLE_OUTSTANDING == 4 && cfg.c2.SERVE_BUDGET == some 3
+  | _ => false)
+-- C2b, §4.11's W_BYTES (the window in bytes): a natural number, 0 among them, as seacast-lite.md's W is, or
+-- null where the window is off. Each refused value in its own guard
+def wbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
+  line2 (entry [("consts", some (consts37 [("W_BYTES", some (js v))]))])
+#guard failsWith "nodes: consts: no W_BYTES" (line2 (entry [("consts", some (consts37 [("W_BYTES", none)]))]))
+#guard failsWith "nodes: consts: W_BYTES is null or a natural number: " (wbIs "-1")
+#guard failsWith "nodes: consts: W_BYTES is null or a natural number: " (wbIs "1200.5")
+#guard failsWith "nodes: consts: W_BYTES is null or a natural number: " (wbIs "true")
+#guard failsWith "nodes: consts: W_BYTES is null or a natural number: " (wbIs "\"1200\"")
+#guard (match wbIs "0" with
+  | .ok ((_, cfg) :: _) => cfg.c2.W_BYTES == some 0
+  | _ => false)
+#guard (match wbIs "2621440" with
+  | .ok ((_, cfg) :: _) => cfg.c2.W_BYTES == some 2621440
+  | _ => false)
+#guard (match wbIs "null" with
+  | .ok ((_, cfg) :: _) => cfg.c2.W_BYTES == none
   | _ => false)
 -- a v2 header of before the sync, whose type still carries the cap, is refused (fv-67's note 2)
 #guard failsWith "nodes: types: payload: not a type parameter: SAMPLE_OUTSTANDING"
@@ -243,7 +262,7 @@ def sbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
 -- C6, the replaced names under v2
 #guard failsWith "nodes: a replaced function the twin has no question for: outstanding"
   (line2 (entry [("replaced", some (strs ["outstanding"]))]))
-#guard failsWith "nodes: node 0 has replaced window_release, which is cut at every node"
+#guard failsWith "nodes: a replaced function the twin has no question for: window_release"
   (line2 (entry [("replaced", some (strs ["window_release"]))]))
 #guard failsWith "nodes: node 0 has replaced [publish], which the header does not list as traced"
   (line2 (entry [("replaced", some (strs ["publish"]))]))
@@ -305,14 +324,17 @@ def maxRelationsLine (v : Json) := line2 (entry [("types", some (maxRelations v)
 #guard routeSeacast "announce" == .seacast
 #guard ["on_pace_tick", "on_block_installed", "respond"].all (routeSeacast · == .form)
 #guard ["with_owed", "build_group", "outstanding", "held"].all (routeSeacast · == .kept)
-#guard ["on_frame", "on_heartbeat", "next_to_send", "wake_front", "track_in_flight", "window_release", "window_timeout",
-        "no_such_function"].all (routeSeacast · == .refused)
+#guard ["on_frame", "on_heartbeat", "no_such_function", "acquire_slot", "free_slot"].all (routeSeacast · == .refused)
+#guard ["wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
+        "window_timeout", "noted", "next_to_send"].all (routeSeacast · == .seacast)   -- §4.11's ten
+#guard routeSeacast "front" == .kept                                            -- seacast-lite.md's, called unchanged
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
 #guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
-#guard fnsSeacast.length == 81                                                  -- v0.11.1's joined, drop_wants_beyond;
+#guard fnsSeacast.length == 91                                                  -- v0.11.1's joined, drop_wants_beyond;
                                                                                 --   §4.5's serving, §4.10's route_want;
-                                                                                --   §4.1's relations, §6.3's room
+                                                                                --   §4.1's relations, §6.3's room;
+                                                                                --   §4.11's window and writer
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused

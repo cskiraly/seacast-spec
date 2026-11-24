@@ -89,6 +89,7 @@ structure State where
   heldSamples : Std.HashMap BlockId (List GI) := {}
   forwarded : Std.HashMap Peer (Std.HashMap Seacast.TypeId Nat) := {}
   servedHb : Std.HashMap Peer Nat := {}
+  sentSeacast : Std.HashMap SendKey (Float × Nat) := {}
 
 /-- An entry of §6.1's tables: the table and its keys, down to the level at which the code reads values (the
 schema, `tools/gen/schema.py`). A missing entry is a value too, and reading it is a read. -/
@@ -173,6 +174,7 @@ inductive Cell where
   | heldSamples (b : BlockId)
   | forwarded (p : Peer) (T : Seacast.TypeId)
   | servedHb (p : Peer)
+  | sentSeacast (k : SendKey)
   deriving BEq, Repr
 
 /-- A level of a table read as a whole: every entry under it. -/
@@ -267,6 +269,7 @@ inductive Level where
   | heldSamples
   | forwarded                             -- every `forwarded[p][T]`
   | servedHb
+  | sentSeacast
   deriving BEq, Repr
 
 /-- What one access of the state touches. -/

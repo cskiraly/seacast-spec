@@ -1,4 +1,5 @@
 import SpecTwin.Seacast.Decode
+import SpecTwin.Seacast.Window
 import SpecTwin.Sec2
 import SpecTwin.Sec42
 import SpecTwin.Sec44
@@ -20,7 +21,7 @@ The twin of `forward` (§4.4), `on_validated`, `defer` and `on_chunk` (§4.2), a
   `over_ihave_limits` and `may_ask`. The node's helpers are `Node61`'s questions: `seen`, `accepted`,
   `mark_seen`, `live`, `admitted`, `reserve`, `penalise`, `authenticable`, `shuffled`, and
   `gossip_history.put`; `valid_have(h)` and `deferred_offers(p, h)` are `NodeSeacast`'s, with the whole holding.
-- **`window_release`** is cut at every node this cycle: `on_holding` calls it through `SeacastLater`.
+- **`window_release`** is §4.11's, the twin's own (`Seacast/Window.lean`).
 - **`T.project(f)`** is asked each time the Python calls it: three times in `on_validated`.
 - **`forward`'s axes** are an `Option`: none projects the chunk's own, and an empty list forwards on none. The
   Python's `None` and `[]` are two values there, and the twin keeps them apart. -/
@@ -29,7 +30,7 @@ namespace SpecTwin.Seacast
 
 open SpecTwin Node61 Tables
 
-variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m] [SeacastLater m]
+variable {m : Type → Type} [Monad m] [Tables m] [Node61 m] [NodeSeacast m]
 
 /-- `forward(f, from_peer, axes)` (§4.4): pushes and offers on each axis we forward on -/
 def forward (f : ChunkF) (fromPeer : Peer) (axes : Option (List GI)) : M2 m Unit := do
@@ -208,11 +209,11 @@ def onHolding (p : Peer) (h : Have) : M2 m Unit := do
       branch "on_holding: a claim on a link not joined"
   for i in newly.toList do
     setHolders g i ((← holdersOf g i).insert p)               -- [c9] distinct live holders
-    SeacastLater.windowRelease p g i                               -- [c14] a slot to p frees when p holds i
+    Seacast.windowRelease p g i                               -- [c14] a slot to p frees when p holds i
     if ← planned g then originAcked g i                       -- [c3, P4] a copy of i exists elsewhere (§4.7)
   -- `for i in h.bits & ~newly:` [c14] a bit p held already: a copy written to it since frees its slot
   for i in (Bits.minus h.bits newly).toList do
-    SeacastLater.windowRelease p g i
+    Seacast.windowRelease p g i
   branch (if newly == 0 then "on_holding: nothing new" else "on_holding: new indices")
 
 /-- `on_offer(p, h)` (§4.3): `seacast-lite.md` §4.4's `on_ihave` over one group's bitmap; the asks -/

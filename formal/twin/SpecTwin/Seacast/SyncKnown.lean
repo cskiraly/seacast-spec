@@ -27,13 +27,14 @@ def tog (x T : String) : String := s!"[\"type_of_group\", [{x}], \"{T}\"]"
 def bo (x : String) : String := s!"[\"block_of\", [{x}], {bq}]"
 def exp (x : String) (v : Bool := false) : String := s!"[\"expired\", [{x}], {v}]"
 
-/-- SEACAST's five constants with this serving budget (a JSON value), read by the header's reader from a nodes entry's
+/-- SEACAST's six constants with this serving budget (a JSON value), read by the header's reader from a nodes entry's
 `consts`; `ReplayKnown`'s where the reader refuses them -/
 def budgetConsts (budget : String) : ConstsSeacast :=
-  let five : List (String × Json) :=
+  let six : List (String × Json) :=
     [("ANSWERS_FIRST", Json.bool false), ("ASK_UPLINK", DispatchKnown.word0), ("MERGE_HOLDINGS", Json.bool false),
-     ("SAMPLE_OUTSTANDING", DispatchKnown.jn 1), ("SERVE_BUDGET", (Json.parse budget).toOption.getD Json.null)]
-  match Header.constsSeacast (Json.mkObj (DispatchKnown.consts31 ++ five)) with
+     ("SAMPLE_OUTSTANDING", DispatchKnown.jn 1), ("SERVE_BUDGET", (Json.parse budget).toOption.getD Json.null),
+     ("W_BYTES", Json.null)]
+  match Header.constsSeacast (Json.mkObj (DispatchKnown.consts31 ++ six)) with
   | .ok (_, k) => k
   | .error _ => c2
 
@@ -120,14 +121,15 @@ def notAdmitted (fn : String) (claimAll : Bool) (out : String) : String :=
     s!"[{exp gq}, [\"valid_have\", [{hv 5 false}], true], {adm 4 false false}]" (ret "null") "[\"on_holding\"]" "[]")
 
 -- G6: a claim on a link that has not joined the type: no note_claim; bit 2 new, bit 1 held before and released too
+-- (`window_release`, §4.11's, the twin's own: nothing of 5's is in flight)
 def g6 (links : String) : String :=
   line "on_holding" s!"[5, {hv 6 true}]"
-    s!"[[\"peer_has\", [5, {gq}], [2, 3, false, false]], [\"holders\", [{gq}, 2], null], [\"planned\", [{gq}], null]]"
+    (s!"[[\"peer_has\", [5, {gq}], [2, 3, false, false]], [\"holders\", [{gq}, 2], null], " ++
+     s!"[\"planned\", [{gq}], null], [\"sent\", [[5, {gq}, 2]], null], [\"sent\", [[5, {gq}, 1]], null]]")
     s!"[[\"peer_has\", [5, {gq}], [6, 3, true, false]], [\"holders\", [{gq}, 2], [5]]]" "[]"
     (s!"[{exp gq}, [\"valid_have\", [{hv 6 true}], true], {adm 6 true true}, {tog gq "row"}, " ++
-     s!"[\"links\", [\"row\"], {links}], [\"window_release\", [5, {gq}, 2], null], " ++
-     s!"[\"window_release\", [5, {gq}, 1], null]]")
-    (ret "null") "[\"joined\", \"on_holding\"]" "[\"holders\", \"peer_has\", \"planned\"]"
+     s!"[\"links\", [\"row\"], {links}]]")
+    (ret "null") "[\"joined\", \"on_holding\", \"window_release\"]" "[\"holders\", \"peer_has\", \"planned\", \"sent\"]"
 
 #guard passes (g6 "[9]")                                          -- G6
 #guard failsWith "reached: " (g6 "[5, 9]")                        -- joined: note_claim entered, not in the record

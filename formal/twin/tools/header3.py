@@ -46,12 +46,12 @@ KINDS = {tuple(sorted(trace3.BLOCK)): f"the block's {len(trace3.BLOCK)} function
 
 
 def seacast_kept_of(toy):
-    """SEACAST's kept names, sorted, from TOYDIR's documents, less §7.1's window: the toy's node.py makes their extracted
-    code. gen.py holds the manifest's KEPT and NODE_OWN to it."""
+    """SEACAST's kept names, sorted, from TOYDIR's documents: the toy's node.py makes their extracted code. gen.py holds
+    the manifest's KEPT and NODE_OWN to it. Of §7.1's window, `front` alone is kept: seacast.md's window calls it
+    unchanged, and redefines or reaches the rest through what it redefines."""
     sys.path.insert(0, str(Path(toy).resolve()))
     import node                         # noqa: E402: the pinned toy, from TOYDIR
-    return tuple(sorted(n for n in trace3.seacast_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))
-                        if n not in trace3.SEC71))      # the window's six are not traced under SEACAST
+    return tuple(sorted(trace3.seacast_kept(trace3.BLOCK, node.SPEC_SRC, node.generate(node.DOC2))))
 
 
 def seacast_kind(toy):

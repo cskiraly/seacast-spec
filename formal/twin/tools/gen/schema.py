@@ -105,6 +105,10 @@ class Table:
                                 # (depth, read, read's doc, erase, erase's doc): whether the row is there (a read of
                                 # its cell), and the row erased with all under it (`tied.pop(r)`: the views' pop
                                 # writes the row and every entry under it)
+    trace: str = None           # the name a record under seacast.md gives the table, where it is a table of
+                                # seacast-lite.md's whose value seacast.md writes otherwise (`sent`: the send's time
+                                # and its bytes): `name` is then the schema's own, and the replay reads the table's
+                                # entries and levels by `trace` under seacast.md alone (`cellIn`, `levelIn`)
 
 
 TABLES = [

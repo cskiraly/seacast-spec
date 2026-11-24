@@ -10,9 +10,12 @@ The lists:
   redefines and the twin serves in their v2 forms, then `joined` and `drop_wants_beyond`, which v0.11.1 adds on
   `on_holding`'s path and `fill`'s, then §4.5's serving: `index_bound`, `our_interest_for`, `outside`, §4.10's
   `route_want`, and `on_want`, then §4.1's relations and §6.3's limit on them: `relation_room`, `graft`, `on_prune`,
-  `on_graft`, `maintain_relations` and `on_join`.
+  `on_graft`, `maintain_relations` and `on_join`, then §4.11's window and writer: `wake_front`, `write_waits`,
+  `free_room`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`, `noted` and
+  `next_to_send`.
 - KEPT: seacast-lite.md's functions that a record under seacast.md may name: those seacast-lite.md keeps all the way down
-  under v2 (trace3.py's `seacast_kept` over the toy's two documents), less §7.1's window and less NODE_OWN's names.
+  under v2 (trace3.py's `seacast_kept` over the toy's two documents), less NODE_OWN's names. Of §7.1's window it
+  holds `front` alone, which seacast.md's window calls unchanged.
   `gen.py --check` computes the rule and compares.
 - NODE_OWN: a traced name that is no function of either document but the node's own helper, which the twin has as
   its own code, with the helper's qualified name in the toy (`held`, §8's interface).
@@ -60,15 +63,17 @@ COVERED = [
     "on_pace_tick", "on_block_installed",
     "joined", "drop_wants_beyond",
     "index_bound", "our_interest_for", "outside", "route_want", "on_want",
-    "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join"]
+    "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join",
+    "wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
+    "window_timeout", "noted", "next_to_send"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
     "committed_descriptor", "drop_beyond", "drop_group", "drop_offer", "drop_stale_waits", "drop_tie", "expand",
-    "group_id", "group_key", "guard_fails", "have_bits", "last_resort", "least_recently_tried", "ledger", "may_ask",
-    "message_id", "on_iwant", "outstanding", "over_ihave_limits", "owe", "parked", "promise_due", "rarest", "respond",
-    "retry_offer", "segment_length", "tie", "tie_room", "tied_to_root", "untried", "valid_descriptor", "valid_id",
-    "validate_chunk", "with_owed"]
+    "front", "group_id", "group_key", "guard_fails", "have_bits", "last_resort", "least_recently_tried", "ledger",
+    "may_ask", "message_id", "on_iwant", "outstanding", "over_ihave_limits", "owe", "parked", "promise_due", "rarest",
+    "respond", "retry_offer", "segment_length", "tie", "tie_room", "tied_to_root", "untried", "valid_descriptor",
+    "valid_id", "validate_chunk", "with_owed"]
 
 NODE_OWN = {"held": "Node._namespace.<locals>.held"}
 
@@ -86,13 +91,15 @@ REPLACEABLE = [
     "publish",              # --source-offers off and late
     "known_in_scope",       # the hand cases that rebind it (toy/*_known.py)
     "on_iwant",             # a withholder's (check.py's withholders, silent, cap-wait)
-    "on_want"]              # a withholder's, the hoarders' filters, --alarm-wait
+    "on_want",              # a withholder's, the hoarders' filters, --alarm-wait
+    "acquire_room"]         # --answers-first line, for an answer its choose chose
 
 REPLACEABLE_WHOLE = ["validate_chunk"]
 
-CUT = ["window_release"]
+CUT = []
 
-OWN = [t.name for t in schema.TABLES] + [t.name for t in schema_seacast.TABLES_Seacast]
+# a table a record names by one of seacast-lite.md's names (`trace`: seacast.md's `sent`) is that name, once
+OWN = [t.name for t in schema.TABLES] + [t.name for t in schema_seacast.TABLES_Seacast if not t.trace]
 
 # closed for COVERED: closure_seacast.py classes every global a covered function loads at each v2 trace's start, and a
 # table in neither OWN nor this list stops the tracer. KEPT is outside that rule, since the twin runs it as its own
@@ -110,12 +117,14 @@ QUESTIONS = [
     "penalise", "release", "release_wanted_groups", "reserve", "resolve", "route_next", "runs_type",
     "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
     "uplink_class", "valid_have", "wake", "wants_family",
+    # §4.11's writer: the owed answer popped, an entry's bytes on the wire, the offers an entry carries
+    "pop_owed_answer", "wire_size", "offers_in",
     # the callables of a type's parameters (`T.params`)
     "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
     # the object type's functions, which covered functions call on a type
     "cross", "decode", "derived_interest", "family", "header_of", "index_count", "project", "threshold", "verify",
     # asked by the twin and loaded by no covered function: QUESTIONS_UNLOADED's
-    "group_of", "open_group_source", "own_interest",
+    "group_of", "open_group_source", "own_interest", "writing",
     # the context globals' uses, by their tape names: `gossip_history.put(f)` in forward, `p in mesh` in unpush, and
     # `gossip_history.remove_group(g)` in drop_group, a kept function the twin runs as its own
     "gossip_put", "mesh_has", "gossip_remove_group"]
@@ -123,7 +132,8 @@ QUESTIONS = [
 QUESTIONS_UNLOADED = {
     "group_of": "loaded by seacast.md's code outside COVERED, on publish's path",
     "open_group_source": "loaded by seacast.md's code outside COVERED, on publish's path",
-    "own_interest": "interest's miss, asked as a question"}
+    "own_interest": "interest's miss, asked as a question",
+    "writing": "asked by seacast-lite.md's front, a kept function the twin runs as its own"}
 
 # the lists, in the order Manifest.lean has them, each with its Lean name and its doc comment there
 LISTS = (("COVERED", "covered",

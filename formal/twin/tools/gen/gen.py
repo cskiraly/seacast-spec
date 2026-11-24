@@ -104,6 +104,7 @@ import manifest_seacast                                          # noqa: E402
 
 # seacast.md's tables after seacast-lite.md's, in one State and one Cell (schema_seacast.py). The lists are new objects:
 # schema.py's own, which the tracer reads, stay seacast-lite.md's
+LITE = {t.name: t for t in TABLES}                  # seacast-lite.md's tables, by name: what a `trace` names
 TABLES = TABLES + schema_seacast.TABLES_Seacast
 VALUES = {**VALUES, **schema_seacast.VALUES_Seacast}
 PARSE = {**PARSE, **schema_seacast.PARSE_Seacast}
@@ -232,6 +233,10 @@ def validate():
         elif t.row_ops and (not t.rows or sorted(d for d, *_ in t.row_ops) != sorted({d for d, *_ in t.row_ops})
                             or any(not 1 <= d < n for d, *_ in t.row_ops)):
             why = "a row's operations are of a table that keeps its rows, one set per row level, at a level it has"
+        elif t.trace is not None and (t.name not in V2_NAMES or t.trace not in LITE or t.rows
+                                      or LITE[t.trace].keys != t.keys or any(depth(s) for s in t.scans)):
+            why = ("a table a record names by another's name is seacast.md's, names a table of seacast-lite.md's with the "
+                   "same keys, keeps no rows, and is read whole at its top level alone")
         if why:
             raise SystemExit(f"gen.py: the schema's {t.name}: {why}")
     used, later = class_fields()
@@ -468,9 +473,14 @@ def pat(t, wild=True, names=None):
 
 def replay():
     r = {}
-    # cell: an entry's name, from a record's table and path
+    # cell: an entry's name, from a record's table and path; a table a record names by another's name (`trace`), under
+    # seacast.md alone (cellIn)
     out = []
+    r["cellIn"] = [f'  | .seacast, "{t.trace}", #[{", ".join(k for k, _ in t.keys)}] => return .{t.cell} '
+                   + " ".join(f"(← {PARSE[ty]} {k})" for k, ty in t.keys) for t in TABLES if t.trace]
     for t in TABLES:
+        if t.trace:
+            continue
         ks = t.keys
         made = f"return .{t.cell} " + " ".join(f"(← {PARSE[ty]} {k})" for k, ty in ks)
         if t.shape == "pair" and len(ks) == 2:
@@ -569,6 +579,8 @@ def replay():
         elif kind == "gis":                         # groups and indices in order; empty is no value
             out += [f"  | {pats} =>", f"    let l ← {v['parse']} j", f'    if l.isEmpty then throw "{v["empty"]} as a value"',
                     "    return some (.gis l)"]
+        elif kind == "sendrec":                     # a send's time and bytes
+            out += [f"  | {pats} =>", f"    let (t, n) ← {v['parse']} j", "    return some (.sendrec t n)"]
         else:
             raise SystemExit(f"gen.py: no `val` arm is written for the kind of value {kind!r}")
     rows = [rowpat(t, n) for t in TABLES for n in range(1, len(t.rows or []) + 1)]
@@ -576,9 +588,13 @@ def replay():
         out.append(f"  | {' | '.join(rows)} =>")
         out.append('    if j == .bool true then return some .flag else throw s!"not a row\'s presence: {j.compress}"')
     r["val"] = out
-    # level
+    # level; a table a record names by another's name is read whole at its top level alone (validate), under
+    # seacast.md (levelIn)
     out = []
+    r["levelIn"] = [f'  | .seacast, "{t.trace}", #[] => return .{s.level}' for t in TABLES if t.trace for s in t.scans]
     for t in TABLES:
+        if t.trace:
+            continue
         for s in t.scans:
             ks = t.keys[:depth(s)]
             out.append(f'  | "{t.name}", #[{", ".join(k for k, _ in ks)}] => return .{s.level} '
@@ -692,6 +708,9 @@ def replay():
         elif t.value == "gis":                     # empty is no value
             va += [f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.gis l)"]
             put.append(f"  | {c}, .gis l => pure {{ s with {f} := {ins('l')} }}")
+        elif t.value == "sendrec":                 # a send's time, as its bits, and its bytes
+            va.append(f"  | {c} => {got_opt}.map fun (t, n) => .sendrec t.toBits n")
+            put.append(f"  | {c}, .sendrec t n => pure {{ s with {f} := {ins('(Float.ofBits t, n)')} }}")
         else:
             raise SystemExit(f"gen.py: no `valueAt` and `put` arms are written for the kind of value {t.value!r}")
         drop.append(f"  | {c} => {{ s with {f} := {ers} }}")
@@ -736,7 +755,10 @@ GENERATED = ("This file is written whole by `tools/gen/gen.py` from `gen/schema.
 
 
 def wrapped(items, indent, width=WIDTH):
-    """Items joined by ", " into lines of at most `width` columns, each after the first indented by one more."""
+    """Items joined by ", " into lines of at most `width` columns, each after the first indented by one more; none,
+    `[]` (CUT's, now that the twin transcribes §4.11's window)."""
+    if not items:
+        return [indent + "[]"]
     lines, cur = [], indent + "["
     for n, x in enumerate(items):
         piece = x + ("," if n + 1 < len(items) else "]")
@@ -792,7 +814,7 @@ def state_file():
         "",
         "/-- `seacast.md`'s tables (`gen/schema_seacast.py`), by the names its records give them, in the schema's order. -/",
         "def seacastTables : List String :=",
-        *wrapped([f'"{t.name}"' for t in TABLES if t.name in V2_NAMES], "  "),
+        *wrapped([f'"{t.name}"' for t in TABLES if t.name in V2_NAMES and not t.trace], "  "),
         "",
         "end SpecTwin",
         "",
@@ -869,9 +891,9 @@ def replay_tables_file():
         "",
         GENERATED,
         "",
-        "How an entry and a level are read from a record (`cell`, `val`, `level`), and how a state is looked up, changed",
-        "and listed entry by entry (`valueAt`, `put`, `drop`, `entries`, `under`, `covers`). The kinds of value (`Val`)",
-        "and the parsers of keys are in `ReplayBase.lean`, written by hand. -/",
+        "How an entry and a level are read from a record (`cell`, `val`, `level`, and under a document, `cellIn` and",
+        "`levelIn`), and how a state is looked up, changed and listed entry by entry (`valueAt`, `put`, `drop`, `entries`,",
+        "`under`, `covers`). The kinds of value (`Val`) and the parsers of keys are in `ReplayBase.lean`, written by hand. -/",
         "",
         "namespace SpecTwin.Replay",
         "",
@@ -882,6 +904,13 @@ def replay_tables_file():
         "  match table, ← path.getArr? with",
         *r["cell"],
         '  | _, _ => throw s!"not an entry of §6.1\'s tables: {table}{path.compress}"',
+        "",
+        "/-- An entry of a record under document `f`: a table that `seacast.md` writes otherwise and a record names by",
+        "`seacast-lite.md`'s name (`trace` in the schema) is read under `seacast.md` alone; every other, as `cell` reads it. -/",
+        "def cellIn (f : Form) (table : String) (path : Json) : Except String Cell := do",
+        "  match f, table, ← path.getArr? with",
+        *r["cellIn"],
+        "  | _, _, _ => cell table path",
         "",
         "/-- An entry's value: `null` for a missing one. An empty value is refused: the tracer writes it as missing. `f`: the",
         "document whose forms a lane and a peer's holding take (`laneEntries`, `haveEntry`). -/",
@@ -896,6 +925,13 @@ def replay_tables_file():
         "  match table, ← pre.getArr? with",
         *r["level"],
         '  | _, _ => throw s!"not a level of §6.1\'s tables: {j.compress}"',
+        "",
+        "/-- A level read as a whole in a record under document `f`, as `cellIn` reads an entry. -/",
+        "def levelIn (f : Form) (j : Json) : Except String Level := do",
+        '  let #[.str table, pre] ← j.getArr? | throw s!"not a level: {j.compress}"',
+        "  match f, table, ← pre.getArr? with",
+        *r["levelIn"],
+        "  | _, _, _ => level j",
         "",
         "/-- An entry's value in a state: none where it is missing or empty. -/",
         "def valueAt (s : State) : Cell → Option Val",

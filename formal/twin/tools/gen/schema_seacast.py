@@ -13,7 +13,8 @@ A table's codec follows from two things: what a read of a missing key does in th
   `count`, `int`, `peerset`, `flagset`, `bool`, `colours`, `relations`, `indices`, `gis`.
 - **With presence.** A stored value is a value, empty or not, where the container raises on a missing key (a
   plain dict; the inner level of `lazy_dict`) or the code observes the key itself (`setdefault`, `.items()`, a
-  pop that deletes a stored leaf). The kinds: `time`, `slot`, `typeid`, `ibits`, `join`, `opeerset`, `verdict`.
+  pop that deletes a stored leaf). The kinds: `time`, `slot`, `typeid`, `ibits`, `join`, `opeerset`, `verdict`,
+  `sendrec`.
 
 How a record writes them, as the tracer writes them:
 - keys: a type id as its string (`"payload"`, `"column"`, `"row"`); a family as an integer, a natural number or
@@ -24,7 +25,7 @@ How a record writes them, as the tracer writes them:
   `["graft", T, family, colour, direction, answer]`, `["prune", T, family, colour, direction]`, enumerations as
   the toy's strings;
 - an `IBits` as an integer in the same signed form; a time as its 64 bits; `probe_ok`'s verdict as `true`, `false`
-  or `["none"]`;
+  or `["none"]`; `sent`'s entry as `[time, bytes]` under seacast-lite.md's key `[peer, group, index]`;
 - a set as a sorted list. That is a form for comparing states, not an order: where the code iterates a set, the
   order the Python took is on the tape (an `order` entry), and the twin takes it from there.
 """
@@ -63,6 +64,8 @@ VALUES_Seacast = {
     # groups and indices in order (`held_samples[b]`); empty is no value
     "gis":       dict(lean="List GI", read="default", default="[]", param="gs", val="gis", parse="giList",
                       empty="an empty list of groups and indices"),
+    # a send's time and its bytes (§4.11's `sent[key]`, a plain dict): `[time, bytes]`, the time as its 64 bits
+    "sendrec":   dict(lean="Float × Nat", read="option", param="sr", val="sendrec", parse="sendRec"),
 }
 # how a key of each of SEACAST's Lean types is read from a record's path (ReplayBase.lean)
 PARSE_Seacast = {"Seacast.TypeId": "typeId", "Seacast.Fam": "intOf", "BlockId": "blockKey", "ColourDir": "colourDir"}
@@ -248,6 +251,13 @@ TABLES_Seacast = [
           read=("servedHbCount", "`served_hb[p]`: the answers to p this heartbeat that SERVE_BUDGET counts"),
           write=("setServedHb", "`served_hb[p] += 1`"),
           scans=[whole("servedHb", "every `served_hb`")]),
+    # §4.11's window: `sent`, seacast-lite.md §7.1's table, whose value seacast.md writes as the send's time and its
+    # bytes. A record names it `sent`; the twin keeps it apart from seacast-lite.md's (`trace`)
+    Table("sent_seacast", "sentSeacast", "sentSeacast", [("k", "SendKey")], "sendrec", trace="sent",
+          read=("sentSeacast?", "`sent.get(key)`, `key in sent`, `sent.pop(key, None)`: the send's time and bytes"),
+          write=("setSentSeacast", "`sent[key] = (now, need)`"),
+          erase=("eraseSentSeacast", "`del sent[key]`, `sent.pop(key, None)`"),
+          scans=[whole("sentSeacast", "every `sent` under seacast.md")]),
 ]
 
 
@@ -266,6 +276,22 @@ def type_id(T):
     return tid
 
 
+def natural(n, what):
+    """A natural number as a record writes it: an int, not a bool, not below zero; anything else is refused, where
+    `int()` would cut it silently."""
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        raise ValueError(f"{what}: not a natural number: {n!r}")
+    return n
+
+
+def send_key(k):
+    """`sent`'s key, `(peer, group, index)`, as seacast-lite.md's tables write it: `[peer, group's hex, index]`, the
+    peer and the index naturals."""
+    if not isinstance(k, tuple) or len(k) != 3:
+        raise ValueError(f"not a send's key: {k!r}")
+    return [natural(k[0], "a send key's peer"), k[1].hex(), natural(k[2], "a send key's index")]
+
+
 DIRECTIONS = ("OUT", "IN", "BOTH")
 
 
@@ -282,12 +308,18 @@ def python_tables_seacast(F, key, fbits, msg):
     tables do (an ask by index `[group, index]`, a structured id its hex digits), `fbits` a float as its 64 bits,
     `msg` a JOIN, GRAFT or PRUNE as its tagged array (the tracer's, which knows the toy's messages)."""
     keyenc = {"Key": key, "Peer": int, "Group": lambda g: g.hex(), "Nat": int, "Seacast.TypeId": type_id,
-              "Seacast.Fam": signed, "BlockId": lambda b: b.hex(), "ColourDir": colour_dir}
+              "Seacast.Fam": signed, "BlockId": lambda b: b.hex(), "ColourDir": colour_dir,
+              "SendKey": send_key}
 
     def finite(t):                      # `--prune-backoff` is not validated: a non-finite leaf is refused here
         if not math.isfinite(t):
             raise ValueError(f"a time a record cannot hold: {t!r}")
         return fbits(t)
+
+    def send_rec(e):                    # `sent[key] = (now, need)`: a pair, the time finite, the bytes a natural
+        if not isinstance(e, tuple) or len(e) != 2:
+            raise ValueError(f"not a send's time and bytes: {e!r}")
+        return [finite(e[0]), natural(e[1], "a send's bytes")]
 
     valenc = {
         "time": finite,
@@ -308,10 +340,11 @@ def python_tables_seacast(F, key, fbits, msg):
         "bool": lambda x: True if x else None,
         "indices": lambda l: [int(i) for i in l] or None,
         "gis": lambda l: [[g.hex(), int(i)] for g, i in l] or None,
+        "sendrec": send_rec,
     }
     out = []
-    for t in TABLES_Seacast:
-        out.append(F.Table(t.name, [keyenc[ty] for _, ty in t.keys], valenc[t.value], rows=bool(t.rows),
+    for t in TABLES_Seacast:                        # by the name a record gives it (`trace`, where it has one)
+        out.append(F.Table(t.trace or t.name, [keyenc[ty] for _, ty in t.keys], valenc[t.value], rows=bool(t.rows),
                            ordered=t.ordered, ordered_levels=t.ordered_levels, values_ordered=t.values_ordered,
                            presence_in=t.presence_in))
     return out
@@ -358,9 +391,23 @@ def self_test():
     msg = lambda m: ["join", m.T, "ALL", 0, "NONE", 1]                   # noqa: E731: the tracer's, here a stand-in
     by = {t.name: t for t in python_tables_seacast(F, key, fbits, msg)}
     names = [t.name for t in TABLES_Seacast]
-    case("SEACAST's tables", len(names), 39)
+    case("SEACAST's tables", len(names), 40)
     case("no name twice, none of seacast-lite.md's", sorted(set(names) - {t.name for t in TABLES}) == sorted(names), True)
+    case("the tables a record names otherwise", [(t.name, t.trace) for t in TABLES_Seacast if t.trace],
+         [("sent_seacast", "sent")])
     g, row = bytes(range(32)), NS(id="row")
+    case("sent's key, as seacast-lite.md's", by["sent"].keys[0]((3, g, 2)), [3, g.hex(), 2])
+    case("sent's leaf, the time and the bytes", by["sent"].value((1.5, 1200)), [fbits(1.5), 1200])
+    raises("sent's leaf, its time infinite", by["sent"].value, (float("inf"), 1200))
+    case("sent's leaf, no bytes", by["sent"].value((1.5, 0)), [fbits(1.5), 0])
+    raises("sent's leaf, its bytes a float", by["sent"].value, (1.5, 1200.0))
+    raises("sent's leaf, its bytes a bool", by["sent"].value, (1.5, True))
+    raises("sent's leaf, its bytes below zero", by["sent"].value, (1.5, -1))
+    raises("sent's leaf, not a pair", by["sent"].value, (1.5, 1200, 0))
+    raises("sent's leaf, a list", by["sent"].value, [1.5, 1200])
+    raises("sent's key, its index a float", by["sent"].keys[0], (3, g, 2.0))
+    raises("sent's key, its peer a bool", by["sent"].keys[0], (True, g, 2))
+    raises("sent's key, its index below zero", by["sent"].keys[0], (3, g, -1))
     case("a family below zero", signed(-1), ["-", 1])
     case("a family of zero", signed(0), 0)
     raises("a bool as an integer", signed, True)

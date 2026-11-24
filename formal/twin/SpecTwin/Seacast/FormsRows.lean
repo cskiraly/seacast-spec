@@ -2,8 +2,8 @@ import SpecTwin.Seacast.Replay
 
 /-! # A question's row, read and refused: the forms of SEACAST's questions
 
-A row is one tape entry of a question, `[name, args, answer]`, under one form of `NodeSeacast`'s or `SeacastLater`'s
-questions, named by its method (`send (a HAVE)` is `send`). An order's row is `["order", place, members]`, and an own
+A row is one tape entry of a question, `[name, args, answer]`, under one form of `NodeSeacast`'s questions, named by
+its method (`send (a HAVE)` is `send`). An order's row is `["order", place, members]`, and an own
 level's keys `["keys", table, path, keys]` (`rowParts`). `checkRow` reads a row twice, as `runSeacast` reads a record's
 tape:
 1. The row's arguments are read with the twin's readers into the twin's values, and the form's question is asked
@@ -223,9 +223,16 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
   | "ownInterest", #[g] => do
     let g ← Replay.groupKey g
     return intJson <$> NodeSeacast.ownInterest (m := R) g
-  | "windowRelease", #[p, g, i] => do
-    let p ← nat p; let g ← Replay.groupKey g; let i ← nat i
-    return unitJson <$> SeacastLater.windowRelease (m := R) p g i
+  | "popOwedAnswer", #[p] => do
+    let p ← nat p
+    return chunkJson <$> NodeSeacast.popOwedAnswer (m := R) p
+  | "wireSize", #[p, e] => do
+    let p ← nat p; let e ← qentry e .seacast
+    return natJson <$> NodeSeacast.wireSize (m := R) p e
+  | "offersIn", #[e] => do
+    let e ← optOf (qentry · .seacast) e
+    return (fun l => Json.arr (l.map fun (g, b) => Json.arr #[Json.str g, (b : Json)]).toArray) <$>
+      NodeSeacast.offersIn (m := R) e
   | "forwardNode", #[f, p, axes] => do
     let f ← chunkF f; let p ← nat p; let axes ← optOf giList axes
     return unitJson <$> NodeSeacast.forwardNode (m := R) f p axes
@@ -341,7 +348,7 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
       | some x => pure (Json.arr #[x])
       | none => throw "shuffledPairs: an empty answer has no first pair"
     | _ => throw s!"shuffledPairs: not a list of pairs: {ans.compress}"
-  | "afterSeacast" | "releaseWantedGroups" | "windowRelease" | "forwardNode" | "pushRebuiltNode" | "sendHaveNode"
+  | "afterSeacast" | "releaseWantedGroups" | "forwardNode" | "pushRebuiltNode" | "sendHaveNode"
   | "serveStandingNode" | "noteClaimNode" => p "1"
   | "shuffledPeers" => match ans with     -- the answer with its first member again at the end
     | .arr xs => match xs[0]? with
@@ -372,6 +379,13 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "inPushers" => p "[3,3]"
   | "outPushees" => p "[4,4]"
   | "uplinkClass" => p "\"SLOW\""
+  -- §4.11's writer's three, each refused by its reader's own check: a chunk with a sixth member, where the answer is
+  -- narrow; a byte count below zero; a group of 63 hex digits
+  | "popOwedAnswer" => match ans with
+    | .arr xs => pure (Json.arr (xs.push Json.null))
+    | _ => throw s!"popOwedAnswer: not a chunk: {ans.compress}"
+  | "wireSize" => p "[\"-\",1]"
+  | "offersIn" => p s!"[[\"{String.ofList (List.replicate 63 'a')}\",1]]"
   | _ => throw s!"no wrong answer for the form {form}"
 
 /-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row
@@ -381,12 +395,13 @@ def refusalOf (form q : String) : String :=
   if form == "shuffledPeers" then "shuffled's answer is not a permutation of its question: "
   else s!"tape: {q}: its answer: "
 
-/-- The labels of SEACAST's question forms, one row each, in the order of `tools/forms-seacast-examples.tsv`: the checker's
-own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). The first 44 are the
-file's at spec 287d575; the next 18 cover the methods of `NodeSeacast` and `SeacastLater` that had no row; the next 4
-are the questions §4.5's serving adds: `own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as
-`on_want` asks them; the last 6 are §4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`,
-`out_pushees` and `uplink_class`. -/
+/-- The labels of SEACAST's question forms, one row each, in the order of `tools/forms-seacast-examples.tsv`: the
+checker's own list, so that a file with a row missing, twice or relabelled is refused (`formsMain`). The first 44 are
+the file's at spec 287d575; the next 17 cover the methods of `NodeSeacast` that had no row (an 18th, `SeacastLater`'s
+`window_release`, went when the twin transcribed §4.11's window); the next 4 are the questions §4.5's serving adds:
+`own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as `on_want` asks them; the next 6 are
+§4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`, `out_pushees` and `uplink_class`; the last 3 are
+§4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -396,13 +411,15 @@ def labels : List String :=
    "choiceNat", "choiceCover", "validHaveSeacast", "sampleCovers", "shuffledPairs",
    -- the forms that had no row before seacast.md v0.11.1's sync, with one `afterSeacast` label per v2 timer
    "afterSeacast (reconsider)", "afterSeacast (ask_sample)", "afterSeacast (resample)", "releaseWantedGroups", "shuffledPeers",
-   "order", "probeWaitingOrder", "claimsOrder", "ownInterest", "windowRelease",
+   "order", "probeWaitingOrder", "claimsOrder", "ownInterest",
    "forwardNode", "pushRebuiltNode", "sendHaveNode", "serveStandingNode", "owedMissingNode", "repairVerdictNode",
    "noteClaimNode", "knownInScopeNode",
    -- §4.5's serving: two of SEACAST's questions, and two of seacast-lite.md's that on_want asks
    "ownId", "admittedGroup", "resolve", "chunkOf",
    -- §4.1's upkeep: the six questions its relations ask
-   "runsType", "ourJoin", "candidates", "inPushers", "outPushees", "uplinkClass"]
+   "runsType", "ourJoin", "candidates", "inPushers", "outPushees", "uplinkClass",
+   -- §4.11's writer: the three questions next_to_send and noted ask
+   "popOwedAnswer", "wireSize", "offersIn"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)
