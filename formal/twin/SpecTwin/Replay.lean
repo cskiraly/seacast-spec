@@ -785,10 +785,11 @@ instance : Node61 R where
     if l.length != k then throw s!"not {k} peers: {j.compress}"
     if !l.all xs.contains then throw s!"a peer that is not of the question's: {j.compress}"
     return l
-  -- §4.1 and §4.5 (group B). chunk_of's answer is the chunk of the id asked; a record holds no prune
+  -- §4.1 and §4.5 (group B). chunk_of's answer is the chunk of the id asked, narrow: the store's, five members, as
+  -- the tracer's one chunk writer gives it (trace3.py's `chunk`); a record holds no prune
   resolve a := askCall "resolve" [keyJson a] fun j => if j == .null then pure none else some <$> mid j
   chunkOf a := askCall "chunk_of" [keyJson a] fun j => do
-    let f ← chunkF j
+    let f ← chunkN j
     if f.mid != a then throw s!"not the chunk of the id asked: {j.compress}"
     return f
   handleGraftPrune p := askCall "handle_graft_prune" [p] fun j => do

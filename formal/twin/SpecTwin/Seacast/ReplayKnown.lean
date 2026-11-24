@@ -215,17 +215,36 @@ def refused (pre : String) (s : String) : Bool :=
 
 /-! ## §4.5's serving: `on_want`, `outside`, `index_bound`, `our_interest_for`, and §4.10's `route_want`
 
-One hand-written record per branch label of `on_want`, `outside` and `route_want`, and per case of `index_bound` and
-`our_interest_for`, each written from the Python's order of reads and questions. Each passes with "fewer" 0 and the
-branch labels it was written for, in order. Three must fail: a wrong return, a question out of order, and a record of
-`on_want` at a node that replaced it. Peer 4 asks index 3 of g, of the type `row`. -/
+Hand-written records, each written from the Python's order of reads and questions, and each passing with "fewer" 0
+and exactly the branch labels it was written for, in order:
+- one per branch label of `on_want` (16), `outside` (6) and `route_want` (5);
+- the decisions inside an exit that change a read, a question or a write: an ask made a probe by the frame's probe
+  of its place, a probe of an id answered already, of an id p does not want, an answer on our offer, a DECLARED
+  peer's routed ask, a probe or a standing ask where p's probe of the index is kept, a routed standing ask not passed
+  on, two answers in their order, a DECLARED peer's bit already set, the probe answered and the DECLARED peer's WANT;
+- `route_want` with several links in order, one parked, and a fallback past a link that does not forward;
+- `index_bound` at its bounds, known and not, and without the parameter; `our_interest_for`'s three cases;
+- each `KeyError` of a missing JOIN, as the Python raises it. The toy reaches none of them, since `links(T)` needs both
+  JOINs (toy/node.py:1399-1402); each is a record of what the Python does in that state.
+
+Several must fail: a wrong return, a question out of order, a record of `on_want` at a node that replaced it, and the
+four questions' answers that their readers refuse by their own checks.
+
+What a record shows, and what it does not: the replay holds the twin to the record's questions in order, its return
+or raise, its writes and the cells it read. It does not show how many times a cell was read, in what order, or when
+a write fell between two questions. Those come from reading the Python against the Lean, line by line (the
+source-order audit), which each piece repeats. The questions here are stubbed by their tape entries, so their own
+effects (`admitted_group`'s, a sent WANT's) are not part of these records. Peer 4 asks index 3 of g, of the type
+`row`. -/
 
 namespace Serve
 
 /-- The type `row`: M = 4, a serving limit of 2, at most 8 indices before a group's count is known, and one routed
-request passed on per link -/
+request passed on per link; `column` the same; `payload`, with parameters but no `MAX_INDICES` -/
 def params1 : TypeId → Option TypeParams := fun T =>
-  if T == "row" then some { M := some 4, SERVE_LIMIT := some 2.0, MAX_INDICES := some 8, FORWARD_LIMIT := some 1.0 }
+  if T == "row" || T == "column" then
+    some { M := some 4, SERVE_LIMIT := some 2.0, MAX_INDICES := some 8, FORWARD_LIMIT := some 1.0 }
+  else if T == "payload" then some { M := some 1 }
   else none
 
 def replay1 (l : String) (c2' : ConstsSeacast := c2) (replaced : List String := []) :
@@ -285,8 +304,25 @@ def gp4 : String := s!"[{gq}, 4]"
 def desc2 : String := s!"[2, 0, 1, 2, 11660, 11660, \"{root}\"]"
 def nid : String := "\"7fec7acb96f018d21bd2b8790a5e680a21afe7f53cce623525328929af3c6436\""
 def choice5 : String := "[\"choice\", [[5]], 5]"
-def sendQ (hops : Nat) (r : String) : String :=
-  s!"[\"send\", [5, [\"want\", {gq}, 8, true, {hops}, false], false], {r}]"
+def sendQ (hops : Nat) (r : String) (q : Nat := 5) : String :=
+  s!"[\"send\", [{q}, [\"want\", {gq}, 8, true, {hops}, false], false], {r}]"
+/-- Chunk 5 of g, stored: a second answer -/
+def id5 : String := g ++ "05000000" ++ String.ofList (List.replicate 40 '0')
+def id5q : String := s!"\"{id5}\""
+def chunk5 : String := s!"[{gq}, 5, 1, \"{root}\", \"{id5}\"]"
+def chunkQ5 : String := s!"[\"chunk_of\", [{id5q}], {chunk5}]"
+/-- A column group whose index 2 is the cell the row group g holds at index 3. The toy stores the one chunk at both
+places, under the id of its native place, the column's (`store` and `resolve`, toy/node.py:660-662 and :707-713;
+`COL.project`, :1275), so `resolve` gives both asks that id -/
+def gH : String := String.ofList (List.replicate 64 'c')
+def hq : String := s!"\"{gH}\""
+def idH2 : String := gH ++ "02000000" ++ String.ofList (List.replicate 40 '0')
+def idH2q : String := s!"\"{idH2}\""
+def chunkH2 : String := s!"[{hq}, 2, 1, \"{root}\", \"{idH2}\"]"
+def jnT (T i d : String) : String := s!"[\"join\", \"{T}\", \"{i}\", 0, \"{d}\", 1]"
+def togH : String := s!"[\"type_of_group\", [{hq}], \"column\"]"
+/-- The IEEE-754 bits of 1.0: a park until then, past the record's now of 0 -/
+def oneBits : String := "4607182418800017408"
 
 /-! ### on_want -/
 
@@ -323,8 +359,14 @@ def w1 : String :=
 -- expired
 #guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]" [] [] [tog, linksQ "[4]", expQ "true"] (ret "[]") ["on_want", "joined"])
   ["on_want: expired"]
--- an index the group cannot have: 9, past MAX_INDICES 8 with no count known
-#guard takes (rec1 "on_want" s!"[4, [{askOf 9}]]" [rd "desc" gp "null"] [] [tog, linksQ "[4]", expQ "false", tog]
+-- an index the group cannot have: 8, at MAX_INDICES 8 with no count known (indices 0 to 7), as the toy's own known
+-- answer asks it (toy/want_bounds_known.py)
+#guard takes (rec1 "on_want" s!"[4, [{askOf 8}]]" [rd "desc" gp "null"] [] [tog, linksQ "[4]", expQ "false", tog]
+    (ret "[]") ["on_want", "joined", "index_bound"])
+  ["on_want: an index the group cannot have"]
+-- the same at a known count: 4 indices, and index 4 asked
+#guard takes (rec1 "on_want" s!"[4, [{askOf 4}]]" [rd "desc" gp desc2] []
+    [tog, linksQ "[4]", expQ "false", tog, s!"[\"index_count\", [\"row\", {desc2}], 4]"]
     (ret "[]") ["on_want", "joined", "index_bound"])
   ["on_want: an index the group cannot have"]
 -- outside what we serve p: our JOIN to p DECLARED, so our interest for it is EMPTY, and p claims nothing
@@ -379,10 +421,27 @@ def w10 : String := rec1 "on_want" s!"[4, [{askOf 3}]]" readsTo [] (tapeTo ++ [r
     [tog, linksQ "[4]", expQ "false", tog, tog, tog, authQ "true", admQ "true", tog, tog, resQ 3 id3q, chunkQ, chunkQ]
     (ret s!"[{chunk3}]") ["on_want", "joined", "index_bound", "outside", "probe_of_claim", "serve_probe"])
   ["outside: held", "on_want: answered"]
--- an id answered in this frame: index 5 of g resolves to the id index 3 was answered with
-#guard takes (rec1 "on_want" s!"[4, [{askOf 3}, {askOf 5}]]" (readsTo ++ readsAnswer) writesAnswer
-    (tapeTo ++ [resQ 3 id3q, chunkQ] ++ tapeTo ++ [resQ 5 id3q]) (ret s!"[{chunk3}]") reachedTo)
-  [inInterest, "on_want: answered", inInterest, "on_want: an id answered in this frame"]
+-- an id answered in this frame: p asks index 2 of the column group, answered; then probes index 3 of g, the same
+-- cell, which we claim. Its id is answered already, so the probe takes its exemption on that answer: no second
+-- chunk_of, no second count
+#guard takes (rec1 "on_want" s!"[4, [[[{hq}, 2], false, 0, false], {askOf 3 (probe := true)}]]"
+    [rd "desc" s!"[{hq}]" "null", rd "join_sent" "[4, \"column\"]" (jnT "column" "ALL" "NONE"),
+     rd "origin" s!"[{hq}]" "null", rd "mine" s!"[{hq}]" "null",
+     rd "join_recv" "[4, \"column\"]" (jnT "column" "ALL" "NONE"), rd "peer_has" s!"[4, {hq}]" "null",
+     rd "served" s!"[4, {hq}]" "null", rd "unwanted" "[4]" "null", rd "serve_count" s!"[4, {idH2q}]" "null",
+     rd "offered_to" s!"[4, {hq}]" "null", rd "served_hb" "[4]" "null",
+     rd "desc" gp "null", rd "join_sent" (pT 4) (jn "ALL" "NONE"), rd "origin" gp "null", rd "mine" gp "8",
+     rd "join_recv" (pT 4) (jn "ALL" "NONE"), rd "probe_served" (pg 4) "null", rd "probe_waiting" gp4 "null",
+     rd "peer_has" (pg 4) "null", rd "served" (pg 4) "null", rd "probe_answers" s!"[4, {hq}]" "null"]
+    [rd "served_hb" "[4]" "1", rd "serve_count" s!"[4, {idH2q}]" "1", rd "served" s!"[4, {hq}]" "1",
+     rd "probe_served" (pg 4) "true", rd "probe_answers" s!"[4, {hq}]" "4"]
+    [togH, "[\"links\", [\"column\"], [4]]", s!"[\"expired\", [{hq}], false]", togH, togH, togH,
+     s!"[\"authenticable\", [{hq}], true]", togH, s!"[\"admitted_group\", [4, {hq}], true]", togH, togH,
+     s!"[\"resolve\", [[{hq}, 2]], {idH2q}]", s!"[\"chunk_of\", [{idH2q}], {chunkH2}]",
+     tog, linksQ "[4]", expQ "false", tog, tog, tog, authQ "true", admQ "true", tog, tog, resQ 3 idH2q]
+    (ret s!"[{chunkH2}]")
+    ["on_want", "joined", "index_bound", "outside", "our_interest_for", "probe_of_claim", "serve_probe"])
+  [inInterest, "on_want: answered", "outside: held", "on_want: an id answered in this frame"]
 -- unwanted: p said it does not want the id
 #guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]" (readsTo ++ [rd "unwanted" "[4]" s!"[{id3q}]"]) []
     (tapeTo ++ [resQ 3 id3q]) (ret "[]") reachedTo)
@@ -418,12 +477,119 @@ def w10 : String := rec1 "on_want" s!"[4, [{askOf 3}]]" readsTo [] (tapeTo ++ [r
   ["outside: routed to a forwarding node", "interest_of_peer: ALL", "route_want: passed on",
    "on_want: standing until the chunk arrives"]
 
+/-! The decisions inside an exit. A probe of index 3 of g, which we claim and store, answered: its reads, writes and
+questions up to `resolve` -/
+def probeReads (unw : String := "null") : List String :=
+  [rd "desc" gp "null", rd "join_sent" (pT 4) (jn "ALL" "NONE"), rd "origin" gp "null", rd "mine" gp "8",
+   rd "join_recv" (pT 4) (jn "ALL" "NONE"), rd "probe_served" (pg 4) "null", rd "probe_waiting" gp4 "null",
+   rd "peer_has" (pg 4) "null", rd "served" (pg 4) "null", rd "unwanted" "[4]" unw,
+   rd "serve_count" s!"[4, {id3q}]" "null", rd "probe_answers" (pg 4) "null"]
+def probeWrites : List String :=
+  [rd "serve_count" s!"[4, {id3q}]" "1", rd "served" (pg 4) "1", rd "probe_served" (pg 4) "true",
+   rd "probe_answers" (pg 4) "8"]
+def tapeHeld : List String := [tog, linksQ "[4]", expQ "false", tog, tog, tog, authQ "true", admQ "true", tog, tog]
+def reachedProbe : List String := ["on_want", "joined", "index_bound", "outside", "probe_of_claim", "serve_probe"]
+/-- The answered probe, its asks and `unwanted[p]` as given, and `serve_probe`'s `chunk_of` answered as given -/
+def wP (asks : String) (unw : String := "null") (first : String := chunkQ) : String :=
+  rec1 "on_want" s!"[4, {asks}]" (probeReads unw) probeWrites (tapeHeld ++ [resQ 3 id3q, first, chunkQ])
+    (ret s!"[{chunk3}]") reachedProbe
+
+-- a plain ask of index 3, then p's probe of it in the same frame: the plain ask is flagged by the frame's probe of
+-- its place, so it is answered as the probe, outside the budget; the probe then finds its index taken
+#guard takes (wP s!"[{askOf 3}, {askOf 3 (probe := true)}]")
+  ["outside: held", "on_want: answered", "on_want: an index answered in this frame"]
+-- a probe of an id p said it does not want: a flagged ask passes `unwanted`, and is answered
+#guard takes (wP s!"[{askOf 3 (probe := true)}]" (unw := s!"[{id3q}]")) ["outside: held", "on_want: answered"]
+-- an answer on our own offer, at a spent budget of 0: not counted, so `served_hb` is neither read nor raised
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]"
+    (readsTo ++ [rd "unwanted" "[4]" "null", rd "serve_count" s!"[4, {id3q}]" "null", rd "offered_to" (pg 4) "8"])
+    [rd "serve_count" s!"[4, {id3q}]" "1", rd "served" (pg 4) "1"] (tapeTo ++ [resQ 3 id3q, chunkQ])
+    (ret s!"[{chunk3}]") reachedTo)
+  [inInterest, "on_want: answered"] { c2 with SERVE_BUDGET := some 0 }
+-- a DECLARED peer's routed ask through us, a forwarding node, outside our interest (our JOIN to p DECLARED): it
+-- keeps its hops, `our_interest_for` is asked, and `want_p` is neither read nor written; answered
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3 (hops := 1)}]]"
+    ([rd "desc" gp "null", rd "join_sent" (pT 4) (jn "DECLARED" "FORWARD"), rd "origin" gp "null",
+      rd "mine" gp "null", rd "join_recv" (pT 4) (jn "DECLARED" "NONE"), rd "peer_has" (pg 4) "null",
+      rd "served" (pg 4) "null"] ++ readsAnswer)
+    writesAnswer
+    [tog, linksQ "[4]", expQ "false", tog, tog, tog, authQ "true", admQ "true", tog, tog, tog, resQ 3 id3q, chunkQ]
+    (ret s!"[{chunk3}]") reachedTo)
+  ["outside: routed to a forwarding node", "on_want: answered"]
+-- a standing probe, not stored, with p's probe of index 3 kept already: neither kept again nor made standing
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3 (st := true) (probe := true)}]]"
+    [rd "desc" gp "null", rd "join_sent" (pT 4) (jn "ALL" "NONE"), rd "origin" gp "null", rd "mine" gp "8",
+     rd "join_recv" (pT 4) (jn "ALL" "NONE"), rd "probe_served" (pg 4) "null", rd "probe_waiting" gp4 "3",
+     rd "peer_has" (pg 4) "null", rd "served" (pg 4) "null"] []
+    (tapeHeld ++ [resQ 3 "null"]) (ret "[]") ["on_want", "joined", "index_bound", "outside", "probe_of_claim"])
+  ["outside: held", "on_want: nothing to answer with"]
+-- a standing plain ask, not stored, with p's probe of the same index kept: not made standing
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3 (st := true)}]]" (readsTo ++ [rd "probe_waiting" gp4 "3"]) []
+    (tapeTo ++ [resQ 3 "null"]) (ret "[]") reachedTo)
+  [inInterest, "on_want: nothing to answer with"]
+-- a routed standing ask through us, a forwarding node, not stored and not passed on (past the limit), outside our
+-- interest: `our_interest_for` is asked a third time, after `route_want`, and the ask is not kept
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3 (st := true) (hops := 1)}]]"
+    [rd "desc" gp "null", rd "join_sent" (pT 4) (jn "DECLARED" "FORWARD"), rd "origin" gp "null",
+     rd "mine" gp "null", rd "join_recv" (pT 4) (jn "ALL" "NONE"), rd "peer_has" (pg 4) "null",
+     rd "served" (pg 4) "null", rd "forwarded" (pT 4) "1", rd "probe_waiting" gp4 "null"] []
+    [tog, linksQ "[4]", expQ "false", tog, tog, tog, authQ "true", admQ "true", tog, tog, resQ 3 "null", tog, tog]
+    (ret "[]") ["on_want", "joined", "index_bound", "outside", "probe_of_claim", "route_want", "our_interest_for"])
+  ["outside: routed to a forwarding node", "route_want: past the limit", "on_want: nothing to answer with"]
+-- two answers, returned in the order asked: index 5, then index 3
+#guard takes (rec1 "on_want" s!"[4, [{askOf 5}, {askOf 3}]]"
+    (readsTo ++ [rd "unwanted" "[4]" "null", rd "serve_count" s!"[4, {id5q}]" "null", rd "offered_to" (pg 4) "null",
+                 rd "served_hb" "[4]" "null", rd "serve_count" s!"[4, {id3q}]" "null"])
+    [rd "served_hb" "[4]" "2", rd "serve_count" s!"[4, {id5q}]" "1", rd "serve_count" s!"[4, {id3q}]" "1",
+     rd "served" (pg 4) "2"]
+    (tapeTo ++ [resQ 5 id5q, chunkQ5] ++ tapeTo ++ [resQ 3 id3q, chunkQ]) (ret s!"[{chunk5}, {chunk3}]") reachedTo)
+  [inInterest, "on_want: answered", inInterest, "on_want: answered"]
+-- a DECLARED peer's WANT of an index its interest holds already: want_p written with its value unchanged. The
+-- footprint cannot tell this write from none (the replay passes a skipped write that leaves the entry as read)
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]"
+    ([rd "desc" gp "null", rd "join_sent" (pT 4) (jn "ALL" "NONE"), rd "origin" gp "null", rd "mine" gp "null",
+      rd "join_recv" (pT 4) (jn "DECLARED" "NONE"), rd "want_p" (pg 4) "8", rd "peer_has" (pg 4) "null",
+      rd "served" (pg 4) "null"] ++ readsAnswer)
+    ([rd "want_p" (pg 4) "8"] ++ writesAnswer) (tapeTo ++ [resQ 3 id3q, chunkQ]) (ret s!"[{chunk3}]") reachedTo)
+  [inInterest, "on_want: answered"]
+
+-- the two KeyErrors of on_want's own, each past `joined`, which the toy's links(T) passes only with both JOINs
+-- (toy/node.py:1399-1402), so the toy cannot reach either: no JOIN sent to p, where the hops are read
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]" [rd "desc" gp "null", rd "join_sent" (pT 4) "null"] []
+    [tog, linksQ "[4]", expQ "false", tog, tog]
+    [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["on_want", "joined", "index_bound"])
+  ["raises: KeyError"]
+-- no JOIN received from p, where `declared` is read
+#guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]"
+    [rd "desc" gp "null", rd "join_sent" (pT 4) (jn "ALL" "NONE"), rd "origin" gp "null", rd "mine" gp "null",
+     rd "join_recv" (pT 4) "null"] []
+    [tog, linksQ "[4]", expQ "false", tog, tog, tog, authQ "true", tog, admQ "true", tog]
+    [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")]
+    ["on_want", "joined", "index_bound", "outside", "our_interest_for"])
+  [inInterest, "raises: KeyError"]
+
 -- the three that must fail: a wrong return, a question out of order, a record at a node that replaced on_want
 #guard fails1 "return value: toy " (rec1 "on_want" s!"[4, [{askOf 3}]]" readsTo [] (tapeTo ++ [resQ 3 "null"])
   (ret s!"[{chunk3}]") reachedTo)
 #guard fails1 "tape: type_of_group" (rec1 "on_want" s!"[4, [{askOf 3}]]" [] [] [linksQ "[5]", tog] (ret "[]")
   ["on_want", "joined"])
 #guard fails1 "a record of on_want at a node that has replaced it" w1 (replaced := ["on_want"])
+-- and four answers that their readers refuse by their own checks, each in a record that passes otherwise: the
+-- answered probe's first chunk_of answer with six members, where the tracer writes five; another id's chunk; an
+-- id of three hex digits; a resolved id that is hex but no structured id
+#guard fails1 "tape: chunk_of: its answer: a chunk here is narrow, five members: "
+  (wP s!"[{askOf 3 (probe := true)}]"
+    (first := s!"[\"chunk_of\", [{id3q}], [{gq}, 3, 1, \"{root}\", \"{id3}\", [null, [], [0, \"x\"]]]]"))
+#guard fails1 "tape: chunk_of: its answer: not the chunk of the id asked: "
+  (rec1 "on_want" s!"[4, [{askOf 3}]]" (readsTo ++ readsAnswer) writesAnswer
+    (tapeTo ++ [resQ 3 id3q, s!"[\"chunk_of\", [{id3q}], {chunk5}]"]) (ret s!"[{chunk5}]") reachedTo)
+#guard fails1 "tape: own_id: its answer: not hex digits, two a byte: 7fe"
+  (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) (jn "DERIVED" "NONE"), rd "desc" gp "null"] []
+    [tog, "[\"own_id\", [], \"7fe\"]",
+     s!"[\"derived_interest\", [\"row\", {gq}, null, \"7fe\", {jn "DERIVED" "NONE"}], 6]"] (ret "6")
+    ["our_interest_for"])
+#guard fails1 "tape: resolve: its answer: not a structured id: abcd"
+  (rec1 "on_want" s!"[4, [{askOf 3}]]" readsTo [] (tapeTo ++ [resQ 3 "\"abcd\""]) (ret "[]") reachedTo)
 
 /-! ### outside -/
 
@@ -453,9 +619,13 @@ def out1 (routed : Bool) (reads tape : List String) (r : String) (reached : List
 #guard takes (rec1 "index_bound" s!"[{gq}]" [rd "desc" gp "null"] [] [tog] (ret "8") ["index_bound"]) []
 #guard takes (rec1 "index_bound" s!"[{gq}]" [rd "desc" gp desc2] []
   [tog, s!"[\"index_count\", [\"row\", {desc2}], 4]"] (ret "4") ["index_bound"]) []
--- a type with no MAX_INDICES at the node: AttributeError
-#guard takes (rec1 "index_bound" s!"[{gq}]" [rd "desc" gp "null"] [] [s!"[\"type_of_group\", [{gq}], \"column\"]"]
+-- a type with parameters but no MAX_INDICES: AttributeError, from the missing field
+#guard takes (rec1 "index_bound" s!"[{gq}]" [rd "desc" gp "null"] [] [s!"[\"type_of_group\", [{gq}], \"payload\"]"]
   [("raises", "\"AttributeError\"")] ["index_bound"]) ["raises: AttributeError"]
+-- the same type with the group's count known: index_count answers, and no parameter is read
+#guard takes (rec1 "index_bound" s!"[{gq}]" [rd "desc" gp desc2] []
+  [s!"[\"type_of_group\", [{gq}], \"payload\"]", s!"[\"index_count\", [\"payload\", {desc2}], 4]"] (ret "4")
+  ["index_bound"]) []
 #guard takes (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) (jn "ALL" "NONE")] [] [tog]
   (ret "[\"-\", 1]") ["our_interest_for"]) []
 #guard takes (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) (jn "DECLARED" "NONE")] [] [tog]
@@ -465,6 +635,10 @@ def out1 (routed : Bool) (reads tape : List String) (r : String) (reached : List
   [] [tog, s!"[\"own_id\", [], {nid}]",
       s!"[\"derived_interest\", [\"row\", {gq}, null, {nid}, {jn "DERIVED" "NONE"}], 6]"] (ret "6")
   ["our_interest_for"]) []
+-- no JOIN sent to p: KeyError on the type. The toy cannot reach it: on_want and outside ask it only of a link
+-- past `joined`, which the toy's links(T) passes only with both JOINs (toy/node.py:1399-1402)
+#guard takes (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) "null"] [] [tog]
+  [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["our_interest_for"]) ["raises: KeyError"]
 
 /-! ### route_want -/
 
@@ -493,6 +667,38 @@ def servesTape : List String := [tog, linksQ "[4, 5]", tog, tog]
     [tog, linksQ "[4, 5]", tog, s!"[\"family\", [\"row\", {gq}], 0]", linksQ "[4, 5]",
      "[\"route_next\", [\"row\", 0, [5]], [5]]", choice5, sendQ 1 "true"] (ret "true") ["route_want", "serves"])
   ["serves: DECLARED", "route_want: passed on"]
+-- three links serve the index, in the links' order 5, 6, 7; 6 is parked until 1.0, past the record's now of 0, so
+-- the choice is between 5 and 7
+#guard takes (rec1 "route_want" s!"[4, {gq}, 3, 1]"
+    [rd "join_sent" (pT 4) (jn "ALL" "FORWARD"), rd "forwarded" (pT 4) "null",
+     rd "join_recv" (pT 5) (jn "ALL" "NONE"), rd "join_recv" (pT 6) (jn "ALL" "NONE"),
+     rd "join_recv" (pT 7) (jn "ALL" "NONE"), rd "park" s!"[5, {gq}]" "null", rd "park" s!"[6, {gq}]" oneBits,
+     rd "park" s!"[7, {gq}]" "null"]
+    [rd "forwarded" (pT 4) "1"]
+    [tog, linksQ "[4, 5, 6, 7]", tog, tog, tog, tog, tog, tog, "[\"choice\", [[5, 7]], 7]", sendQ 0 "true" (q := 7)]
+    (ret "true") ["route_want", "serves", "interest_of_peer", "parked"])
+  ["interest_of_peer: ALL", "interest_of_peer: ALL", "interest_of_peer: ALL", "route_want: passed on"]
+-- no link serves it (both DECLARED), two hops left: the fallback keeps 5, which forwards, and leaves 6, which does not
+#guard takes (rec1 "route_want" s!"[4, {gq}, 3, 2]"
+    [rd "join_sent" (pT 4) (jn "ALL" "FORWARD"), rd "forwarded" (pT 4) "null",
+     rd "join_recv" (pT 5) (jn "DECLARED" "FORWARD"), rd "join_recv" (pT 6) (jn "DECLARED" "NONE")]
+    [rd "forwarded" (pT 4) "1"]
+    [tog, linksQ "[4, 5, 6]", tog, tog, s!"[\"family\", [\"row\", {gq}], 0]", linksQ "[4, 5, 6]",
+     "[\"route_next\", [\"row\", 0, [5]], [5]]", choice5, sendQ 1 "true"] (ret "true") ["route_want", "serves"])
+  ["serves: DECLARED", "serves: DECLARED", "route_want: passed on"]
+-- the two KeyErrors of route_want's own. No JOIN sent to p: on_want asks route_want only past `joined`, which the
+-- toy's links(T) passes only with both JOINs (toy/node.py:1399-1402), so the toy cannot reach it
+#guard takes (rec1 "route_want" s!"[4, {gq}, 3, 1]" [rd "join_sent" (pT 4) "null"] [] [tog]
+    [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["route_want"])
+  ["raises: KeyError"]
+-- no JOIN received from a link, in the fallback's list. The toy cannot reach it: each link of the toy's links(T) has
+-- both JOINs, and the first list asks `serves`, which raises first, of the same links. Here links(T) answers p alone
+-- the first time and adds 6 the second, which the Python's code allows and the toy's state does not
+#guard takes (rec1 "route_want" s!"[4, {gq}, 3, 2]"
+    [rd "join_sent" (pT 4) (jn "ALL" "FORWARD"), rd "forwarded" (pT 4) "null", rd "join_recv" (pT 6) "null"] []
+    [tog, linksQ "[4]", s!"[\"family\", [\"row\", {gq}], 0]", linksQ "[4, 6]"]
+    [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["route_want"])
+  ["raises: KeyError"]
 
 end Serve
 

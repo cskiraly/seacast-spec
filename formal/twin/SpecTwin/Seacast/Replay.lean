@@ -23,10 +23,11 @@ import SpecTwin.Seacast.Manifest
   with its two claims, and a lane's controls with SEACAST's IWANT, holdings and relation controls. Each position has
   one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
-- **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `Seacast/Manifest.lean`). It runs SEACAST's 68
-  functions by their Python names, hands a record of one of `seacast-lite.md`'s functions that v2 keeps, or of the
-  node's own `held` (`keptSeacast`), to `Replay.run`, runs the three that take another form under v2 (`keptFormsSeacast`) in
-  their v2 forms (`Seacast/Kept.lean`), and refuses every other name,
+- **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `Seacast/Manifest.lean`). It runs
+  SEACAST's functions (`fnsSeacast`, 75 with §4.5's serving) by their Python names, hands a record of one of
+  `seacast-lite.md`'s functions that v2 keeps, or of the node's own `held` (`keptSeacast`), to `Replay.run`, runs the
+  three that take another form under v2 (`keptFormsSeacast`) in their v2 forms (`Seacast/Kept.lean`), and refuses
+  every other name,
   among them the ones v2 redefines and this cycle does not cover (`on_frame`, `on_heartbeat`, `next_to_send`,
   `wake_front`, `track_in_flight`, `window_release`, `window_timeout`). A record of a name the node's line
   replaces is refused, as `run` refuses one. -/
@@ -455,7 +456,8 @@ them with their v2 forms (`Seacast/Kept.lean`), not with `Replay.run`. -/
 def keptFormsSeacast : List String := ["on_pace_tick", "on_block_installed", "respond"]
 
 /-- SEACAST's functions this cycle covers, by their Python names: the manifest's covered names but the two kept forms,
-the 66, main's `fill` and `serve_standing`, and v0.11.1's `joined` and `drop_wants_beyond`. -/
+the 66, main's `fill` and `serve_standing`, v0.11.1's `joined` and `drop_wants_beyond`, and §4.5's serving
+(`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`): 75. -/
 def fnsSeacast : List String := Manifest.covered.filter (!keptFormsSeacast.contains ·)
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept

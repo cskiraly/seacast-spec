@@ -333,10 +333,14 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "owedMissingNode" => p "0"
   | "repairVerdictNode" => p "\"repaired\""
   | "knownInScopeNode" => p "[\"-\",1]"
-  | "ownId" => p "7"
+  -- §4.5's four, each refused by its reader's own check, not by the JSON's kind or shape: own_id's hex digits;
+  -- resolve's structured id; chunk_of's id asked (a narrow chunk, well formed, of the all-zero group's index 0)
+  | "ownId" => p "\"7fe\""
   | "admittedGroup" => p "\"true\""
-  | "resolve" => p "5"
-  | "chunkOf" => p "[1]"
+  | "resolve" => p "\"abcd\""
+  | "chunkOf" =>
+    let z (n : Nat) := String.ofList (List.replicate n '0')
+    p s!"[\"{z 64}\", 0, 0, \"{String.ofList (List.replicate 64 'b')}\", \"{z 112}\"]"
   | _ => throw s!"no wrong answer for the form {form}"
 
 /-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row

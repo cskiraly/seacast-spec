@@ -94,7 +94,7 @@ def routeWant (p : Peer) (g : Group) (i : Nat) (hops : Nat) : M2 m Bool := do
     branch "route_want: not a forwarding link"
     return false
   let n ← forwardedCount p T
-  if n.toFloat ≥ (← param T "FORWARD_LIMIT" (·.FORWARD_LIMIT)) then
+  if natGeFloat n (← param T "FORWARD_LIMIT" (·.FORWARD_LIMIT)) then
     branch "route_want: past the limit"
     return false
   -- `[q for q in links(T) if q != p and serves(q, g, i) and not parked(q, Ask(g, i))]`, left to right
@@ -130,7 +130,7 @@ read, as the Python evaluates them -/
 private def pastServeLimit (p : Peer) (g : Group) : M2 m Bool := do
   let n ← servedCount p g
   let lim ← param (← NodeSeacast.typeOfGroup g) "SERVE_LIMIT" (·.SERVE_LIMIT)
-  return n.toFloat ≥ lim
+  return natGeFloat n lim                                    -- Python's int-to-float `>=`, exactly
 
 /-- `s[g][i].discard(p)` on a lazy set table: a missing entry is left missing, a present one keeps its set -/
 private def discardFrom (get : Group → Nat → M2 m (Option (Std.HashSet Peer)))

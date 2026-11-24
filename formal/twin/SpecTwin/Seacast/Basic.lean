@@ -518,6 +518,37 @@ def param {m : Type → Type} [Monad m] [Node61 m] {α : Type} [Inhabited α] (T
 #guard Bits.andI 255 (-13) == 243
 #guard Bits.andI 255 (-256) == 0
 
+/-- Python's `n >= x` of an int count and a float limit, exactly, as Python compares the two values. `n.toFloat ≥ x`
+rounds `n` above 2^53, so a count just below a large limit would reach it. A NaN limit is never reached, and an
+infinite one only from below. A positive finite limit is `mant · 2^(e - 53)` exactly, with `mant` an integer below
+2^53 (`Float.frExp`), and `n` reaches it where `n · 2^(53 - e) ≥ mant`, or `n ≥ mant · 2^(e - 53)` for `e ≥ 53`. -/
+def natGeFloat (n : Nat) (x : Float) : Bool :=
+  if x.isNaN then false
+  else if x.isInf then x < 0
+  else if x ≤ 0 then true
+  else
+    let (fr, e) := x.frExp
+    let mant := (fr.scaleB 53).toUInt64.toNat           -- exact: an integral float below 2^53
+    if e ≥ 53 then n ≥ mant * 2 ^ (e - 53).toNat else n * 2 ^ (53 - e).toNat ≥ mant
+
+-- a count of 2^53 + 3 and a limit of 2^53 + 4: Python's `>=` is false, and the rounded count would reach it
+#guard (9007199254740995 : Nat).toFloat ≥ 9007199254740996.0
+#guard !natGeFloat 9007199254740995 9007199254740996.0
+#guard natGeFloat 9007199254740996 9007199254740996.0
+#guard natGeFloat 2 2.0
+#guard !natGeFloat 1 2.0
+#guard natGeFloat 2 1.5
+#guard !natGeFloat 1 1.5
+#guard natGeFloat 0 0.0
+#guard natGeFloat 0 (-1.0)
+#guard !natGeFloat 5 (1.0 / 0.0)                         -- infinity: no limit
+#guard natGeFloat 0 (-1.0 / 0.0)
+#guard !natGeFloat 5 (0.0 / 0.0)                         -- NaN: never reached
+#guard natGeFloat (2 ^ 60) (2.0 ^ 60.0)
+#guard !natGeFloat (2 ^ 60 - 1) (2.0 ^ 60.0)
+#guard natGeFloat 1 1e-310                               -- a subnormal limit
+#guard !natGeFloat 0 1e-310
+
 /-! ## The new constructors in `seacast-lite.md`'s pure case analyses
 
 `QEntry.asks` reads every IWANT, marked or not, as the toy's `entry.iwants()` does, and drops the flags; a

@@ -153,7 +153,7 @@ them -/
 private def servedOut (q : Peer) (g : Group) : M2 m Bool := do
   let n ← servedCount q g
   let lim ← param (← NodeSeacast.typeOfGroup g) "SERVE_LIMIT" (·.SERVE_LIMIT)
-  return n.toFloat ≥ lim
+  return natGeFloat n lim                                    -- Python's int-to-float `>=`, exactly
 
 /-- `serve_standing(g, i)` (§4.5): the chunk a WANT waited for is here (§4.10) -/
 def serveStanding (g : Group) (i : Nat) : M2 m Unit := do
