@@ -267,8 +267,8 @@ def maxIndices (v : Json) : Json := Json.mkObj [("payload", Json.mkObj [("MAX_IN
 #guard failsWith "nodes: types: payload: MAX_INDICES: 0, where a group of a type has at least one index"
   (line2 (entry [("types", some (maxIndices (jn 0)))]))
 #guard failsWith "nodes: types: payload: MAX_INDICES: " (line2 (entry [("types", some (maxIndices (Json.bool true)))]))
--- `MAX_RELATIONS` (§6.3's `relation_room`): a float's word, read as that float, or +∞'s word, the toy's default;
--- absent, none, whose read crashes; a NaN's word and a boolean refused
+-- `MAX_RELATIONS` (§6.3's `relation_room`): a count's word, read as that float, or +∞'s word, the toy's default;
+-- absent, none, whose read crashes; a NaN's word and a boolean refused, and every word that is no count (below)
 def maxRelations (v : Json) : Json := Json.mkObj [("payload", Json.mkObj [("MAX_RELATIONS", v)])]
 def maxRelationsBits (j : Json) : Option (Option UInt64) :=
   match line2 (entry [("types", some j)]) with
@@ -281,6 +281,23 @@ def maxRelationsBits (j : Json) : Option (Option UInt64) :=
   (line2 (entry [("types", some (maxRelations (jn 9221120237041090560)))]))
 #guard failsWith "nodes: types: payload: MAX_RELATIONS: "
   (line2 (entry [("types", some (maxRelations (Json.bool true)))]))
+-- a finite value is a count (§1.1's `int`). Refused: −1.0's and 0.5's words; the number 2^53 + 1 put where a word
+-- goes, which reads as the word it is, a positive float below 1; 10^400 (1e400 as an int), no 64-bit word; −∞'s word,
+-- no finite float. Taken: 0.0's and −0.0's words, and 2^53's, a limit that 2^53 reaches and 2^53 − 1 does not
+def maxRelationsLine (v : Json) := line2 (entry [("types", some (maxRelations v))])
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: no count nor +∞: "
+  (maxRelationsLine (jn (-1.0 : Float).toBits.toNat))
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: no count nor +∞: "
+  (maxRelationsLine (jn (0.5 : Float).toBits.toNat))
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: no count nor +∞: " (maxRelationsLine (jn (2 ^ 53 + 1)))
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: not a 64-bit word: " (maxRelationsLine (jn (10 ^ 400)))
+#guard failsWith "nodes: types: payload: MAX_RELATIONS: not a finite float: "
+  (maxRelationsLine (jn 18442240474082181120))
+#guard maxRelationsBits (maxRelations (jn 0)) == some (some 0)
+#guard maxRelationsBits (maxRelations (jn 9223372036854775808)) == some (some 9223372036854775808)
+#guard (match maxRelationsBits (maxRelations (jn (9007199254740992.0 : Float).toBits.toNat)) with
+  | some (some w) => natGeFloat (2 ^ 53) (Float.ofBits w) && !natGeFloat (2 ^ 53 - 1) (Float.ofBits w)
+  | _ => false)
 
 /-! ## The dispatch -/
 

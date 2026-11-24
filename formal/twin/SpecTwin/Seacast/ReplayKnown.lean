@@ -722,24 +722,38 @@ and exactly the branch labels it was written for, in order:
 - the boundaries: `relation_room` at exactly `MAX_RELATIONS` and one below, a pair held in two maps counting once, a
   backoff that runs out exactly now (not counted, and deleted), the slice `cs[:n]` at `n` = 0 and -1;
 - `relation_room` at a type with parameters but no `MAX_RELATIONS` (`param`'s missing-field arm);
+- the parameters the Python leaves unread, each at a type that lacks it, so that a read would raise: `MAX_RELATIONS`
+  where the pair is held (`payload`), and `M` where no family has duty (`bare`), beside `M`'s `AttributeError` where
+  one does;
+- the owed messages: a JOIN of the record's own type skipped before its type is read, a GRAFT of the type counted, a
+  GRAFT of another type not counted, and a PRUNE of the type counted;
+- symmetric upkeep at each of its places: below the floor, between the floor and the cap (the repair alone), and at
+  the cap with a draw of 2 and of 0; and a symmetric PRUNE with a backoff, ending both ways with two backoffs;
 - each `KeyError` of a missing JOIN sent, as the Python raises it. The toy reaches none of them, since `links(T)`
   needs both JOINs (toy/node.py:1399-1402); each is a record of what the Python does in that state.
 
 Several must fail: a wrong return, a question out of order, `type_of` answered once where the Python asks it twice,
-and the six questions' answers that their readers refuse by their own checks.
+the six questions' answers that their readers refuse by their own checks, and a draw of a negative count at the
+symmetric cap, which the twin refuses with a crash of its own (no tracer writes that record: the draw's arguments are
+written as naturals).
 
 What a record shows, and what it does not: as in §4.5's records, the replay holds the twin to the record's questions
 in order, its return or raise, its writes and the cells it read. It does not show how many times a cell was read, in
-what order, or when a write fell between two questions. Those come from the source-order audit of each function,
-line by line against the Python. The questions are stubbed by their tape entries, and their own reads (`cr`) are
-left out here: the traces carry them.
+what order, or when a write fell between two questions; nor a level's presence once its leaves are gone, nor whether a
+parameter was read where the type has it. Those come from the source-order audit of each function, line by line
+against the Python. The questions are stubbed by their tape entries, and their own reads (`cr`) are left out here:
+the traces carry them.
 
-The link is peer 4, the family 0 and the colour 0. Three types have parameters: `row`, one way, with a limit of 2
+The link is peer 4, the family 0 and the colour 0. Five types have parameters: `row`, one way, with a limit of 2
 pairs and a backoff of 1.0; `column`, symmetric, with no limit (+∞, the toy's default) and no backoff; `payload`, with
-parameters but no `MAX_RELATIONS`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and `D_OUT_MAX` at 12, 8, 8 and 12 for
-its three types (toy/node.py:1235, :1285, :1330); the records take smaller values, which §1.1's class allows, so that
-their lists stay short, and the twin reads each from the context the same way at any value. A record's time is 0
-unless it says otherwise. -/
+parameters but no `MAX_RELATIONS`; `sym`, symmetric, with a floor below its cap and a `D_OUT` above both, and a
+backoff of 1.0; and `bare`, with parameters but no `M`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and `D_OUT_MAX`
+at 12, 8, 8 and 12 for its three types (toy/node.py:1235, :1285, :1330); the records take smaller values, which
+§1.1's class allows, so that their lists stay short, and the twin reads each from the context the same way at any
+value. `sym`'s `D_OUT` above its `F_HI` is outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table) and outside every
+type of the toy's: it is there so that the draw at the cap can be asked with 0, and with a negative count in the one
+that must fail. Each record is a state the toy's store and tables can make at the record's parameters. A record's time
+is 0 unless it says otherwise. -/
 
 namespace Upkeep
 
@@ -750,7 +764,9 @@ def inf : Float := Float.ofBits 9218868437227405312
 
 /-- `row`: one way, M = 1, a floor and a cap of 1 pusher, 1 out (2 on a fast uplink), a limit of 2 pairs per link, a
 backoff of 1.0; `column`: symmetric, M = 1, a floor and a cap of 3, 1 out, no limit and no backoff; `payload`: no
-`MAX_RELATIONS` -/
+`MAX_RELATIONS`; `sym`: symmetric, M = 1, a floor of 1 and a cap of 2, so that one pusher sits between them, a
+`D_OUT` of 3 above the cap, so that the draw at the cap can be 0 or negative, no limit, and a backoff of 1.0; `bare`:
+one way, with no `M` -/
 def params2 : TypeId → Option TypeParams := fun T =>
   if T == "row" then
     some { M := some 1, SYMMETRIC := some false, F_LO := some 1, F_HI := some 1, D_OUT := some 1,
@@ -759,6 +775,10 @@ def params2 : TypeId → Option TypeParams := fun T =>
     some { M := some 1, SYMMETRIC := some true, F_LO := some 3, F_HI := some 3, D_OUT := some 1,
            PRUNE_BACKOFF := some 0.0, MAX_RELATIONS := some inf }
   else if T == "payload" then some { M := some 1, SYMMETRIC := some false, PRUNE_BACKOFF := some 0.0 }
+  else if T == "sym" then
+    some { M := some 1, SYMMETRIC := some true, F_LO := some 1, F_HI := some 2, D_OUT := some 3,
+           PRUNE_BACKOFF := some 1.0, MAX_RELATIONS := some inf }
+  else if T == "bare" then some { SYMMETRIC := some false }
   else none
 
 def replay2 (l : String) : Except String (Array String × Nat) := do
@@ -856,11 +876,11 @@ def raisesKey (T : String) : List (String × String) :=
     [rc "push_in" 4 "row" "[0]" 2, rc "push_out" 4 "row" "[0]" 2, owed0 4] (room 4 "row") [] [] (ret "true")
     ["relation_room"])
   [below]
--- at time 2.0: a backoff run out at 1.0 and one that runs out exactly now are not counted, nor an owed JOIN, nor an
--- owed GRAFT of another type; one pair counted, below the limit
+-- at time 2.0: a backoff run out at 1.0 and one that runs out exactly now are not counted, nor an owed JOIN of the
+-- type (skipped before its type is read), nor an owed GRAFT of another type; one pair counted, below the limit
 #guard takes2 (rec2 "relation_room" (args "row")
     [rc "push_in" 4 "row" "[0]" 2, rd "backoff" (ptfk 4 "row" 3 0 "IN") f1, rd "backoff" (ptfk 4 "row" 5 1 "OUT") f2,
-     rd "owed_relations" "[4]" s!"[{jnT "column" "ALL" "FORWARD"}, [\"graft\", \"column\", 6, 0, \"OUT\", false]]"]
+     rd "owed_relations" "[4]" s!"[{jnT "row" "ALL" "FORWARD"}, [\"graft\", \"column\", 6, 0, \"OUT\", false]]"]
     (room 4 "row" [3, 5]) [] [] (ret "true") ["relation_room"] (t := f2))
   [below]
 -- at time 2.0: a backoff that runs out at 3.0 and an owed PRUNE of the type are counted; two pairs, at the limit
@@ -868,10 +888,19 @@ def raisesKey (T : String) : List (String × String) :=
     [rd "backoff" (ptfk 4 "row" 5 1 "OUT") f3, rd "owed_relations" "[4]" "[[\"prune\", \"row\", 7, 0, \"IN\"]]"]
     (room 4 "row" [5]) [] [] (ret "false") ["relation_room"] (t := f2))
   [atLimit]
+-- an owed GRAFT of the type is counted: with one pair pushed to us, two pairs, at the limit
+#guard takes2 (rec2 "relation_room" (args "row")
+    [rc "push_in" 4 "row" "[0]" 2, rd "owed_relations" "[4]" "[[\"graft\", \"row\", 6, 0, \"OUT\", false]]"]
+    (room 4 "row") [] [] (ret "false") ["relation_room"])
+  [atLimit]
 -- a type with parameters but no MAX_RELATIONS: AttributeError, from the missing field, where the pair is not held
 #guard takes2 (rec2 "relation_room" (args "payload") [owed0 4] (room 4 "payload") [] []
     [("raises", "\"AttributeError\"")] ["relation_room"])
   ["raises: AttributeError"]
+-- the same type with the pair held: MAX_RELATIONS is not read
+#guard takes2 (rec2 "relation_room" (args "payload") [rc "push_in" 4 "payload" "[0]", owed0 4] (room 4 "payload") []
+    [] (ret "true") ["relation_room"])
+  [heldPair]
 
 /-! ### graft -/
 
@@ -928,6 +957,14 @@ def p1 : String := rec2 "on_prune" s!"[4, {pr "row" "OUT"}]"
     [rc "push_in" 4 "column" "null", rc "push_out" 4 "column" "null"] (entryQ "column") (ret "null")
     ["on_prune", "joined", "relation_room"])
   [heldPair, "on_prune: pushes to us end, no backoff", "on_prune: our pushes end, no backoff"]
+-- the same at a symmetric type with a backoff (sym's 1.0): both ends wait until 1.0
+#guard takes2 (rec2 "on_prune" s!"[4, {pr "sym" "IN"}]"
+    [rc "push_in" 4 "sym" "[0]", rc "push_out" 4 "sym" "[0]", owed0 4, rc "grafted_in" 4 "sym" "null",
+     rc "grafted_out" 4 "sym" "null"] (room 4 "sym")
+    [rc "push_in" 4 "sym" "null", rd "backoff" (ptfk 4 "sym" 0 0 "IN") f1, rc "push_out" 4 "sym" "null",
+     rd "backoff" (ptfk 4 "sym" 0 0 "OUT") f1] (entryQ "sym") (ret "null")
+    ["on_prune", "joined", "relation_room"])
+  [heldPair, "on_prune: pushes to us end, a backoff", "on_prune: our pushes end, a backoff"]
 -- at time 2.0, the cleanup: family 0's (0, IN) ran out at 1.0 and goes, its (0, OUT) runs out at 3.0 and stays;
 -- family 3's (1, IN) runs out exactly now and goes, which empties the family. Then OUT sets (0, IN) again, to 3.0
 #guard takes2 (rec2 "on_prune" s!"[4, {pr "row" "OUT"}]"
@@ -1125,6 +1162,13 @@ def m1 : String := rec2 "maintain_relations" "[\"row\"]" [owed0 6] (room 6 "row"
   ["maintain_relations: past the cap, one way", sent]
 -- no family with duty: nothing asked of the type, M not read
 #guard takes2 (rec2 "maintain_relations" "[\"row\"]" [] [] [] [dutyQ "row" "[]"] (ret "null") ["maintain_relations"]) []
+-- the same at a type with no M, where a read of M would raise
+#guard takes2 (rec2 "maintain_relations" "[\"bare\"]" [] [] [] [dutyQ "bare" "[]"] (ret "null") ["maintain_relations"])
+  []
+-- and with one family: range(T.params.M) reads the missing field, AttributeError
+#guard takes2 (rec2 "maintain_relations" "[\"bare\"]" [] [] [] [dutyQ "bare" "[0]"] [("raises", "\"AttributeError\"")]
+    ["maintain_relations"])
+  ["raises: AttributeError"]
 -- symmetric, below the floor with none: D_OUT - 0 = 1 of the two candidates grafted BOTH; no relation held half
 #guard takes2 (rec2 "maintain_relations" "[\"column\"]"
     [owed0 5, owed0 6, rc "grafted_in" 5 "column" "null", rc "grafted_out" 5 "column" "null"]
@@ -1143,18 +1187,19 @@ def m1 : String := rec2 "maintain_relations" "[\"row\"]" [owed0 6] (room 6 "row"
     (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
   [below, below, "maintain_relations: below the floor, a negative slice", below, "graft: sent", sent]
 -- symmetric, below the floor with one: D_OUT - 1 = 0, none grafted. Then the relations held one way, 8 pushing us
--- and 7 and 6 pushed, are grafted in sorted order, 6, 7, 8, not the questions' 8, 7, 6
+-- (push_in) and 6 and 7 pushed (push_out), are grafted in sorted order, 6, 7, 8, not the questions' 8, 6, 7; each
+-- pair is held already, so relation_room says so
 #guard takes2 (rec2 "maintain_relations" "[\"column\"]"
-    ([owed0 5] ++ [6, 7, 8].flatMap fun q =>
-      [rc "grafted_in" q "column" "null", rc "grafted_out" q "column" "null", owed0 q])
+    ([owed0 5, rc "push_in" 8 "column" "[0]", rc "push_out" 6 "column" "[0]", rc "push_out" 7 "column" "[0]"] ++
+      [6, 7, 8].flatMap fun q => [rc "grafted_in" q "column" "null", rc "grafted_out" q "column" "null", owed0 q])
     (room 5 "column" ++ [6, 7, 8].flatMap (room · "column"))
     ([6, 7, 8].flatMap fun q => [rc "grafted_in" q "column" "[0]", rc "grafted_out" q "column" "[0]"])
     [dutyQ "column" "[0]", inQ "column" "[8]", candQ "column" "BOTH" "[5]", inQ "column" "[8]",
-     outQ "column" "[7, 6]", sendQ 6 (gr "column" "BOTH" false), sendQ 7 (gr "column" "BOTH" false),
+     outQ "column" "[6, 7]", sendQ 6 (gr "column" "BOTH" false), sendQ 7 (gr "column" "BOTH" false),
      sendQ 8 (gr "column" "BOTH" false)]
     (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
   ([below, "maintain_relations: below the floor"] ++
-    (List.replicate 3 ["maintain_relations: a half-held relation grafted", below, "graft: sent", sent]).flatten)
+    (List.replicate 3 ["maintain_relations: a half-held relation grafted", heldPair, "graft: sent", sent]).flatten)
 -- the same with our GRAFTs pending: 5's in grafted_in, so its grafted_out is not read; 6's in grafted_out
 #guard takes2 (rec2 "maintain_relations" "[\"column\"]"
     [rc "grafted_in" 5 "column" "[0]", rc "grafted_in" 6 "column" "null", rc "grafted_out" 6 "column" "[0]"]
@@ -1171,6 +1216,24 @@ def m1 : String := rec2 "maintain_relations" "[\"row\"]" [owed0 6] (room 6 "row"
      sendQ 7 (pr "column" "BOTH"), sendQ 5 (pr "column" "BOTH"), inQ "column" "[6]", outQ "column" "[6]"]
     (ret "null") ["maintain_relations", "prune", "send_relation"])
   ["maintain_relations: at the cap", sent, sent]
+-- symmetric, at the cap with len(ins) = D_OUT (sym: 3 pushers, F_HI 2, D_OUT 3): the draw is asked with 0 and
+-- answers none; then no relation held half
+#guard takes2 (rec2 "maintain_relations" "[\"sym\"]" [] [] []
+    [dutyQ "sym" "[0]", inQ "sym" "[5, 6, 7]", "[\"sample_without_replacement\", [[5, 6, 7], 0], []]",
+     inQ "sym" "[5, 6, 7]", outQ "sym" "[5, 6, 7]"]
+    (ret "null") ["maintain_relations"])
+  ["maintain_relations: at the cap"]
+-- symmetric, between the floor and the cap (sym: 1 pusher, F_LO 1, F_HI 2): only the half-held repair runs, for 5
+-- pushing us and 6 pushed, each pair held already
+#guard takes2 (rec2 "maintain_relations" "[\"sym\"]"
+    ([rc "push_in" 5 "sym" "[0]", rc "push_out" 6 "sym" "[0]"] ++
+      [5, 6].flatMap fun q => [rc "grafted_in" q "sym" "null", rc "grafted_out" q "sym" "null", owed0 q])
+    ([5, 6].flatMap (room · "sym"))
+    ([5, 6].flatMap fun q => [rc "grafted_in" q "sym" "[0]", rc "grafted_out" q "sym" "[0]"])
+    [dutyQ "sym" "[0]", inQ "sym" "[5]", inQ "sym" "[5]", outQ "sym" "[6]", sendQ 5 (gr "sym" "BOTH" false),
+     sendQ 6 (gr "sym" "BOTH" false)]
+    (ret "null") ["maintain_relations", "relation_room", "graft", "send_relation"])
+  (List.replicate 2 ["maintain_relations: a half-held relation grafted", heldPair, "graft: sent", sent]).flatten
 
 /-! ### on_join -/
 
@@ -1211,6 +1274,13 @@ def j1 : String := rec2 "on_join" s!"[4, {jnT "row" "DECLARED" "NONE"}]" [rd "jo
     [rc "push_in" 4 "row" "null", rd "backoff" (ptfk 4 "row" 0 0 "IN") f1]
     [runsQ "row", typeQ "row", linksQ "row" "[4]"]
     (ret "null") ["on_prune", "joined", "relation_room"])
+-- a draw of a negative count at the symmetric cap (sym: 2 pushers, F_HI 2, D_OUT 3, so 2 - 3 = -1), where the
+-- Python's draw raises ValueError: the twin's question cannot carry the count, and the twin crashes with a name of its
+-- own. No tracer writes this record (the draw's arguments are written as naturals); it is written here by hand
+#guard fails2 ("the Python raises ValueError; the twin: crash: twin: sample_without_replacement of a negative " ++
+    "count")
+  (rec2 "maintain_relations" "[\"sym\"]" [] [] [] [dutyQ "sym" "[0]", inQ "sym" "[5, 6]"]
+    [("raises", "\"ValueError\"")] ["maintain_relations"])
 -- and the six questions' answers that their readers refuse by their own checks, each in a record that passes
 -- otherwise: a number for a bool, a JOIN's array with another tag, a peer twice in each list of peers, an uplink
 -- class outside the two

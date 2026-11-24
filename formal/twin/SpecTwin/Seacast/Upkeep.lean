@@ -16,8 +16,9 @@ rule): `relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `
 - **`type_of` is asked twice** in `on_graft` and `on_prune`, as the Python asks it: once for `joined`, once for `T`.
 - **`on_prune`'s cleanup** goes over `backoff[p][T]` whole and deletes the keys whose time has come. The family a
   deletion empties is deleted too in the Python; a level deleted whole writes nothing that a record shows, so the
-  twin leaves the empty family, which no read can tell from a missing one. Which family is cleaned first changes
-  nothing that is written, so no order is asked.
+  twin leaves the empty family, which the replay cannot tell from a missing one: a record holds neither how often a
+  cell is read nor a level's presence once its leaves are gone. Which family is cleaned first changes nothing that
+  is written, so no order is asked.
 - **`maintain_relations`' slices are Python's:** `cs[:n]` with a negative `n` drops the last `-n` candidates, so a
   symmetric type whose `D_OUT` is below `len(ins)` grafts fewer than all; `ins[F_HI:]` is every pusher past the
   first `F_HI`; `cs[:max(0, n)]` takes none for a negative `n`. `relation_room` is called for every candidate, in

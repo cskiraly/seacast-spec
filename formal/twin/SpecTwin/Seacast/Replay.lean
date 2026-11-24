@@ -163,8 +163,9 @@ def uplinkClassOf : Json → Except String UplinkClass
 
 /-- One type's parameters in a nodes entry's `types` map, `{NAME: value, ...}` (`TypeParams`). A natural number is not
 negative, and neither `M` nor `MAX_INDICES` is 0. A boolean is JSON's. A float is its 64-bit word and finite, and
-`SERVE_LIMIT`, `FORWARD_LIMIT` and `MAX_RELATIONS` may be +∞. `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"`
-and `"NONE"`. `EVIDENCE` is present only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`, one step or more. A
+`SERVE_LIMIT`, `FORWARD_LIMIT` and `MAX_RELATIONS` may be +∞. A finite `MAX_RELATIONS` is a count: not negative and
+integral (−0.0 among them, which compares as 0). `ANNOUNCE_EXTRA` is one of `"ALL_JOINED"`, `"SAMPLE"` and
+`"NONE"`. `EVIDENCE` is present only as `null`. `REPAIR_SAMPLE` is `null` or `[[S, L], ...]`, one step or more. A
 parameter the type does not have is left out, and its read is the toy's `AttributeError`; a missing member and `null`
 differ. -/
 def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
@@ -204,7 +205,11 @@ def typeParamsOf (t : TypeId) (j : Json) : Except String TypeParams := do
     | "SAMPLE_WAIT" => p := { p with SAMPLE_WAIT := some (← x false) }
     | "SERVE_LIMIT" => p := { p with SERVE_LIMIT := some (← x true) }
     | "FORWARD_LIMIT" => p := { p with FORWARD_LIMIT := some (← x true) }
-    | "MAX_RELATIONS" => p := { p with MAX_RELATIONS := some (← x true) }
+    | "MAX_RELATIONS" =>
+      let v ← x true
+      if v.isFinite && (v < 0 || v.floor != v) then         -- §1.1's `int`: a count, or +∞, the toy's default
+        throw s!"types: {t}: MAX_RELATIONS: no count nor +∞: {v}"
+      p := { p with MAX_RELATIONS := some v }
     | "ANNOUNCE_EXTRA" => p := { p with ANNOUNCE_EXTRA := some (← inParam t name (announceWidthOf v)) }
     | "EVIDENCE" =>
       if v != .null then throw s!"types: {t}: EVIDENCE: present only as null in this version: {v.compress}"

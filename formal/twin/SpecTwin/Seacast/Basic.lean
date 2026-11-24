@@ -65,7 +65,9 @@ def IBits.toBits? : IBits → Option Bits
 its payload and row types no `SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT`
 (`toy/node.py:1231-1243`, `toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it
 crashes here. The three limits that can be unbounded are floats, infinity for none: `SERVE_LIMIT`, `FORWARD_LIMIT`
-and `MAX_RELATIONS`, which §1.1 types `int` and the toy sets to `math.inf` unless a run gives it. -/
+and `MAX_RELATIONS`, which §1.1 types `int` and the toy sets to `math.inf` unless a run gives it. A finite
+`MAX_RELATIONS` is a count, a float that holds it exactly: the tracer writes no other, and the reader takes no other
+(`typeParamsOf`). -/
 structure TypeParams where
   M : Option Nat := none
   F_LO : Option Nat := none
@@ -539,9 +541,11 @@ def param {m : Type → Type} [Monad m] [Node61 m] {α : Type} [Inhabited α] (T
 #guard Bits.andI 255 (-256) == 0
 
 /-- Python's `n >= x` of an int count and a float limit, exactly, as Python compares the two values. `n.toFloat ≥ x`
-rounds `n` above 2^53, so a count just below a large limit would reach it. A NaN limit is never reached, and an
-infinite one only from below. A positive finite limit is `mant · 2^(e - 53)` exactly, with `mant` an integer below
-2^53 (`Float.frExp`), and `n` reaches it where `n · 2^(53 - e) ≥ mant`, or `n ≥ mant · 2^(e - 53)` for `e ≥ 53`. -/
+rounds `n` above 2^53, so a count just below a large limit would reach it. A NaN limit is never reached, as in
+Python, where `n >= nan` is false. So `!natGeFloat` is not Python's `n < x` at NaN, which is false too: the readers
+refuse a NaN limit (`Seacast/Replay.lean`'s `paramFloat`), and the tracer writes none. An infinite limit is reached
+only from below. A positive finite limit is `mant · 2^(e - 53)` exactly, with `mant` an integer below 2^53
+(`Float.frExp`), and `n` reaches it where `n · 2^(53 - e) ≥ mant`, or `n ≥ mant · 2^(e - 53)` for `e ≥ 53`. -/
 def natGeFloat (n : Nat) (x : Float) : Bool :=
   if x.isNaN then false
   else if x.isInf then x < 0
