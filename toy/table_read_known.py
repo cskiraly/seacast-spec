@@ -24,6 +24,7 @@ And the case that made the rule matter for the writer, found in review: reading
 `owed_answers[p][G].empty()` used to leave an empty group under p, and `next_to_send(p)` then took it for an
 answer owed and failed on `min` of an empty bitmap. Here `next_to_send(p)` must return nothing to send.
 """
+import re
 import sys
 from pathlib import Path
 
@@ -60,10 +61,13 @@ def main():
     ns = got["sim"].nodes[NODE].ns
     bad = 0
 
+    def stable(x):                                          # an object's address changes from run to run
+        return re.sub(r" object at 0x[0-9a-f]+>", " object>", f"{x}")
+
     def line(what, got_, want):
         nonlocal bad
         bad += got_ != want
-        print(f"{what}: {got_}{'' if got_ == want else f'  <-- must be {want}'}")
+        print(f"{what}: {stable(got_)}{'' if got_ == want else f'  <-- must be {stable(want)}'}")
 
     entry = Wm.Entry(control=Wm.IWANT([Wm.WantIndex(G, 0)]))
     a, k, root = Wm.WantIndex(G, 0), (G, 0), bytes([0x66]) * 32
