@@ -527,74 +527,74 @@ SWAPPED_DRAW, DURING_CALL, ADAPTER = "swapped draw", "bound during a call", "ada
 ClosureKind = namedtuple("ClosureKind", "cell if_true if_false")
 DRAWS = ("choice", "sample_without_replacement", "shuffled")    # the draws a toy's layer may swap (K13)
 LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),  # counts
-          ("node.py", "Node._namespace.<locals>.held", 703): ("held", NODE_HELPER),         # the asks held back
-          ("node.py", "Node._override.<locals>.message_id", 943): ("message_id", OBSERVER),     # a cache: it skips
-          ("node.py", "Node._override.<locals>.add_offer", 957): ("add_offer", OBSERVER),       #   the call on a hit
-          ("node.py", "Node._override.<locals>.may_ask", 964): ("may_ask", OBSERVER),           # these three keep the
-          ("node.py", "Node._override.<locals>.close_promises", 969): ("close_promises", OBSERVER),   # toy's index
-          ("node.py", "Node._faults.<locals>.<lambda>", 1102): ("on_iwant", CHANGING),     # a withholder's: no answer
-          ("node.py", "Node._peer_promise.<locals>.close_promises", 1177): ("close_promises", OBSERVER),  # answer times
-          ("node.py", "Node._seacast.<locals>.promise_due", 1765): ("promise_due", OBSERVER),   # notes a broken promise
+          ("node.py", "Node._namespace.<locals>.held", 705): ("held", NODE_HELPER),         # the asks held back
+          ("node.py", "Node._override.<locals>.message_id", 945): ("message_id", OBSERVER),     # a cache: it skips
+          ("node.py", "Node._override.<locals>.add_offer", 959): ("add_offer", OBSERVER),       #   the call on a hit
+          ("node.py", "Node._override.<locals>.may_ask", 966): ("may_ask", OBSERVER),           # these three keep the
+          ("node.py", "Node._override.<locals>.close_promises", 971): ("close_promises", OBSERVER),   # toy's index
+          ("node.py", "Node._faults.<locals>.<lambda>", 1104): ("on_iwant", CHANGING),     # a withholder's: no answer
+          ("node.py", "Node._peer_promise.<locals>.close_promises", 1179): ("close_promises", OBSERVER),  # answer times
+          ("node.py", "Node._seacast.<locals>.promise_due", 1764): ("promise_due", OBSERVER),   # notes a broken promise
           # over SEACAST's covered names. Observers: a count or a note after the call (--alarm's, the member check's, the
           # peer promise's sender, the measurement point, the reach report)
           ("node.py", "Node._hoard_column.<locals>.defer_on_claim", 274): ("defer_on_claim", OBSERVER),
-          ("node.py", "Node._member_check.<locals>.repair_verdict", 511): ("repair_verdict", OBSERVER),
-          ("node.py", "Node._peer_promise.<locals>.fill", 1170): ("fill", OBSERVER),
-          ("node.py", "Node._seacast.<locals>.check_completion", 1721): ("check_completion", OBSERVER),
-          ("node.py", "Node._seacast.<locals>.fill", 1756): ("fill", OBSERVER),
+          ("node.py", "Node._member_check.<locals>.repair_verdict", 513): ("repair_verdict", OBSERVER),
+          ("node.py", "Node._peer_promise.<locals>.fill", 1172): ("fill", OBSERVER),
+          ("node.py", "Node._seacast.<locals>.check_completion", 1720): ("check_completion", OBSERVER),
+          ("node.py", "Node._seacast.<locals>.fill", 1755): ("fill", OBSERVER),
           # --alarm-wait's count before the call: type_of_group, which it asks, only reads (scan_bindings.py's follow)
           ("node.py", "Node._alarm.<locals>.serve_standing", 422): ("serve_standing", OBSERVER),
           # the invariants' count of the asks on_want leaves unanswered, by reason, before the call: what it asks
           # (resolve, and probe_of_claim, which reads) changes nothing (scan_bindings.py's follow)
-          ("node.py", "Node._seacast.<locals>.on_want", 1729): ("on_want", OBSERVER),
+          ("node.py", "Node._seacast.<locals>.on_want", 1728): ("on_want", OBSERVER),
           # swapped draws: the floor's draw on sim.floor_rng; the probed index's on a stream of its own
-          ("node.py", "Node._seacast.<locals>.keep_floor", 1686): ("keep_floor", SWAPPED_DRAW),
-          ("node.py", "Node._seacast.<locals>.defer_on_claim", 1775): ("defer_on_claim", SWAPPED_DRAW),
+          ("node.py", "Node._seacast.<locals>.keep_floor", 1685): ("keep_floor", SWAPPED_DRAW),
+          ("node.py", "Node._seacast.<locals>.defer_on_claim", 1774): ("defer_on_claim", SWAPPED_DRAW),
           # closure-dependent: --member-check off returns False without the document's call; on, it counts
-          ("node.py", "Node._member_check.<locals>.owed_missing", 502): ("owed_missing",
+          ("node.py", "Node._member_check.<locals>.owed_missing", 504): ("owed_missing",
                                                                          ClosureKind("on", OBSERVER, CHANGING)),
           # changing, over one of the ten names the twin asks where a node replaces it (ASKED_Seacast)
           ("node.py", "Node.__init__.<locals>.note_claim", 219): ("note_claim", CHANGING),        # a liar's
           ("node.py", "Node._hoard_column.<locals>.push_rebuilt", 256): ("push_rebuilt", CHANGING),   # a hoarder's
-          ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 526): ("push_rebuilt", CHANGING),
-          ("node.py", "Node._faults.<locals>.<lambda>", 1110): ("push_rebuilt", CHANGING),        # --fault's
-          ("node.py", "Node._rebuilt.<locals>.<lambda>", 1140): ("push_rebuilt", CHANGING),       # --rebuilt's
-          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1142): ("push_rebuilt", CHANGING),   #   variants
-          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1149): ("push_rebuilt", CHANGING),
-          ("node.py", "Node._seacast.<locals>.<lambda>", 1808): ("push_rebuilt", CHANGING),            # --fault hoard's
-          ("node.py", "Node._seacast.<locals>.push_rebuilt", 1810): ("push_rebuilt", CHANGING),        # hoardcol's
-          ("node.py", "Node._seacast.<locals>.serve_standing", 1841): ("serve_standing", CHANGING),
+          ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 528): ("push_rebuilt", CHANGING),
+          ("node.py", "Node._faults.<locals>.<lambda>", 1112): ("push_rebuilt", CHANGING),        # --fault's
+          ("node.py", "Node._rebuilt.<locals>.<lambda>", 1142): ("push_rebuilt", CHANGING),       # --rebuilt's
+          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1144): ("push_rebuilt", CHANGING),   #   variants
+          ("node.py", "Node._rebuilt.<locals>.push_rebuilt", 1151): ("push_rebuilt", CHANGING),
+          ("node.py", "Node._seacast.<locals>.<lambda>", 1807): ("push_rebuilt", CHANGING),            # --fault hoard's
+          ("node.py", "Node._seacast.<locals>.push_rebuilt", 1809): ("push_rebuilt", CHANGING),        # hoardcol's
+          ("node.py", "Node._seacast.<locals>.serve_standing", 1840): ("serve_standing", CHANGING),
           ("node.py", "Node._repair_bias.<locals>.repair_verdict", 471): ("repair_verdict", CHANGING),
-          ("node.py", "Node._faults.<locals>.forward", 1106): ("forward", CHANGING),              # a silent node's
-          ("node.py", "Node._seacast.<locals>.send_have", 1799): ("send_have", CHANGING),              # a liar's
+          ("node.py", "Node._faults.<locals>.forward", 1108): ("forward", CHANGING),              # a silent node's
+          ("node.py", "Node._seacast.<locals>.send_have", 1798): ("send_have", CHANGING),              # a liar's
           # filter_entry, asked since §4.11 covers next_to_send, whose own code calls it: --alarm-wait's, and
           # --promise-mode peer's
           ("node.py", "Node._alarm.<locals>.filter_entry", 350): ("filter_entry", CHANGING),
-          ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191): ("filter_entry", CHANGING),
+          ("node.py", "Node._peer_promise.<locals>.filter_entry", 1193): ("filter_entry", CHANGING),
           # on_want, asked since on_frame's records call it (§4.5)
           ("node.py", "Node._hoard_column.<locals>.on_want", 260): ("on_want", CHANGING),         # a hoarder's filter
           ("node.py", "Node._alarm.<locals>.on_want", 403): ("on_want", CHANGING),              # --alarm-wait's
-          ("node.py", "Node._seacast.<locals>.<lambda>", 1795): ("on_want", CHANGING),          # a withholder's
-          ("node.py", "Node._seacast.<locals>.on_want", 1825): ("on_want", CHANGING),           # hoardcol's filter
+          ("node.py", "Node._seacast.<locals>.<lambda>", 1794): ("on_want", CHANGING),          # a withholder's
+          ("node.py", "Node._seacast.<locals>.on_want", 1824): ("on_want", CHANGING),           # hoardcol's filter
           # changing, over a name the manifest makes replaceable and the twin cannot ask (NOASK_Seacast): entered
           # outside every record alone (iface_of stops a record's own call of one)
-          ("node.py", "Node._writer_variants.<locals>.choose", 1049): ("choose", CHANGING),
+          ("node.py", "Node._writer_variants.<locals>.choose", 1051): ("choose", CHANGING),
           # --answers-first line's: an answer its choose chose waits at the head of the line (§4.11's window)
-          ("node.py", "Node._writer_variants.<locals>.acquire_room", 1082): ("acquire_room", CHANGING),
+          ("node.py", "Node._writer_variants.<locals>.acquire_room", 1084): ("acquire_room", CHANGING),
           ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 439): ("decode_group", CHANGING),
           # publish, the source's root: --source-offers off's and late's layers bind announce during their call of
           # the document's publish (the two below). The simulator enters it outside every record, so it runs bare
           # (late's is refused before, at the install: source_offers_check)
-          ("node.py", "Node._no_source_offers.<locals>.publish", 995): ("publish", CHANGING),
-          ("node.py", "Node._late_source_offers.<locals>.publish", 1014): ("publish", CHANGING),
+          ("node.py", "Node._no_source_offers.<locals>.publish", 997): ("publish", CHANGING),
+          ("node.py", "Node._late_source_offers.<locals>.publish", 1016): ("publish", CHANGING),
           # an adapter: the gossipsub binding's reading of a frame as SEACAST's messages, around the one call of the
           # document's on_frame that is the record. seacast-bindings.md §4 (the gossipsub binding, :369) gives that
           # reading to the binding, and :393-395 keep an IDONTWANT's stock ids in unwanted[p] with stock gossipsub's
           # admission, after the frame's asks: the work the adapter does after its call
-          ("node.py", "Node._seacast.<locals>.on_frame", 1696): ("on_frame", ADAPTER),
+          ("node.py", "Node._seacast.<locals>.on_frame", 1695): ("on_frame", ADAPTER),
           # bound during a call: publish's announce under --source-offers off and late
-          ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 997): ("announce", DURING_CALL),
-          ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1015): ("announce", DURING_CALL)}
+          ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 999): ("announce", DURING_CALL),
+          ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1017): ("announce", DURING_CALL)}
 # Under SEACAST: the replaceable names (the manifest's, and the directed sets' validate_chunk); the ten the twin asks
 # as questions where a node replaces them (its NodeSeacast, Seacast/Replay.lean); and those it cannot ask, which a
 # record's own code must not call where they are replaced: the manifest's replaceable covered names but the ten
@@ -3149,7 +3149,7 @@ def drop_outside(g):
 def adapters_self_test():
     """ADAPTER's guards (adapter_wrap, Adapter.write_check), in observers_self_test's form: planted adapters over a
     document function of two of seacast.md's tables (`stop_pull`, `received`), with no toy node. The document's function is
-    compiled as seacast.md's; each adapter as node.py's at :1696, the toy's adapter's name and first line, from text
+    compiled as seacast.md's; each adapter as node.py's at :1695, the toy's adapter's name and first line, from text
     that no scan of the toy reads; the record is a stub of sec61's (the depth, the record's node and function, the
     recorder on). The cases: an adapter that writes received before and after its call, outside the record: the
     record's log the document's alone; one whose own code (a class it makes, whose property the document's function
@@ -3168,7 +3168,7 @@ def adapters_self_test():
     doc_src = ("def on_frame(p, frame):\n"                 # the document's: a read of received, a write of stop_pull
                "    if received[frame.g].has(0):\n"
                "        stop_pull[frame.g] = True\n")
-    adapter_src = "\n" * 1694 + (                         # the adapter's def at node.py:1696
+    adapter_src = "\n" * 1693 + (                         # the adapter's def at node.py:1695
         "def make(ns, doc_on_frame, how, h):\n"
         "    def on_frame(p, frame):\n"
         "        class Seen:\n"
@@ -3260,7 +3260,7 @@ def adapters_self_test():
 
     def stops(*parts):
         return lambda got: isinstance(got, str) and got.startswith(
-            "stop: trace3: node stub: the adapter Node._seacast.<locals>.on_frame (node.py:1696) over on_frame ") \
+            "stop: trace3: node stub: the adapter Node._seacast.<locals>.on_frame (node.py:1695) over on_frame ") \
             and all(x in got for x in parts)
 
     around = ("its work before and after the call, outside the record: the record's log the document's alone",

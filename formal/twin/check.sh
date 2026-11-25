@@ -2048,11 +2048,11 @@ h4_plant() {            # H4's plant (n): trace3.py's LAYERS without the silent 
     no "H4's plant (n): not planted once, or the tracer wrote its trace to its end (c-h4.err)"
     echo "  H4's plant (n): not as it must be"
   elif [ "$(grep -c '^tracerfaults3: scan: .*NOT' "$f.err")" != 1 ] \
-      || ! has -x -F "tracerfaults3: scan: layer forward Node._faults.<locals>.forward@1106: changing, NOT so in LAYERS" "$f.err" \
+      || ! has -x -F "tracerfaults3: scan: layer forward Node._faults.<locals>.forward@1108: changing, NOT so in LAYERS" "$f.err" \
       || ! has -x -F "tracerfaults3: scan: 1 differences from trace3.py's lists" "$f.err"; then
     no "H4's plant (n): the scan's lists do not name the layer left out, alone (c-h4.err)"
     echo "  H4's plant (n): not as it must be"
-  elif ! has -x -F "trace3: node 3: forward: a layer in none of the tracer's lists: Node._faults.<locals>.forward (node.py:1106)" "$f.err"; then
+  elif ! has -x -F "trace3: node 3: forward: a layer in none of the tracer's lists: Node._faults.<locals>.forward (node.py:1108)" "$f.err"; then
     no "H4's plant (n): the tracer stopped without the words it must give (c-h4.err)"
     echo "  H4's plant (n): not as it must be"
   else

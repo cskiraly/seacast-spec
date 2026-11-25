@@ -536,8 +536,8 @@ def chains_omit_seacast():
 
 # The chain cases' plants (check.sh's tracercontrols, "the chain cases"): each runs on the cell whose run.py arguments
 # follow OUT, and each must make the cases on that cell fail as check.sh writes.
-FILTER_ENTRY_PEER = ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191)
-OWED_MISSING = ("node.py", "Node._member_check.<locals>.owed_missing", 502)
+FILTER_ENTRY_PEER = ("node.py", "Node._peer_promise.<locals>.filter_entry", 1193)
+OWED_MISSING = ("node.py", "Node._member_check.<locals>.owed_missing", 504)
 
 
 def layer_classed_seacast(key, kind):
@@ -1053,7 +1053,7 @@ def timers_note_per_index_seacast(toy):
     N.Node.__init__ = init
 
 
-SILENT_FORWARD =("node.py", "Node._faults.<locals>.forward", 1106)    # LAYERS' key of the silent node's forward
+SILENT_FORWARD =("node.py", "Node._faults.<locals>.forward", 1108)    # LAYERS' key of the silent node's forward
 
 
 def layer_missing_seacast(toy):
