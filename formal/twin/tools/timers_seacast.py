@@ -34,7 +34,7 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       matched to one note in particular.
       retry_offer has a second caller with no timer: seacast.md's on_heartbeat retries every offer §4.3's limits held
       back (`for a in held_back.values(): retry_offer(a)`), then clears held_back. Since the roots are traced
-      (piece 5), on_heartbeat is a record, and those retries and its drop_stale_waits run inside it and are no
+      (917d02f), on_heartbeat is a record, and those retries and its drop_stale_waits run inside it and are no
       records of their own. Its other callers run inside records too: on_header_validated (:1223), and
       seacast-lite.md's on_block_installed (:572) and drop_tie (:578), which runs inside on_block_installed or,
       through drop_stale_waits, on_heartbeat. So every retry_offer record is a timer's, no marker is met, and K4
@@ -52,7 +52,7 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       branch and across epochs (two markers at one t). The limit: a timer lost whose fire falls on a heartbeat, for
       an ask held back in the epoch that heartbeat closes and not yet retried, is taken for the heartbeat's retry.
       on_offer is the one writer of held_back's entries (seacast.md's :1321); on_heartbeat's `held_back.clear()`
-      (:2826) writes it too, inside on_heartbeat's record. on_offer's one caller is on_frame (:624). Since piece 5
+      (:2826) writes it too, inside on_heartbeat's record. on_offer's one caller is on_frame (:624). Since 917d02f
       on_frame is traced, so each call of on_offer runs inside an on_frame record, and its writes are among that
       record's, where the checker reads them (it reads held_back's writes on every record). In a trace made before,
       on_frame was not traced, and each call of on_offer was a record of its own. A trace whose header's traced names
@@ -70,7 +70,7 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       requires each held value to be retried: K4 bounds the records from above, and the heartbeat's retries are
       excused, not required. And a held_back write made outside any record (inside a question at another node) is
       not seen; the document's writers run inside records wherever they are traced (on_offer inside on_frame's, or,
-      before piece 5, a record of its own; the clear inside on_heartbeat's). Nor is one a question makes inside a
+      before 917d02f, a record of its own; the clear inside on_heartbeat's). Nor is one a question makes inside a
       record, which its tape entry's log holds (`cw`), not the record's writes: none is made now, since the one
       writer of held_back's entries, on_offer, is no question, and its one caller, on_frame, is a record whose
       writes hold on_offer's.
