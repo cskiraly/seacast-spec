@@ -62,9 +62,9 @@ The sets:
   same for every record of the scenario. Each record starts with the window empty (`in_flight` 0, nobody in line,
   nothing in `sent`) and nothing planned, held as origin, owed, stored or described at its node. W_BYTES is H's, the
   window on (card 14). Then a last step, C1, made once: the toy's close of a link (`sim.close_link`) at a recording
-  node, to a peer that records nothing, with a chunk of ours in flight to it and another peer in line. The close
+  node, to a peer outside the set's nodes, with a chunk of ours in flight to it and another peer in line. The close
   calls the document's `claims_close` and `leave_line` at both ends, and `free_room` for the chunk: five records, as
-  the toy makes them at a close under --churn.
+  the toy makes them at a close under --churn. The peer's two are its only records.
 
 Beside the trace, OUT.scenarios has a line per record in the trace's order: its number from 1, its line in the trace
 (the content line the first), its node, its function, and the key of the scenario whose call made it (`setup` for the
@@ -808,7 +808,8 @@ def w_wt3(rng, nd, ns, B):
 
 def w_n1(rng, nd, ns, B):
     """N1: an answer a full queue refused, owed to p, the window full. -> queue_owed_relations: nothing owed;
-    next_to_send: an owed answer enqueued; choose: the first; acquire_room: in line; next_to_send: in line."""
+    next_to_send: an owed answer enqueued; choose: the rarest (RAREST on H); acquire_room: in line; next_to_send: in
+    line."""
     p, g, i, _ = on_window(rng, nd, ns)
     window(ns, ns["W_BYTES"])
     wire_chunk(ns, g, i)
@@ -818,9 +819,11 @@ def w_n1(rng, nd, ns, B):
 
 def w_c1(rng, nd, ns, B):
     """C1, the last step: the toy's close of a link (sim.close_link) whose peer q has a chunk of ours in flight, with
-    q2 in line. q is a peer that records nothing (1 or 5 on H), so its window is as built. -> at the node:
-    claims_close(q); leave_line(q): not in line; free_room (its wake_front wakes q2). At q: claims_close and
-    leave_line: not in line. Returns the closing peer."""
+    q2 in line. q is outside the set's nodes (1 or 5 on H): no record ran at q before, so its window is as built, and
+    the close's two records at q are its only ones. -> at the node: claims_close(q); leave_line(q): not in line;
+    free_room (its wake_front wakes q2). At q: claims_close and leave_line: not in line. The wake kicks q2's writer
+    (node.kick), which arms a write only if none is pending: `begin` leaves writer_kicked as earlier records left it,
+    and the trace notes no timer for the kick (its tape holds the asked wake). Returns the closing peer."""
     sim = CTX["sim"]
     q = rng.choice(sorted(set(nd.peers) - set(CTX["nodes"])))
     q2 = rng.choice(sorted(set(nd.peers) - {q}))
