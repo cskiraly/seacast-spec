@@ -685,6 +685,10 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "respond", #[p, asks, answers, prunes] => do
       exec (Seacast.respond (← nat p) (← (← arr asks).mapM key) (← (← arr answers).mapM chunkN) (← nat prunes)) none_
     | f, _ => throw s!"not a function of the twin under seacast.md, or not its arguments: {f}"
+  -- a name the node's line gives as replaced, which the twin entered: the twin ran its own code where the node ran
+  -- another. The names it asks where a node replaces them are asked, not entered.
+  if let some f := rs.entered.toList.find? replaced.contains then
+    throw s!"the twin ran its own {f}, which this node has replaced"
   judge traced r res rs
 
 end SpecTwin.Seacast

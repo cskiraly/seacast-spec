@@ -1414,6 +1414,20 @@ def fails3r (pre : String) (l : String) : Bool :=
   | .error e => e.startsWith pre
   | .ok _ => false
 
+/-- The same at a node whose line replaces the names `rp` -/
+def replay3at (rp : List String) (l : String) : Except String (Array String × Nat) := do
+  runSeacast c0 c3 params rp traced (← record (← Json.parse l) docSeacast) []
+
+def takes3at (rp : List String) (l : String) (marks : List String) : Bool :=
+  match replay3at rp l with
+  | .ok (ms, 0) => ms.toList == marks
+  | _ => false
+
+def fails3at (rp : List String) (pre : String) (l : String) : Bool :=
+  match replay3at rp l with
+  | .error e => e.startsWith pre
+  | .ok _ => false
+
 /-- The window's count and line, as one entry each -/
 def inF (v : String) : String := rd "in_flight" "[\"count\"]" v
 def wl (v : String) : String := rd "waiters" "[\"line\"]" v
@@ -1785,6 +1799,13 @@ def nNoted : String := withNotes s!"{promiseNote}, {alarmNote}"
 #guard takes3r nNoted [lNothingOwed, "choose: the first", lNoRoom, lRoom, ntsWay "a chunk", "noted: no offers"]
 -- a note whose target no `after` arms is refused where the record is read
 #guard fails3r "a timer note's target is not one an after arms: " (withNotes wrapperNote)
+-- a record where the twin runs its own code for a name the node has replaced is refused, naming the first such name
+-- it entered: `--answers-first line` replaces `choose` and `acquire_room`, and `choose` is entered first
+#guard fails3at ["acquire_room", "choose"] "the twin ran its own choose, which this node has replaced" nWait
+#guard fails3at ["acquire_room"] "the twin ran its own acquire_room, which this node has replaced" nWait
+-- a replaced name that the record does not enter refuses nothing: control takes no room
+#guard takes3at ["acquire_room"] nControl
+  [lNothingOwed, "choose: control at the head", ntsWay "control", "noted: no offers"]
 -- and the records these are made from pass as they are
 #guard takes3 nWait [lNothingOwed, "choose: the first", lInLine, ntsWay "in line"] &&
   takes3 nControl [lNothingOwed, "choose: control at the head", ntsWay "control", "noted: no offers"] &&

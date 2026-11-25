@@ -49,6 +49,12 @@ replayed from what the call read. No earlier record feeds it, and the replay doe
 note that armed the timer. So a trace in which a `promise_due` fires with no arming before it replays record by
 record as if the timer had been armed.
 
+**A record is refused where the twin ran its own code for a function the node replaced.** Under `seacast.md`, a
+covered record is refused when the twin entered a function that the node's line gives as replaced, since the node
+ran something else there. The functions the twin asks where a node replaces them are asked, not entered. The tracer
+refuses to write such a record as well, but the replay does not rely on that. A record of a function that
+`seacast-lite.md` keeps goes through the lite replay, which does not make this check.
+
 ## Scope
 
 Every function that the code blocks of `seacast-lite.md` define has a twin of the same name. The `scope` step of
