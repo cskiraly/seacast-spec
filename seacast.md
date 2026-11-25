@@ -2958,9 +2958,10 @@ has not expired, the sample's ask of its next peer takes the slot first, when a 
 The block's held samples are then tried in the order they were held while room is left, even when
 the group of the ask whose wait ended has expired. A sample with no peer to declare it to in the
 first phase (no link of ordinary custody not yet asked serves it, and none routes it) is not
-declared then, and goes to the second phase after the same wait. The hunt ends when no link is left
-to ask (each has been asked for a sample, is parked for the group, or neither serves the sample nor
-forwards) or the group expires, so an unavailable block costs a bounded number of asks. Where the
+declared then, and goes to the second phase after the same wait. The hunt for a sample ends when it
+arrives, when no link is left to ask (each has been asked for a sample, is parked for the group, or
+neither serves the sample nor forwards) or when the group expires, so an unavailable block costs a
+bounded number of asks. Where the
 binding offers a fetch from a node that is not a link (§7), the second phase may use it before a
 routed request, under the same rule: one sample per node.
 
