@@ -9,7 +9,8 @@ admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc)
 (pop_owed_answer, whose writer is Tracer3.pop_owed_enc, wire_size and offers_in); then the ninth name a node can
 replace, filter_entry, asked since §4.11 covers next_to_send; and last the four §4.2's gate asks (cell_groups, the
 order of on_header_validated's groups, and the keys of `standing[g]` and of `want_p` where drop_outside iterates
-them); 79 rows in all. Each line is the twin's
+them); then the four §4.8's heartbeat asks (joined_peers, joined_types, related and sampled_types); and last the tenth
+name a node can replace, on_want, asked since on_frame's records call it; 84 rows in all. Each line is the twin's
 form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
@@ -106,6 +107,8 @@ class Join(Have):
 
 
 class WantIndex:                        # an ask by index, as the toy's wire module has it (Tracer3.key tells it apart)
+    standing, hops, probe = False, 0, False     # as the toy's class holds them (Tracer3.ask_seacast reads the three)
+
     def __init__(self, group, index):
         self.group, self.index = group, index
 
@@ -305,6 +308,15 @@ def rows(f0, d, w=None):
         ("groupsOrder", "order", lambda r: tail("order", order_entry("on_header_validated", [g2, g])), None, (), {}),
         ("standingOrder", "keys", lambda r: tail("keys", keys_entry(ts["standing"], (g,), [5, 2, 9])), None, (), {}),
         ("wantPOrder", "keys", lambda r: tail("keys", keys_entry(ts["want_p"], (), [7, 2, 4])), None, (), {}),
+        # §4.8's heartbeat: the peers its gossip draws from, the node's types joined and sampled, and whether a peer
+        # holds a relation of ours
+        ("joinedPeers", "joined_peers", q["joined_peers"], [4, 7], (), {}),
+        ("joinedTypes", "joined_types", q["joined_types"], [COL, P], (), {}),
+        ("related", "related", q["related"], True, (4,), {}),
+        ("sampledTypes", "sampled_types", q["sampled_types"], [ROW], (), {}),
+        # on_want, the tenth name a node can replace, asked since on_frame's records call it: the asks handed over,
+        # and the chunks it answers
+        ("onWantNode", "on_want", asked["on_want"], [fa], (4, [WantIndex(g, 0)]), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 

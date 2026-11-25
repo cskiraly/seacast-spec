@@ -2627,11 +2627,15 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
     # the third: a SEACAST cell's record with its node said to have replaced a name the header does not trace, picked by a
     # rule: the first, sorted, of the manifest's replaceable names outside the header's traced. A replaceable name,
     # so that the nodes line's check of the header's traced refuses it, not the check before it (a replaced name the
-    # twin has no question for)
+    # twin has no question for). Where none is outside (since the roots are traced every replaceable name is:
+    # publish and on_want with them), the first, sorted, of the replaceable names, and the header given without it: the
+    # header's traced may be any list of the manifest's names (the replay's tracedSeacast), and the nodes line's
+    # replaced names are checked against it before its chains are
     hdr2, nodes2, r2 = first(v2trace, lambda d: "raises" not in d)
     outside = sorted(set(header3.manifest_seacast.REPLACEABLE) - set(hdr2["header"]["traced"]))
-    assert outside, "no replaceable name outside SEACAST's traced"
-    name2 = outside[0]
+    name2 = outside[0] if outside else sorted(header3.manifest_seacast.REPLACEABLE)[0]
+    hdr2u = hdr2 if outside else {**hdr2, "header": {**hdr2["header"],
+                                                     "traced": [n for n in hdr2["header"]["traced"] if n != name2]}}
     own2 = node_of(nodes2, r2)
     untraced = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]], "replaced": sorted(set(own2["replaced"]) | {name2})}]}
     just = {"nodes": [{**copy.deepcopy(own2), "n": [r2["n"]]}]}
@@ -2645,7 +2649,7 @@ def carried_controls(directed3v, directed1, v2trace, work, head):
         "its index written as the last a uint32 holds": (alone(hdr1, nodes1, within), 1, "the Python raises OverflowError"),
         "a SEACAST cell's record with its node's line, as it is": (alone(hdr2, just, r2), 0, None),
         f"that node said to have replaced {name2}, which the header does not trace": (
-            alone(hdr2, untraced, r2), 1, f"nodes: has replaced [{name2}], which the header does not list as traced"),
+            alone(hdr2u, untraced, r2), 1, f"nodes: has replaced [{name2}], which the header does not list as traced"),
     }, work, head, "carried")
 
 

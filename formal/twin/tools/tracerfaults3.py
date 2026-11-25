@@ -685,19 +685,20 @@ def draws_unrestored_seacast():
     before_install_seacast(plant)
 
 
-def on_chunk_without_p_seacast():
+def on_frame_without_p_seacast():
     """Under v2, the plant of a record writer whose arguments are not those of runSeacast's case: records_seacast.py's writer of
-    `on_chunk` leaves the peer out, and writes the chunk alone. The tracer checks no record's arity, so the trace is
-    written to its end, and the replay must refuse each on_chunk record, as no function of the twin with those
-    arguments. Counted once for each on_chunk record written so."""
+    `on_frame` leaves the peer out, and writes the frame alone. The tracer checks no record's arity, so the trace is
+    written to its end, and the replay must refuse each on_frame record, as no function of the twin with those
+    arguments. Counted once for each on_frame record written so. (Until the roots were traced the plant was
+    on_chunk's writer's; on_chunk now runs inside on_frame's record, and writes none of its own.)"""
     import records_seacast as R              # noqa: E402: this directory's, as trace3.py imports it
-    params, _, ret = R.TABLE["on_chunk"]
+    params, _, ret = R.TABLE["on_frame"]
 
-    def without_p(tr, p, f):
+    def without_p(tr, p, fr):
         PLANTED[0] += 1
-        return [tr.wchunk(f)]
+        return [R.frame(tr, fr)]
 
-    R.TABLE["on_chunk"] = (params, without_p, ret)
+    R.TABLE["on_frame"] = (params, without_p, ret)
 
 
 def observer_timer_seacast(off):
@@ -848,11 +849,41 @@ def noask_in_record_seacast():
     F.Recorder.read = read
 
 
+def live_binding_seacast(toy, count=True):
+    """Under v2, piece D's point 6 (D3), planted since LAYERS lists publish's layer under --source-offers off as
+    changing: the toy's own case, its lambda over `announce` bound through publish, now runs inside a replaced name
+    entered outside every record, where no record opens. At node 1's first heartbeat after the nodes line (which is
+    written at the trace's first record, with its own check of every binding: there it would stop first), the
+    simulator's `_heartbeat` runs with `announce` bound to a lambda of this tool's own, which calls what was bound,
+    and is bound back after. The first record inside that call must stop the tracer at its entry. Counted once (where
+    `count`)."""
+    sys.path.insert(0, str(Path(toy).resolve()))
+    import sim as S                     # noqa: E402: the pinned toy's
+    tracer_instance()
+    _heartbeat, done = S.Sim._heartbeat, [False]
+
+    @functools.wraps(_heartbeat)
+    def heartbeat(self, nd):
+        if done[0] or int(nd.id) != 1 or not (TR and TR[0].nodes_written):
+            return _heartbeat(self, nd)
+        done[0] = True
+        PLANTED[0] += count
+        ns = nd.ns
+        was = ns["announce"]
+        ns["announce"] = lambda *a, **k: was(*a, **k)
+        try:
+            return _heartbeat(self, nd)
+        finally:
+            ns["announce"] = was
+    S.Sim._heartbeat = heartbeat
+
+
 def bindings_checks_off_seacast(both):
-    """Under v2, piece D's plant (q) (`both` false) and point 6's control (`both` true): trace3's record binding check
-    (`bindings_check`) skipped at each record's entry, or at its entry and its exit. Under `--source-offers off`, the
-    layer's lambda over `announce`, live through publish, is then met at the exit of the record it is bound across (q),
-    or not at all (the control: no cell calls it). Counted once for each check skipped."""
+    """Under v2, piece D's plant (q) (`both` false) and point 6's control (`both` true), each over point 6's planted
+    binding (live_binding_seacast): trace3's record binding check (`bindings_check`) skipped at each record's entry,
+    or at its entry and its exit. The planted lambda over `announce`, live through node 1's first heartbeat, is then
+    met at the exit of the record it is bound across (q), or not at all (the control). Counted once for each check
+    skipped, and the binding's plant not counted."""
     _check = T.bindings_check
 
     def bindings_check(nid, ns, slots, found, fname, at):
@@ -1125,7 +1156,8 @@ def suppressed_filter_seacast(toy, off):
     N.Node._write = _write
 
 
-CELL_PLANTS_Seacast = ("--noask-in-record-v2", "--entry-check-off-v2", "--bindings-checks-off-v2",  # on a cell's arguments
+CELL_PLANTS_Seacast = ("--noask-in-record-v2", "--live-binding-v2", "--entry-check-off-v2",  # on a cell's arguments
+                  "--bindings-checks-off-v2",
                   "--per-node-depth-v2", "--suppressed-filter-v2", "--suppressed-filter-v2-off",
                   "--timers-note-dropped-v2", "--timers-delay-no-eps-v2", "--timers-note-per-index-v2",   # timers_seacast.py's (i)-(iii)
                   "--calls-paired-off-v2")      # calls_seacast.py's (w), on $LATE16 --doc seacast
@@ -1208,19 +1240,21 @@ def hdr_read_seacast(raw):
 
 
 def unscanned_layer_seacast(toy):
-    """Under v2: a layer over `on_frame` that claims to be the toy's (its code compiled as node.py's, at a line where
-    no binding is) and holds the bound `on_frame` in a closure cell, so that the namespace check, which follows the
-    layers to SEACAST's own function, passes it. Bound just before the install: the scan of the toy's bindings names no
-    such function, and the tracer must stop at the install."""
+    """Under v2: a layer over `propose_colour`, a name of seacast.md's that no record covers (so that no chain rule
+    reads it first: until the roots were traced the layer was over `on_frame`, which records now cover), that claims
+    to be the toy's (its code compiled as node.py's, at a line where no binding is) and holds the bound
+    `propose_colour` in a closure cell. Bound just before the install: the scan of the toy's bindings names no such function, and the tracer
+    must stop at the install."""
     node_py = str(Path(toy).resolve() / "node.py")
     g = {}
-    exec(compile("def make(doc):\n    def on_frame(p, frame):\n        return doc(p, frame)\n    return on_frame\n",
-                 node_py, "exec"), g)
+    exec(compile("def make(doc):\n    def propose_colour(T, fam):\n        return doc(T, fam)\n"
+                 "    return propose_colour\n", node_py, "exec"), g)
     _install = T.Tracer3.install
 
     @functools.wraps(_install)
     def install(self, nd, ns):
-        ns["on_frame"] = g["make"](ns["on_frame"])
+        assert "propose_colour" not in self.traced, "propose_colour is traced: the plant would meet the chain rule"
+        ns["propose_colour"] = g["make"](ns["propose_colour"])
         PLANTED[0] += 1
         return _install(self, nd, ns)
 
@@ -1499,7 +1533,7 @@ FAULTS = ("--made-rows-off", "--alias", "--alias-control", "--installed-flip", "
 # the plants under v2 that must not stop the tracer, with their controls: each prints what it saw
 PLANTS = ("--bare-in-question-v2", "--bare-in-question-v2-per-node", "--suppressed-entry-v2",
           "--suppressed-entry-v2-off", "--bare-replaced-v2", "--bare-timer-v2", "--bare-timer-v2-now", "--hdr-read-v2",
-          "--hdr-read-v2-raw", "--observer-timer-v2-off", "--on-chunk-without-p-v2", "--chains-omit-v2") + CHAIN_PLANTS + (
+          "--hdr-read-v2-raw", "--observer-timer-v2-off", "--on-frame-without-p-v2", "--chains-omit-v2") + CHAIN_PLANTS + (
           "--draws-rewrap-off-v2", "--draws-unrestored-v2") + CELL_PLANTS_Seacast + (  # K13's two: the first must not
           "--layer-missing-v2",         # stop it, the second must; pieces D's and E's; H4's plant (n), on hand5-own;
           "--calls-nested-off-v2", "--calls-iwants-off-v2")     # piece (b)'s (u) and (v), on hand5
@@ -1554,8 +1588,8 @@ def main(argv):
             hdr_read_seacast(raw=fault.endswith("-raw"))
         elif fault.startswith("--observer-timer-v2"):
             observer_timer_seacast(off=fault.endswith("-off"))
-        elif fault == "--on-chunk-without-p-v2":
-            on_chunk_without_p_seacast()
+        elif fault == "--on-frame-without-p-v2":
+            on_frame_without_p_seacast()
         elif fault == "--chains-omit-v2":
             chains_omit_seacast()
         elif fault == "--chain-filter-observer-v2":
@@ -1576,7 +1610,10 @@ def main(argv):
             verdict_replaced_seacast()
         elif fault == "--noask-in-record-v2":
             noask_in_record_seacast()
+        elif fault == "--live-binding-v2":
+            live_binding_seacast(rest[0])
         elif fault in ("--entry-check-off-v2", "--bindings-checks-off-v2"):
+            live_binding_seacast(rest[0], count=False)  # counted by the checks skipped alone, as before
             bindings_checks_off_seacast(both=fault == "--bindings-checks-off-v2")
         elif fault == "--per-node-depth-v2":
             per_node_depth_seacast()

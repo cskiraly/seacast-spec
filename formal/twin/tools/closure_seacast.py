@@ -746,9 +746,10 @@ def self_test(N, m, schema_values, type_functions):
          ["mesh (iterated) in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
         ("now.x", "context", synth("def c():\n    return now.x\n", ["c"]),
          ["now.x in c: a use of the record's context in neither CONTEXT_USES_Seacast nor CONTEXT_REASONS_Seacast"]),
-        ("the documents with gossip_put taken out of QUESTIONS", "context",
+        ("the documents with gossip_put taken out of QUESTIONS", "context",    # publish's too since it is covered
          (None, man(QUESTIONS=without("gossip_put"))),
-         ["gossip_history.put() in forward: its question gossip_put is not in QUESTIONS"]),
+         ["gossip_history.put() in forward: its question gossip_put is not in QUESTIONS",
+          "gossip_history.put() in publish: its question gossip_put is not in QUESTIONS"]),
         ("type_attrs_check, a tenth function added", "attrs", tobj(extra=("extra",)),
          ["type payload: attribute extra, not in TYPE_ATTRS_Seacast"]),
         ("type_attrs_check, verify taken out", "attrs", tobj(drop=("verify",)),

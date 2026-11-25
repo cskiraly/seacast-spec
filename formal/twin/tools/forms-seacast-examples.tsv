@@ -77,3 +77,8 @@ cellGroups	["cell_groups",["07b0dc1613d6034ad848111ef7cbd97b0a10d7428c9b8039ed96
 groupsOrder	["order","on_header_validated",["59bd4b06a85a87b96988cb1c54b16082b5a4dd81a25770c4df7346123fc81ed8","25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6"]]
 standingOrder	["keys","standing",["25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6"],[5,2,9]]
 wantPOrder	["keys","want_p",[],[7,2,4]]
+joinedPeers	["joined_peers",[],[4,7]]
+joinedTypes	["joined_types",[],["column","payload"]]
+related	["related",[4],true]
+sampledTypes	["sampled_types",[],["row"]]
+onWantNode	["on_want",[4,[[["25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6",0],false,0,false]]],[["25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6",0,1,"07b0dc1613d6034ad848111ef7cbd97b0a10d7428c9b8039ed96b0119ee0c990","25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a600000000a578c621d39349b02c1bb29629e7c939ebc71d2f"]]]

@@ -553,7 +553,7 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           # closure-dependent: --member-check off returns False without the document's call; on, it counts
           ("node.py", "Node._member_check.<locals>.owed_missing", 502): ("owed_missing",
                                                                          ClosureKind("on", OBSERVER, CHANGING)),
-          # changing, over one of the nine names the twin asks where a node replaces it (ASKED_Seacast)
+          # changing, over one of the ten names the twin asks where a node replaces it (ASKED_Seacast)
           ("node.py", "Node.__init__.<locals>.note_claim", 219): ("note_claim", CHANGING),        # a liar's
           ("node.py", "Node._hoard_column.<locals>.push_rebuilt", 256): ("push_rebuilt", CHANGING),   # a hoarder's
           ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 526): ("push_rebuilt", CHANGING),
@@ -571,16 +571,22 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           # --promise-mode peer's
           ("node.py", "Node._alarm.<locals>.filter_entry", 350): ("filter_entry", CHANGING),
           ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191): ("filter_entry", CHANGING),
+          # on_want, asked since on_frame's records call it (§4.5)
+          ("node.py", "Node._hoard_column.<locals>.on_want", 260): ("on_want", CHANGING),         # a hoarder's filter
+          ("node.py", "Node._alarm.<locals>.on_want", 403): ("on_want", CHANGING),              # --alarm-wait's
+          ("node.py", "Node._seacast.<locals>.<lambda>", 1795): ("on_want", CHANGING),          # a withholder's
+          ("node.py", "Node._seacast.<locals>.on_want", 1825): ("on_want", CHANGING),           # hoardcol's filter
           # changing, over a name the manifest makes replaceable and the twin cannot ask (NOASK_Seacast): entered
           # outside every record alone (iface_of stops a record's own call of one)
           ("node.py", "Node._writer_variants.<locals>.choose", 1049): ("choose", CHANGING),
           # --answers-first line's: an answer its choose chose waits at the head of the line (§4.11's window)
           ("node.py", "Node._writer_variants.<locals>.acquire_room", 1082): ("acquire_room", CHANGING),
           ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 439): ("decode_group", CHANGING),
-          ("node.py", "Node._hoard_column.<locals>.on_want", 260): ("on_want", CHANGING),         # a hoarder's filter
-          ("node.py", "Node._alarm.<locals>.on_want", 403): ("on_want", CHANGING),              # --alarm-wait's
-          ("node.py", "Node._seacast.<locals>.<lambda>", 1795): ("on_want", CHANGING),          # a withholder's
-          ("node.py", "Node._seacast.<locals>.on_want", 1825): ("on_want", CHANGING),           # hoardcol's filter
+          # publish, the source's root: --source-offers off's and late's layers bind announce during their call of
+          # the document's publish (the two below). The simulator enters it outside every record, so it runs bare
+          # (late's is refused before, at the install: source_offers_check)
+          ("node.py", "Node._no_source_offers.<locals>.publish", 995): ("publish", CHANGING),
+          ("node.py", "Node._late_source_offers.<locals>.publish", 1014): ("publish", CHANGING),
           # an adapter: the gossipsub binding's reading of a frame as SEACAST's messages, around the one call of the
           # document's on_frame that is the record. seacast-bindings.md §4 (the gossipsub binding, :369) gives that
           # reading to the binding, and :393-395 keep an IDONTWANT's stock ids in unwanted[p] with stock gossipsub's
@@ -589,12 +595,12 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           # bound during a call: publish's announce under --source-offers off and late
           ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 997): ("announce", DURING_CALL),
           ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1015): ("announce", DURING_CALL)}
-# Under SEACAST: the replaceable names (the manifest's, and the directed sets' validate_chunk); the nine the twin asks
+# Under SEACAST: the replaceable names (the manifest's, and the directed sets' validate_chunk); the ten the twin asks
 # as questions where a node replaces them (its NodeSeacast, Seacast/Replay.lean); and those it cannot ask, which a
-# record's own code must not call where they are replaced: the manifest's replaceable covered names but the nine
+# record's own code must not call where they are replaced: the manifest's replaceable covered names but the ten
 REPLACEABLE_Seacast = tuple(manifest_seacast.REPLACEABLE) + tuple(manifest_seacast.REPLACEABLE_WHOLE)
 ASKED_Seacast = ("forward", "push_rebuilt", "send_have", "serve_standing", "owed_missing", "repair_verdict", "note_claim",
-            "known_in_scope", "filter_entry")
+            "known_in_scope", "filter_entry", "on_want")
 NOASK_Seacast = tuple(n for n in manifest_seacast.REPLACEABLE if n not in ASKED_Seacast and n not in manifest_seacast.KEPT)
 # Under SEACAST, the places where the twin asks the order of a set of peers (its NodeSeacast.order calls): eight iterate
 # `suppression_scope(g)` (fill its union with the sender's ack), and serve_standing the set it pops from `standing`.
@@ -615,7 +621,7 @@ JOIN_FIELDS_Seacast = frozenset(("object_type", "interest", "custody_count", "du
 TYPE_QUESTIONS_Seacast = ("index_count", "threshold", "verify", "decode", "header_of", "project", "cross", "family",
                      "derived_interest")
 COVERED_SET = frozenset(manifest_seacast.COVERED)    # the covered names, whose records records_seacast.py writes under SEACAST
-ADAPTED_Seacast = ("gossip_put", "gossip_remove_group", "mesh_has", "own_interest")
+ADAPTED_Seacast = ("gossip_put", "gossip_remove_group", "gossip_ids", "mesh_has", "own_interest")
 
 
 OWN_THROUGH = [True]    # own_code reads a listed wrapper's closure through the tracer's hand-over (a self-test plant)
@@ -4235,6 +4241,11 @@ class Tracer3(Tracer):
             "in_pushers": lambda r, T, fam, c: [[t(T), i_(fam), n(c)], peers(r)],
             "out_pushees": lambda r, T, fam, c: [[t(T), i_(fam), n(c)], peers(r)],
             "uplink_class": lambda r: [[], self.uplink_word(r)],
+            # §4.8's heartbeat (on_heartbeat's): the joined types and peers, the sampled types, a peer's relations
+            "joined_types": lambda r: [[], [t(T) for T in r]],
+            "joined_peers": lambda r: [[], peers(r)],
+            "sampled_types": lambda r: [[], [t(T) for T in r]],
+            "related": lambda r, q: [[n(q)], boolean(r)],
             "interest_satisfied": lambda r, g: [[g_(g)], boolean(r)],
             "merge_waiting": lambda r, p, h: [[n(p), self.have_msg_seacast(h)], boolean(r)],
             "deferred_offers": lambda r, p, h: [[n(p), self.have_msg_seacast(h)], self.none_listed(r)],
@@ -4299,9 +4310,10 @@ class Tracer3(Tracer):
                 "REPAIR_TO": lambda r, g: [[t, g.hex()], [self.nat(q) for q in r]]}
 
     def asked_enc_seacast(self):
-        """The nine names the twin asks where a node replaces them (ASKED_Seacast), in its NodeSeacast's forms:
+        """The ten names the twin asks where a node replaces them (ASKED_Seacast), in its NodeSeacast's forms:
         `forward` with its axes or null, `known_in_scope`'s bitmap as a natural, `filter_entry`'s entry as a lane holds
-        it, and its answer the entry it returns, or null (its argument written at the call: EAGER_Seacast)."""
+        it, and its answer the entry it returns, or null (its argument written at the call: EAGER_Seacast); `on_want`'s
+        asks as askSeacastOf reads them, and its answers narrow, in order."""
         n, nothing = self.nat, self.nothing
         return {
             "forward": lambda r, f, p, axes=None: [[self.chunk(f), n(p),
@@ -4314,7 +4326,8 @@ class Tracer3(Tracer):
             "repair_verdict": lambda r, g: [[g.hex()], self.repair_word(r)],
             "note_claim": lambda r, p, g: [[n(p), g.hex()], nothing(r)],
             "known_in_scope": lambda r, g: [[g.hex()], n(r.v)],
-            "filter_entry": lambda r, p, entry: [[n(p), self.qentry(entry)], None if r is None else self.qentry(r)]}
+            "filter_entry": lambda r, p, entry: [[n(p), self.qentry(entry)], None if r is None else self.qentry(r)],
+            "on_want": lambda r, p, asks: [[n(p), [self.ask_seacast(a) for a in asks]], [self.chunk(f) for f in r]]}
 
     @staticmethod
     def repair_word(r):
@@ -5431,7 +5444,7 @@ class Tracer3(Tracer):
                                                       [tr.chunk(f) for f in r]],
                         "push_rebuilt": lambda r, g, new: [[g.hex(), [tr.nat(i) for i in new]], tr.nothing(r)],
                         "validate_chunk": lambda r, f: [[tr.chunk(f)], r]}
-        if tr.doc_seacast:   # under SEACAST: the nine the twin asks, in its forms (asked_enc_seacast); on_iwant, a
+        if tr.doc_seacast:   # under SEACAST: the ten the twin asks, in its forms (asked_enc_seacast); on_iwant, a
             #             kept name, and the directed sets' validate_chunk in seacast-lite.md's; and no form for a
             #             name the twin cannot ask (iface_of stops a record's own call of one)
             replaced_enc = ({n: replaced_enc[n] for n in ("on_iwant", "validate_chunk")} | tr.asked_enc_seacast()

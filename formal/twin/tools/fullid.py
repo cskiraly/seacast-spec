@@ -51,6 +51,17 @@ The places a full id stands by design (trace3.py), and the only ones taken out b
   once message_id gave it): on the tape of a record of publish, `mark_seen`'s id, `gossip_put`'s chunk, the value
   of a read of `chunks`, and a chunk enqueued alone. (`store` and `content_id` hold the chunk as built there, with
   no id; `tiebreak` is choose_push's place, which publish reaches.)
+- seacast.md's own (its type questions hand the type a chunk, which carries its id; none is an ask):
+  - in any record, the chunk that header_of, verify and project are asked about (TYPE_CHUNK_QS: `[type, chunk,
+    ...]`), on the tape of whichever record runs on_chunk;
+  - on next_to_send's tape, wire_size's entry (`[p, entry]`) and offers_in's (`[entry]`), the writer's entry in
+    hand;
+  - in a record of decode_group or push_rebuilt, `decode`'s answer and `shuffled`'s argument and answer, the
+    rebuilt chunks each under its index;
+  - on_frame's frame of five lists (`[chunks, haves, asks, grafts, prunes]`): its chunks, wide, as the frame of
+    four's;
+  - on_want, seacast.md's answerer (ANSWER_FNS): its record's `resolve` and `chunk_of`, and its `ret`, the
+    answers, as on_iwant's; and in on_frame's record, the answers of on_want asked on the tape, as on_iwant's.
 The tape's places are taken out only in a record of a function whose code asks them (CHUNK_FNS, the deferral
 path's functions among them); under another function, a seen or a mark_seen of a full id counts. Anywhere else,
 the id counts: as an ask key in a record's args, its reads, writes, rest or scans, an IWANT on the tape or in a
@@ -66,7 +77,8 @@ CHUNK_FNS = ("on_chunk", "on_validated",          # and the deferral path's, who
              "defer", "tie", "tie_room", "on_block_installed", "drop_stale_waits",
              "on_frame",                          # on_chunk runs inside a frame's record
              "committed_descriptor")              # level 1: its second argument is the chunk
-ANSWER_FNS = ("on_iwant", "on_frame")             # their code resolves an ask to our chunk
+ANSWER_FNS = ("on_iwant", "on_frame", "on_want")  # their code resolves an ask to our chunk (on_want: seacast.md's)
+TYPE_CHUNK_QS = ("header_of", "verify", "project")  # seacast.md's type questions about a chunk: [type, chunk, ...]
 ENQ_ENTRY_FNS = ("next_to_send", "respond", "on_frame")     # their code enqueues an entry with a chunk
 REBUILT_FNS = ("decode_group", "push_rebuilt")              # level 2 and the repair
 TAPE_CHUNK_AT = {"validate_chunk": 0, "open_group": 1, "store": 2, "forward": 0,
@@ -133,13 +145,13 @@ def strip(d):
         if isinstance(d.get("ret"), str):
             d["ret"] = "(the chunk's id)"
     if d.get("fn") == "on_frame" and isinstance(d.get("args"), list) and len(d["args"]) == 2:
-        fr = d["args"][1]                                               # [chunks, ihave, iwant, idontwant]
-        if isinstance(fr, list) and len(fr) == 4 and isinstance(fr[0], list):
+        fr = d["args"][1]                       # [chunks, ihave, iwant, idontwant]; seacast.md's five lists
+        if isinstance(fr, list) and len(fr) in (4, 5) and isinstance(fr[0], list):   # [chunks, haves, asks, grafts, prunes]
             d["args"] = [d["args"][0], [[blank_chunk(c) for c in fr[0]]] + fr[1:]]
     elif chunk_fn and isinstance(d.get("args"), list) and len(d["args"]) >= 2:
         d["args"] = [d["args"][0], blank_chunk(d["args"][1])] + d["args"][2:]
     answers = d.get("fn") in ANSWER_FNS
-    if d.get("fn") == "on_iwant" and isinstance(d.get("ret"), list):    # the answers
+    if d.get("fn") in ("on_iwant", "on_want") and isinstance(d.get("ret"), list):    # the answers
         d["ret"] = [blank_chunk(c) for c in d["ret"]]
     if d.get("fn") == "respond" and isinstance(d.get("args"), list) and len(d["args"]) == 4 and isinstance(d["args"][2], list):
         d["args"] = d["args"][:2] + [[blank_chunk(c) for c in d["args"][2]]] + d["args"][3:]
@@ -172,13 +184,23 @@ def strip(d):
                 t = [t[0], [t[1][0], blank_chunk(t[1][1])]] + t[2:]
             elif t[0] == "pop_owed_answer" and len(t) >= 3:
                 t = t[:2] + [blank_chunk(t[2])] + t[3:]
+            elif t[0] == "wire_size" and len(t) >= 2 and isinstance(t[1], list) and len(t[1]) == 2:
+                t = [t[0], [t[1][0], blank_entry(t[1][1])]] + t[2:]                 # seacast.md's [p, entry]
+            elif t[0] == "offers_in" and len(t) >= 2 and isinstance(t[1], list) and len(t[1]) == 1:
+                t = [t[0], [blank_entry(t[1][0])]] + t[2:]                          # [entry]
+        if (isinstance(t, list) and len(t) >= 2 and t[0] in TYPE_CHUNK_QS and isinstance(t[1], list)
+                and len(t[1]) >= 2):                                    # [type, chunk, ...]
+            t = [t[0], [t[1][0], blank_chunk(t[1][1])] + t[1][2:]] + t[2:]
         if (isinstance(t, list) and t and enq_entry and t[0] == "enqueue" and len(t) >= 2 and isinstance(t[1], list)
                 and len(t[1]) >= 2 and isinstance(t[1][1], list) and len(t[1][1]) == 2 and t[1][1][0] == "entry"):
             t = [t[0], [t[1][0], ["entry", blank_entry(t[1][1][1])]] + t[1][2:]] + t[2:]
         if isinstance(t, list) and len(t) >= 3 and d.get("fn") in REBUILT_FNS:    # the rebuilt chunks
             pairs = lambda l: [[x[0], blank_chunk(x[1])] if isinstance(x, list) and len(x) == 2 else x for x in l]  # noqa: E731
-            if t[0] == "decode_and_reencode" and isinstance(t[2], list):
+            if t[0] in ("decode_and_reencode", "decode") and isinstance(t[2], list):     # decode: seacast.md's
                 t = t[:2] + [pairs(t[2])] + t[3:]
+            elif (t[0] == "shuffled" and isinstance(t[1], list) and len(t[1]) == 1 and isinstance(t[1][0], list)
+                    and isinstance(t[2], list)):                        # the rebuilt pairs, drawn in order
+                t = [t[0], [pairs(t[1][0])], pairs(t[2])] + t[3:]
             elif t[0] == "payload_of" and isinstance(t[1], list) and len(t[1]) == 1 and isinstance(t[1][0], list):
                 t = [t[0], [pairs(t[1][0])]] + t[2:]
             elif t[0] == "store" and isinstance(t[1], list) and len(t[1]) == 3:
@@ -195,7 +217,7 @@ def strip(d):
                 t = [t[0], ["(the chunk's id)"], blank_chunk(t[2])] + t[3:]
             elif t[0] == "read" and len(t) == 4 and t[1] == "unwanted" and isinstance(t[2], list) and len(t[2]) == 2:
                 t = [t[0], t[1], [t[2][0], "(the chunk's id)"], t[3]]
-            elif t[0] == "on_iwant" and d.get("fn") == "on_frame" and isinstance(t[2], list):
+            elif t[0] in ("on_iwant", "on_want") and d.get("fn") == "on_frame" and isinstance(t[2], list):
                 t = t[:2] + [[blank_chunk(c) for c in t[2]]] + t[3:]
         if (isinstance(t, list) and t and gossip and t[0] == "group_bits" and len(t) >= 2 and isinstance(t[1], list)
                 and len(t[1]) == 1):                                    # group_bits(ids)
@@ -532,6 +554,43 @@ def self_test():
          {"fn": "on_chunk", "args": [4, chunk + [[[2, 0, 1, 4, 4, 8, "d0" * 32], [mid], [4, ["x", 1]]]]], "tape": []}),
         ("a wide chunk in the argument of a function that takes none: so it counts", 1,
          {"fn": "retry_offer", "args": [wide], "tape": []}),
+    ]
+    entry = [chunk, None, False]
+    cases += [  # seacast.md's places, one a case; where a place is a function's, the same entry under another counts
+        ("header_of's chunk, under on_frame", 0,
+         {"fn": "on_frame", "args": [4, [[], [], [], [], []]], "tape": [["header_of", ["payload", chunk], [2, 0]]]}),
+        ("verify's chunk, under on_chunk", 0,
+         {"fn": "on_chunk", "args": [4, wide], "tape": [["verify", ["payload", chunk, [2, 0]], "ACCEPT"]]}),
+        ("project's chunk, under decode_group", 0,
+         {"fn": "decode_group", "args": [g], "tape": [["project", ["payload", chunk], [[g, 1]]]]}),
+        ("a full id as project's answer: no place, so it counts", 1,
+         {"fn": "on_chunk", "args": [4, wide], "tape": [["project", ["payload", chunk], [[mid, 1]]]]}),
+        ("wire_size's entry, under next_to_send", 0,
+         {"fn": "next_to_send", "args": [5], "tape": [["wire_size", [5, entry], 11881]]}),
+        ("wire_size's entry, under another function: so it counts", 1,
+         {"fn": "send_have", "args": [4, g], "tape": [["wire_size", [5, entry], 11881]]}),
+        ("offers_in's entry, under next_to_send", 0,
+         {"fn": "next_to_send", "args": [5], "tape": [["offers_in", [entry], []]]}),
+        ("offers_in's entry, under another function: so it counts", 1,
+         {"fn": "send_have", "args": [4, g], "tape": [["offers_in", [entry], []]]}),
+        ("decode's answer, under decode_group", 0,
+         {"fn": "decode_group", "args": [g], "tape": [["decode", ["payload", g, [2, 0]], [[0, chunk], [1, chunk]]]]}),
+        ("decode's answer, under another function: so it counts", 1,
+         {"fn": "claim_group", "args": [g], "tape": [["decode", ["payload", g, [2, 0]], [[0, chunk]]]]}),
+        ("shuffled's rebuilt pairs, under decode_group", 0,
+         {"fn": "decode_group", "args": [g], "tape": [["shuffled", [[[1, chunk]]], [[1, chunk]]]]}),
+        ("shuffled's rebuilt pairs, under another function: so it counts", 1,
+         {"fn": "send_have", "args": [4, g], "tape": [["shuffled", [[[1, chunk]]], [[1, chunk]]]]}),
+        ("a wide chunk in a frame of five lists", 0, {"fn": "on_frame", "args": [4, [[wide], [], [], [], []]], "tape": []}),
+        ("an ask by full id in a frame of five lists: an ask, so it counts", 1,
+         {"fn": "on_frame", "args": [4, [[wide], [], [[mid]], [], []]], "tape": []}),
+        ("resolve's answer and chunk_of's, under on_want", 0,
+         {"fn": "on_want", "args": [4, [[g, 1]]], "tape": [["resolve", [g, 1], mid], ["chunk_of", [mid], chunk]]}),
+        ("on_want's answers, its record's ret", 0, {"fn": "on_want", "args": [4, [[g, 1]]], "tape": [], "ret": [chunk]}),
+        ("on_want's answers, asked on on_frame's tape", 0,
+         {"fn": "on_frame", "args": [4, [[], [], [], [], []]], "tape": [["on_want", [4, [[g, 1]]], [chunk]]]}),
+        ("on_want's answers, asked on another function's tape: so it counts", 1,
+         {"fn": "send_have", "args": [4, g], "tape": [["on_want", [4, [[g, 1]]], [chunk]]]}),
     ]
     bad = 0
     for name, want, rec in cases:

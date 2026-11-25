@@ -114,6 +114,17 @@ def have(tr, h):                        # haveOf: ["have", g, bits, offer, claim
             tr.flag(getattr(h, "complete", None), "a HAVE's complete")]
 
 
+def frame(tr, fr):                      # FrameSeacast: on_frame's five lists, each in the frame's order, its chunks
+    return [[tr.wchunk(f) for f in fr.chunks], [have(tr, h) for h in fr.haves],     # wide (chunkF), its HAVEs (haveOf),
+            [tr.ask_seacast(a) for a in fr.asks],                                    # its asks (askSeacastOf), its
+            [tr.rel_msg(x, "graft") for x in fr.grafts], [tr.rel_msg(x, "prune") for x in fr.prunes]]  # GRAFTs, PRUNEs
+
+
+def publish_args(tr, block, d, shards):  # blockOf, descriptor, shardOf: seacast-lite.md's form, [index, proof, blob]
+    return [tr.block(block), tr.descriptor(d),
+            [[tr.nat(x.index), [h.hex() for h in x.proof], tr.blob(x.data)] for x in shards]]
+
+
 def cover(tr, r):
     """coverOf: a record of a node or of a link, {"id": p, "families": [...], "high": b}, with the fields it has
     (link_cover's has no id, floor_candidates' no flag). Any other attribute has no place in the form."""
@@ -376,6 +387,10 @@ TABLE = {
     # §4.2's gate for cells: what came before it, tested once it opens (§4.5's drop_outside), and the gate itself
     "drop_outside": ("g", g_only, none),
     "on_header_validated": ("root", lambda tr, root: [root_key(root)], none),
+    # the roots: §4's frame, §4.8's heartbeat and §4.7's source
+    "on_frame": ("p, frame", lambda tr, p, fr: [peer(tr, p), frame(tr, fr)], none),
+    "on_heartbeat": ("", lambda tr: [], none),
+    "publish": ("block, d, shards", publish_args, none),
 }
 
 if set(TABLE) != set(manifest_seacast.COVERED):
@@ -420,7 +435,8 @@ def ret_seacast(tr, fn, r):
 
 # ---- the arity check
 
-HELPERS = ("nat", "integer", "flag", "nothing", "chunk", "wchunk", "descriptor", "blob", "mid_of", "key", "ask_key",
+HELPERS = ("nat", "integer", "flag", "nothing", "chunk", "wchunk", "descriptor", "blob", "block", "mid_of", "key",
+           "ask_key",
            "ask_seacast", "qentry", "qmsg", "qmsg_seacast", "rel_msg", "offer", "holding", "ihave_entry")
 
 
@@ -534,6 +550,10 @@ def stand_in():
         "track_in_flight": (one(4, f, 11660), None), "window_release": (one(4, g, 1), None),
         "window_timeout": (one((4, g, 1), 2.5), None), "noted": (one(4, entry) + one(4, None), entry),
         "next_to_send": (one(4), tr.WAIT), "drop_outside": (one(g), None), "on_header_validated": (one(root), None),
+        "on_frame": (one(4, NS(chunks=[f], haves=[h], asks=[ask, flagged], grafts=[graft], prunes=[prune])), None),
+        "on_heartbeat": (one(), None),
+        "publish": (one(NS(slot=1, body=None), d, [NS(index=0, proof=[bytes(32)], data=Blob(11660, ("payload", 1)))]),
+                    None),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_seacast: the check's stubs are not the table's names: "
@@ -541,12 +561,37 @@ def stand_in():
     return tr, stubs
 
 
+def top_elements(s):
+    """An array pattern's elements, split at its own commas: one nested in a bracket stays whole."""
+    out, depth, cur = [], 0, ""
+    for ch in s:
+        depth += {"[": 1, "]": -1}.get(ch, 0)
+        if ch == "," and depth == 0:
+            out.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    return [x.strip() for x in out + [cur] if x.strip()]
+
+
 def runv2_cases(text):
-    """runSeacast's argument arrays by name, from its `| "name", #[a, b, ...] =>` cases: {name: {length, ...}}."""
+    """runSeacast's argument arrays by name, from its `| "name", #[a, b, ...] =>` cases: {name: {length: {place:
+    length}}}, each array's length with the length of each array pattern nested in it by its place (on_frame's
+    `#[p, .arr #[cs, hs, ks, gs, ps]]`: {2: {1: 5}})."""
     body = text[text.index("def runSeacast"):]
     out = {}
-    for m in re.finditer(r'^\s*\|\s*"(\w+)",\s*#\[([^\]]*)\]\s*=>', body, re.M):
-        out.setdefault(m.group(1), set()).add(len([x for x in m.group(2).split(",") if x.strip()]))
+    for m in re.finditer(r'^\s*\|\s*"(\w+)",\s*#\[', body, re.M):
+        i = j = m.end()
+        depth = 1
+        while depth and j < len(body):
+            depth += {"[": 1, "]": -1}.get(body[j], 0)
+            j += 1
+        if depth or not re.match(r"\s*=>", body[j:]):
+            continue
+        els = top_elements(body[i:j - 1])
+        inner = {k: len(top_elements(n.group(1))) for k, e in enumerate(els)
+                 if (n := re.fullmatch(r"\.arr\s*#\[(.*)\]", e, re.S))}
+        out.setdefault(m.group(1), {})[len(els)] = inner
     return out
 
 
@@ -573,7 +618,7 @@ def check_lines(replay_lean_path, root=ROOT):
     out = []
     for name in manifest_seacast.COVERED:
         calls, r = stubs[name]
-        want, bad = cases.get(name, set()), []
+        want, bad = set(cases.get(name, {})), []
         if not want:
             bad.append("no case in runSeacast")
         if docs.get(name) != TABLE[name][0]:
@@ -581,13 +626,18 @@ def check_lines(replay_lean_path, root=ROOT):
         got = []
         for args, kw in calls:
             try:
-                n = len(json.loads(json.dumps(args_seacast(tr, name, args, kw))))
+                a = json.loads(json.dumps(args_seacast(tr, name, args, kw)))
             except Exception as e:      # noqa: BLE001: any failure of a writer on its stub is a difference
                 bad.append(f"args_seacast on {len(args)} arguments and keywords {sorted(kw)}: {type(e).__name__}: {e}")
                 continue
+            n = len(a)
             got.append(n)
             if want and n not in want:
                 bad.append(f"args_seacast gives {n} args, runSeacast's case takes {' or '.join(map(str, sorted(want)))}")
+            for k, m in cases.get(name, {}).get(n, {}).items():    # an array nested in the case's, by its length
+                if not isinstance(a[k], list) or len(a[k]) != m:
+                    bad.append(f"args_seacast gives {len(a[k]) if isinstance(a[k], list) else 'no list'} at its "
+                               f"argument {k + 1}, runSeacast's case takes an array of {m} there")
         for n in sorted(want - set(got)):   # each count runSeacast takes is given by some stub call: a case none
             bad.append(f"runSeacast's case takes {n} args, which no stub call gives")    # exercises is not checked
         try:
