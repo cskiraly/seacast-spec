@@ -93,6 +93,12 @@ one to one.
   the twin has, a constant of the trace's nodes line, a function in the manifest's lists, a question, or a value
   that holds no node state. A function that a covered or kept function calls must itself be covered, kept or a
   question. `gen.py --check` holds the manifest's questions to what the code asks.
+- `seacast.md`'s `propose_colour` has no twin and is in none of the manifest's lists. No function calls it:
+  `maintain_relations` grafts toward the floor of every colour separately (§4.1), so no colour is proposed over
+  another. The function is left from the first draft's balanced colouring at GRAFT. A limit: no check holds the
+  document's functions to the manifest's lists. The closure check starts from the covered and kept functions and
+  follows their calls, so it never reaches a function that nothing calls. Example: a function added to `seacast.md`
+  that nothing calls and no list names passes every step, as `propose_colour` does.
 
 ## The record
 

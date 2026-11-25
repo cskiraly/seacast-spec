@@ -59,7 +59,8 @@ def dropOutside (g : Group) : M2 m Unit := do
   -- A limit: a record the Python makes can be refused. Example: the toy's `release_places` deletes a peer's last
   -- group and keeps its empty `want_p` row; the Python's loop puts that peer on the tape, the twin's tables hold no
   -- empty row, and `wantPOrder` refuses the record. No recorded cell calls the gate (`on_header_validated`, this
-  -- function's one caller), and no K4 draw has such a row.
+  -- function's one caller), and no K4 draw has such a row. Nor does the replay tell a row deleted from a row left
+  -- empty: the state is compared entry by entry, (p, g), and an empty row has no entry.
   let all ← allWantPAll
   let mut qs : List Peer := []
   for q in ← NodeSeacast.wantPOrder (all.map (·.1)) do
@@ -136,7 +137,10 @@ def onHeaderValidated (root : Root) : M2 m Unit := do
   if (← allTiedRoot root).isEmpty then
     let _ ← lite (popTiedRoot root)
     if there then branch "on_header_validated: the root's ties gone"
-  -- `for g in groups:` every column and row group of the block, in `cell_groups`' order, read from the tape
+  -- `for g in groups:` every column and row group of the block, in `cell_groups`' order, read from the tape.
+  -- A limit: the order is read, not computed, and any permutation of `groups` the tape gives is followed. Example: on
+  -- a pass over two groups where neither drops nor retries anything, a tape with its order entry and the two
+  -- groups' entries reversed together replays clean, though the Python's order is `cell_groups`'.
   for g in ← NodeSeacast.groupsOrder "on_header_validated" groups do
     dropOutside g                                             -- §4.5: the asks that came before the header
     for a in ← lite (ledger g) do                             -- offered meanwhile, or released, asked for now
