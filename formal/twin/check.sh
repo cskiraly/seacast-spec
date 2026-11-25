@@ -851,9 +851,10 @@ s_seacastdirected() {   # traced alone: the replays are the next step's
   f=$OUT/seacastdirected/asked_h.err   # MB8's calls each raised at their key (RAISED_AT): as many raises as calls
   has -x -F "directed_seacast: raised: MB8 KeyError $(sed -n 's/^directed_seacast: MB8: \([0-9]*\)$/\1/p' "$f")" "$f" \
     || no "asked_h: its MB8 calls did not each raise at their key (asked_h.err)"
-  k=$(echo $SDIRS | wc -w)   # SDIRS names the sets and gives the count in the lines: a set left out would shrink both
+  k=$(echo $SDIRS | wc -w)   # SDIRS names the sets and gives the count in the lines: a set left out would shrink both.
+  #                            The replays and seeds steps read SDIRS too and do not repeat this: a run of either
+  #                            without this step is not held to 12
   [ "$k" = 12 ] || no "SDIRS holds $k sets, not directed_seacast.py's 12"
-  k=$(echo $SDIRS | wc -w)
   echo "  $(ls "$OUT"/seacastdirected/*.jsonl.gz 2> /dev/null | wc -l) of $k directed sets under seacast.md traced"
 }
 s_seacastdirectedreplays() {
