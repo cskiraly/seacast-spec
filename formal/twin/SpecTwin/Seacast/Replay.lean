@@ -277,7 +277,8 @@ def callNamesSeacast : List String :=
    "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
    "open_sampling_link", "choice", "own_interest", "send_have", "serve_standing", "owed_missing", "repair_verdict",
    "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join", "candidates", "in_pushers",
-   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in", "filter_entry", "cell_groups"]
+   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in", "filter_entry", "cell_groups",
+   "joined_peers", "joined_types", "related", "sampled_types", "on_want"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
