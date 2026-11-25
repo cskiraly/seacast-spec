@@ -239,7 +239,8 @@ statement Refine.promiseDue_parks : ∀ {a : SpecTwin.Key} {p : SpecTwin.Peer} {
           rsampleAsked := st.rsampleAsked, rsampleFinal := st.rsampleFinal, served := st.served,
           offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed, probeAnswers := st.probeAnswers,
           probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom, samplesInFlight := st.samplesInFlight,
-          heldSamples := st.heldSamples, forwarded := st.forwarded, servedHb := st.servedHb }
+          heldSamples := st.heldSamples, forwarded := st.forwarded, servedHb := st.servedHb,
+          sentSeacast := st.sentSeacast }
 statement Refine.promiseDue_refines : ∀ (kind ord : Type) [inst : DecidableEq kind] [inst_1 : Inhabited kind]
   [inst_2 : NoStallEquiv.kind_EnumClass kind] [inst_3 : DecidableEq ord] [inst_4 : Inhabited ord]
   [inst_5 : NoStallEquiv.ord_EnumClass ord] {n₀ : SpecTwin.Peer} {bg : Refine.MState kind ord}

@@ -1033,7 +1033,7 @@ statement Refine.Carry.parkedP_park_other : ∀ {st : SpecTwin.State} {now t : F
           served := st.served, offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed,
           probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
           samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded,
-          servedHb := st.servedHb }
+          servedHb := st.servedHb, sentSeacast := st.sentSeacast }
         q g' =
       Refine.Ask.parkedP now st q g'
 statement Refine.Carry.parkedP_park_self : ∀ {st : SpecTwin.State} {now t : Float} {p : SpecTwin.Peer}
@@ -1058,7 +1058,7 @@ statement Refine.Carry.parkedP_park_self : ∀ {st : SpecTwin.State} {now t : Fl
         served := st.served, offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed,
         probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
         samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded,
-        servedHb := st.servedHb }
+        servedHb := st.servedHb, sentSeacast := st.sentSeacast }
       p g =
     decide (now < t)
 statement Refine.Carry.parkedWorld_parked_other : ∀ {i : Nat} {a : SpecTwin.Key} {p : SpecTwin.Peer}
@@ -1314,7 +1314,7 @@ statement Refine.Carry.promisedP_erase : ∀ {st : SpecTwin.State} {a : SpecTwin
           served := st.served, offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed,
           probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
           samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded,
-          servedHb := st.servedHb }
+          servedHb := st.servedHb, sentSeacast := st.sentSeacast }
         q k =
       true ↔
     ∃ b, b.chunk = k ∧ (b, q) ≠ (a, p) ∧ (b, q) ∈ st.promises
@@ -1340,7 +1340,7 @@ statement Refine.Carry.promisedP_erase_last : ∀ {st : SpecTwin.State} {a : Spe
           served := st.served, offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed,
           probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
           samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded,
-          servedHb := st.servedHb }
+          servedHb := st.servedHb, sentSeacast := st.sentSeacast }
         p a.chunk =
       false
 statement Refine.Carry.promisedP_erase_more : ∀ {st : SpecTwin.State} {a : SpecTwin.Key} {p : SpecTwin.Peer},
@@ -1365,7 +1365,7 @@ statement Refine.Carry.promisedP_erase_more : ∀ {st : SpecTwin.State} {a : Spe
           served := st.served, offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed,
           probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
           samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded,
-          servedHb := st.servedHb }
+          servedHb := st.servedHb, sentSeacast := st.sentSeacast }
         p a.chunk =
       true
 statement Refine.Carry.promisedP_erase_other : ∀ {st : SpecTwin.State} {a : SpecTwin.Key} {p q : SpecTwin.Peer}
@@ -1391,7 +1391,7 @@ statement Refine.Carry.promisedP_erase_other : ∀ {st : SpecTwin.State} {a : Sp
           served := st.served, offeredTo := st.offeredTo, wantP := st.wantP, probeServed := st.probeServed,
           probeAnswers := st.probeAnswers, probeWaiting := st.probeWaiting, sampledFrom := st.sampledFrom,
           samplesInFlight := st.samplesInFlight, heldSamples := st.heldSamples, forwarded := st.forwarded,
-          servedHb := st.servedHb }
+          servedHb := st.servedHb, sentSeacast := st.sentSeacast }
         q k =
       Refine.Ask.promisedP st q k
 statement Refine.Carry.promisedP_iff : ∀ {st : SpecTwin.State} {q : SpecTwin.Peer} {k : SpecTwin.Chunk},
@@ -1479,7 +1479,7 @@ statement Refine.Carry.run_erasePromise : ∀ {ctx : SpecTwin.Ctx} {ans : Refine
             wantP := __src.wantP, probeServed := __src.probeServed, probeAnswers := __src.probeAnswers,
             probeWaiting := __src.probeWaiting, sampledFrom := __src.sampledFrom,
             samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples, forwarded := __src.forwarded,
-            servedHb := __src.servedHb },
+            servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
         timers := w.timers, made := w.made, crashed := w.crashed })
 statement Refine.Carry.run_held_or_window_or_clause : ∀ (kind ord : Type) [inst : DecidableEq kind]
   [inst_1 : Inhabited kind] [inst_2 : NoStallEquiv.kind_EnumClass kind] [inst_3 : DecidableEq ord]
@@ -1534,7 +1534,8 @@ statement Refine.Carry.run_setPark : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.
             served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP,
             probeServed := __src.probeServed, probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting,
             sampledFrom := __src.sampledFrom, samplesInFlight := __src.samplesInFlight,
-            heldSamples := __src.heldSamples, forwarded := __src.forwarded, servedHb := __src.servedHb },
+            heldSamples := __src.heldSamples, forwarded := __src.forwarded, servedHb := __src.servedHb,
+            sentSeacast := __src.sentSeacast },
         timers := w.timers, made := w.made, crashed := w.crashed })
 statement Refine.Carry.stalledStart_after_facts : (Refine.Ask.retryFire 0 Refine.Ask.kA Refine.Ask.ctx1
           Refine.Carry.ansExpired Refine.Carry.stalledStart).timers.length =
@@ -3464,7 +3465,7 @@ fun i a p ctx w =>
         rsampleFinal := __src.rsampleFinal, served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP,
         probeServed := __src.probeServed, probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting,
         sampledFrom := __src.sampledFrom, samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples,
-        forwarded := __src.forwarded, servedHb := __src.servedHb },
+        forwarded := __src.forwarded, servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
     timers := w.timers.eraseIdx i, made := w.made, crashed := w.crashed }
 definition Refine.Carry.promState : (kind ord : Type) →
   SpecTwin.Peer → Bool → Bool → Bool → (SpecTwin.Peer → Bool) → (SpecTwin.Peer → Bool) → Refine.Ask.MState kind ord :=
@@ -4213,7 +4214,7 @@ fingerprint statement Refine.Carry.control_start : 1276033131
 fingerprint statement Refine.Carry.covered_keeps_window : 2721824688
 fingerprint statement Refine.Carry.covered_preserves : 2680549103
 fingerprint statement Refine.Carry.covered_run_keeps_work : 3609428293
-fingerprint statement Refine.Carry.empty_is_init : 1288710358
+fingerprint statement Refine.Carry.empty_is_init : 2734845123
 fingerprint statement Refine.Carry.held_last_open_breaks_window_retry : 1072282744
 fingerprint statement Refine.Carry.idleButPromises_of_empty : 1816332951
 fingerprint statement Refine.Carry.idleState_invariants : 3166637346
@@ -4229,8 +4230,8 @@ fingerprint statement Refine.Carry.open_window_is_work : 3789128469
 fingerprint statement Refine.Carry.parkOther_preserves : 1185946230
 fingerprint statement Refine.Carry.parkOther_tr_intro : 2898125293
 fingerprint statement Refine.Carry.parkedP_of_park : 4013936021
-fingerprint statement Refine.Carry.parkedP_park_other : 2392772044
-fingerprint statement Refine.Carry.parkedP_park_self : 1786662817
+fingerprint statement Refine.Carry.parkedP_park_other : 1525998891
+fingerprint statement Refine.Carry.parkedP_park_self : 1293448863
 fingerprint statement Refine.Carry.parkedWorld_parked_other : 673608832
 fingerprint statement Refine.Carry.parkedWorld_parked_self : 867712671
 fingerprint statement Refine.Carry.parkedWorld_promised_last : 990343731
@@ -4258,10 +4259,10 @@ fingerprint statement Refine.Carry.promise_step_applies : 3875742318
 fingerprint statement Refine.Carry.promisedOne_facts : 1215168887
 fingerprint statement Refine.Carry.promisedOne_idle : 3081272521
 fingerprint statement Refine.Carry.promisedOne_promised_offered : 327740318
-fingerprint statement Refine.Carry.promisedP_erase : 81980669
-fingerprint statement Refine.Carry.promisedP_erase_last : 2406382762
-fingerprint statement Refine.Carry.promisedP_erase_more : 1216031415
-fingerprint statement Refine.Carry.promisedP_erase_other : 367630023
+fingerprint statement Refine.Carry.promisedP_erase : 3441597703
+fingerprint statement Refine.Carry.promisedP_erase_last : 1526507062
+fingerprint statement Refine.Carry.promisedP_erase_more : 2508324635
+fingerprint statement Refine.Carry.promisedP_erase_other : 2966405824
 fingerprint statement Refine.Carry.promisedP_iff : 1290099549
 fingerprint statement Refine.Carry.promisedP_of_get : 1945042816
 fingerprint statement Refine.Carry.promisedP_of_promises : 3678383776
@@ -4274,11 +4275,11 @@ fingerprint statement Refine.Carry.retryArmedP_erase_promise : 3969881993
 fingerprint statement Refine.Carry.retryAsk_preserves : 3300164705
 fingerprint statement Refine.Carry.retryFire_expired : 940279426
 fingerprint statement Refine.Carry.retryNoop_preserves : 1515431136
-fingerprint statement Refine.Carry.run_erasePromise : 2141096697
+fingerprint statement Refine.Carry.run_erasePromise : 1502435657
 fingerprint statement Refine.Carry.run_held_or_window_or_clause : 2645247337
 fingerprint statement Refine.Carry.run_promise : 3704642926
 fingerprint statement Refine.Carry.run_safety_twin : 2726082949
-fingerprint statement Refine.Carry.run_setPark : 3086703096
+fingerprint statement Refine.Carry.run_setPark : 1180146108
 fingerprint statement Refine.Carry.stalledStart_after_facts : 1688560669
 fingerprint statement Refine.Carry.stalledStart_asks_facts : 4078296021
 fingerprint statement Refine.Carry.stalledStart_facts : 4173713410
@@ -4376,13 +4377,13 @@ fingerprint definition Refine.Carry.cWitness : 650204645 2969214289
 fingerprint definition Refine.Carry.cWitnessAfter : 650204645 643087691
 fingerprint definition Refine.Carry.idleState : 3338744451 805566826
 fingerprint definition Refine.Carry.n0 : 1157460454 1172186728
-fingerprint definition Refine.Carry.parkedWorld : 3478904157 692429081
+fingerprint definition Refine.Carry.parkedWorld : 3478904157 4120708556
 fingerprint definition Refine.Carry.promState : 2891830844 746488015
 fingerprint definition Refine.Carry.promiseFire : 4017565922 811577998
-fingerprint definition Refine.Carry.promisedOne : 840518160 2958436906
-fingerprint definition Refine.Carry.quietHeld : 840518160 2658313440
+fingerprint definition Refine.Carry.promisedOne : 840518160 3121328601
+fingerprint definition Refine.Carry.quietHeld : 840518160 3256885852
 fingerprint definition Refine.Carry.rOn : 1455053208 829348486
-fingerprint definition Refine.Carry.stalledStart : 840518160 1740890851
+fingerprint definition Refine.Carry.stalledStart : 840518160 2404956422
 fingerprint definition Refine.Carry.withBlocks : 672814338 1393218655
 fingerprint inductive Refine.Carry.Cfg : 2301245127
 fingerprint constructor Refine.Carry.Cfg.mk : 2175270735

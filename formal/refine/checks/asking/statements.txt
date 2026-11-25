@@ -629,7 +629,7 @@ statement Refine.Ask.run_mayAsk : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.Ans
               wantP := __src.wantP, probeServed := __src.probeServed, probeAnswers := __src.probeAnswers,
               probeWaiting := __src.probeWaiting, sampledFrom := __src.sampledFrom,
               samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples, forwarded := __src.forwarded,
-              servedHb := __src.servedHb },
+              servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
           timers := w.timers ++ [(ctx.c.IWANT_WINDOW + ctx.c.RETRY_SLACK, SpecTwin.Timer.retryOffer a)], made := w.made,
           crashed := w.crashed })
 statement Refine.Ask.run_mineBits : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.Answers} {w : Refine.Ask.World}
@@ -696,7 +696,7 @@ statement Refine.Ask.run_retryOffer_asks : ∀ {ctx : SpecTwin.Ctx} {ans : Refin
                           probeServed := __src.probeServed, probeAnswers := __src.probeAnswers,
                           probeWaiting := __src.probeWaiting, sampledFrom := __src.sampledFrom,
                           samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples,
-                          forwarded := __src.forwarded, servedHb := __src.servedHb },
+                          forwarded := __src.forwarded, servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
                       timers := w.timers ++ [(ctx.c.IWANT_WINDOW + ctx.c.RETRY_SLACK, SpecTwin.Timer.retryOffer a)],
                       made := w.made, crashed := w.crashed }.push
                   (Refine.Ask.pickP ctx ans w.st a) SpecTwin.Lane.normal (Refine.Ask.entryOf (SpecTwin.Msg.iwant [a]))
@@ -731,7 +731,7 @@ statement Refine.Ask.run_retryOffer_asks : ∀ {ctx : SpecTwin.Ctx} {ans : Refin
                       wantP := __src.wantP, probeServed := __src.probeServed, probeAnswers := __src.probeAnswers,
                       probeWaiting := __src.probeWaiting, sampledFrom := __src.sampledFrom,
                       samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples,
-                      forwarded := __src.forwarded, servedHb := __src.servedHb },
+                      forwarded := __src.forwarded, servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
                   timers := w.timers ++ [(ctx.c.IWANT_WINDOW + ctx.c.RETRY_SLACK, SpecTwin.Timer.retryOffer a)],
                   made := w.made, crashed := w.crashed }
 statement Refine.Ask.run_setAskedAt : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.Answers} {w : Refine.Ask.World}
@@ -763,7 +763,7 @@ statement Refine.Ask.run_setAskedAt : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask
             wantP := __src.wantP, probeServed := __src.probeServed, probeAnswers := __src.probeAnswers,
             probeWaiting := __src.probeWaiting, sampledFrom := __src.sampledFrom,
             samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples, forwarded := __src.forwarded,
-            servedHb := __src.servedHb },
+            servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
         timers := w.timers, made := w.made, crashed := w.crashed })
 statement Refine.Ask.run_setTried : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.Answers} {w : Refine.Ask.World}
   (a : SpecTwin.Key) (p : SpecTwin.Peer) (t : Float),
@@ -794,7 +794,8 @@ statement Refine.Ask.run_setTried : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.A
             served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP,
             probeServed := __src.probeServed, probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting,
             sampledFrom := __src.sampledFrom, samplesInFlight := __src.samplesInFlight,
-            heldSamples := __src.heldSamples, forwarded := __src.forwarded, servedHb := __src.servedHb },
+            heldSamples := __src.heldSamples, forwarded := __src.forwarded, servedHb := __src.servedHb,
+            sentSeacast := __src.sentSeacast },
         timers := w.timers, made := w.made, crashed := w.crashed })
 statement Refine.Ask.run_stopPull : ∀ {ctx : SpecTwin.Ctx} {ans : Refine.Ask.Answers} {w : Refine.Ask.World}
   (g : SpecTwin.Group), Refine.Ask.run (SpecTwin.Tables.stopPull g) ctx ans w = (Refine.Ask.stopP w.st g, w)
@@ -1467,7 +1468,7 @@ fun w p l e =>
         rsampleFinal := __src.rsampleFinal, served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP,
         probeServed := __src.probeServed, probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting,
         sampledFrom := __src.sampledFrom, samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples,
-        forwarded := __src.forwarded, servedHb := __src.servedHb },
+        forwarded := __src.forwarded, servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
     timers := w.timers,
     made := fun k q => w.made k q + if q = p then (List.filter (fun x => x.chunk == k) e.asks).length else 0,
     crashed := w.crashed }
@@ -1571,7 +1572,7 @@ fun i a ctx ans w =>
           served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP, probeServed := __src.probeServed,
           probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting, sampledFrom := __src.sampledFrom,
           samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples, forwarded := __src.forwarded,
-          servedHb := __src.servedHb },
+          servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
       timers := w.timers.eraseIdx i ++ [(ctx.c.IWANT_WINDOW + ctx.c.RETRY_SLACK, SpecTwin.Timer.retryOffer a)],
       made := w.made, crashed := w.crashed };
   if ans.admits «pick» (SpecTwin.Msg.iwant [a]) false = true then
@@ -1621,7 +1622,7 @@ have __src := Refine.Ask.threeAnn;
       rsampleFinal := __src.rsampleFinal, served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP,
       probeServed := __src.probeServed, probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting,
       sampledFrom := __src.sampledFrom, samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples,
-      forwarded := __src.forwarded, servedHb := __src.servedHb },
+      forwarded := __src.forwarded, servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
   timers := [(0.205, SpecTwin.Timer.retryOffer Refine.Ask.kA)], made := __src.made, crashed := __src.crashed }
 definition Refine.Ask.heldP : SpecTwin.State → SpecTwin.Chunk → Bool :=
 fun st k => (st.mine.getD k.fst 0).has k.snd
@@ -1865,7 +1866,7 @@ fun t4 =>
         rsampleFinal := __src.rsampleFinal, served := __src.served, offeredTo := __src.offeredTo, wantP := __src.wantP,
         probeServed := __src.probeServed, probeAnswers := __src.probeAnswers, probeWaiting := __src.probeWaiting,
         sampledFrom := __src.sampledFrom, samplesInFlight := __src.samplesInFlight, heldSamples := __src.heldSamples,
-        forwarded := __src.forwarded, servedHb := __src.servedHb },
+        forwarded := __src.forwarded, servedHb := __src.servedHb, sentSeacast := __src.sentSeacast },
     timers := [(0.205, SpecTwin.Timer.retryOffer Refine.Ask.kA)],
     made := fun k q =>
       if k = Refine.Ask.kA.chunk then if q = 1 ∨ q = 2 then 1 else if q = 3 then 3 else if q = 4 then 5 else 0 else 0 }
@@ -2065,7 +2066,7 @@ fingerprint statement Refine.Ask.run_held : 223838587
 fingerprint statement Refine.Ask.run_ite : 2076800637
 fingerprint statement Refine.Ask.run_lane : 2430635604
 fingerprint statement Refine.Ask.run_leastRecentlyTried : 3650196432
-fingerprint statement Refine.Ask.run_mayAsk : 40411614
+fingerprint statement Refine.Ask.run_mayAsk : 2361767521
 fingerprint statement Refine.Ask.run_mineBits : 4076988308
 fingerprint statement Refine.Ask.run_offeredBits : 3393315141
 fingerprint statement Refine.Ask.run_offersOf : 1587359163
@@ -2075,9 +2076,9 @@ fingerprint statement Refine.Ask.run_parkUntil : 2307952689
 fingerprint statement Refine.Ask.run_parked : 1365878050
 fingerprint statement Refine.Ask.run_pure : 3186924095
 fingerprint statement Refine.Ask.run_read : 3384136522
-fingerprint statement Refine.Ask.run_retryOffer_asks : 1356978102
-fingerprint statement Refine.Ask.run_setAskedAt : 1026824712
-fingerprint statement Refine.Ask.run_setTried : 2211001450
+fingerprint statement Refine.Ask.run_retryOffer_asks : 2112077769
+fingerprint statement Refine.Ask.run_setAskedAt : 913081099
+fingerprint statement Refine.Ask.run_setTried : 1592560209
 fingerprint statement Refine.Ask.run_stopPull : 419504177
 fingerprint statement Refine.Ask.run_tiedToRoot : 3159544024
 fingerprint statement Refine.Ask.run_tried : 3165323921
@@ -2233,29 +2234,29 @@ fingerprint definition Refine.Ask.World.mk._flat_ctor : 458643697 357683465
 fingerprint definition Refine.Ask.World.mk.noConfusion : 495700032 1327984733
 fingerprint definition Refine.Ask.World.noConfusion : 4111884424 3442692233
 fingerprint definition Refine.Ask.World.noConfusionType : 1972120583 2314692525
-fingerprint definition Refine.Ask.World.push : 3291377923 1490509568
+fingerprint definition Refine.Ask.World.push : 3291377923 4241772104
 fingerprint definition Refine.Ask.World.recOn : 3962436978 2579647597
 fingerprint definition Refine.Ask.World.st : 1387758646 552212811
-fingerprint definition Refine.Ask.World.st._default : 734558010 4021713837
+fingerprint definition Refine.Ask.World.st._default : 734558010 2105011318
 fingerprint definition Refine.Ask.World.timers : 3047342305 3629616932
 fingerprint definition Refine.Ask.World.timers._default : 2598820738 2945939570
 fingerprint definition Refine.Ask.alpha : 3351233345 1260750114
 fingerprint definition Refine.Ask.announcersP : 2324005603 1296082738
 fingerprint definition Refine.Ask.ans1 : 2127011278 4126986432
 fingerprint definition Refine.Ask.ansFull : 2127011278 1134635055
-fingerprint definition Refine.Ask.askedWorld : 1041952349 2477040664
+fingerprint definition Refine.Ask.askedWorld : 1041952349 1976613477
 fingerprint definition Refine.Ask.candsP : 1519443175 773869987
 fingerprint definition Refine.Ask.ctx1 : 1043613046 1469018112
 fingerprint definition Refine.Ask.entryOf : 2137011479 3796726456
 fingerprint definition Refine.Ask.entryOf.match_1 : 1969191427 2127814744
 fingerprint definition Refine.Ask.freeP : 1519443175 430359550
-fingerprint definition Refine.Ask.heldLast : 840518160 1179641971
+fingerprint definition Refine.Ask.heldLast : 840518160 3347836088
 fingerprint definition Refine.Ask.heldP : 3345324911 1174862875
 fingerprint definition Refine.Ask.instMonadStateOfStateStateMWorld : 1501888696 393977384
 fingerprint definition Refine.Ask.instNode61I : 1237836181 1077703993
 fingerprint definition Refine.Ask.instTablesI : 1765211228 3972018996
 fingerprint definition Refine.Ask.kA : 3870963693 1479526603
-fingerprint definition Refine.Ask.laterAsk : 576304811 1794109127
+fingerprint definition Refine.Ask.laterAsk : 576304811 1929784666
 fingerprint definition Refine.Ask.loopP : 3527879828 1538251260
 fingerprint definition Refine.Ask.loopP._f : 3697848126 2896835776
 fingerprint definition Refine.Ask.loopP._sunfold : 3527879828 2437716800
@@ -2284,7 +2285,7 @@ fingerprint definition Refine.Ask.retryArmedP.match_4 : 2545649084 3216673842
 fingerprint definition Refine.Ask.retryFire : 1041952349 402272187
 fingerprint definition Refine.Ask.run : 761291896 3409781018
 fingerprint definition Refine.Ask.stopP : 949096890 4290301617
-fingerprint definition Refine.Ask.threeAnn : 840518160 3376948187
+fingerprint definition Refine.Ask.threeAnn : 840518160 4264030638
 fingerprint definition Refine.Ask.tiedP : 1606262045 2124318667
 fingerprint definition Refine.Ask.tiedP.match_1 : 2905842104 3480120348
 fingerprint definition Refine.Ask.tiedP.match_3 : 108034822 2597909489
