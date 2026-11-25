@@ -65,6 +65,13 @@ The sets:
   node, to a peer outside the set's nodes, with a chunk of ours in flight to it and another peer in line. The close
   calls the document's `claims_close` and `leave_line` at both ends, and `free_room` for the chunk: five records, as
   the toy makes them at a close under --churn. The peer's two are its only records.
+- **gate_o** and **gate_v** (D, nodes 2 to 30), the gate of §4.2 and the drop of §4.5: `drop_outside(g)` in gate_o
+  (O1 to O6) and `on_header_validated(R)`, R the published block's root, in gate_v (V1 to V8), each on a state whose
+  path is one and the same for every record of the scenario. Each record starts from the serving sets' state, with
+  the gate's tables (GATE_EMPTIED), the offers and the reservations emptied. A record of gate_v calls drop_outside on
+  each of R's 132 groups, so it is over ten times the size of one of gate_o's, and gate_v is made at a smaller n
+  (check.sh's sdir_shape). That pass iterates a set of bytes (seacast.md's `groups`), so its order is the hash
+  seed's: gate_v's trace differs from one process to another in that order alone, and its replay does not.
 
 Beside the trace, OUT.scenarios has a line per record in the trace's order: its number from 1, its line in the trace
 (the content line the first), its node, its function, and the key of the scenario whose call made it (`setup` for the
@@ -95,6 +102,9 @@ RESET = ("join_recv", "join_sent", "owed_relations", "desc", "state", "mine", "p
 RELATIONS = ("push_in", "push_out", "grafted_in", "grafted_out", "backoff", "owed_relations")
 # the tables the window's scenarios draw or their calls write, put back before each record (the window's count and
 # line, which are no dicts, by window_start)
+# the gate's tables (§4.2's ties and waiting copies, and what their release writes), emptied before each record of the
+# gate's scenarios, beside RESET's
+GATE_EMPTIED = ("tied", "tie_slot", "pending", "pending_ids", "asked_parked", "offered", "tried", "promises")
 WINDOW_RESET = ("sent", "planned", "origin", "owed_answers", "owed", "owed_relations", "chunks", "known_id", "desc")
 CTX = {}                              # the frame: the simulator, the toy's modules, the tracer
 
@@ -152,6 +162,12 @@ def restore(raw, saved):
         cur = raw[k]
         cur.clear()
         cur.update(row)
+
+
+def empty(raw):
+    """A table emptied in the toy's own container: a lazy map (toy/bits.py's LazyMap, which has no `clear`) by its
+    dict."""
+    (raw._d if not hasattr(raw, "clear") else raw).clear()
 
 
 def window_start(nid, ns, build=False):
@@ -834,6 +850,211 @@ def w_c1(rng, nd, ns, B):
     return q
 
 
+# ---- §4.2's gate: on_header_validated(R), R the published block's root, and drop_outside(g), on D. The
+# defaults: p a link of columns (link), cg one of R's columns with the simulator's header, n its count and i below it;
+# nothing of cg held. The records start from RESET, the gate's tables emptied (GATE_EMPTIED), `offers` and the store's
+# reservations (node.reserved) empty too
+
+GX = bytes([0xab]) * 32                 # a group that is not one of R's
+
+
+def gate_root():
+    """R, the published block's root, and the block."""
+    (root, block), = CTX["sim"].blocks.items()
+    return root, block
+
+
+def gate_col(rng, nd, ns):
+    """The gate's defaults: p, cg, n, i and the column type."""
+    sim = CTX["sim"]
+    cg = rng.choice(CTX["column"])
+    T = nd._types["column"]
+    p = rng.choice(sorted(nd.peers))
+    link(ns, p, T)
+    ns["desc"][cg] = sim.ghdr[cg]
+    n = sim.ghdr[cg].count
+    return p, cg, n, rng.randrange(n), T
+
+
+def tie_at(ns, root, slot, p, g, i):
+    """p tied for index i of g under root, its tie's slot the first one (seacast-lite.md's `tie`)."""
+    F.unwrap(ns["tied"])[root][p][g].set(i)
+    F.unwrap(ns["tie_slot"]).setdefault((root, p), slot)
+
+
+def other_link(rng, nd, ns, T, *but):
+    """Another peer than `but`, a link of T as `link` makes one."""
+    q = rng.choice(sorted(set(nd.peers) - set(but)))
+    link(ns, q, T)
+    return q
+
+
+def v1(rng, nd, ns, B):
+    """V1 (D): the block's cell b of cg waited at the gate, beside a copy under R of a group that is not R's (GX); both
+    in pending[R] and pending_ids, each with its reservation; no ties. -> on_header_validated: a cell that waited
+    resumes (once: cg's); GX's copy stays in pending[R]."""
+    sim, Wm = CTX["sim"], CTX["Wm"]
+    root, block = gate_root()
+    p, cg, n, b, T = gate_col(rng, nd, ns)
+    f = sim.canonical[cg][b]
+    fx = types.SimpleNamespace(slot=block.slot, beacon_block_root=root, group=GX, index=0,
+                               data=types.SimpleNamespace(tag=("gate", 0)))
+    fx.mid = GX + (0).to_bytes(4, "little") + Wm.content_id(fx)
+    F.unwrap(ns["pending"])[root].append((p, f))
+    F.unwrap(ns["pending"])[root].append((p, fx))
+    ids = F.unwrap(ns["pending_ids"])
+    ids.add(cg + b.to_bytes(4, "little") + Wm.content_id(f))
+    ids.add(fx.mid)
+    nd.reserved[p] += 2
+    return "on_header_validated", (root,)
+
+
+def v2(rng, nd, ns, B):
+    """V2 (D): p tied for index i of cg, which p's link offers and we lack. -> on_header_validated: an offer again; a
+    sender's last tie under the root gone, with its slot; the root's ties gone."""
+    root, block = gate_root()
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    tie_at(ns, root, block.slot, p, cg, i)
+    return "on_header_validated", (root,)
+
+
+def v3(rng, nd, ns, B):
+    """V3 (D): p tied for index n of cg, beyond its count, known now. -> on_header_validated: an index beyond the count
+    learnt meanwhile; a sender's last tie under the root gone, with its slot; the root's ties gone."""
+    root, block = gate_root()
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    tie_at(ns, root, block.slot, p, cg, n)
+    return "on_header_validated", (root,)
+
+
+def v4(rng, nd, ns, B):
+    """V4 (D): p tied for index i of cg, its JOIN for columns taken back (our JOIN to it stays), so the link has not
+    joined the type. -> on_header_validated: a tie on a link not joined for the type; a sender's last tie under the
+    root gone, with its slot; the root's ties gone."""
+    root, block = gate_root()
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    del ns["join_recv"][p][T]
+    tie_at(ns, root, block.slot, p, cg, i)
+    return "on_header_validated", (root,)
+
+
+def v5(rng, nd, ns, B):
+    """V5 (D): V2's tie, with index i of cg held. -> on_header_validated: a tied index held; a sender's last tie under
+    the root gone, with its slot; the root's ties gone."""
+    root, block = gate_root()
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    ns["mine"][cg] = B.Bits(1 << i)
+    tie_at(ns, root, block.slot, p, cg, i)
+    return "on_header_validated", (root,)
+
+
+def v6(rng, nd, ns, B):
+    """V6 (D): p tied for index i of cg and for index 0 of GX, q (another link of columns) for index i of cg alone.
+    -> on_header_validated: an offer again (p's); an offer again (q's); a sender's last tie under the root gone,
+    with its slot (q's). p stays tied for GX, with its slot, so the root's ties stay."""
+    root, block = gate_root()
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    q = other_link(rng, nd, ns, T, p)
+    tie_at(ns, root, block.slot, p, cg, i)
+    tie_at(ns, root, block.slot, p, GX, 0)
+    tie_at(ns, root, block.slot, q, cg, i)
+    return "on_header_validated", (root,)
+
+
+def v7(rng, nd, ns, B):
+    """V7 (D): a standing request of p for index 0 of ge, our JOIN to p for columns DECLARED, and one of q for index 0
+    of gk, our JOIN to q of interest ALL (ge ≠ gk columns of R, neither routed, nothing held); no ties. ->
+    drop_outside: a standing request outside, dropped (ge's, once); gk's kept."""
+    sim = CTX["sim"]
+    root, block = gate_root()
+    T = nd._types["column"]
+    ge, gk = rng.sample(CTX["column"], 2)
+    p = rng.choice(sorted(nd.peers))
+    q = other_link(rng, nd, ns, T, p)
+    link(ns, p, T)
+    ns["join_sent"][p][T] = join(T, "DECLARED")
+    for g, x in ((ge, p), (gk, q)):
+        ns["desc"][g] = sim.ghdr[g]
+        F.unwrap(ns["standing"])[g][0].add(x)
+    return "on_header_validated", (root,)
+
+
+def v8(rng, nd, ns, B):
+    """V8 (D): nothing waits at the gate: nothing pending, no ties, nothing standing, no interest bits. -> none of the
+    gate's labels: 132 calls of drop_outside on empty levels."""
+    root, block = gate_root()
+    return "on_header_validated", (root,)
+
+
+def o1(rng, nd, ns, B):
+    """O1 (D): a standing request of p for index i of cg, not routed, our JOIN to p for columns DECLARED. ->
+    drop_outside: a standing request outside, dropped."""
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    ns["join_sent"][p][T] = join(T, "DECLARED")
+    F.unwrap(ns["standing"])[cg][i].add(p)
+    return "drop_outside", (cg,)
+
+
+def o2(rng, nd, ns, B):
+    """O2 (D): a standing request of p for index i of cg, routed, our JOIN to p DECLARED with duty FORWARD; no interest
+    bit. -> none of drop_outside's labels: kept, a routed request to a forwarding node."""
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    ns["join_sent"][p][T] = join(T, "DECLARED")
+    F.unwrap(ns["standing"])[cg][i].add(p)
+    F.unwrap(ns["routed_standing"])[cg][i].add(p)
+    return "drop_outside", (cg,)
+
+
+def o3(rng, nd, ns, B):
+    """O3 (D): a standing request of p for index i of cg, not routed, and p's interest bit for it; our JOIN to p
+    DECLARED with duty NONE. -> drop_outside: a standing request outside, dropped; interest bits outside, dropped."""
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    ns["join_sent"][p][T] = join(T, "DECLARED", duty="NONE")
+    F.unwrap(ns["standing"])[cg][i].add(p)
+    ns["want_p"][p][cg] = B.Bits(1 << i)
+    return "drop_outside", (cg,)
+
+
+def o4(rng, nd, ns, B):
+    """O4 (D): p's interest bit for index i of cg, our JOIN to p of interest ALL. -> drop_outside: interest kept."""
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    ns["want_p"][p][cg] = B.Bits(1 << i)
+    return "drop_outside", (cg,)
+
+
+def o5(rng, nd, ns, B):
+    """O5 (D), the orders: standing[cg] = {i: {p1, p2}, j: {p2}} (i ≠ j); our JOIN to p1 DECLARED, to p2 of interest
+    ALL; p1's interest bit for i, p2's for j, and p3's for index 0 of GX alone (p1, p2, p3 three links of columns).
+    -> drop_outside: a standing request outside, dropped (p1's at i); interest bits outside, dropped (p1's); interest
+    kept (p2's), the last two in want_p's order."""
+    sim = CTX["sim"]
+    T = nd._types["column"]
+    cg = rng.choice(CTX["column"])
+    ns["desc"][cg] = sim.ghdr[cg]
+    i, j = rng.sample(range(sim.ghdr[cg].count), 2)
+    p1, p2, p3 = rng.sample(sorted(nd.peers), 3)
+    for q in (p1, p2, p3):
+        link(ns, q, T)
+    ns["join_sent"][p1][T] = join(T, "DECLARED")
+    st = F.unwrap(ns["standing"])
+    st[cg][i].add(p1)
+    st[cg][i].add(p2)
+    st[cg][j].add(p2)
+    ns["want_p"][p1][cg] = B.Bits(1 << i)
+    ns["want_p"][p2][cg] = B.Bits(1 << j)
+    ns["want_p"][p3][GX] = B.Bits(1)
+    return "drop_outside", (cg,)
+
+
+def o6(rng, nd, ns, B):
+    """O6 (D): O1's request, with index i of cg held. -> none of drop_outside's labels: kept, held."""
+    p, cg, n, i, T = gate_col(rng, nd, ns)
+    ns["join_sent"][p][T] = join(T, "DECLARED")
+    ns["mine"][cg] = B.Bits(1 << i)
+    F.unwrap(ns["standing"])[cg][i].add(p)
+    return "drop_outside", (cg,)
+
+
 SETS = {     # name: (frame, the nodes its records are made at, its scenarios, what each record starts from)
     "control": ("H", (2, 3, 4), {"note_claim": note_claim}, None),
     "serve_h": ("H", (2, 3, 4), {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "S5": s5, "S6": s6, "S7": s7, "S8": s8,
@@ -849,11 +1070,15 @@ SETS = {     # name: (frame, the nodes its records are made at, its scenarios, w
     "upkeep_wu": ("WU", (2, 3, 4), {"G12": g12, "G13": g13, "G14": g14, "M1": m1, "M2": m2, "M3": m3}, "upkeep"),
     "window_h": ("H", (2, 3, 4), {"A1": w_a1, "L1": w_l1, "T1": w_t1, "WT1": w_wt1, "WT2": w_wt2, "WT3": w_wt3,
                                   "N1": w_n1}, "window"),
+    "gate_o": ("D", tuple(range(2, 31)), {"O1": o1, "O2": o2, "O3": o3, "O4": o4, "O5": o5, "O6": o6}, "gate"),
+    "gate_v": ("D", tuple(range(2, 31)), {"V1": v1, "V2": v2, "V3": v3, "V4": v4, "V5": v5, "V6": v6, "V7": v7,
+                                          "V8": v8}, "gate"),
 }
 LAST = {"window_h": ("C1", w_c1)}     # a set's last step, made once after its records: its key and its scenario
 # what a record starts from: the tables put back as the build left them (all but the JOIN tables empty then), and
 # the tables emptied; under "window" the window's count and line too (window_start)
-STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS), "window": (WINDOW_RESET, ())}
+STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS), "window": (WINDOW_RESET, ()),
+          "gate": (RESET, GATE_EMPTIED)}
 FRAMES = {   # name: (run.py's arguments, the config's additions, a block published, each recording node's peers)
     "H": (HAND5, None, False, 4), "H+": (HAND5, {"MAX_PENDING_GROUPS": 1, "SERVE_BUDGET": 2}, False, 4),
     "D": (DAS30, None, True, None), "R": (HAND5 + ["--prune-backoff", "1"], {"MAX_RELATIONS": 2}, False, 4),
@@ -904,9 +1129,13 @@ def main(argv):
             for name in kept:
                 restore(F.unwrap(ns[name]), saved[k][name])
             for name in emptied:
-                F.unwrap(ns[name]).clear()
+                empty(F.unwrap(ns[name]))
             if start == "window":
                 window_start(k, ns)
+            if start == "gate":         # the offers' lists and the store's reservations, which no table holds
+                ns["offers"]._d.clear()
+                ns["offers"].listed.clear()
+                nd.reserved.clear()
             nd.want_unknown.clear()
             queues = F.unwrap(ns["queue"])
             for q in nd.peers:

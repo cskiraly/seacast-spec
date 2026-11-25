@@ -53,11 +53,13 @@
 #   small     hand5 (whole; §6.1's twelve alone; at PUBLISH), late16, and hand5 twice under seacast.md: each
 #             traced and replayed, its digest the untraced run's with the same arguments
 #   directed  the 22 directed sets, traced and replayed
-#   seacastdirected (--v2steps and the record's) the 9 directed sets under seacast.md (directed_seacast.py's),
-#             traced: each set's scenarios counted and summing to its 20000 records, serve_d's setup the publish's 132
-#             records of group_id, and window_h's last step, C1, a link's close of 5 records
-#   seacastdirectedreplays (with it) those 9 traces replayed, every record ok; a step of its own, so that each of the
-#             two fits a local scope of 285 s (serve_d's trace and its replay take about 3 min each)
+#   seacastdirected (--v2steps and the record's) the 11 directed sets under seacast.md (directed_seacast.py's),
+#             traced: each set's scenarios counted and summing to its n records (sdir_shape's: 20000, gate_v's 2000),
+#             the setup of serve_d, gate_o and gate_v the publish's 132 records of group_id, and window_h's last
+#             step, C1, a link's close of 5 records
+#   seacastdirectedreplays (with it) those 11 traces replayed, every record ok; a step of its own, so that each of
+#             the two fits a local scope of 285 s (at -j 8, the 11 sets' traces take about 3 min, and their replays
+#             about 4 min)
 #   replays   every replay above read a trace that is not empty, to its trailer, with no record mismatched and no
 #             read of the Python's left unmade
 #   headers   every trace's first line is this tree's content line, and its header of the kind its name says
@@ -73,8 +75,8 @@
 #   cells     every cell of the toy's check.py, not `none` alone: each digest golden.txt's, each replayed
 #   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of the
 #             names that are seacast-lite.md's all the way down); the tracer's self-test of those names
-#   seacastdirected, seacastdirectedreplays  as above: the 9 directed sets under seacast.md, read by replays and
-#             headers too, and among the record's 64 traces below
+#   seacastdirected, seacastdirectedreplays  as above: the 11 directed sets under seacast.md, read by replays and
+#             headers too, and among the record's 66 traces below
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
 #   viewcontrols     23 broken views, each failing its own count of the views' cases, as written here; and
 #             views_control's own controls: three stubs of the test that fail otherwise than its own failure (a
@@ -95,13 +97,13 @@
 #             --no-das: the DAS cells and the plants on them skipped, which each line says; the check is then a
 #             part, not a pass
 #   seeds     the same bytes whatever Python's hash seed, which is random in every process of an isolated Python:
-#             every directed set, the 9 under seacast.md among them, made again twice, two cells once (64 traces)
+#             every directed set, the 11 under seacast.md among them, made again twice, two cells once (68 traces)
 #   sizes     sizes.txt: each of the record's traces as the tracer wrote it: bytes, lines, the longest line; and
 #             full-id-keys.txt: its records that hold a chunk's full id anywhere but where one stands by design
 #             (fullid.py): none in a cell's trace under either document, where the nodes ask by index
 #   manifest  record-manifest.txt: the content line's sha256, the Python and the platform, each document's file
 #             sha256 (for provenance: the content line names the documents by their code), and the two hashes of
-#             each of the record's 64 traces (15 cells, three hand traces, 22 directed sets, 15 SEACAST cells, and 9
+#             each of the record's 66 traces (15 cells, three hand traces, 22 directed sets, 15 SEACAST cells, and 11
 #             directed sets under seacast.md)
 # The steps `replays`, `headers` and the hashes then cover the record's traces.
 # With --against DIR too (a record: a directory with a run's record-manifest.txt and content.line), a last step:
@@ -127,7 +129,7 @@
 #
 # With --v2steps (not with --record or --matrix, which run them all): the quick check and six of the record's steps,
 # seacastcells, seacastdirected, seacastdirectedreplays, schemacontrols, viewcontrols and tracercontrols, with the 15
-# cells' SEACAST traces and the 9 directed sets under seacast.md among those the steps replays and headers read; its
+# cells' SEACAST traces and the 11 directed sets under seacast.md among those the steps replays and headers read; its
 # pass is "check.sh: PASS (with seacastcells, seacastdirected, seacastdirectedreplays, schemacontrols, viewcontrols and
 # tracercontrols)". Without it the steps and the traces are the quick check's.
 #
@@ -218,12 +220,15 @@ dirtool() {             # a directed set's tool, and its own options
     *) echo "$1.py" ;;
   esac
 }
-SDIRS="control serve_h serve_hplus serve_d upkeep_h upkeep_r upkeep_w upkeep_wu window_h"  # directed_seacast.py's sets
-sdir_shape() {          # a set of SDIRS: its scenarios' count, and the records its replay reads (serve_d's 132 setup
-  case $1 in            #   records of group_id among them, and window_h's last step's 5)
-    control) echo "1 20000" ;; serve_h) echo "10 20000" ;; serve_hplus) echo "2 20000" ;; serve_d) echo "8 20132" ;;
-    upkeep_h) echo "15 20000" ;; upkeep_r) echo "4 20000" ;; upkeep_w) echo "2 20000" ;; upkeep_wu) echo "6 20000" ;;
-    window_h) echo "7 20005" ;;
+# directed_seacast.py's sets
+SDIRS="control serve_h serve_hplus serve_d upkeep_h upkeep_r upkeep_w upkeep_wu window_h gate_o gate_v"
+sdir_shape() {          # a set of SDIRS: its scenarios' count, the records its replay reads (the 132 setup records of
+  case $1 in            #   group_id among them on D, and window_h's last step's 5), and its n (--n: its scenarios'
+    #                     records; gate_v's records are over ten times gate_o's, so it has a smaller n)
+    control) echo "1 20000 20000" ;; serve_h) echo "10 20000 20000" ;; serve_hplus) echo "2 20000 20000" ;;
+    serve_d) echo "8 20132 20000" ;; upkeep_h) echo "15 20000 20000" ;; upkeep_r) echo "4 20000 20000" ;;
+    upkeep_w) echo "2 20000 20000" ;; upkeep_wu) echo "6 20000 20000" ;; window_h) echo "7 20005 20000" ;;
+    gate_o) echo "6 20132 20000" ;; gate_v) echo "8 2132 2000" ;;
   esac
 }
 SDTRACES=$(for s in $SDIRS; do echo "seacastdirected/$s"; done)
@@ -244,8 +249,8 @@ if [ -z "$RECORD" ]; then
 elif [ -n "$PART" ]; then       # a matrix part: the record's traces but the cells under seacast.md
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done)"
   TRACES="$RTRACES $SMALL"
-else                    # the record's 64: the 55 of both documents' cells and of the hand and directed traces, then the
-  #                       9 directed sets under seacast.md; TRACES in the order it had: the 55, the small ones, the 9
+else                    # the record's 66: the 55 of both documents' cells and of the hand and directed traces, then the
+  #                       11 directed sets under seacast.md; TRACES in the order it had: the 55, the small ones, the 11
   RTRACES="$(for c in $CELLS; do echo "traces/$c"; done) traces/hand5 traces/hand5-sec61 traces/hand5-publish $(for d in $DIRS; do echo "directed/$d"; done) $(for c in $CELLS; do echo "seacast/$c"; done)"
   TRACES="$RTRACES $SMALL $(echo $SDTRACES)"
   RTRACES="$RTRACES $(echo $SDTRACES)"
@@ -813,36 +818,42 @@ s_directed() {
 one_seacastdirected() {
   local s=$1
   rm -f "$OUT/seacastdirected/$s.jsonl.gz" "$OUT/seacastdirected/$s.replay" "$OUT/seacastdirected/$s.replay.rc"
-  (cd "$TOY" && $PY "$T/directed_seacast.py" . "$OUT/seacastdirected/$s.jsonl.gz" --set "$s" --n 20000 --seed 1 \
+  (cd "$TOY" && $PY "$T/directed_seacast.py" . "$OUT/seacastdirected/$s.jsonl.gz" --set "$s" \
+      --n "$(sdir_shape "$s" | cut -d' ' -f3)" --seed 1 \
       > "$OUT/seacastdirected/$s.out" 2> "$OUT/seacastdirected/$s.err")
 }
 s_seacastdirected() {   # traced alone: the replays are the next step's
-  local s k n f
+  local s k n m f
   for s in $SDIRS; do par one_seacastdirected "$s"; done
   par_end || no "a directed set under seacast.md was not traced"
   for s in $SDIRS; do
-    read -r k n <<< "$(sdir_shape "$s")"
+    read -r k n m <<< "$(sdir_shape "$s")"
     f=$OUT/seacastdirected/$s.err
     [ "$(grep -c -E '^directed_seacast: [A-Za-z0-9_]+: [0-9]+$' "$f")" = "$k" ] || no "$s: not $k scenarios counted ($s.err)"
-    [ "$(grep -E '^directed_seacast: [A-Za-z0-9_]+: [0-9]+$' "$f" | awk '{s += $3} END {print s + 0}')" = 20000 ] \
-      || no "$s: its scenarios' records do not sum to 20000 ($s.err)"
+    [ "$(grep -E '^directed_seacast: [A-Za-z0-9_]+: [0-9]+$' "$f" | awk '{s += $3} END {print s + 0}')" = "$m" ] \
+      || no "$s: its scenarios' records do not sum to $m ($s.err)"
   done
-  has -x -F "directed_seacast: setup: 132 records, {'group_id': 132}" "$OUT/seacastdirected/serve_d.err" \
-    || no "serve_d: its setup is not the publish's 132 records of group_id (serve_d.err)"
+  for s in serve_d gate_o gate_v; do
+    has -x -F "directed_seacast: setup: 132 records, {'group_id': 132}" "$OUT/seacastdirected/$s.err" \
+      || no "$s: its setup is not the publish's 132 records of group_id ($s.err)"
+  done
   has -x -F "directed_seacast: last: C1, 5 records" "$OUT/seacastdirected/window_h.err" \
     || no "window_h: its last step is not C1's close of 5 records (window_h.err)"
-  echo "  $(ls "$OUT"/seacastdirected/*.jsonl.gz 2> /dev/null | wc -l) of 9 directed sets under seacast.md traced"
+  k=$(echo $SDIRS | wc -w)
+  echo "  $(ls "$OUT"/seacastdirected/*.jsonl.gz 2> /dev/null | wc -l) of $k directed sets under seacast.md traced"
 }
 s_seacastdirectedreplays() {
-  local s k n
+  local s k n m
   for s in $SDIRS; do par replay_of "seacastdirected/$s"; done
   par_end || no "a directed set under seacast.md was not replayed, or its replay did not end with status 0"
   for s in $SDIRS; do
-    read -r k n <<< "$(sdir_shape "$s")"
+    read -r k n m <<< "$(sdir_shape "$s")"
     has -x -F "replay: $n records, $n ok, 0 mismatched" "$OUT/seacastdirected/$s.replay" \
       || no "$s: not its $n records replayed, each ok ($s.replay)"
   done
-  echo "  $(grep -l -x -E 'replay: [0-9]+ records, [0-9]+ ok, 0 mismatched' "$OUT"/seacastdirected/*.replay 2> /dev/null | wc -l) of 9 directed sets under seacast.md replayed, none mismatched"
+  k=$(grep -l -x -E 'replay: [0-9]+ records, [0-9]+ ok, 0 mismatched' "$OUT"/seacastdirected/*.replay 2> /dev/null \
+    | wc -l)
+  echo "  $k of $(echo $SDIRS | wc -w) directed sets under seacast.md replayed, none mismatched"
 }
 by_cells3() {           # $1: a trace of TRACES: replayed by cells3.py, as a cell of check.py, whose verdict requires the
   case $1 in traces/*|seacast/*) case " $CELLS none " in *" ${1#*/} "*) return 0 ;; esac ;; esac   #   replay's code 0
@@ -2523,13 +2534,13 @@ again_directed() {      # $1: a directed set; $2: 1 or 2: made again, in a proce
 }
 again_seacastdirected() {   # $1: a directed set under seacast.md; $2: 1 or 2: made again, in a process of its own,
   (cd "$TOY" && $PY "$T/directed_seacast.py" . "$OUT/seeds/seacastdirected-$1-again$2.jsonl.gz" --set "$1" \
-      --n 20000 --seed 1 > /dev/null 2>&1)    #   as one_seacastdirected makes it
+      --n "$(sdir_shape "$1" | cut -d' ' -f3)" --seed 1 > /dev/null 2>&1)    #   as one_seacastdirected makes it
 }
 seed_cells() {          # the seeds' cells, traced and replayed once more: their report to a file of its own
   # shellcheck disable=SC2086
   $PY "$T/cells3.py" "$TOY" "$OUT/seeds" -j 2 --replay "$REPLAY" $SEEDCELLS > "$OUT/seeds/cells.txt" 2>&1
 }
-s_seeds() {             # the same bytes whatever Python's hash seed: every directed set (the 9 under seacast.md among
+s_seeds() {             # the same bytes whatever Python's hash seed: every directed set (the 11 under seacast.md among
   #                       them) made again twice, two cells once
   local d s a b n=0 want h1 h2
   # The tracers' Python runs isolated and reads no PYTHONHASHSEED: its hash seed is random in every process. That
@@ -2636,7 +2647,7 @@ s_against() {           # the run's manifest against the record's
     *) no "the run is not the record's, or one of the two cannot be read (against.py's exit code $rc; against.txt): $(tail -n 1 "$OUT/against.txt" | cut -c1-120)" ;;
   esac
 }
-s_manifest() {           # the record's 64 traces by their two hashes, with what they were made from and by
+s_manifest() {           # the record's 66 traces by their two hashes, with what they were made from and by
   local f=$OUT/record-manifest.txt
   { echo "content $(sha256sum < "$CONTENT" | cut -c1-64)"
     echo "python $($PY -c 'import sys, platform; print(platform.python_version(), platform.machine(), sys.platform)')"
