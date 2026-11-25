@@ -553,7 +553,9 @@ lawful cases that the `budget`, `window` and `late` entries name:
   yet held), timed at `may_ask`, where the harness's request ledger times its asks too;
 - `late`: a chunk sent to a mesh peer whose HAVE for it (in an IDONTWANT, the only carrier that feeds
   `peer_has`) had reached the sender earlier in the message, held or since expired, as the harness's
-  ledger reads it. `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
+  ledger reads it. Under `--churn` it also counts a HAVE the sender never held: the recorder notes a
+  frame as it arrives, before the simulator discards one whose connection closed while it travelled.
+  `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
   it is on, drops such a send, and under `seacast.md` it lets a probe's exempt answer through; a
   send that cancel would not drop complies with card 8;
 - `fault`: a chunk from a silent node, or an answer from a withholder.
@@ -561,7 +563,9 @@ lawful cases that the `budget`, `window` and `late` entries name:
 The recorder reads node state without creating entries and schedules nothing, so a run's events
 and digest are the same with it or without it. A duplicate is a chunk the node received before, or
 one delivered to its publisher, as the harness's seen cache counts it, not one held only since the
-decode. The recorder counts tier 4's events. Under both documents, `xcheck_observes_known.py` and
+decode. The recorder counts tier 4's events, and variant C's (`--setting c`) by the same rules.
+Where a count names the mesh (`late`, and `asks_in_mesh`, the asks received from a mesh peer), it reads
+`mesh`, which under variant C is the union of the colours' meshes. Under both documents, `xcheck_observes_known.py` and
 `xcheck_window_known.py` run it on `check.py`'s push cell.
 
 **A DAS dump** (the research harness's column proxy, 2026-11-01) runs under `--doc seacast --setting
@@ -909,16 +913,24 @@ than `--cgc` columns, the proposer included) counting for at most `--cover-high`
 draws are its own, after the meshes, so that the graph and the meshes are those of a run without
 it, and the proposer counts where it already is a link and is never added (proposers rotate).
 `--route on|off` (on) lets a sample that no link serves go as a routed request to a link with duty
-`FORWARD`, which passes it one step on (§4.5), `--route-hops` (1) steps at most; `--sample-retry2`
+`FORWARD`, which passes it one step on (§4.5), `--route-hops` (1) steps at most. With `off`, a link
+that only forwards is no candidate (`route_next` gives none), so a sample's hunt ends once no link
+that serves it is left to ask. `--sample-retry2`
 (0.5 s), `--sample-outstanding` (4) and `--forward-limit` (none) are the second phase's wait per
 peer, its cap on asks in flight per block and the forwarders' limit. That cap is the node's; it
 counts the asks across the block's sampled types, and it is at least 1. A sampler asks a peer for at
 most one sample of a block, and it asks a peer of high custody directly only in the second phase.
-The `reach` line gives the floor's links per sampler, by which ask each sample first arrived, the
-asks per sample, the routed requests passed on per node, the most samples of a block one peer was
-asked for by one sampler, and how many were asked of the block's source. A sample nobody delivered
-is missing (the document no longer gives one up): it is reported on a line of its own, not as a
-completion violation, which stays the custodians' invariant.
+The `reach` line gives the floor's links per sampler; how each sample first arrived; the asks per
+sample; the routed requests passed on per node; the most samples of a block one peer was asked for
+by one sampler; and how many were asked of the block's source. How a sample arrived is read from the
+sampler's asks for it (`report_reach` in invariants.py). It is "routed" if the deliverer's first ask
+was a routed request, "first phase" if that ask was the sample's first, "second phase" if a later
+one, and "unasked" if the deliverer was never asked. The label follows the order of the asks, not
+the phase: a sample first asked in the second phase, having had no peer to declare it to in the
+first, counts as "first phase". A forwarder's routed requests are counted when it hands them to its
+queue. A sample nobody delivered is missing (the document no longer gives one up), counted per
+sample, not per sampler and group: it is reported on a line of its own, not as a completion
+violation, which stays the custodians' invariant.
 
 Known answers (2026-10-23; 60 nodes, degree 30, 12 samplers, `--net bld`, seed 7): without samplers
 the custody and row cells' digests are those from before the change, and both `check.py` runs pass.

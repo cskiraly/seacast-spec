@@ -318,19 +318,19 @@ def main(argv):
     ap.add_argument("--phase3", type=float, default=2.0, help="rows: seconds from the block before a member decodes a row still short (phase 3)")
     ap.add_argument("--phase3-jitter", type=float, default=0.2, help="rows: random extra seconds on the phase-3 delay")
     ap.add_argument("--defer-window", type=float, default=1.0, help="rows: how long a peer's claim defers our decode while a probe verifies it, and the probe's promise (R5)")
-    ap.add_argument("--blobs", type=int, default=32, help="custody: blobs per block (cells per column)")
-    ap.add_argument("--cgc", type=int, default=8, help="custody: columns each node custodies")
-    ap.add_argument("--floor", type=int, default=6, help="custody: custodian peers a node keeps per custody column")
-    ap.add_argument("--source-floor", type=int, default=2, help="custody: custodian peers the proposer keeps per column")
+    ap.add_argument("--blobs", type=int, default=32, help="custody, rows: blobs per block (cells per column)")
+    ap.add_argument("--cgc", type=int, default=8, help="custody, rows: columns each node custodies")
+    ap.add_argument("--floor", type=int, default=6, help="custody, rows: custodian peers a node keeps per custody column")
+    ap.add_argument("--source-floor", type=int, default=2, help="custody, rows: custodian peers the proposer keeps per column")
     ap.add_argument("--repair-floor", type=int, default=1, help="rows: custodian peers each row member keeps per column it does not custody, so that a row it rebuilds reaches every column (the rebuilders' fanout, seacast.md §4.6); 0: only the links it has")
-    ap.add_argument("--samplers", type=int, default=0, help="custody: percent of nodes that sample instead of custodying (interest DECLARED, duty NONE)")
-    ap.add_argument("--samples", type=int, default=8, help="custody: cells each sampler declares per block")
-    ap.add_argument("--sample-retry", type=float, default=2.0, help="custody: seconds a sampler waits before asking another link")
-    ap.add_argument("--sample-cover", type=int, default=0, help="custody: seacast.md's SAMPLE_COVER [D12]: each sampler adds "
+    ap.add_argument("--samplers", type=int, default=0, help="custody, rows: percent of nodes that sample instead of custodying (interest DECLARED, duty NONE)")
+    ap.add_argument("--samples", type=int, default=8, help="custody, rows: cells each sampler declares per block")
+    ap.add_argument("--sample-retry", type=float, default=2.0, help="custody, rows: seconds a sampler waits before asking another link")
+    ap.add_argument("--sample-cover", type=int, default=0, help="custody, rows: seacast.md's SAMPLE_COVER [D12]: each sampler adds "
                     "sampling-only links until every column has this many custodians among its links (the coverage floor, §1.3); 0: its links as drawn")
-    ap.add_argument("--cover-high", type=int, default=1, help="custody: COVER_HIGH [D12]: columns a node of high custody (more than "
+    ap.add_argument("--cover-high", type=int, default=1, help="custody, rows: COVER_HIGH [D12]: columns a node of high custody (more than "
                     "--cgc, or the proposer) counts for in the coverage floor (§1.3: diversity, not the fewest links); a large value counts it in full")
-    ap.add_argument("--route", default="on", choices=("on", "off"), help="custody: seacast.md's routed sample requests [D12]: a sample "
+    ap.add_argument("--route", default="on", choices=("on", "off"), help="custody, rows: seacast.md's routed sample requests [D12]: a sample "
                     "no link serves goes to a link with duty FORWARD, which passes it one step on (§4.5, §4.10)")
     ap.add_argument("--churn", type=int, default=0, help="with --upkeep on: link replacements per message gap; in "
                     "each, a node other than the source closes one of its links and opens one to a node it has none "
@@ -347,10 +347,10 @@ def main(argv):
                     "upkeep before 2026-11-09")
     ap.add_argument("--prune-backoff", type=float, default=0.0, help="seconds: every type's PRUNE_BACKOFF (seacast.md "
                     "§4.1): after a PRUNE received, its relation is not grafted again before then (0: none)")
-    ap.add_argument("--route-hops", type=int, default=1, help="custody: ROUTE_HOPS, the forwarding steps of a routed request (1: two hops)")
-    ap.add_argument("--sample-retry2", type=float, default=0.5, help="custody: SAMPLE_RETRY2, the second phase's wait per peer (§4.10)")
-    ap.add_argument("--sample-outstanding", type=int, default=4, help="custody: SAMPLE_OUTSTANDING, the node's cap on second-phase sample asks in flight per block, across types (§4.10); at least 1")
-    ap.add_argument("--forward-limit", type=float, default=math.inf, help="custody: FORWARD_LIMIT, routed requests a node passes on per peer and block")
+    ap.add_argument("--route-hops", type=int, default=1, help="custody, rows: ROUTE_HOPS, the forwarding steps of a routed request (1: two hops)")
+    ap.add_argument("--sample-retry2", type=float, default=0.5, help="custody, rows: SAMPLE_RETRY2, the second phase's wait per peer (§4.10)")
+    ap.add_argument("--sample-outstanding", type=int, default=4, help="custody, rows: SAMPLE_OUTSTANDING, the node's cap on second-phase sample asks in flight per block, across types (§4.10); at least 1")
+    ap.add_argument("--forward-limit", type=float, default=math.inf, help="custody, rows: FORWARD_LIMIT, routed requests a node passes on per peer and block")
     ap.add_argument("--no-invariants", action="store_true", help="--doc seacast: skip the invariants report (invariants.py)")
     ap.add_argument("--answers-first", default="off",
                     choices=("off", "on", "v03", "oldest", "line", "others", "fresh", "late", "othersans"),
@@ -416,6 +416,8 @@ def main(argv):
                ALARM_WAIT=a.alarm_wait, ALARM_JITTER=a.alarm_jitter, ALARM_NEXT=a.alarm_next, ALARM_MAX=a.alarm_max)
     if a.fault.startswith("hoardcol") and a.rebuilt_seen != "on":
         ap.error("--fault hoardcol is meant strict: with --rebuilt-seen on")
+    if a.xcheck and a.setting in ("custody", "rows"):
+        ap.error("--xcheck counts tier 4's events (variant C's too): not under --setting custody or rows")
     if a.sample_outstanding < 1:
         ap.error("--sample-outstanding: SAMPLE_OUTSTANDING's bound is at least 1 (seacast.md §6.3)")
     if a.payload:

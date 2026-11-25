@@ -37,7 +37,9 @@ name:
   (when the router sends them, not when the writer writes them);
 - late: chunks sent to a mesh peer whose HAVE (in an IDONTWANT, the only carrier that feeds
   peer_has, §4.4) for them had reached the sender earlier in the message, whether or not the sender
-  still holds it: the harness's ledger reads it the same way. late_live, a diagnostic, counts those
+  still holds it: the harness's ledger reads it the same way. Under --churn this includes a HAVE the
+  sender never held: a frame is noted here as it arrives, before the simulator discards one whose
+  connection closed while it travelled. late_live, a diagnostic, counts those
   whose HAVE the sender still held. Cancel (card 8), when it is on, drops such a send, and under
   seacast.md it lets a probe's exempt answer through; a send that cancel would not drop complies
   with card 8;

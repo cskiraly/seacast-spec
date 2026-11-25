@@ -327,10 +327,10 @@ def colour_of(g, i) -> int:
 ```
 
 A node keeps, per family it has duty in and per colour, at least `F_LO` and at most `F_HI` peers in
-its in-relation: this is the **floor** per colour. Colours are proposed from the proposer's
-least-used colours (balanced colouring at GRAFT, §4.1). The floor needs links to form on: a node
-also keeps, per family it has duty in, at least `F_LO` links to peers whose interest holds the
-family, and opens more where churn leaves it short (`keep_floor`, §4.1).
+its in-relation: this is the **floor** per colour. Each colour keeps its floor by GRAFTs of its
+own (`maintain_relations`, §4.1), so no colour is chosen over another. The floor needs links to
+form on: a node also keeps, per family it has duty in, at least `F_LO` links to peers whose
+interest holds the family, and opens more where churn leaves it short (`keep_floor`, §4.1).
 
 ### 1.5 Holdings, offers, claims, completion and evidence
 
@@ -562,13 +562,16 @@ is bounded (§6.3).
 type a group id names), `links(T)` (the peers with a JOIN for `T` both ways: theirs received, ours
 queued rather than owed, §4.1; none for a type the node does not run), `our_join(T)` (the JOIN
 the node sends for `T`: its interest, custody count, duty and `M`, §1.2), `joined_types()`,
+`joined_peers()` (the peers in `links(T)` for some `T` in `joined_types()`), `related(q)` (`q` holds a
+relation of ours: it is in `in_pushers(T, fam, c)` or `out_pushees(T, fam, c)` for some type, family and
+colour; stock's `q in mesh`),
 `runs_type(tid)` (the node runs the object type `tid` names), `node_id(p)`, `own_id()` (the node's
 own id),
 `in_pushers(T, fam, c)` and
 `out_pushees(T, fam, c)` (the peers whose relation holds that colour), `candidates(T, fam, c, d)`
 (joined peers with duty whose interest holds the family, by `link_cover`; not yet in the relation of
 colour `c` and direction `d`, with `BOTH` in neither; with no GRAFT of ours for it unanswered; and
-out of its backoff, with `BOTH` for both directions; §4.1), `least_used_colour(T, fam)`,
+out of its backoff, with `BOTH` for both directions; §4.1),
 `families_with_duty(T)`, `wants_family(T, fam)`, `duty_for(g)`, `uplink_class()` (card 17),
 `send(p, msg, urgent)` (a message into the bounded per-peer queue of `seacast-lite.md` §7; the binding's
 job; true if the queue admitted it, as v0.5's `enqueue`; the asks of a `Want` sent through it are
@@ -782,9 +785,6 @@ def queue_owed_relations(p):                           # the writer, before anyt
     while owed_relations[p] and has_room(p):
         m = owed_relations[p].pop(0)
         send(p, m, urgent=isinstance(m, Join))
-
-def propose_colour(T, fam) -> int:                     # balanced colouring
-    return least_used_colour(T, fam)
 
 def serves(q, g, i) -> bool:                           # §1.3: q's interest holds index i of g, so q will hold it
     T = type_of_group(g)
@@ -2958,9 +2958,10 @@ has not expired, the sample's ask of its next peer takes the slot first, when a 
 The block's held samples are then tried in the order they were held while room is left, even when
 the group of the ask whose wait ended has expired. A sample with no peer to declare it to in the
 first phase (no link of ordinary custody not yet asked serves it, and none routes it) is not
-declared then, and goes to the second phase after the same wait. The hunt ends when no link is left
-to ask (each has been asked for a sample, is parked for the group, or neither serves the sample nor
-forwards) or the group expires, so an unavailable block costs a bounded number of asks. Where the
+declared then, and goes to the second phase after the same wait. The hunt for a sample ends when it
+arrives, when no link is left to ask (each has been asked for a sample, is parked for the group, or
+neither serves the sample nor forwards) or when the group expires, so an unavailable block costs a
+bounded number of asks. Where the
 binding offers a fetch from a node that is not a link (§7), the second phase may use it before a
 routed request, under the same rule: one sample per node.
 
