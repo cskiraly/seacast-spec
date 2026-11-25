@@ -1788,30 +1788,94 @@ sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/
   else e3="carried 9, (s) or (t) not as it must be"; fi
   echo "  the carried cases: $e1; $e2; $e3"
 }
-f_cases() {             # piece F: S1-8a's count (carried), S1-8b in both halves, S1-C5's line; local, after carried
-  local churn=chains/custody-floor-churn1 nb r0 nsr m rc tl lines refused rows s8a s8b s5 c fw
-  local ok8a=0 okw=0 oks=0 okp=0 ok5=0 okc=0
-  local tline="node [0-9]+'s send_relation to [0-9]+: a GRAFT of the −1 family; a counted record put in after it, at node [0-9]+; node [0-9]+'s send_relation to [0-9]+: a PRUNE of the −1 family; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
-  : > "$OUT/c-fcases.txt"
-  # The backoff codec's case (its #guard refuses +inf as the leaf, Seacast/Codecs.lean), carried: no record of churn1
-  # (carried's trace) names backoff among its tables. seacast.md's readers of it are relation_room (called by
-  # maintain_relations, graft, on_graft and on_prune) and on_prune, its one writer; none of these is traced, so none
-  # is a function the twin replays: carried until one is. A count above 0 fails, for the carried status must be read again
-  nb=$($PY - "$OUT/$churn.jsonl.gz" 2> /dev/null <<'EOF_BO'
+rows_absent() {         # $1: a trace under seacast.md: its non-leaf reads logged with the row absent (the tape's
+  #                       row-absent form), per table by the schema's key counts, and per table by function
+  $PY - "$T/gen" "$1" 2> /dev/null <<'EOF_RA'
 import gzip
 import json
 import sys
-n = 0
-with gzip.open(sys.argv[1], "rt") as f:
+from collections import Counter
+sys.path.insert(0, sys.argv[1])
+import schema                           # noqa: E402: the spec's gen/
+import schema_seacast                        # noqa: E402
+depth = {t.name: len(t.keys) for t in schema.TABLES}
+depth.update({t.name: len(t.keys) for t in schema_seacast.TABLES_Seacast})
+c, by = Counter(), Counter()
+with gzip.open(sys.argv[2], "rt") as f:
     for line in f:
-        if line.startswith('{"n"') and "backoff" in (json.loads(line).get("tables") or ()):
-            n += 1
-print(n)
+        if not line.startswith('{"n"'):
+            continue
+        rec = json.loads(line)
+        for r in rec.get("reads") or ():
+            if (r and isinstance(r[0], str) and len(r) >= 3 and isinstance(r[1], list) and r[0] in depth
+                    and len(r[1]) < depth[r[0]] and r[2] is None):
+                c[r[0]] += 1
+                by[r[0], rec["fn"]] += 1
+print(", ".join(f"{t} {n} (" + ", ".join(f"{fn} {k}" for (u, fn), k in sorted(by.items()) if u == t) + ")"
+                for t, n in sorted(c.items())))
+EOF_RA
+}
+fam_line() {            # $1: the GRAFT's record's places; $2: the PRUNE's: families_seacast.py's line after its mode, as
+  #                       a pattern, the copy's three lines captured
+  echo "node [0-9]+'s on_graft from [0-9]+, answered with a GRAFT: its family [0-9]+ of [a-z_]+ made the −1 family at $1; a counted record put in after it, at node [0-9]+; node [0-9]+'s on_graft from [0-9]+, answered with a PRUNE: its family [0-9]+ of [a-z_]+ made the −1 family at $2; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
+}
+f_cases() {             # piece F: S1-8a on seacastdirected/upkeep_h, S1-8b in both halves, S1-C5's line, each with its
+  #                       planted fault; local, after carried
+  local sd=seacastdirected/upkeep_h fc=$OUT/fcases r0 nog nop m rc tl lines refused rows rowsp s8a s8b s5 c fw
+  local ok8a=0 okw=0 oks=0 okp=0 oka=0 okk=0 ok5=0 okc=0
+  local want5="owed 133 (next_to_send 133), planned 32 (on_frame 32), promises 2 (next_to_send 1, promise_due 1), queue 1 (on_frame 1)"
+  local want5p="owed 132 (next_to_send 132), planned 32 (on_frame 32), promises 2 (next_to_send 1, promise_due 1), queue 1 (on_frame 1)"
+  local pg0="args, in_pushers, in_pushers's log push_in, wants_family, send, reads grafted_in, reads push_in"
+  local pp0="args, send, reads grafted_out, reads push_out"
+  : > "$OUT/c-fcases.txt"
+  mkdir -p "$fc"
+  # The run's upkeep_h (seacastdirected's), whose replay (seacastdirectedreplays') is every record ok: S1-8a's and
+  # S1-8b's copies are made from it, and their counts are its own
+  r0=$(sed -n -E 's/^replay: ([0-9]+) records, \1 ok, 0 mismatched$/\1/p' "$OUT/$sd.replay" 2> /dev/null)
+  nog=$(sed -n -E 's/^fn on_graft: ([0-9]+) records, \1 ok$/\1/p' "$OUT/$sd.replay" 2> /dev/null)
+  nop=$(sed -n -E 's/^fn on_prune: ([0-9]+) records, \1 ok$/\1/p' "$OUT/$sd.replay" 2> /dev/null)
+  # S1-8a, the backoff codec's case (its #guard refuses +inf as the leaf, Seacast/Codecs.lean), read again now that
+  # backoff's readers are traced: it is not carried. upkeep_h's on_prune records read backoff's leaves, and its replay
+  # reads each through the codec (churn1's records name backoff as levels alone). Their count, exact; and the plant: a
+  # copy with the first leaf read made +inf, which the replay must refuse at that record alone, in the codec's words
+  rm -f "$fc/s18a-inf".*
+  $PY - "$OUT/$sd.jsonl.gz" "$fc/s18a-inf.jsonl.gz" > "$fc/s18a-inf.out" 2>&1 <<'EOF_BO'
+import gzip
+import json
+import sys
+INF = 9218868437227405312               # +inf's bits: the leaf the codec must refuse
+n, fns, said = 0, {}, None
+with gzip.open(sys.argv[1], "rt") as f, gzip.open(sys.argv[2], "wt", compresslevel=1) as out:
+    for k, line in enumerate(f, 1):
+        if line.startswith('{"n"'):
+            r = json.loads(line)
+            leaves = [x for x in r.get("reads") or () if x[0] == "backoff" and len(x[1]) == 4 and x[2] is not None]
+            n += len(leaves)
+            if leaves:
+                fns[r["fn"]] = fns.get(r["fn"], 0) + 1
+            if leaves and said is None:
+                said = (f"line {k}, node {r['n']}'s {r['fn']}: backoff {json.dumps(leaves[0][1], separators=(',', ':'))}"
+                        f" read {leaves[0][2]}, made +inf")
+                leaves[0][2] = INF
+                line = json.dumps(r, separators=(",", ":")) + "\n"
+        out.write(line)
+print(f"count: {n} backoff leaves read, in " + ", ".join(f"{k} records of {fn}" for fn, k in sorted(fns.items())))
+print(f"planted: {said}")
 EOF_BO
-)
-  if [ "$nb" = 0 ]; then
-    echo "S1-8a on custody-floor-churn1: as it must: 0 records read or write backoff; carried" >> "$OUT/c-fcases.txt"; ok8a=1
-  else echo "S1-8a on custody-floor-churn1: ${nb:-no count} records read or write backoff, not 0: the carried status must be read again  <-- NOT" >> "$OUT/c-fcases.txt"; fi
+  replay_of "fcases/s18a-inf"
+  if [ -z "$r0" ] || [ -z "$nop" ]; then
+    echo "S1-8a on $sd: its replay is not every record ok, or gives no count of on_prune  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif ! has -x "count: 1300 backoff leaves read, in 1300 records of on_prune" "$fc/s18a-inf.out" \
+      || ! has -x -E "planted: line [0-9]+, node [0-9]+'s on_prune: backoff .* read [0-9]+, made [+]inf" "$fc/s18a-inf.out"; then
+    echo "S1-8a on $sd: the leaves read are not 1300, in 1300 on_prune records, or none was planted: $(head -n 1 "$fc/s18a-inf.out" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ "$(cat "$fc/s18a-inf.replay.rc" 2> /dev/null)" = 0 ] \
+      || ! has -x "replay: $r0 records, $((r0 - 1)) ok, 1 mismatched" "$fc/s18a-inf.replay" \
+      || ! has -x "mismatch malformed record: not a finite float: 1" "$fc/s18a-inf.replay" \
+      || ! has -x "fn on_prune: $((nop - 1)) records, $((nop - 1)) ok" "$fc/s18a-inf.replay"; then
+    echo "S1-8a on $sd: the copy with +inf not refused at its one record, in the codec's words: $(grep -m 1 '^replay: ' "$fc/s18a-inf.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  else
+    echo "S1-8a on $sd: as it must: 1300 backoff leaves read, in 1300 on_prune records, each replayed; the copy with the first made +inf ($(sed -n -E "s/^planted: (line [0-9]+, node [0-9]+'s on_prune): .*/\\1/p" "$fc/s18a-inf.out")) refused at that record alone: malformed record: not a finite float" >> "$OUT/c-fcases.txt"; ok8a=1
+  fi
   # S1-8b, the writer's half: --self-test-seacast's four lines (its own run, for the selftests step keeps no output)
   $PY "$T/trace3.py" --self-test-seacast > "$OUT/c-fcases-selftest.txt" 2>&1
   if has -x "ok: every case as it must be" "$OUT/c-fcases-selftest.txt" \
@@ -1821,34 +1885,37 @@ EOF_BO
       && has -x -F "forms self-test, S1-8b's planted writer (the plain int): refuses exactly the 3 cases, ok" "$OUT/c-fcases-selftest.txt"; then
     echo "S1-8b, the writer: as it must: the −1 family written [\"-\", 1] in a GRAFT, a PRUNE and counted's need; the plain-int writer refused in exactly the 3 cases" >> "$OUT/c-fcases.txt"; okw=1
   else echo "S1-8b, the writer: --self-test-seacast's S1-8b lines not as they must be (c-fcases-selftest.txt)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
-  # S1-8b, the reader's half, on churn1 (no trace at hand holds a PRUNE or a record of counted): families_seacast.py's
-  # copies, signed and plain. Signed: every record ok, counted's among them; plain: the strict scan refuses exactly
-  # the three lines the tool changed, and the trailer then counts three records more than were read
-  r0=$(sed -n -E 's/^replay: ([0-9]+) records, .*/\1/p' "$OUT/$churn.replay" 2> /dev/null)
-  nsr=$(sed -n -E 's/^fn send_relation: ([0-9]+) records, .*/\1/p' "$OUT/$churn.replay" 2> /dev/null)
-  for m in signed plain; do
-    rm -f "$OUT/chains/fam-$m".*
-    if $PY "$T/families_seacast.py" "$m" "$OUT/$churn.jsonl.gz" "$OUT/chains/fam-$m.jsonl.gz" > "$OUT/chains/fam-$m.out" 2>&1; then
-      replay_of "chains/fam-$m"; echo $? > "$OUT/chains/fam-$m.rc"
+  # S1-8b, the reader's half, on the relation records that hold send_relation's calls: upkeep_h's on_graft records,
+  # which take the family from the message they receive. families_seacast.py's copies: signed and plain (chains/, as
+  # the inventory lists them), and two plants (fcases/): the −1 in the two records' args alone, and the GRAFT's
+  # record's write left at its family. Signed: every record ok, counted's among them; plain: the strict scan refuses
+  # exactly the three lines the tool changed, and the trailer then counts three records more than were read; each
+  # plant: its records mismatched, as many as it must
+  for m in signed plain argsonly writekept; do
+    case $m in signed|plain) c=chains ;; *) c=fcases ;; esac
+    rm -f "$OUT/$c/fam-$m".*
+    if $PY "$T/families_seacast.py" "$m" "$OUT/$sd.jsonl.gz" "$OUT/$c/fam-$m.jsonl.gz" > "$OUT/$c/fam-$m.out" 2>&1; then
+      replay_of "$c/fam-$m"
     fi
   done
-  if [ -z "$r0" ] || [ -z "$nsr" ]; then
-    echo "S1-8b, the reader: churn1's replay gives no record count  <-- NOT" >> "$OUT/c-fcases.txt"
-  elif ! has -E "^families_seacast: signed: $tline" "$OUT/chains/fam-signed.out" || [ "$(cat "$OUT/chains/fam-signed.rc" 2> /dev/null)" != 0 ]; then
+  lines=$(sed -n -E "s/^families_seacast: signed: $(fam_line "$pg0, writes push_in" "$pp0")/\\1 \\2 \\3/p" "$OUT/chains/fam-signed.out" 2> /dev/null)
+  if [ -z "$r0" ] || [ -z "$nog" ]; then
+    echo "S1-8b, the reader: $sd's replay is not every record ok, or gives no count of on_graft  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ -z "$lines" ] || [ "$(cat "$OUT/chains/fam-signed.replay.rc" 2> /dev/null)" != 0 ]; then
     echo "S1-8b, the reader, signed: the copy not made as written, or its replay did not end with 0  <-- NOT" >> "$OUT/c-fcases.txt"
   elif ! has -x "replay: $((r0 + 1)) records, $((r0 + 1)) ok, 0 mismatched" "$OUT/chains/fam-signed.replay" \
       || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/chains/fam-signed.replay" \
       || ! has -x "fn counted: 1 records, 1 ok" "$OUT/chains/fam-signed.replay" \
-      || ! has -x "fn send_relation: $nsr records, $nsr ok" "$OUT/chains/fam-signed.replay" \
+      || ! has -x "fn on_graft: $nog records, $nog ok" "$OUT/chains/fam-signed.replay" \
       || ! has -E "^content: as --content's, " "$OUT/chains/fam-signed.replay" \
       || has -E '^(lines refused |trailer: )' "$OUT/chains/fam-signed.replay"; then
     echo "S1-8b, the reader, signed: not every record ok: $(grep -m 1 '^replay: ' "$OUT/chains/fam-signed.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
   else
-    echo "S1-8b, the reader, signed: as it must: $(grep -m 1 '^replay: ' "$OUT/chains/fam-signed.replay"); counted's record and the $nsr send_relation records ok" >> "$OUT/c-fcases.txt"; oks=1
+    echo "S1-8b, the reader, signed: as it must: $(grep -m 1 '^replay: ' "$OUT/chains/fam-signed.replay"); counted's record and the $nog on_graft records ok, the −1 family's GRAFT and PRUNE among them" >> "$OUT/c-fcases.txt"; oks=1
   fi
-  lines=$(sed -n -E "s/^families_seacast: plain: $tline/\\1 \\2 \\3/p" "$OUT/chains/fam-plain.out" 2> /dev/null)
   refused=$(sed -n -E 's/^line ([0-9]+): not a line the tracer writes: a number with a sign, at [0-9]+$/\1/p' "$OUT/chains/fam-plain.replay" 2> /dev/null | tr '\n' ' ' | sed 's/ $//')
-  if [ -z "$r0" ] || [ -z "$lines" ] || [ "$(cat "$OUT/chains/fam-plain.rc" 2> /dev/null)" = 0 ]; then
+  if [ -z "$r0" ] || [ -z "$lines" ] || ! has -E "^families_seacast: plain: $(fam_line "$pg0, writes push_in" "$pp0")" "$OUT/chains/fam-plain.out" 2> /dev/null \
+      || [ "$(cat "$OUT/chains/fam-plain.replay.rc" 2> /dev/null)" = 0 ]; then
     echo "S1-8b, the reader, plain: the copy not made as written, or its replay ended with 0  <-- NOT" >> "$OUT/c-fcases.txt"
   elif [ "$refused" != "$lines" ] || ! has -x "lines refused before they were parsed, or by the parser: 3" "$OUT/chains/fam-plain.replay"; then
     echo "S1-8b, the reader, plain: the lines refused for a number with a sign are ${refused:-none}, not the copy's $lines  <-- NOT" >> "$OUT/c-fcases.txt"
@@ -1858,13 +1925,31 @@ EOF_BO
   else
     echo "S1-8b, the reader, plain: as it must: its lines $lines refused, each \"not a line the tracer writes: a number with a sign\"; $(grep -m 1 '^replay: ' "$OUT/chains/fam-plain.replay"); trailer: $((r0 + 1)) records written, $((r0 - 2)) read" >> "$OUT/c-fcases.txt"; okp=1
   fi
+  if [ -z "$r0" ] || [ -z "$lines" ] || [ "$(sed -n -E "s/^families_seacast: argsonly: $(fam_line args args)/\\1 \\2 \\3/p" "$OUT/fcases/fam-argsonly.out" 2> /dev/null)" != "$lines" ] \
+      || [ "$(cat "$OUT/fcases/fam-argsonly.replay.rc" 2> /dev/null)" = 0 ]; then
+    echo "S1-8b, the plant with the −1 in args alone: the copy not made as written, or its replay ended with 0  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif ! has -x "replay: $((r0 + 1)) records, $((r0 - 1)) ok, 2 mismatched" "$OUT/fcases/fam-argsonly.replay" \
+      || ! has -x "fn on_graft: $nog records, $((nog - 2)) ok" "$OUT/fcases/fam-argsonly.replay" \
+      || ! has -x "fn counted: 1 records, 1 ok" "$OUT/fcases/fam-argsonly.replay"; then
+    echo "S1-8b, the plant with the −1 in args alone: not its two records mismatched: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-argsonly.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  else
+    echo "S1-8b, the plant with the −1 in args alone: as it must: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-argsonly.replay"), the two on_graft records" >> "$OUT/c-fcases.txt"; oka=1
+  fi
+  if [ -z "$r0" ] || [ -z "$lines" ] || [ "$(sed -n -E "s/^families_seacast: writekept: $(fam_line "$pg0" "$pp0")/\\1 \\2 \\3/p" "$OUT/fcases/fam-writekept.out" 2> /dev/null)" != "$lines" ] \
+      || [ "$(cat "$OUT/fcases/fam-writekept.replay.rc" 2> /dev/null)" = 0 ]; then
+    echo "S1-8b, the plant with the GRAFT's write kept at its family: the copy not made as written, or its replay ended with 0  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif ! has -x "replay: $((r0 + 1)) records, $r0 ok, 1 mismatched" "$OUT/fcases/fam-writekept.replay" \
+      || ! has -x "mismatch on_graft: post: the whole state: 1" "$OUT/fcases/fam-writekept.replay" \
+      || ! has -x "fn on_graft: $nog records, $((nog - 1)) ok" "$OUT/fcases/fam-writekept.replay"; then
+    echo "S1-8b, the plant with the GRAFT's write kept at its family: not its record mismatched on the state: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-writekept.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  else
+    echo "S1-8b, the plant with the GRAFT's write kept at its family: as it must: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-writekept.replay"), the GRAFT's record, on the whole state" >> "$OUT/c-fcases.txt"; okk=1
+  fi
   # families_seacast.py's input: it takes only a whole run's trace, or its copy would hold a prefix as a whole run's.
   # Three copies of seacast/hand5 (the small step's): cut before its trailer; its trailer line cut to 20 characters,
   # with no newline (a trailer whose write failed); its trailer saying the run stopped. Each must be refused, with
   # exit 1 and its words. The copies and what families_seacast.py leaves of each are under fcases/, which no reader of
   # the run's traces scans: under chains/, the calls summary read them as traces the inventory does not list
-  local fc=$OUT/fcases
-  mkdir -p "$fc"
   rm -f "$fc/fam-cut".* "$fc/fam-cutline".* "$fc/fam-stop".* "$fc/fam-copies.out"
   $PY - "$OUT/seacast/hand5.jsonl.gz" "$fc" > "$fc/fam-copies.out" 2>&1 <<'EOF_FC'
 import gzip
@@ -1901,47 +1986,50 @@ EOF_FC
     echo "families_seacast.py's input: as it must: it refuses seacast/hand5 cut before its trailer (\"no trailer\"), with its trailer line cut (\"the trailer line is cut\") and with a trailer that says the run stopped (\"the trailer says the run stopped\"), each with exit 1" >> "$OUT/c-fcases.txt"
   else echo "families_seacast.py's input: its exits on seacast/hand5's copies:${fw%,}; not each 1 with its words (fcases/fam-cut.out, fam-cutline.out, fam-stop.out)  <-- NOT" >> "$OUT/c-fcases.txt"; fi
   # S1-C5 (cases 2 and 3 carried as unreachable from the document): seacast/hand5 (the small step's) enters origin_acked
-  # 8 times, in its two branches, inside records that replay with 0 reads not made; and its non-leaf reads logged
-  # with the row absent, per table (the tape's row-absent form), by the schema's key counts
-  rows=$($PY - "$T/gen" "$OUT/seacast/hand5.jsonl.gz" 2> /dev/null <<'EOF_RA'
+  # 8 times, in its two branches, inside records that replay with 0 reads not made; and its reads logged with the row
+  # absent, per table and per function (next_to_send's records hold owed's). The plant: a copy whose first such read
+  # of owed in next_to_send is given its row (true, as a present row is read), which the count must not pass
+  rows=$(rows_absent "$OUT/seacast/hand5.jsonl.gz")
+  rm -f "$fc/s1c5-row".*
+  $PY - "$OUT/seacast/hand5.jsonl.gz" "$fc/s1c5-row.jsonl.gz" > "$fc/s1c5-row.out" 2>&1 <<'EOF_RW'
 import gzip
 import json
 import sys
-from collections import Counter
-sys.path.insert(0, sys.argv[1])
-import schema                           # noqa: E402: the spec's gen/
-import schema_seacast                        # noqa: E402
-depth = {t.name: len(t.keys) for t in schema.TABLES}
-depth.update({t.name: len(t.keys) for t in schema_seacast.TABLES_Seacast})
-c = Counter()
-with gzip.open(sys.argv[2], "rt") as f:
-    for line in f:
-        if not line.startswith('{"n"'):
-            continue
-        for r in json.loads(line).get("reads") or ():
-            if (r and isinstance(r[0], str) and len(r) >= 3 and isinstance(r[1], list) and r[0] in depth
-                    and len(r[1]) < depth[r[0]] and r[2] is None):
-                c[r[0]] += 1
-print(", ".join(f"{t} {n}" for t, n in sorted(c.items())))
-EOF_RA
-)
+said = None
+with gzip.open(sys.argv[1], "rt") as f, gzip.open(sys.argv[2], "wt", compresslevel=1) as out:
+    for k, line in enumerate(f, 1):
+        if said is None and line.startswith('{"n"') and '"fn":"next_to_send"' in line:
+            r = json.loads(line)
+            for x in r.get("reads") or ():
+                if x[0] == "owed" and len(x[1]) == 1 and x[2] is None:
+                    said = f"line {k}, node {r['n']}'s next_to_send: owed {json.dumps(x[1])} read with the row absent, given its row"
+                    x[2] = True
+                    line = json.dumps(r, separators=(",", ":")) + "\n"
+                    break
+        out.write(line)
+print(f"planted: {said}")
+EOF_RW
+  rowsp=$(rows_absent "$fc/s1c5-row.jsonl.gz")
   if ! has -x "branch origin_acked: acknowledged before: 6" "$OUT/seacast/hand5.replay" 2> /dev/null \
       || ! has -x "branch origin_acked: the holding grows: 2" "$OUT/seacast/hand5.replay" \
       || ! has -x "reads of the Python's that the twin did not make: 0" "$OUT/seacast/hand5.replay"; then
     echo "S1-C5 on seacast/hand5: origin_acked's branches not 6 and 2, or a read not made, or no replay  <-- NOT" >> "$OUT/c-fcases.txt"
-  elif [ "$rows" != "owed 87, planned 32, promises 2, queue 1" ]; then
-    echo "S1-C5 on seacast/hand5: the reads with the row absent are ${rows:-none}, not owed 87, planned 32, promises 2, queue 1  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ "$rows" != "$want5" ]; then
+    echo "S1-C5 on seacast/hand5: the reads with the row absent are ${rows:-none}, not $want5  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ "$rowsp" != "$want5p" ] \
+      || ! has -x -E "planted: line [0-9]+, node [0-9]+'s next_to_send: owed [[][0-9]+[]] read with the row absent, given its row" "$fc/s1c5-row.out"; then
+    echo "S1-C5, the plant with a row given: its count is ${rowsp:-none}, not one owed read fewer under next_to_send  <-- NOT" >> "$OUT/c-fcases.txt"
   else
-    echo "S1-C5 on seacast/hand5: as it must: origin_acked entered 8 times (6 acknowledged before, 2 the holding grows), 0 reads not made; the reads with the row absent: $rows" >> "$OUT/c-fcases.txt"; ok5=1
+    echo "S1-C5 on seacast/hand5: as it must: origin_acked entered 8 times (6 acknowledged before, 2 the holding grows), 0 reads not made; the reads with the row absent: $rows; the plant with a row given gives $rowsp, which fails it" >> "$OUT/c-fcases.txt"; ok5=1
   fi
   if grep -q '<-- NOT' "$OUT/c-fcases.txt"; then no "F's three (c-fcases.txt)"; fi
-  s8a="the backoff codec's case carried: no record of custody-floor-churn1 reads or writes backoff (its readers relation_room and on_prune and its writer on_prune are not traced, nor are their callers)"
-  [ "$ok8a" = 1 ] || s8a="the backoff codec's case not as it must be"
-  s8b="S1-8b: the writer writes the −1 family as [\"-\", 1] in a GRAFT, a PRUNE and need, and a plain-int writer is refused; on churn1 the reader replays the three ($((r0 + 1)) records, all ok) and refuses the plain int at their 3 lines"
+  s8a="S1-8a: the backoff codec's leaf replayed: 1300 leaves read on $sd; +inf in the first refused at its record alone"
+  [ "$ok8a" = 1 ] || s8a="S1-8a not as it must be"
+  s8b="S1-8b: the writer writes the −1 family as [\"-\", 1] in a GRAFT, a PRUNE and need, and a plain-int writer is refused; on $sd the reader replays an on_graft record answered with a GRAFT and one answered with a PRUNE, each with the −1 family, and counted's ($((r0 + 1)) records, all ok), refuses the plain int at their 3 lines, and fails both plants (the family in args alone; a write kept at the old family)"
   if [ "$okc" = 1 ]; then s8b="$s8b; it refuses a trace cut before its trailer or in it, and one whose trailer says the run stopped"; fi
-  [ "$okw$oks$okp" = 111 ] || s8b="S1-8b not as it must be"
+  [ "$okw$oks$okp$oka$okk" = 11111 ] || s8b="S1-8b not as it must be"
   if [ "$okc" != 1 ]; then s8b="$s8b; families_seacast.py's input not refused as it must be"; fi
-  s5="S1-C5: origin_acked entered 8 times on seacast/hand5, 0 reads not made; the rows absent: $rows; cases 2 and 3 carried as unreachable"
+  s5="S1-C5: origin_acked entered 8 times on seacast/hand5, 0 reads not made; the rows absent: $rows; a row given to one of them fails it; cases 2 and 3 carried as unreachable"
   [ "$ok5" = 1 ] || s5="S1-C5 not as it must be"
   echo "  F's three: $s8a; $s8b; $s5"
 }
@@ -2545,9 +2633,10 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # limit); a replaced name entered outside every record on das-hoardcol-w16 (decode_group), and plants (s) and (t)
   # on hand5-peer (c-carried.txt)
   carried
-  # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-seacast) and reader (families_seacast.py
-  # on churn1, signed and plain, and its refusal of seacast/hand5 cut short or stopped); S1-C5's line on seacast/hand5
-  # (c-fcases.txt)
+  # F's three (piece F): S1-8a on seacastdirected/upkeep_h, its backoff leaves counted and +inf planted in one; S1-8b's
+  # writer (--self-test-seacast) and reader (families_seacast.py on upkeep_h's on_graft records, signed and plain, its
+  # two plants, and its refusal of seacast/hand5 cut short or stopped); S1-C5's line on seacast/hand5, by function, and
+  # its plant (c-fcases.txt)
   f_cases
   # H4's plant (n): one of LAYERS' changing layers left out, which the scan names and at whose install the tracer
   # stops (c-h4.err)
