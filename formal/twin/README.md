@@ -1,8 +1,8 @@
-# The Lean twin of the Python in `seacast-lite.md`
+# The Lean twin of the Python in `seacast-lite.md` and `seacast.md`
 
-This directory holds an executable Lean 4 twin of the Python in the code blocks of `seacast-lite.md`. The twin is a
-transcription of that Python, function by function. It is not an abstract model, and on its own it proves nothing.
-Its value is that it can be checked against the Python, which this directory does by trace replay (below), and
+This directory holds an executable Lean 4 twin of the Python in the code blocks of `seacast-lite.md` and `seacast.md`.
+The twin is a transcription of that Python, function by function. It is not an abstract model, and on its own it proves
+nothing. Its value is that it can be checked against the Python, which this directory does by trace replay (below), and
 linked to the Veil models, a link that `formal/refine/` begins (below).
 
 The record of the twin is in `record/`. It shows that the twin as it stood at v0.11.1 replays the traces of the
@@ -22,12 +22,12 @@ Some tables use representations specific to the twin.
 
 ## How it is checked: trace replay
 
-A tracer runs the toy (`toy/`), which runs the code blocks of `seacast-lite.md` directly. The tracer writes one record
-for each top-level call of a function that the twin covers; a call of such a function from inside another such
-function is part of the record of its caller. A record holds what the call read and wrote in the node's own
-tables, what it asked of the rest of the node, and what it returned. The twin replays each call from the recorded
-state, with the recorded answers. It must read the same entries as the Python, though not necessarily as often or
-in the same order; it must write what the Python wrote and return what the Python returned.
+A tracer runs the toy (`toy/`), which runs the code blocks of `seacast-lite.md`, or with `--doc seacast` those of
+`seacast.md`, directly. The tracer writes one record for each top-level call of a function that the twin covers; a call
+of such a function from inside another such function is part of the record of its caller. A record holds what the call
+read and wrote in the node's own tables, what it asked of the rest of the node, and what it returned. The twin replays
+each call from the recorded state, with the recorded answers. It must read the same entries as the Python, though not
+necessarily as often or in the same order; it must write what the Python wrote and return what the Python returned.
 
 A mutant is a twin with one rule changed. The mutants are there to show whether the traces are strong enough to
 tell a wrong twin from the right one. `check.sh` replays one mutant as a control and requires the replay to tell

@@ -39,7 +39,8 @@ measurements. SEACAST, `seacast.md`, runs in the toy too, with recorded cells
 of its own (`toy/golden-seacast.txt`), known answers on its own functions, and the invariants its §6.2
 names: `toy/invariants.py` checks three on every run and two under its row setting, and
 `toy/check.py --doc seacast --golden golden.txt` holds its tier 4 setting to `seacast-lite.md`'s cells.
-Outside the toy, nothing here checks its own functions.
+Outside the toy, the Lean twin replays the toy's traces of them (below); nothing else here checks
+them.
 
 **The Quint model checks the rules on small instances.** [`formal/diffusion.qnt`](diffusion.qnt)
 models §4–§7 for one group, written by hand at v0.4's rules with v0.5's as switches. TLC explores
@@ -75,15 +76,19 @@ hand, the models can drift from the code. No check compares them with the code d
 replay checks the twin against the code, and a first piece of refinement relates one of the models
 to the twin, on a narrow scope (both below).
 
-**The twin transcribes the code into Lean.** [`formal/twin/`](twin/) is a
-transcription of `seacast-lite.md`'s Python into Lean, function by function, executable: every function
-the document's code blocks define, matched by name (its README counts them by section), but not the
+**The twin transcribes the code into Lean.** [`formal/twin/`](twin/) is a transcription of
+`seacast-lite.md`'s Python into Lean, function by function, executable: every function the
+document's code blocks define, matched by name (its README counts them by section), but not the
 helpers the document names without writing them out (one aside, `held`), nor the events it gives in
-prose (a connection's close, an announcer's offers ageing out, a group's expiry), nor
-`seacast.md`'s own functions. It is not an abstract model: it follows the code's functions and
-branches, but for a few narrowings its README names, and holds the code's tables, some in a form of
-its own; on its own it proves nothing. It is there to be checked against the code on one side, by
-trace replay, and linked to the Veil models on the other, by refinement.
+prose (a connection's close, an announcer's offers ageing out, a group's expiry). It transcribes
+`seacast.md`'s code the same way: every function its code blocks define, and `seacast-lite.md`'s
+`on_block_installed` and `on_pace_tick`, which call some of `seacast.md`'s own functions.
+`formal/twin/tools/gen/manifest_seacast.py` lists them. A trace under `seacast.md` replays through
+these and through the functions of `seacast-lite.md` that the twin lists as kept. The twin is not an
+abstract model: it follows the code's functions and branches, but for a few narrowings its README
+names, and holds the code's tables, some in a form of its own; on its own it proves nothing. It is
+there to be checked against the code on one side, by trace replay, and linked to the Veil models on
+the other, by refinement.
 
 **Trace replay checks the twin against the code.** A tracer runs the toy and records, for each
 top-level call of a function that the trace selects (among those the twin has, where the node uses
@@ -111,6 +116,8 @@ which shows which mutants part of those traces tell from the twin, by a mismatch
 read left unmade. Its [`RECORD.md`](twin/record/RECORD.md) says what else the directory holds, what
 the record ran, what it shows and what it does not show. The record was made at v0.11.1, before
 v0.12.0 renamed the files, and keeps their old names (`protocol.md`, `protocol-v2.md`, `--doc v2`).
+It does not cover what has changed since v0.12.0 in the twin (the twin of `seacast.md`'s own
+functions among them), in the documents' code or in the toy.
 
 **Refinement, from the twin to the Veil models, has a first piece.** A refinement proof would show
 that the twin's initial states and each of its steps, projected onto a model's state, are states and
@@ -392,7 +399,7 @@ python3 -I formal/wire/check_wire.py
 - `toy/monitor.py`: the runtime monitors on the toy; `wire/check_wire.py`: §1–§2's arithmetic.
 - `package.json`, `package-lock.json`, `quint`: the pinned toolchain.
 - `veil/`: properties at any size, proved in Veil (Lean 4) for any number of nodes, groups and chunks: A1 at every place `seacast-lite.md` penalises a peer (its four `penalise` calls, by inspection; an ask: with no assumption under the live window, `seacast-lite.md` §8.1, a group's key fixing its slot, §1, and under the fallback without a slot given the bound on its tombstone; a chunk that fails level 1, its slot included; a malformed HAVE or IHAVE bitmap), and no stall (Q1), in three pieces: no quiet state in which an honest node reachable from the source along mesh links is incomplete, under the assumptions its README states (among them no equivocation, and, where the source announces at a chunk's acknowledgement, the chunks acknowledged on the source's links); the mesh may change and connections close, with §5.4's announcement to a peer that joins the mesh (F9). Under equivocation it holds, with the same condition at `ACK`, with §4.2's ties and §6.1's rule against a second ask (F6), for the nodes the source reaches through nodes that installed the builder's block (`NoStallEquiv.lean`, with its assumptions). The no-stall proof found an eleventh gap, F11: an IHAVE over a receiver's IHAVE limit was ignored, and nothing offered its chunks again; v0.7 closes it (`seacast-lite.md` §4.4, and its README). Q1 also holds with malicious peers, with the same condition at `ACK`, for the honest nodes the source reaches through honest nodes that installed the block, relabelled copies (F12, open in `seacast-lite.md` §4.6) excluded; with finitely many nodes and weak fairness, a run goes quiet (Q3) once the environment stops, adversaries' actions included (the asking with `NO_REASK_OPEN`; with malicious peers, the honest nodes' machinery); level 2 is all or none, a check that succeeds recovers the bytes the root commits, and two honest nodes that both deliver a group deliver the same payload, under the codec's assumptions its README lists, an MDS code and a binding hash among them. Two more findings are there: F13, dropped offers that leave their ask, closed in v0.8, and F14, an announcer that is never parked holding the last resort off, open (`seacast-lite.md` §6.1). The proofs are of v0.8's rules, with four later changes: the source's announcement at the acknowledgement, level 1's check of the slot, the IHAVE bitmap's penalty, and the drop of an adversary's tie whose slot left the live window. Their README lists what changed since, which of it the models have, and each result's assumptions.
-- `twin/`: the Lean twin of `seacast-lite.md`'s Python. Its README says what it covers and what
+- `twin/`: the Lean twin of both documents' Python. Its README says what it covers and what
   `check.sh` checks, and `twin/record/RECORD.md` says what its record ran, what it shows and what it
   does not show.
 - `refine/`: a first piece of a refinement from the twin to the Veil model `NoStallEquiv`, on the

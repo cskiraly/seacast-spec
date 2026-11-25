@@ -450,3 +450,8 @@ carried later than its version.
   and its protocol is SEACAST Lite, no longer SEACAST on gossipsub; this draft's files,
   `protocol-v2.md` and `protocol-v2-*.md`, are now `seacast.md` and `seacast-*.md`. No rule
   changed, so there is nothing to carry.
+- v0.13.0-rc.1 (2026-11-25): `seacast-lite.md` is the same but for its version line, so there is
+  nothing to carry. In this draft, §1.4 says how the floor per colour is kept, §3 lists
+  `joined_peers()` and `related(q)`, `propose_colour` and `least_used_colour` are gone,
+  `on_header_validated` visits the block's groups in `cell_groups`' order, and §4.10's text says
+  that a sample's hunt also ends when it arrives. No rule changed.

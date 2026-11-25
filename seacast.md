@@ -14,7 +14,7 @@ toy runs this document with `--doc seacast`.*
 *This document began as draft 1, of 2026-10-07. It is a sibling of [`seacast-lite.md`](seacast-lite.md),
 which defines SEACAST Lite; SEACAST contains that protocol as its tier 4 setting, with the
 differences that §6.1 lists. That document was draft v0.3 when this was written and has been
-v0.12.0 since 2026-11-22, with the same section numbers. Below, `seacast-lite.md` means that document
+v0.13.0-rc.1 since 2026-11-25, with the same section numbers. Below, `seacast-lite.md` means that document
 as it is now, and "v0.3" means draft v0.3 itself, for its own rules.*
 
 *Each later version of `seacast-lite.md` is carried into this document in the same way; §5 maps what

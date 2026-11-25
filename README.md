@@ -12,8 +12,8 @@ This repository holds SEACAST's specification, written as Python-like code in th
 Ethereum's consensus specs; a small simulator, the toy, runs that code as written. The
 specification defines two protocols:
 
-- **SEACAST**, in [`seacast.md`](seacast.md), is the main one. It is checked in the toy
-  only, and no client runs it yet.
+- **SEACAST**, in [`seacast.md`](seacast.md), is the main one. It is checked by running its code, in
+  the toy and in the Lean twin's replay of the toy's traces, and no client runs it yet.
 - **SEACAST Lite**, in [`seacast-lite.md`](seacast-lite.md), diffuses an execution payload over
   gossipsub. It is the one that was measured and proved: the measurements ran a research
   implementation of it, and the proofs are of models of its rules. SEACAST contains it as one of
@@ -50,8 +50,8 @@ release it belongs to.
   models of its rules written by hand. Under the assumptions they state, they show for any number
   of nodes that an honest node is never penalised, and that, for one object, once nothing is left
   to happen, every honest node reachable from the source along the mesh of that moment has
-  completed. The models have v0.8's rules and four later changes. A Lean transcription of
-  `seacast-lite.md`'s code, function by function, replays traces of the toy's runs.
+  completed. The models have v0.8's rules and four later changes. A Lean transcription of both
+  documents' code, function by function, replays traces of the toy's runs.
 
 The numbers come from the announcement post, which calls SEACAST Lite simply SEACAST. The
 four protocols ran in one simulator, on a virtual clock. SEACAST Lite ran there as its
@@ -72,14 +72,15 @@ that implementation differs from the text.
 
 ## Where it stands
 
-- **The latest release is [v0.12.0](https://github.com/cskiraly/seacast-spec/tree/v0.12.0)**,
-  2026-11-22. [`CHANGELOG.md`](CHANGELOG.md) says what each release changed; changes after the
+- **The latest release is [v0.13.0-rc.1](https://github.com/cskiraly/seacast-spec/tree/v0.13.0-rc.1)**,
+  2026-11-25. [`CHANGELOG.md`](CHANGELOG.md) says what each release changed; changes after the
   latest tag are on `main`, and the changelog's first entry names them.
 - **SEACAST Lite** (`seacast-lite.md`) was measured on a research implementation, and each
   results record names the code it ran. [`formal/README.md`](formal/README.md) says what each check
   of it shows: the proofs, the Lean twin with its record, and the first piece of a refinement.
-- **SEACAST** (`seacast.md`) is checked in the toy only: no client runs it, and the research
-  implementation's simulations ran only designs that SEACAST contains as settings.
+- **SEACAST** (`seacast.md`) is checked by running its code: the toy runs it, and the Lean twin
+  replays the toy's traces of it. No client runs it, and the research implementation's simulations
+  ran only designs that SEACAST contains as settings.
 - **Results.** The announcement post, *[SEACAST: fast, lean, sampled broadcast for Ethereum, with an
   executable spec and a formal model](https://ethresear.ch/t/seacast-fast-lean-sampled-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)*
   (2026), stays as published. Its text is kept current, with the latest results and the data and

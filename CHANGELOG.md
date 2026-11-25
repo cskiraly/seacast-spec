@@ -13,7 +13,121 @@ are in the documents, most of them in their Rationales, and the full story is in
 messages. The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
 
-## v0.12.0 — 2026-11-22
+## v0.13.0-rc.1 — 2026-11-25
+
+This release is a candidate for v0.13.0. The Lean twin now transcribes `seacast.md`'s own functions
+too, and replays the toy's traces of them; its record is still v0.11.1's. The other changes correct
+the text and the toy, and add `CITATION.cff`. No rule changed, and every digest of `toy/check.py` is
+as it was, under either document.
+
+### Added
+- `CITATION.cff`, at the repository's root, says how to cite the specification. GitHub shows it as
+  "Cite this repository".
+- `formal/twin/SpecTwin/Seacast/` holds the twin of `seacast.md`'s code. It transcribes 99
+  functions: the 97 that `seacast.md` defines, and `seacast-lite.md`'s `on_block_installed` and
+  `on_pace_tick`, which call some of `seacast.md`'s own functions. A trace under `seacast.md`
+  replays through them and through the 43 functions of `seacast-lite.md` that the twin lists as
+  kept; before, the twin left out the functions specific to `seacast.md`.
+  `formal/twin/tools/gen/manifest_seacast.py` lists them, with the 90 questions that the twin asks
+  of the rest of the node, and `schema_seacast.py` adds `seacast.md`'s 40 tables to the twin's
+  state.
+- The replay (`formal/twin/Main.lean`) reads each record and the nodes line in the forms of the
+  document that the trace's header names. Its new command `--forms` reads a file of rows of
+  `seacast.md`'s questions (`tools/forms-seacast-examples.tsv`) and checks that the twin's readers
+  take each row as written and refuse it with a wrong answer in its place; `check.sh`'s build step
+  runs it.
+- `formal/twin/tools/`: `scan_bindings.py` lists the toy's bindings of names, and
+  `closure_seacast.py` checks the globals that each covered function of `seacast.md` loads. The
+  tracer stops at a name that one of the two cannot put in a class. After a trace,
+  `calls_seacast.py` counts each call of a traced name by where it ran, `timers_seacast.py` checks
+  the timer notes of the question `deferred_offers` against the `retry_offer` records they arm, and
+  `inventory_seacast.py` checks that the count read or skipped each trace as
+  `formal/twin/inventory.tsv` lists it. That file names every trace the count can meet, with its
+  class.
+- `formal/twin/tools/directed_seacast.py` holds 12 directed sets under `seacast.md`. They call the
+  toy's own functions on drawn states: §4.1's relations, §4.2's gate, §4.5's serving and
+  `may_be_asked`, §4.11's window and its writer, and a control set on `note_claim`.
+
+### Changed
+- `seacast.md` §4.2, `on_header_validated`: the block's groups are kept in a `dict`, not a `set`, so
+  that the last pass (`drop_outside` and the retries) visits them in `cell_groups`' order. A set of
+  group ids is visited in an order that Python's hash seed sets, which by default differs per
+  process. The membership tests are unchanged, and no rule changes.
+- `toy/run.py`: 14 options are read under `--setting rows` as well as under custody. Their help now
+  begins "custody, rows:", where it began "custody:".
+- `toy/README.md`: text only, and the toy counts as before. It now says that with `--route off` a
+  link that only forwards is no candidate, so a sample's hunt ends once no link that serves it is
+  left to ask. On the `reach` line, it says that a sample's label "first phase" or "second phase"
+  follows the order of its asks, not the phase, that a forwarder's routed requests are counted when
+  it queues them, and that missing samples are counted per sample, not per sampler and group. On
+  `--xcheck`, it says that the recorder counts variant C's events by tier 4's rules, that a count
+  that names the mesh then reads the union of the colours' meshes, and that under `--churn`, `late`
+  also counts a chunk sent after a HAVE the sender never held. `toy/xcheck.py`'s docstring says the
+  last too.
+- `formal/twin/tools/trace3.py` traces `seacast.md`'s own functions under `--doc seacast`, where
+  v0.12.0 traced only the toy's helper `held` and the functions that `seacast.md` keeps from
+  `seacast-lite.md`. It writes one record for each top-level call of a traced function, the roots
+  `on_frame`, `on_heartbeat` and `publish` among them, and logs the calls made inside it in that
+  record. It checks its arguments before it opens the trace's file, and the trailer of a run that
+  stops says so. `tracerfaults3.py` plants 31 faults in the tracer, where v0.12.0 planted 16, and
+  each must stop it with its own words.
+- `formal/twin/check.sh`: the scope step covers `seacast.md` too. Each covered name must have its
+  twin and its case in the replay, and each of the manifest's questions must be one that the twin
+  asks. The new option `--v2steps` runs the quick check with six of the record's steps, among them
+  the new `seacastdirected` and `seacastdirectedreplays`, which trace and replay the 12 directed
+  sets. The record's run (`check.sh --record`) now lists 67 traces in its manifest, where v0.12.0's
+  listed 55: the 12 directed sets under `seacast.md` are the new ones. `tracercontrols` adds the
+  chain cases (`chaincases.py`) and traces a cell with `--repair-bias` to its end. `--no-das` skips
+  the cases that need DAS and says that the run is partial.
+- `formal/twin/README.md` says what the twin covers of `seacast.md`, which its manifest lists, and
+  that no check holds `seacast.md`'s functions to the manifest's lists. It names a further limit of
+  the replay: a timer that fires is not checked to have been armed. It also says that the replay
+  refuses a record where the twin ran its own code for a function that the node replaced.
+- `formal/refine/`: the statements that the `twinstep`, `asking` and `carry` checks record
+  (`checks/*/statements.txt`) are recorded again. Each changed statement writes a state out field by
+  field, now with the fields that the twin's state gained, and the fingerprints of `asking` and
+  `carry` move with them. The counts of theorems, definitions and axioms are those of v0.12.0, and
+  each check passes on this release's tree.
+- `formal/twin/record/`: the twin's record is still the run from `9f33f60` that v0.11.1 (`1370aa0`)
+  published, carried with no new run, as in v0.12.0. It covers neither the twin's changes since
+  v0.12.0 nor this release's changes to the documents' code and to the toy. `RECORD.md` says so, and
+  which commit its sentences describe, and `formal/README.md` says so too.
+
+### Fixed
+- `seacast.md` §1.4: the floor per colour is kept by each colour's own GRAFTs (`maintain_relations`,
+  §4.1), so no colour is chosen over another. Before, the section said colours were proposed from
+  the proposer's least-used colours, which only `propose_colour` did, and nothing called it.
+- `seacast.md` §3: `joined_peers()` and `related(q)`, which `on_heartbeat`'s gossip line calls, are
+  now in the list of helpers not written out. `joined_peers()` is the peers in `links(T)` for some
+  joined type, and `related(q)` is true when `q` is in one of the node's relations (stock's `q in
+  mesh`). Neither was defined before.
+- `toy/node.py`: under `--upkeep on`, `joined_peers()` follows §3. Before, it took any peer with a
+  JOIN each way, which counted a JOIN of the node's that was still owed, and JOINs for different
+  types. A run with `--upkeep on` can differ where that was so. No cell of `toy/check.py` passes
+  `--upkeep`.
+- `seacast.md` §4.10: the text now says that the hunt for a sample also ends when the sample
+  arrives. `ask_sample` already returned for a sample that is held; the text named only the links
+  running out and the group's expiry.
+- `toy/node.py`: `--repair-bias` reads `shuffled` at each call. Before, a binding of `shuffled`
+  installed after the node was built, as the twin's tracer installs one, was replaced by the earlier
+  one at the end of the first `repair_verdict` under the bias, so a cell with `--repair-bias` could
+  not be traced. A run with no tracer is unchanged, since nothing else binds `shuffled`.
+- `toy/run.py`: `--xcheck` is refused under `--setting custody` and `rows`, with an argument error.
+  Before, it raised `KeyError` there, since `toy/sim.py`'s `publish_block` never names a publisher
+  to the recorder. The recorder counts tier 4's events and variant C's; what it would count under
+  custody and rows is not settled.
+- `toy/table_read_known.py` prints an object without its memory address, so its output is the same
+  on every run.
+- `formal/twin/tools/contentcontrols.py`: the control that changes `seacast-lite.md`'s version line
+  now matches a pre-release's line, such as this release's. Before, its pattern took digits and dots
+  only, so on a line that reads "v0.13.0-rc.1" the control would have raised.
+
+### Removed
+- `seacast.md` §4.1 no longer has `propose_colour`, which nothing called. `least_used_colour`, a
+  helper not written out that only `propose_colour` called, leaves §3's list of helpers. The toy's
+  own `least_used_colour` in `toy/node.py`, which nothing called, goes too.
+
+## v0.12.0 — 2026-11-22 (`ca0bbb0`)
 
 This release changes names only: the files take their protocols' names, and SEACAST on gossipsub
 is now SEACAST Lite. No rule changed, and every digest of `toy/check.py` is as it was, under either
