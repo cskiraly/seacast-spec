@@ -264,10 +264,22 @@ class NodeSeacast (m : Type → Type) where
   /-- the order in which `want_p`'s keys iterate (`for q in want_p` in `drop_outside`, a `keys` entry on the tape): a
   permutation of the peers the twin holds -/
   wantPOrder : List Peer → m (List Peer)
-  -- The nine names that a node can replace, by a binding of its own that changes what the function does, and that
-  -- have a call site inside the replayed closure: eight of the 71, and `filter_entry`, which §4.11's `next_to_send`
-  -- calls. Where the node's line names one as replaced, the Python asks the node, and the twin asks this question in
-  -- place of the document's body, as `seacast-lite.md`'s `forwardNode` is.
+  -- §4.8's heartbeat: four helpers that `on_heartbeat` calls and the documents do not write out. seacast.md's list
+  -- of helpers names `joined_types()` and `sampled_types()`; `joined_peers()` and `related(q)` are in neither
+  -- document's list.
+  /-- `joined_types()`: the types whose floor and relations the heartbeat keeps, in the node's order -/
+  joinedTypes : m (List TypeId)
+  /-- `sampled_types()`: the object types the node samples, in the node's order -/
+  sampledTypes : m (List TypeId)
+  /-- `joined_peers()`: the peers the heartbeat's gossip draws from, in the node's order -/
+  joinedPeers : m (List Peer)
+  /-- `related(q)`: whether q is in a relation with the node, which leaves it out of the heartbeat's gossip -/
+  related : Peer → m Bool
+  -- The ten names that a node can replace, by a binding of its own that changes what the function does, and that
+  -- have a call site inside the replayed closure: eight of the 71, `filter_entry`, which §4.11's `next_to_send`
+  -- calls, and `on_want`, which §4's `on_frame` calls. Where the node's line names one as replaced, the Python asks
+  -- the node, and the twin asks this question in place of the document's body, as `seacast-lite.md`'s `forwardNode`
+  -- is.
   /-- `forward(f, from_peer, axes)` as the node binds it -/
   forwardNode : ChunkF → Peer → Option (List GI) → m Unit
   /-- `push_rebuilt(g, new)` as the node binds it -/
@@ -286,6 +298,8 @@ class NodeSeacast (m : Type → Type) where
   knownInScopeNode : Group → m Bits
   /-- `filter_entry(p, entry)` as the node binds it: what of the entry still goes, or none -/
   filterEntryNode : Peer → QEntry → m (Option QEntry)
+  /-- `on_want(p, asks)` as the node binds it: the answers it returns -/
+  onWantNode : Peer → List AskSeacast → m (List ChunkF)
 
 namespace NodeSeacast
 
@@ -355,6 +369,10 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   groupsOrder a b := f (groupsOrder a b)
   standingOrder a b := f (standingOrder a b)
   wantPOrder a := f (wantPOrder a)
+  joinedTypes := f joinedTypes
+  sampledTypes := f sampledTypes
+  joinedPeers := f joinedPeers
+  related a := f (related a)
   forwardNode a b c := f (forwardNode a b c)
   pushRebuiltNode a b := f (pushRebuiltNode a b)
   sendHaveNode a b := f (sendHaveNode a b)
@@ -364,6 +382,7 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   noteClaimNode a b := f (noteClaimNode a b)
   knownInScopeNode a := f (knownInScopeNode a)
   filterEntryNode a b := f (filterEntryNode a b)
+  onWantNode a b := f (onWantNode a b)
 
 instance {m : Type → Type} {σ : Type} [Monad m] [NodeSeacast m] : NodeSeacast (StateT σ m) :=
   lift (m := m) (n := StateT σ m) fun x => monadLift x

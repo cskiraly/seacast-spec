@@ -250,6 +250,7 @@ TABLES_Seacast = [
     Table("served_hb", "servedHb", "servedHb", [P], "count",
           read=("servedHbCount", "`served_hb[p]`: the answers to p this heartbeat that SERVE_BUDGET counts"),
           write=("setServedHb", "`served_hb[p] += 1`"),
+          clear=("clearServedHb", "`served_hb.clear()`: a write of every entry there"),
           scans=[whole("servedHb", "every `served_hb`")]),
     # §4.11's window: `sent`, seacast-lite.md §7.1's table, whose value seacast.md writes as the send's time and its
     # bytes. A record names it `sent`; the twin keeps it apart from seacast-lite.md's (`trace`)

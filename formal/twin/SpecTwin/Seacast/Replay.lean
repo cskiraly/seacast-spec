@@ -5,6 +5,7 @@ import SpecTwin.Seacast.Kept
 import SpecTwin.Seacast.Serve
 import SpecTwin.Seacast.Gate
 import SpecTwin.Seacast.Upkeep
+import SpecTwin.Seacast.Roots
 import SpecTwin.Seacast.Manifest
 
 /-! # Replaying a record of a trace under seacast.md
@@ -93,6 +94,10 @@ def haveJson (h : Have) : Json :=
 def wantJson (w : Want) : Json :=
   Json.arr #[Json.str "want", Json.str w.group, (w.bits : Json), Json.bool w.standing, (w.hops : Json),
              Json.bool w.probe]
+
+/-- An ask with its flags, as `askSeacastOf` reads it: `[key, standing, hops, probe]`. -/
+def askSeacastJson (a : AskSeacast) : Json :=
+  Json.arr #[keyJson a.key, Json.bool a.standing, (a.hops : Json), Json.bool a.probe]
 
 def msgSeacastJson : MsgSeacast → Json
   | .have h => haveJson h
@@ -246,6 +251,12 @@ def probePromiseOf (j : Json) : Except String (Option ((Key × Peer) × Float)) 
 /-- A list of groups, none twice. -/
 def groupList (what : String) (j : Json) : Except String (List Group) := do
   let l ← (← arr j).mapM Replay.groupKey
+  nodup what l
+  return l
+
+/-- A list of object types, none twice (an order the Python iterated). -/
+def typeList (what : String) (j : Json) : Except String (List TypeId) := do
+  let l ← (← arr j).mapM typeId
   nodup what l
   return l
 
@@ -492,6 +503,10 @@ instance : NodeSeacast R where
     permOf s!"standing[{g}]'s keys" is ks
   wantPOrder qs := do
     permOf "want_p's keys" qs (← askCall "keys" [Json.str "want_p", Json.arr #[]] (peerList "keys of want_p"))
+  joinedTypes := askCall "joined_types" [] (typeList "joined_types")
+  sampledTypes := askCall "sampled_types" [] (typeList "sampled_types")
+  joinedPeers := askCall "joined_peers" [] (peerList "joined_peers")
+  related q := askCall "related" [(q : Json)] boolOf
   -- the names a node's line can give as replaced: asked where it does, the document's body run elsewhere
   forwardNode f p axes :=
     askCall "forward" [chunkJson f, (p : Json), optJson (fun l => Json.arr (l.map giJson).toArray) axes] nothing
@@ -509,6 +524,9 @@ instance : NodeSeacast R where
         | .arr #[q, x] => q == (p : Json) && (match qentry x .seacast with | .ok e' => e' == e | .error _ => false)
         | _ => false)
       (optOf (qentry · .seacast))
+  -- §4's: the asks handed over, and the answers the node's binding returns, narrow
+  onWantNode p asks :=
+    askCall "on_want" [(p : Json), Json.arr (asks.map askSeacastJson).toArray] fun j => do (← arr j).mapM chunkN
 
 /-! ## One record -/
 
@@ -522,7 +540,8 @@ the 66, main's `fill` and `serve_standing`, v0.11.1's `joined` and `drop_wants_b
 (`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`), §4.1's relations with §6.3's limit
 (`relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `on_join`), and §4.11's window and writer
 (`wake_front`, `write_waits`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`,
-`noted`, `free_room`, `next_to_send`): 91. -/
+`noted`, `free_room`, `next_to_send`), §4.2's gate for cells (`drop_outside`, `on_header_validated`), and the roots
+(`on_frame`, `on_heartbeat`, `publish`): 96. -/
 def fnsSeacast : List String := Manifest.covered.filter (!keptFormsSeacast.contains ·)
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
@@ -699,6 +718,21 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
           | .null => pure .nothing
           | j => .entry <$> qentry j .seacast
         return v == want
+    -- the roots: §4's frame, §4.8's heartbeat and §4.7's source
+    | "on_frame", #[p, .arr #[cs, hs, ks, gs, ps]] => do   -- the frame's five lists, each in the frame's order
+      let graftOf (x : Json) : Except String Graft := do
+        let .graft gr ← relation x | throw s!"on_frame: not a GRAFT: {x.compress}"
+        return gr
+      let pruneOf (x : Json) : Except String Prune := do
+        let .prune pr ← relation x | throw s!"on_frame: not a PRUNE: {x.compress}"
+        return pr
+      let fr : FrameSeacast := { chunks := ← (← arr cs).mapM chunkF, haves := ← (← arr hs).mapM haveOf,
+                                 asks := ← (← arr ks).mapM askSeacastOf, grafts := ← (← arr gs).mapM graftOf,
+                                 prunes := ← (← arr ps).mapM pruneOf }
+      exec (Seacast.onFrame (← nat p) fr) none_
+    | "on_heartbeat", #[] => do exec Seacast.onHeartbeat none_
+    | "publish", #[b, d, sh] => do
+      exec (Seacast.publish (← blockOf b) (← descriptor d) (← (← arr sh).mapM shardOf)) none_
     -- seacast-lite.md's two that call SEACAST's functions, in their v2 forms
     | "on_pace_tick", #[] => do exec onPaceTick none_
     | "on_block_installed", #[root] => do exec (onBlockInstalled (← rootKey root)) none_

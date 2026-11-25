@@ -12,7 +12,8 @@ The lists:
   `route_want`, and `on_want`, then §4.1's relations and §6.3's limit on them: `relation_room`, `graft`, `on_prune`,
   `on_graft`, `maintain_relations` and `on_join`, then §4.11's window and writer: `wake_front`, `write_waits`,
   `free_room`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`, `noted` and
-  `next_to_send`, then §4.2's gate for cells: `drop_outside` and `on_header_validated`.
+  `next_to_send`, then §4.2's gate for cells: `drop_outside` and `on_header_validated`, then the roots: `on_frame`,
+  `on_heartbeat` and `publish`.
 - KEPT: seacast-lite.md's functions that a record under seacast.md may name: those seacast-lite.md keeps all the way down
   under v2 (trace3.py's `seacast_kept` over the toy's two documents), less NODE_OWN's names. Of §7.1's window it
   holds `front` alone, which seacast.md's window calls unchanged.
@@ -66,7 +67,8 @@ COVERED = [
     "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join",
     "wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
     "window_timeout", "noted", "next_to_send",
-    "drop_outside", "on_header_validated"]
+    "drop_outside", "on_header_validated",
+    "on_frame", "on_heartbeat", "publish"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
@@ -110,14 +112,15 @@ FOREIGN = ["known_id", "chunks"]
 
 QUESTIONS = [
     # the globals that covered functions load, classed as questions: each is answered from the tape
-    "accepted", "admitted", "admitted_group", "after", "authenticable", "bid_group", "block_of", "candidates", "choice",
-    "chunk_of", "close_promises_of_group", "connected", "cover_candidates", "deferred_offers", "deliver", "duty_for",
-    "enqueue", "expired", "families", "families_with_duty", "floor_candidates", "floor_links", "group_bits", "has_room",
-    "high_custody", "in_pushers", "interest_satisfied", "link_cover", "links", "live", "mark_seen", "merge_waiting",
-    "node_id", "open_group", "open_link", "open_sampling_link", "our_join", "out_pushees", "own_id", "payload_of",
-    "penalise", "release", "release_wanted_groups", "reserve", "resolve", "route_next", "runs_type",
-    "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
-    "uplink_class", "valid_have", "wake", "wants_family",
+    "accepted", "admitted", "admitted_group", "after", "authenticable", "bid_group", "block_of", "block_root",
+    "candidates", "choice", "chunk_of", "close_promises_of_group", "connected", "cover_candidates", "deferred_offers",
+    "deliver", "duty_for", "enqueue", "expired", "families", "families_with_duty", "floor_candidates", "floor_links",
+    "gossip_eligible", "group_bits", "group_of", "has_room", "high_custody", "in_pushers", "interest_satisfied",
+    "joined_peers", "joined_types", "link_cover", "links", "live", "mark_seen", "merge_waiting", "node_id",
+    "open_group", "open_group_source", "open_link", "open_sampling_link", "our_join", "out_pushees", "own_id",
+    "payload_of", "penalise", "related", "release", "release_wanted_groups", "reserve", "resolve", "route_next",
+    "runs_type", "sample_without_replacement", "sampled_types", "seen", "send", "shuffled", "start", "store",
+    "type_of", "type_of_group", "uplink_class", "valid_have", "wake", "wants_family",
     # §4.11's writer: the owed answer popped, an entry's bytes on the wire, the offers an entry carries
     "pop_owed_answer", "wire_size", "offers_in",
     # §4.2's gate for cells: the block's column and row groups
@@ -127,14 +130,13 @@ QUESTIONS = [
     # the object type's functions, which covered functions call on a type
     "cross", "decode", "derived_interest", "family", "header_of", "index_count", "project", "threshold", "verify",
     # asked by the twin and loaded by no covered function: QUESTIONS_UNLOADED's
-    "group_of", "open_group_source", "own_interest", "writing",
-    # the context globals' uses, by their tape names: `gossip_history.put(f)` in forward, `p in mesh` in unpush, and
-    # `gossip_history.remove_group(g)` in drop_group, a kept function the twin runs as its own
-    "gossip_put", "mesh_has", "gossip_remove_group"]
+    "own_interest", "writing",
+    # the context globals' uses, by their tape names: `gossip_history.put(f)` in forward and publish, `p in mesh` in
+    # unpush, `gossip_history.remove_group(g)` in drop_group, a kept function the twin runs as its own, and
+    # `gossip_history.gossip_ids()` in on_heartbeat
+    "gossip_put", "mesh_has", "gossip_remove_group", "gossip_ids"]
 
 QUESTIONS_UNLOADED = {
-    "group_of": "loaded by seacast.md's code outside COVERED, on publish's path",
-    "open_group_source": "loaded by seacast.md's code outside COVERED, on publish's path",
     "own_interest": "interest's miss, asked as a question",
     "writing": "asked by seacast-lite.md's front, a kept function the twin runs as its own"}
 

@@ -89,7 +89,8 @@ class Table:
     values_ordered: bool = False    # the order of `t.values()` is asked (`held_back.values()`, the order of the
                                 # heartbeat's retries); `tied.values()` is not: `any` over it
     clear: tuple = None         # (name, doc): the whole table emptied (`t.clear()`), a write of every entry there;
-                                # for a table of one key (the heartbeat's three)
+                                # for a table of one key (the heartbeat's: seacast-lite.md's three, and
+                                # seacast.md's served_hb)
     scans: list = field(default_factory=list)
     presence_in: bool = False   # `planned`: the Python's `k in t` at a row's level is a read of that row's
                                 # presence alone (the tracer's view; the twin's row operation is that read already)

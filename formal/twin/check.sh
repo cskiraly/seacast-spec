@@ -626,9 +626,9 @@ gone = covered[0]                            # the controls: each must be refuse
 ctl1 = missing(entered - {gone}, cases)
 ok1 = bool(ctl1) and ctl1[0].startswith(gone + ":")
 print(f"control, SEACAST's twin without {gone}: {'refused, as it must be' if ok1 else 'NOT refused  <-- FAIL'}")
-ctl2 = missing(entered, cases | {"on_frame"})
-ok2 = "on_frame: a case of runSeacast the manifest does not cover" in ctl2
-print(f"control, runSeacast with a case named on_frame: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
+ctl2 = missing(entered, cases | {"acquire_slot"})
+ok2 = "acquire_slot: a case of runSeacast the manifest does not cover" in ctl2
+print(f"control, runSeacast with a case named acquire_slot: {'refused, as it must be' if ok2 else 'NOT refused  <-- FAIL'}")
 if bad or not ok1 or not ok2:
     print(f"NOT every one of seacast.md's covered functions has its twin, or runSeacast has a case it does not cover: {len(bad)}")
     sys.exit(1)

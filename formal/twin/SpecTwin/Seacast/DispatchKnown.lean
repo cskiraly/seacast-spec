@@ -86,11 +86,11 @@ def fails (hd : Json) (only? : Option String := none) : List String := (readHead
 
 -- B3, traced under v2
 #guard fails (hdSeacast (sortBy (· < ·) ("announce" :: traced43))) == []
-#guard fails (hdSeacast (sortBy (· < ·) ("on_frame" :: traced43)))
-  == ["header: traced names that seacast.md's manifest does not list: on_frame"]
+#guard fails (hdSeacast (sortBy (· < ·) ("acquire_slot" :: traced43)))
+  == ["header: traced names that seacast.md's manifest does not list: acquire_slot"]
 #guard Manifest.cut.isEmpty                                      -- window_release is §4.11's, transcribed
 #guard fails (hdSeacast (sortBy (· < ·) ("window_release" :: traced43))) == []
-#guard fails (hdLite [("traced", strs (sortBy (· < ·) ("on_frame" :: traced43)))]) == []   -- not seacast-lite.md's check
+#guard fails (hdLite [("traced", strs (sortBy (· < ·) ("acquire_slot" :: traced43)))]) == []   -- not seacast-lite.md's check
 
 -- B4, --only under v2
 #guard fails hdSeacast (some "fn=respond") == []
@@ -324,18 +324,19 @@ def maxRelationsLine (v : Json) := line2 (entry [("types", some (maxRelations v)
 #guard routeSeacast "announce" == .seacast
 #guard ["on_pace_tick", "on_block_installed", "respond"].all (routeSeacast · == .form)
 #guard ["with_owed", "build_group", "outstanding", "held"].all (routeSeacast · == .kept)
-#guard ["on_frame", "on_heartbeat", "no_such_function", "acquire_slot", "free_slot"].all (routeSeacast · == .refused)
+#guard ["no_such_function", "acquire_slot", "free_slot"].all (routeSeacast · == .refused)
+#guard ["on_frame", "on_heartbeat", "publish"].all (routeSeacast · == .seacast)               -- the roots
 #guard ["wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
         "window_timeout", "noted", "next_to_send"].all (routeSeacast · == .seacast)   -- §4.11's ten
 #guard routeSeacast "front" == .kept                                            -- seacast-lite.md's, called unchanged
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
 #guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
-#guard fnsSeacast.length == 93                                                  -- v0.11.1's joined, drop_wants_beyond;
+#guard fnsSeacast.length == 96                                                  -- v0.11.1's joined, drop_wants_beyond;
                                                                                 --   §4.5's serving, §4.10's route_want;
                                                                                 --   §4.1's relations, §6.3's room;
                                                                                 --   §4.11's window and writer;
-                                                                                --   §4.2's gate for cells
+                                                                                --   §4.2's gate for cells; the roots
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused
@@ -343,8 +344,8 @@ def maxRelationsLine (v : Json) := line2 (entry [("types", some (maxRelations v)
   (ReplayKnown.line "valid_id" "[\"abcd\"]" "[]" "[]" "[]" "[]" (ReplayKnown.ret "false") "[\"valid_id\"]" "[]")
 #guard ReplayKnown.failsWith "return value: "
   (ReplayKnown.line "valid_id" "[\"abcd\"]" "[]" "[]" "[]" "[]" (ReplayKnown.ret "true") "[\"valid_id\"]" "[]")
-#guard ReplayKnown.failsWith "not a function of the twin under seacast.md: on_frame"
-  (ReplayKnown.line "on_frame" "[1, []]" "[]" "[]" "[]" "[]" (ReplayKnown.ret "null") "[\"on_frame\"]" "[]")
+#guard ReplayKnown.failsWith "not a function of the twin under seacast.md: acquire_slot"
+  (ReplayKnown.line "acquire_slot" "[1]" "[]" "[]" "[]" "[]" (ReplayKnown.ret "null") "[\"acquire_slot\"]" "[]")
 
 -- D4, a subset's pick by the tape reads the list of the trace's document
 def tapeLine : String := "{\"tape\": [[\"send_have\", \"[1]\", \"null\"], [\"forward\", \"[]\", \"null\"]]}"

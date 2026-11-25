@@ -568,6 +568,8 @@ class Tables (m : Type → Type) extends TablesWhole m where
   servedHbCount : Peer → m Nat
   /-- `served_hb[p] += 1` -/
   setServedHb : Peer → Nat → m Unit
+  /-- `served_hb.clear()`: a write of every entry there -/
+  clearServedHb : m Unit
   /-- `sent.get(key)`, `key in sent`, `sent.pop(key, None)`: the send's time and bytes -/
   sentSeacast? : SendKey → m (Option (Float × Nat))
   /-- `sent[key] = (now, need)` -/
@@ -1030,6 +1032,9 @@ def ofState {m : Type → Type} [Monad m] [MonadStateOf State m] (note : Touch �
     modify fun s => { s with forwarded := s.forwarded.insert p ((s.forwarded.getD p {}).insert T n) }
   servedHbCount p := do note (.read (.servedHb p)); return (← get).servedHb.getD p 0
   setServedHb p n := do note (.write (.servedHb p)); modify fun s => { s with servedHb := s.servedHb.insert p n }
+  clearServedHb := do
+    for (p, _) in (← get).servedHb.toList do note (.write (.servedHb p))
+    modify fun s => { s with servedHb := {} }
   sentSeacast? k := do note (.read (.sentSeacast k)); return (← get).sentSeacast.get? k
   setSentSeacast k sr := do
     note (.write (.sentSeacast k))
@@ -1525,6 +1530,7 @@ abbrev lift {m n : Type → Type} [Tables m] (f : ∀ {α : Type}, m α → n α
   setForwarded p T n := f (setForwarded p T n)
   servedHbCount p := f (servedHbCount p)
   setServedHb p n := f (setServedHb p n)
+  clearServedHb := f clearServedHb
   sentSeacast? k := f (sentSeacast? k)
   setSentSeacast k sr := f (setSentSeacast k sr)
   eraseSentSeacast k := f (eraseSentSeacast k)

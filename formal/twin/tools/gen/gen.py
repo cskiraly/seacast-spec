@@ -1399,8 +1399,9 @@ def controls(twin, work):
 
     manifest("respond taken out of KEPT", lambda m: m["KEPT"].remove("respond"),
              [MF, "the manifest: respond in seacast_kept, not in the manifest"])
-    manifest("on_frame, a name seacast.md defines, added to KEPT", lambda m: m["KEPT"].append("on_frame"),
-             [MF, "the manifest: on_frame in the manifest, not in seacast_kept"])
+    manifest("acquire_slot, a name of seacast-lite.md's that seacast.md does not keep, added to KEPT",
+             lambda m: m["KEPT"].append("acquire_slot"),
+             [MF, "the manifest: acquire_slot in the manifest, not in seacast_kept"])
     files("one name of Manifest.lean changed", change(MF, '"respond"', '"respond2"'), [MF])
     manifest("announce twice in COVERED", lambda m: m["COVERED"].append("announce"),
              [MF, "the manifest: announce twice in COVERED"])

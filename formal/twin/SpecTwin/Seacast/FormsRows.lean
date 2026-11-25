@@ -50,6 +50,7 @@ def famsJson (l : List Fam) : Json := Json.arr (l.map intJson).toArray
 def natJson (n : Nat) : Json := (n : Json)
 def unitJson (_ : Unit) : Json := Json.null
 def groupsJson (l : List Group) : Json := Json.arr (l.map Json.str).toArray
+def typesJson (l : List TypeId) : Json := Json.arr (l.map Json.str).toArray
 
 def repairVerdictJson : RepairVerdict → Json
   | .repaired => Json.str "REPAIRED"
@@ -310,6 +311,20 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
     return natsJson <$> NodeSeacast.outPushees (m := R) t fam c
   | "uplinkClass", #[] => do
     return uplinkClassJson <$> NodeSeacast.uplinkClass (m := R)
+  -- §4.8's heartbeat: the peers its gossip draws from, the node's types, and whether a peer holds a relation of ours
+  | "joinedPeers", #[] => do
+    return natsJson <$> NodeSeacast.joinedPeers (m := R)
+  | "joinedTypes", #[] => do
+    return typesJson <$> NodeSeacast.joinedTypes (m := R)
+  | "related", #[q] => do
+    let q ← nat q
+    return Json.bool <$> NodeSeacast.related (m := R) q
+  | "sampledTypes", #[] => do
+    return typesJson <$> NodeSeacast.sampledTypes (m := R)
+  -- on_want as the node binds it, which on_frame asks where the node's line names it as replaced
+  | "onWantNode", #[p, asks] => do
+    let p ← nat p; let asks ← (← arr asks).mapM askSeacastOf
+    return (fun l => Json.arr (l.map chunkJson).toArray) <$> NodeSeacast.onWantNode (m := R) p asks
   | _, _ => throw s!"not a form of SEACAST's questions, or not its arguments: {form} {(Json.arr args).compress}"
 
 /-- The question run over a tape of these rows, each read as a record's tape entry is under seacast.md. The
@@ -420,6 +435,19 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "filterEntryNode" => match ans with
     | .arr #[.arr c, ctrl, sol] => pure (Json.arr #[Json.arr (c.push Json.null), ctrl, sol])
     | _ => throw s!"filterEntryNode: not an entry with a chunk: {ans.compress}"
+  -- §4.8's heartbeat's four, each refused by its reader's own check: a peer twice; a type twice; a type of the empty
+  -- string. related's 0 is the Boolean form's control, refused by its kind: a number to a Boolean
+  | "joinedPeers" => p "[5,5]"
+  | "joinedTypes" => p "[\"column\",\"column\"]"
+  | "related" => p "0"
+  | "sampledTypes" => p "[\"\"]"
+  -- the answers `on_want` returns where the node replaces it: the first chunk with a sixth member, refused by the
+  -- chunk's reader, which takes it narrow; an empty answer, which has no first chunk, gets a number where a chunk is
+  | "onWantNode" => match ans with
+    | .arr xs => match xs[0]? with
+      | some (.arr c) => pure (Json.arr #[Json.arr (c.push Json.null)])
+      | _ => p "[5]"
+    | _ => throw s!"onWantNode: not a list of chunks: {ans.compress}"
   | _ => throw s!"no wrong answer for the form {form}"
 
 /-- The words a wrong answer must be refused with: its reader's, after the question's name. `shuffledPeers`' row
@@ -436,8 +464,10 @@ the file's at spec 287d575; the next 17 cover the methods of `NodeSeacast` that 
 `own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as `on_want` asks them; the next 6 are
 §4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`, `out_pushees` and `uplink_class`; the next 3 are
 §4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`; the next is `filter_entry` as the node binds it, which
-`next_to_send` asks where the node's line names it as replaced; the last 4 are §4.2's gate's: `cell_groups`, the order
-of `on_header_validated`'s groups, and the key orders of `standing[g]` and `want_p` in `drop_outside`. -/
+`next_to_send` asks where the node's line names it as replaced; the next 4 are §4.2's gate's: `cell_groups`, the order
+of `on_header_validated`'s groups, and the key orders of `standing[g]` and `want_p` in `drop_outside`; the next 4 are
+§4.8's heartbeat's: `joined_peers`, `joined_types`, `related` and `sampled_types`; the last is `on_want` as the node
+binds it, which `on_frame` asks where the node's line names it as replaced. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -459,7 +489,11 @@ def labels : List String :=
    -- and filter_entry, which next_to_send asks where the node replaces it
    "filterEntryNode",
    -- §4.2's gate: cell_groups, and the orders of three of its loops
-   "cellGroups", "groupsOrder", "standingOrder", "wantPOrder"]
+   "cellGroups", "groupsOrder", "standingOrder", "wantPOrder",
+   -- §4.8's heartbeat: the four questions it asks of the node
+   "joinedPeers", "joinedTypes", "related", "sampledTypes",
+   -- and on_want, which on_frame asks where the node replaces it
+   "onWantNode"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)
