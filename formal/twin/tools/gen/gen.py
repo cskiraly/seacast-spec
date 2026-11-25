@@ -1397,8 +1397,10 @@ def controls(twin, work):
         print(f"control, the manifest with {what}: the check finds {', '.join(got) or 'nothing'}"
               f"{'' if good else '  <-- must find ' + ', '.join(must)}")
 
+    # on_frame, which is covered, calls respond: out of KEPT, it is a name the code asks
     manifest("respond taken out of KEPT", lambda m: m["KEPT"].remove("respond"),
-             [MF, "the manifest: respond in seacast_kept, not in the manifest"])
+             [MF, "the manifest: respond in seacast_kept, not in the manifest",
+              "the manifest: respond asked by the code, not in QUESTIONS"])
     manifest("acquire_slot, a name of seacast-lite.md's that seacast.md does not keep, added to KEPT",
              lambda m: m["KEPT"].append("acquire_slot"),
              [MF, "the manifest: acquire_slot in the manifest, not in seacast_kept"])
@@ -1410,8 +1412,9 @@ def controls(twin, work):
     manifest("held, a key of NODE_OWN, in COVERED too", lambda m: m["COVERED"].append("held"),
              [MF, "the manifest: held, a key of NODE_OWN, in COVERED",
               "the manifest: held in COVERED, not a function of the documents"])
-    manifest("window_release, which is cut, in REPLACEABLE", lambda m: m["REPLACEABLE"].append("window_release"),
-             [MF, "the manifest: window_release, in CUT, in REPLACEABLE too"])
+    # CUT is empty, so this control puts a covered name in it
+    manifest("window_release, a covered name, in CUT too", lambda m: m["CUT"].append("window_release"),
+             [MF, "the manifest: window_release, in CUT, in COVERED too"])
     manifest("forward in REPLACEABLE_WHOLE", lambda m: m["REPLACEABLE_WHOLE"].append("forward"),
              [MF, "the manifest: forward in REPLACEABLE_WHOLE, not in KEPT"])
     manifest("links twice in QUESTIONS", lambda m: m["QUESTIONS"].append("links"),
