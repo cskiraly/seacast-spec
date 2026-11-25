@@ -79,7 +79,8 @@ The sets:
   default p is a link of g's type as built, and g is one of three groups the simulator does not know, of the default
   type, with a drawn descriptor of 1 to 8 chunks and an index below it. MB8's state takes p's JOIN of the type back,
   so that interest_of_peer raises KeyError at `join_recv[p][T]`: the loop takes a KeyError, and that error alone, as
-  MB8's path (RAISES), and stops the set at an MB8 call that does not raise. The tracer writes the record with
+  MB8's path (RAISES), where its key is the type the scenario took back (RAISED_AT). It stops the set at an MB8 call
+  that does not raise, or that raises at another key. The tracer writes the record with
   `raises` and `raises_key`, and the replay compares the twin's crash with the record's: the error's name and its
   key (`raises_key`), not the function that raised it.
   Any other raise stops the set, as in every set.
@@ -1191,10 +1192,11 @@ def mb7(rng, nd, ns, B):
 
 def mb8(rng, nd, ns, B):
     """MB8 (H): not offered; p's JOIN of P taken back; `claim_all` drawn. -> may_be_asked: interest_of_peer raises
-    KeyError at `join_recv[p][T]` (RAISES)."""
+    KeyError at `join_recv[p][T]` (RAISES), T being P (RAISED_AT)."""
     p, g, i, n, P = on_h(rng, nd, ns)
     not_offered(rng, nd, ns, p, g, i, n)
     F.unwrap(ns["join_recv"])[p].pop(P, None)
+    RAISED_AT["MB8"] = P                # the key the call must raise at: the type whose JOIN it took back
     holding(rng, ns, p, g, i, n, B)
     return asked_call(rng, p, g, i)
 
@@ -1222,6 +1224,7 @@ SETS = {     # name: (frame, the nodes its records are made at, its scenarios, w
 }
 LAST = {"window_h": ("C1", w_c1)}     # a set's last step, made once after its records: its key and its scenario
 RAISES = {"asked_h": {"MB8": KeyError}}   # a scenario each of whose calls raises this, a record with `raises`
+RAISED_AT = {}                      # the key a RAISES scenario's call must raise at, as the scenario writes it
 # what a record starts from: the tables put back as the build left them (all but the JOIN tables empty then), and
 # the tables emptied; under "window" the window's count and line too (window_start)
 STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS), "window": (WINDOW_RESET, ()),
@@ -1305,9 +1308,13 @@ def main(argv):
             name, fargs = scenarios[key](rng, nd, ns, B)
             current[0] = key
             if key in raises:           # the raise is the scenario's path: the tracer wrote the record with `raises`
+                at = RAISED_AT.pop(key)     # and its key the one the scenario wrote: a raise at another stops the set
                 try:
                     ns[name](*fargs)
-                except raises[key]:
+                except raises[key] as e:
+                    if e.args != (at,):
+                        raise SystemExit(f"directed_seacast: {a.set}: a call of {key} raised {raises[key].__name__} "
+                                         f"at {e.args!r:.80}, not at its scenario's key") from e
                     raised[key] += 1
                 else:
                     raise SystemExit(f"directed_seacast: {a.set}: a call of {key} did not raise "
