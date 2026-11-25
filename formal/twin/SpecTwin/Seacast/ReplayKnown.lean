@@ -2017,11 +2017,11 @@ each change one answer, and what follows from it. In one, peer 5 is not related,
 the twin then asks answers false. In the other, the second `joined_types()` answers no type, so `maintain_relations`
 runs for none: its entries leave the tape, and its name leaves `reached`. -/
 
-/-- The type `payload`: the parameters the heartbeat reads -/
+/-- The type `payload`: the parameters the heartbeat and an offer read -/
 def paramsP : TypeId → Option TypeParams := fun T =>
   if T == "payload" then
     some { M := some 1, F_LO := some 6, F_HI := some 12, D_OUT := some 8, D_OUT_FAST := some 8,
-           SYMMETRIC := some false, EAGER := some true }
+           SYMMETRIC := some false, EAGER := some true, START_DELAY := some 0.0 }
   else none
 
 def paced : Consts := { c0 with PACED := true }
@@ -2088,6 +2088,46 @@ def rel4 : List String := [relLabel, relLabel, relLabel, relLabel]
   !takesP hb paced (head3 ++ rel4 ++ ["on_heartbeat: gossip sent at once"])
 -- and each changed record differs from the toy's
 #guard notEligible != hb && differ != hb && entriesLeft != hb && noEntry != hb
+
+/-! ## §4's `on_frame`: an offer on a link not joined for its type
+
+The record is the toy's: peer 2 offers node 5 a group that node 5 holds whole, so `on_offer` finds nothing to ask
+and `respond` has nothing to send. In the other, `links(payload)` leaves peer 2 out, so the offer is ignored:
+`on_offer` does not run, and its questions, its reads and its write leave the record. -/
+
+/-- The toy's record, whole -/
+def fr : String :=
+  "{\"n\":5,\"t\":4614427617194021004,\"fn\":\"on_frame\",\"args\":[2,[[],[[\"have\",\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\",1,true,false,false]],[],[],[]]],\"tape\":[[\"type_of_group\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],\"payload\"],[\"links\",[\"payload\"],[1,2,3,4],{\"cr\":[[\"join_recv\",[1,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_recv\",[2,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_recv\",[3,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_recv\",[4,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[1,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[2,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[3,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[4,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"owed_relations\",[1],null],[\"owed_relations\",[2],null],[\"owed_relations\",[3],null],[\"owed_relations\",[4],null]],\"cw\":[]}],[\"expired\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],false],[\"valid_have\",[[\"have\",\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\",1,true,false,false]],true,{\"cr\":[[\"desc\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],[2,0,1,2,11660,11660,\"369b57cd871e967a5c21f7031cf699e6e8d22decd4206d303a4e37a730bc397f\"]]],\"cw\":[]}],[\"admitted\",[2,[\"holding\",\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\",1,false,false]],true],[\"type_of_group\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],\"payload\"],[\"shuffled\",[[]],[]]],\"reads\":[[\"ihave_frames\",[2],1],[\"known_at\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],4613975146731908579],[\"interest\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],[\"-\",1]],[\"mine\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],3]],\"scans\":[],\"writes\":[[\"ihave_frames\",[2],2]],\"rest\":[[\"desc\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],[2,0,1,2,11660,11660,\"369b57cd871e967a5c21f7031cf699e6e8d22decd4206d303a4e37a730bc397f\"]],[\"join_recv\",[1,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_recv\",[2,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_recv\",[3,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_recv\",[4,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[1,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[2,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[3,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]],[\"join_sent\",[4,\"payload\"],[\"join\",\"payload\",\"ALL\",0,\"FORWARD\",1]]],\"ret\":null,\"reached\":[\"joined\",\"on_frame\",\"on_offer\",\"on_want\",\"respond\"],\"tables\":[\"ihave_frames\",\"interest\",\"known_at\",\"mine\"]}"
+
+/-- `links(payload)`'s answer; `on_offer`'s five entries, with the comma before them; the reads, the write, and
+`reached` with `tables` -/
+def linksQ : String := "[\"links\",[\"payload\"],[1,2,3,4],"
+def offerE : String :=
+  ",[\"expired\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],false],[\"valid_have\",[[\"have\",\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\",1,true,false,false]],true,{\"cr\":[[\"desc\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],[2,0,1,2,11660,11660,\"369b57cd871e967a5c21f7031cf699e6e8d22decd4206d303a4e37a730bc397f\"]]],\"cw\":[]}],[\"admitted\",[2,[\"holding\",\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\",1,false,false]],true],[\"type_of_group\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],\"payload\"],[\"shuffled\",[[]],[]]"
+def frReads : String :=
+  "\"reads\":[[\"ihave_frames\",[2],1],[\"known_at\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],4613975146731908579],[\"interest\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],[\"-\",1]],[\"mine\",[\"25b4c9bcad7d922788db669a4e2733044edad3d9abbbc23d894d20f8428cd1a6\"],3]]"
+def frWrites : String := "\"writes\":[[\"ihave_frames\",[2],2]]"
+def frTail : String :=
+  "\"reached\":[\"joined\",\"on_frame\",\"on_offer\",\"on_want\",\"respond\"],\"tables\":[\"ihave_frames\",\"interest\",\"known_at\",\"mine\"]"
+
+/-- `links(payload)` leaves peer 2 out; the rest is the toy's -/
+def linksNo : String := fr.replace linksQ "[\"links\",[\"payload\"],[1,3,4],"
+/-- and what follows from it: `on_offer` does not run -/
+def notJoined : String :=
+  (((linksNo.replace offerE "").replace frReads "\"reads\":[]").replace frWrites "\"writes\":[]").replace frTail
+    "\"reached\":[\"joined\",\"on_frame\",\"on_want\",\"respond\"],\"tables\":[]"
+def nothingLabel : String := "respond: nothing to ask, answer or prune"
+
+-- each text replaced is in the record once
+#guard [linksQ, offerE, frReads, frWrites, frTail].all fun s => (fr.splitOn s).length == 2
+#guard takesP fr paced ["on_frame: an offer-bearing frame", nothingLabel]
+#guard takesP notJoined paced ["on_frame: an offer on a link not joined for its type, ignored", nothingLabel]
+
+/-! ### The one that must fail -/
+
+-- peer 2 not among the links, and on_offer's entries left: the twin asks nothing after links
+#guard failsP "tape: the toy asked more: " linksNo paced
+#guard linksNo != fr && notJoined != linksNo
 
 end Roots
 
