@@ -562,6 +562,9 @@ is bounded (§6.3).
 type a group id names), `links(T)` (the peers with a JOIN for `T` both ways: theirs received, ours
 queued rather than owed, §4.1; none for a type the node does not run), `our_join(T)` (the JOIN
 the node sends for `T`: its interest, custody count, duty and `M`, §1.2), `joined_types()`,
+`joined_peers()` (the peers in `links(T)` for some `T` in `joined_types()`), `related(q)` (`q` holds a
+relation of ours: it is in `in_pushers(T, fam, c)` or `out_pushees(T, fam, c)` for some type, family and
+colour; stock's `q in mesh`),
 `runs_type(tid)` (the node runs the object type `tid` names), `node_id(p)`, `own_id()` (the node's
 own id),
 `in_pushers(T, fam, c)` and

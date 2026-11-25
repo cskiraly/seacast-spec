@@ -1404,10 +1404,10 @@ class Node:
         def joined_types():
             return list(types.values())
 
-        def joined_peers():
+        def joined_peers():                             # seacast.md §3's helper: the peers in links(T) for some joined T
             if not c.get("upkeep"):
                 return node.peers
-            return [q for q in node.peers if ns["join_recv"].get(q) and ns["join_sent"].get(q)]   # --upkeep on
+            return [q for q in node.peers if any(q in links(T) for T in joined_types())]   # --upkeep on
 
         def related(q):
             po, pi = ns["push_out"].get(q), ns["push_in"].get(q)
