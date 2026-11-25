@@ -82,6 +82,7 @@ import math
 import os
 import re
 import sys
+import types
 from collections import Counter, namedtuple
 from pathlib import Path
 
@@ -515,8 +516,14 @@ REPLACEABLE_WHOLE = ("validate_chunk",)
 # after it), which no install finds bound, and which a record's entry or exit finds and stops at (bindings_check).
 # A closure-dependent layer (ClosureKind) has its kind read at each node from a closure value the node is made with:
 # `cell`'s truth value picks `if_true` or `if_false`.
+# An adapter (ADAPTER) is a binding's layer: it calls the document's function exactly once, and its work before and
+# after that call is the binding's, which the documents give to it. The record is that inner call (the install puts
+# the record's wrapper in the adapter's cell that holds the function), and the adapter's own work is outside every
+# record; its guards (Adapter) stop it where it writes inside the call, calls the function twice or not at all, or is
+# entered with a record open. It must be the one layer over the document's function, and the scan must find its
+# row adapter-shaped (scan_bindings.py --lists). Each ADAPTER entry cites the text that makes its work the binding's.
 OBSERVER, NODE_HELPER, CHANGING = "observer", "node's own", "changing"
-SWAPPED_DRAW, DURING_CALL = "swapped draw", "bound during a call"
+SWAPPED_DRAW, DURING_CALL, ADAPTER = "swapped draw", "bound during a call", "adapter"
 ClosureKind = namedtuple("ClosureKind", "cell if_true if_false")
 DRAWS = ("choice", "sample_without_replacement", "shuffled")    # the draws a toy's layer may swap (K13)
 LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_ihave_limits", OBSERVER),  # counts
@@ -574,6 +581,11 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._alarm.<locals>.on_want", 403): ("on_want", CHANGING),              # --alarm-wait's
           ("node.py", "Node._seacast.<locals>.<lambda>", 1795): ("on_want", CHANGING),          # a withholder's
           ("node.py", "Node._seacast.<locals>.on_want", 1825): ("on_want", CHANGING),           # hoardcol's filter
+          # an adapter: the gossipsub binding's reading of a frame as SEACAST's messages, around the one call of the
+          # document's on_frame that is the record. seacast-bindings.md §4 (the gossipsub binding, :369) gives that
+          # reading to the binding, and :393-395 keep an IDONTWANT's stock ids in unwanted[p] with stock gossipsub's
+          # admission, after the frame's asks: the work the adapter does after its call
+          ("node.py", "Node._seacast.<locals>.on_frame", 1696): ("on_frame", ADAPTER),
           # bound during a call: publish's announce under --source-offers off and late
           ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 997): ("announce", DURING_CALL),
           ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1015): ("announce", DURING_CALL)}
@@ -712,7 +724,8 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
     qualified name and its first line (layer_key): the toy's in node.py, and a fixture's that the fixture lists
     before the install. The name is replaced where any layer is changing (an observer and a swapped draw are not; a
     closure-dependent layer's kind is read at the node, closure_kind), and only a name of `replaceable` may be
-    (REPLACEABLE, or under SEACAST REPLACEABLE_Seacast). A layer listed as bound only during a call stops here. A
+    (REPLACEABLE, or under SEACAST REPLACEABLE_Seacast). An adapter must be the one layer, over `doc`, and replaces
+    nothing. A layer listed as bound only during a call stops here. A
     walk that does not reach `doc` ends in a changing layer, or is the node's own helper alone. In a trace of the
     whole state, a REPLACEABLE_WHOLE name bound to a function outside node.py (a directed set's level 1) is changing.
     Anything else raises ChainStop, naming the layer."""
@@ -752,6 +765,11 @@ def chain_rule(name, fn, whole=False, lists=None, replaceable=None):
             raise ChainStop(f"{name}: the node's own helper with other layers: "
                             + ", ".join(layer_where(f) for f in above))
         return None, False
+    if ADAPTER in kinds:                    # an adapter: the one layer over the document's function, not replaced
+        if kinds != [ADAPTER] or not doc:
+            raise ChainStop(f"{name}: an adapter that is not the one layer over the document's {name}: "
+                            + ", ".join(layer_where(f) for f in above))
+        return [getattr(above[0], "__qualname__", None), "doc"], False
     if not doc and kinds[-1] != CHANGING:
         raise ChainStop(f"{name}: its layers end in {kinds[-1]} {layer_where(above[-1])}, which holds no function "
                         f"of its name")
@@ -774,6 +792,89 @@ OBSERVE, HANDOVER = [True], [True]
 # function). SIMGUARD: the simulator's own `after`, wrapped at the install (sim_guard), stops an observer's own code
 # that arms a timer through it (off: let through). Each off only in a planted fault or a control.
 HANDOVER_BOUND, SIMGUARD = [True], [True]
+# An adapter's guards (Adapter), each off only in a planted fault: ADAPTER_WRITES, a write of a table by code the
+# adapter made (a function, lambda, class or generator expression of its own) while its call of the document's
+# function is open; ADAPTER_CALLS, that call exactly once in each of the adapter's calls; ADAPTER_ENTRY, the adapter
+# entered while a record is open.
+ADAPTER_WRITES, ADAPTER_CALLS, ADAPTER_ENTRY = [True], [True], [True]
+
+
+def nested_codes(code):
+    """The code objects made inside a function's code (its functions, lambdas, classes and generator expressions, and
+    theirs in turn), its own left out. Python 3.12 runs a list, set or dict comprehension in the function's own code."""
+    out, todo = set(), [code]
+    while todo:
+        for c in todo.pop().co_consts:
+            if isinstance(c, types.CodeType) and c not in out:
+                out.add(c)
+                todo.append(c)
+    return frozenset(out)
+
+
+class Adapter:
+    """An adapter layer of a traced name at a node (ADAPTER): its stops' words, the code made inside it, and, while
+    one of its calls runs, how many times that call has called the document's function. The record is that inner call;
+    the adapter's own frame waits in it, so its own code can run inside the record only as code it made, which the
+    document's code reaches (a callback, a property, a generator): a write there stops the tracer (write_check)."""
+    __slots__ = ("nid", "name", "where", "codes", "calls")
+
+    def __init__(self, nid, name, f):
+        self.nid, self.name, self.where = nid, name, layer_where(f)
+        self.codes, self.calls = nested_codes(f.__code__), 0
+
+    def words(self, what, why):
+        return f"trace3: node {self.nid}: the adapter {self.where} over {self.name} {what}: {why}"
+
+    def write_check(self, t, p):
+        """footprint's Recorder at a write while the adapter's call of the document's function is open: a frame of code
+        the adapter made, anywhere on the stack, is the adapter's own work inside the record."""
+        if not ADAPTER_WRITES[0] or not self.codes:
+            return
+        f = sys._getframe(1)
+        while f is not None:
+            if f.f_code in self.codes:
+                raise SystemExit(self.words(f"writes {t.name}{json.dumps(t.path(p))} while its call of the document's "
+                                            f"{self.name} is open", "an adapter's work is the binding's, outside that "
+                                            "call"))
+            f = f.f_back
+
+
+def adapter_wrap(rec, st, nid, name, a, d, inner):
+    """An adapter's chain at a node (ADAPTER, the one layer `a` over the document's `d`), as the install makes it:
+    `inner`, the record's wrapper of d (the install's sec61), in a's cell that holds d, its calls counted there; and a
+    itself, guarded, for the slot. `st` is the tracer's shared state (its depth, node and open record). Each guard's
+    words are the adapter's (Adapter.words). (the slot's function, the Adapter)"""
+    ad = Adapter(nid, name, a)
+
+    def once(*args, **kw):                  # the adapter's call of the document's function: the record
+        ad.calls += 1
+        if ADAPTER_CALLS[0] and ad.calls > 1:
+            raise SystemExit(ad.words(f"calls the document's {name} a second time in one call",
+                                      "an adapter calls it exactly once"))
+        rec.adapter = ad
+        try:
+            return inner(*args, **kw)
+        finally:
+            rec.adapter = None
+    once._trace3_through, once.__wrapped__ = True, d
+    cell_holding(a, d).cell_contents = once
+
+    @functools.wraps(a)
+    def entry(*args, **kw):                 # the adapter's own call, outside every record
+        if ADAPTER_ENTRY[0] and st["depth"]:
+            raise SystemExit(ad.words(f"is entered while node {st['node']}'s record of {st['cur']['fn']} is open",
+                                      "an adapter's call is no part of a record"))
+        was, ad.calls = ad.calls, 0
+        try:
+            r = a(*args, **kw)
+            n = ad.calls
+        finally:
+            ad.calls = was
+        if ADAPTER_CALLS[0] and n == 0:
+            raise SystemExit(ad.words(f"returns without calling the document's {name}",
+                                      "an adapter calls it exactly once"))
+        return r
+    return entry, ad
 
 
 class ObservedLayer:
@@ -3029,6 +3130,152 @@ def drop_outside(g):
     return bad
 
 
+def adapters_self_test():
+    """ADAPTER's guards (adapter_wrap, Adapter.write_check), in observers_self_test's form: planted adapters over a
+    document function of two of seacast.md's tables (`stop_pull`, `received`), with no toy node. The document's function is
+    compiled as seacast.md's; each adapter as node.py's at :1696, the toy's adapter's name and first line, from text
+    that no scan of the toy reads; the record is a stub of sec61's (the depth, the record's node and function, the
+    recorder on). The cases: an adapter that writes received before and after its call, outside the record: the
+    record's log the document's alone; one whose own code (a class it makes, whose property the document's function
+    reads from the frame it is handed) writes stop_pull while the call is open: a stop, its words; one that calls the
+    document's function twice, and one that never calls it: a stop each; one entered while a record is open: a stop.
+    The planted faults, each guard's branch not taken (ADAPTER_WRITES, ADAPTER_CALLS, ADAPTER_ENTRY off): the write
+    logged as the record's, the second call and the missing one let through, the entry let through; each fails its
+    cases."""
+    sys.path.insert(0, str(HERE.parents[2] / "toy"))
+    import bits as B                    # noqa: E402: the toy's, beside this repository's documents
+    import wire as Wm                   # noqa: E402
+    tr = object.__new__(Tracer3)
+    tr.Wm, tr.doc_seacast = Wm, True
+    ts = {t.name: t for t in tr.schema(None)}
+    g, h = bytes([1]) * 32, bytes([2]) * 32
+    doc_src = ("def on_frame(p, frame):\n"                 # the document's: a read of received, a write of stop_pull
+               "    if received[frame.g].has(0):\n"
+               "        stop_pull[frame.g] = True\n")
+    adapter_src = "\n" * 1694 + (                         # the adapter's def at node.py:1696
+        "def make(ns, doc_on_frame, how, h):\n"
+        "    def on_frame(p, frame):\n"
+        "        class Seen:\n"
+        "            def __init__(s, g):\n"
+        "                s._g = g\n"
+        "\n"
+        "            @property\n"
+        "            def g(s):\n"
+        "                if how == 'inside':\n"
+        "                    ns['stop_pull'][h] = True\n"
+        "                return s._g\n"
+        "        if how == 'around':\n"
+        "            ns['received'][frame].set(3)\n"
+        "        out = doc_on_frame(p, Seen(frame)) if how != 'none' else None\n"
+        "        if how == 'twice':\n"
+        "            doc_on_frame(p, Seen(frame))\n"
+        "        if how == 'around':\n"
+        "            ns['received'][frame].set(4)\n"
+        "        return out\n"
+        "    return on_frame\n")
+
+    def run(how, entered=False):
+        """The planted adapter `how` in its slot, called once with frame g (`entered`: while a stub record of
+        check_completion is open at the node): the tables the record read and wrote, and received[g]'s bits after."""
+        rec = F.Recorder()
+        ns = {"stop_pull": B.DefaultMap(False), "received": B.lazy(B.LazyBits)}
+        ns["received"][g].set(0)
+        F.install(rec, ns, [ts["stop_pull"], ts["received"]])
+        exec(compile(doc_src, SEACAST_FILE, "exec"), ns)
+        gm = {}
+        exec(compile(adapter_src, "node.py", "exec"), gm)
+        d = ns["on_frame"]
+        a = gm["make"](ns, d, how, h)
+        a.__qualname__ = "Node._seacast.<locals>.on_frame"
+        st = {"depth": 0, "cur": None, "node": None}
+        log = {}
+
+        def inner(*args):               # sec61's record, at its least
+            rec.clear()
+            rec.on, rec.tape = True, []
+            st["depth"], st["cur"], st["node"] = 1, {"fn": "on_frame"}, "stub"
+            try:
+                return d(*args)
+            finally:
+                rec.on = False
+                st["depth"], st["cur"], st["node"] = 0, None, None
+                reads, _, writes = rec.footprint()
+                log["read"] = sorted({json.dumps(e[:2]) for e in reads})
+                log["wrote"] = sorted({json.dumps(e[:2]) for e in writes})
+        entry, _ = adapter_wrap(rec, st, "stub", "on_frame", a, d, inner)
+        if entered:
+            st["depth"], st["cur"], st["node"] = 1, {"fn": "check_completion"}, "stub"
+        entry(7, g)
+        return {"read": log.get("read"), "wrote": log.get("wrote"),
+                "received": [i for i in range(8) if ns["received"][g].has(i)]}
+
+    bad = 0
+    gk = json.dumps(["stop_pull", ts["stop_pull"].path((g,))])
+    rk = json.dumps(["received", ts["received"].path((g,))])
+
+    def case(what, f, want):
+        nonlocal bad
+        try:
+            got = f()
+        except SystemExit as e:
+            got = f"stop: {e}"
+        ok = want(got) if callable(want) else got == want
+        bad += not ok
+        print(f"adapters self-test, {what}: {'ok' if ok else f'got {got!r}  <-- FAIL'}")
+
+    def fault(what, switch, cases):
+        """A planted fault: with `switch` (a module list) off, each of `cases` must fail."""
+        nonlocal bad
+        switch[0] = False
+        try:
+            failed = []
+            for c in cases:
+                try:
+                    got = c[1]()
+                except SystemExit as e:
+                    got = f"stop: {e}"
+                failed.append(not (c[2](got) if callable(c[2]) else got == c[2]))
+        finally:
+            switch[0] = True
+        ok = all(failed)
+        bad += not ok
+        print(f"adapters self-test, its planted fault ({what}): "
+              f"{'fails its ' + str(len(cases)) + ' cases, ok' if ok else f'passes {failed.count(False)}  <-- FAIL'}")
+
+    def stops(*parts):
+        return lambda got: isinstance(got, str) and got.startswith(
+            "stop: trace3: node stub: the adapter Node._seacast.<locals>.on_frame (node.py:1696) over on_frame ") \
+            and all(x in got for x in parts)
+
+    around = ("its work before and after the call, outside the record: the record's log the document's alone",
+              lambda: run("around"), {"read": [rk], "wrote": [gk], "received": [0, 3, 4]})
+    inside = ("its own code writes stop_pull while the call is open (a property of a class it makes, read by the "
+              "document's function): a stop, its words",
+              lambda: run("inside"),
+              stops(" writes stop_pull[\"", " while its call of the document's on_frame is open: an adapter's work is "
+                    "the binding's, outside that call"))
+    twice = ("two calls of the document's function: a stop, its words", lambda: run("twice"),
+             stops("calls the document's on_frame a second time in one call: an adapter calls it exactly once"))
+    none = ("no call of the document's function: a stop, its words", lambda: run("none"),
+            stops("returns without calling the document's on_frame: an adapter calls it exactly once"))
+    entered = ("entered while a record is open: a stop, its words", lambda: run("around", entered=True),
+               stops("is entered while node stub's record of check_completion is open: an adapter's call is no part "
+                     "of a record"))
+    for c in (around, inside, twice, none, entered):
+        case(*c)
+    fault("the write check off: the adapter's write logged as the record's", ADAPTER_WRITES, [inside])
+    hk = json.dumps(["stop_pull", ts["stop_pull"].path((h,))])
+    ADAPTER_WRITES[0] = False           # that fault's reason: the write in the record's log, not merely no stop
+    try:
+        case("with the write check off, the adapter's write is in the record's writes, beside the document's",
+             lambda: run("inside")["wrote"], sorted([gk, hk]))
+    finally:
+        ADAPTER_WRITES[0] = True
+    fault("the call count off: a second call and a missing one let through", ADAPTER_CALLS, [twice, none])
+    fault("the entry check off: the adapter run inside the open record", ADAPTER_ENTRY, [entered])
+    return bad
+
+
 def close_self_test():
     """Tracer3.close on a stand-in tracer (no toy), its output in a temporary directory: the files beside the trace
     are written before the trailer; a failure there, or in a check at the close, gives the trailer a `stopped` that
@@ -3097,7 +3344,7 @@ def close_self_test():
 def self_test_seacast():
     bad = (seacast_kept_self_test() + forms_self_test() + views_self_test() + manifest_self_test() + chains_self_test()
            + closure_self_test() + timers_self_test() + questions_self_test() + orders_self_test()
-           + observers_self_test() + close_self_test())
+           + observers_self_test() + adapters_self_test() + close_self_test())
     print("ok: every case as it must be" if not bad else f"{bad} cases wrong")
     return 1 if bad else 0
 
@@ -3131,6 +3378,7 @@ class Tracer3(Tracer):
         self.type_nodes = []            # under SEACAST, (node, namespace, its types as the install read them), for
         #                                   final_check: the nodes line holds the install's parameters
         self.observers = []             # under SEACAST, every handled observer layer at each node (class 6), its counts
+        self.adapters = []              # under SEACAST, every adapter layer at each node (ADAPTER)
         self.doc_mid = {}               # and m2_check's reference function, a node's own
         self.cur_nid = None             # the node of the record being written (mid_of's reference)
         self.built_objs = {}            # the chunks the record's publish built (built, content_id_asked)
@@ -5222,7 +5470,21 @@ class Tracer3(Tracer):
                 if ob is not None:          # then each observer chain's cells: the hand-overs (rewrap_observers)
                     obs_of[name] = ob
                     tr.observers.extend(obs)
+
+        def adapter_install(name, a, d):    # the record is sec61's wrapper of d (adapter_wrap)
+            entry, ad = adapter_wrap(rec, st, nd.id, name, a, d, sec61(name, d))
+            tr.adapters.append(ad)
+            return entry
+        adapters = {}                       # each traced name whose one layer is an adapter (the chain rule has passed
+        if tr.doc_seacast:                  #   it: the one layer, over the document's function)
+            for name in tr.traced:
+                ls = layers_of(name, ns[name])
+                if len(ls) == 2 and LAYERS.get(layer_key(ls[0]), (None, None))[1] == ADAPTER:
+                    adapters[name] = ls
         for name in tr.traced:
+            if name in adapters:
+                ns[name] = adapter_install(name, *adapters[name])
+                continue
             ns[name] = iface(name, ns[name], replaced_enc[name]) if name in replaced else sec61(name, ns[name])
         for name, e in enc.items():
             ns[name] = iface(name, ns[name], e)

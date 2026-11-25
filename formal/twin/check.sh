@@ -494,8 +494,12 @@ EOF_SELF
   $PY "$T/scan_bindings.py" "$TOY" --lists > "$OUT/scan-lists.txt" 2>&1; local lrc=$?
   if [ "$lrc" = 0 ] && [ "$(grep -c 'NOT' "$OUT/scan-lists.txt")" = 0 ] \
       && has -x "observer close_promises Node._peer_promise.<locals>.close_promises: v2-only, an observer in LAYERS (the chain rule's)" "$OUT/scan-lists.txt" \
-      && has -x "the lists as trace3.py's" "$OUT/scan-lists.txt"; then
-    echo "  the scan's lists: trace3.py's (scan-lists.txt)"
+      && has -x "the lists as trace3.py's" "$OUT/scan-lists.txt" \
+      && [ "$(grep -c ': adapter, as LAYERS$' "$OUT/scan-lists.txt")" = 1 ] \
+      && [ "$(grep -c ': adapter-shaped, listed changing$' "$OUT/scan-lists.txt")" = 5 ]; then
+    # LAYERS' one ADAPTER (on_frame@1696), and the five adapter-shaped rows it lists as changing, each count exact:
+    # a row that moves in or out of the shape is read before the count is set anew
+    echo "  the scan's lists: trace3.py's, with 1 adapter and 5 adapter-shaped rows listed changing (scan-lists.txt)"
   else no "the scan's lists differ from trace3.py's (scan-lists.txt)"; fi
 }
 s_tables() {

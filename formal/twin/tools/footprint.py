@@ -210,7 +210,8 @@ class Recorder:
         self.row_reads = frozenset()    # the tables whose rows are read on the way down (the contract's line)
         self.observer = None            # an observer's own code running (under v2: trace3.py's ObservedLayer), or None
         self.obs_seen = {}              #   and the entries it touched since its last boundary: (t, p) -> value then
-        self.clear()
+        self.adapter = None             # an adapter whose call of the document's function is open (under v2:
+        self.clear()                    #   trace3.py's Adapter, which checks each write), or None
 
     def reads_rows(self, t):
         """Whether a table's rows are read on the way down: a table that keeps its rows, named in `row_reads`."""
@@ -342,6 +343,8 @@ class Recorder:
             self._touch(t, p, "r")
 
     def write(self, t, p):
+        if self.adapter is not None:
+            self.adapter.write_check(t, p)
         if self.observer is not None:
             self.observer_writes(t, p)
         if t.foreign:
@@ -392,6 +395,8 @@ class Recorder:
 
     def write_level(self, t, prefix):
         """A whole level assigned or removed: every entry under it before, and (at the end) after."""
+        if self.adapter is not None:
+            self.adapter.write_check(t, prefix)
         if self.observer is not None:
             self.observer_writes(t, prefix)
         if t.foreign:

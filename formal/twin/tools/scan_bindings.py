@@ -563,6 +563,11 @@ class Scanner:
                         r["class"] = "observer" if why is None else "layer"
                         if why:
                             r["why"] = why
+                            no, around = self.adapter_test(fn, name, held)
+                            if no is None:      # a layer whose work lies outside its one call: adapter-shaped (its
+                                r["adapter"] = around   # class stays a layer; trace3.py's LAYERS says which it is)
+                            else:
+                                r["not_adapter"] = no
                             # a swapped draw: a layer that is an observer but for binding a draw's slot (and
                             # naming it) under each document
                             if all(self.observer_test(fn, name, held, d, DRAWS) is None for d in docs):
@@ -890,6 +895,92 @@ class Scanner:
         if why is None and not exempt:      # an observer verdict: the bodies it rests on (the followed code's listing)
             self.observed += walked
         return why
+
+    def adapter_test(self, fn, name, held):
+        """Why a layer is no adapter (trace3.py's ADAPTER: its work lies outside its one call of the earlier binding,
+        which is the record), or None and what it does around that call: [(side, what), ...], each namespace function
+        it calls and each write it makes, `before` or `after` the call. Read on the layer's own body, under seacast.md's
+        namespace:
+        - it is a function, and makes no function, lambda, class or generator expression (code the document's code
+          could run inside the call), and does not yield or await;
+        - it names the earlier binding once, in one call, which is the value of a statement of its body's top level
+          (`x = held(...)`, `return held(...)` or the call alone, `x` a name), each argument a name or a constant (a
+          starred name too);
+        - every other statement is before or after that one. In them, each call of a namespace function or of a local
+          function and each write is named: an assignment, deletion or augmented assignment of a target under a
+          namespace name or of any other target that is no local name or the layer's own new object, and a call on a
+          table of a mutating method or of a method the test does not take as a read.
+        A namespace function it calls is not followed: under the tracer it runs outside the document's call, a record of
+        its own where it is traced. What the test can miss: a write made inside the call by code the layer did not
+        make, reached through what it hands the call (a method or property of a class defined elsewhere, a bound
+        method of a table), which neither this test nor the tracer's runtime guard (trace3.py's Adapter: code the
+        adapter made) reads; and, around the call, a write made by a function that is neither the namespace's nor a
+        local one (a module's function, a method of an object the namespace does not hold), whose call is not named."""
+        node = fn.node
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            return "is a lambda", None
+        made = [n for n in ast.walk(node) if n is not node
+                and isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef, ast.GeneratorExp,
+                                   ast.Yield, ast.YieldFrom, ast.Await))]
+        if made:
+            return f"makes a {type(made[0]).__name__.lower()} at line {made[0].lineno}", None
+        named = [n for n in ast.walk(node) if isinstance(n, (ast.Name, ast.Attribute)) and ast.unparse(n) == held]
+        calls = [n for n in ast.walk(node) if self.is_held(n, held)]
+        if len(calls) != 1 or len(named) != 1:
+            return f"calls {held} {len(calls)} times, and names it {len(named)} times", None
+        call = calls[0]
+        at = [i for i, st in enumerate(node.body)
+              if (isinstance(st, (ast.Expr, ast.Return)) and st.value is call)
+              or (isinstance(st, ast.Assign) and st.value is call and all(isinstance(t, ast.Name) for t in st.targets))]
+        if not at:
+            return f"calls {held} at line {call.lineno}, in no statement of its body's top level", None
+        for a in list(call.args) + [k.value for k in call.keywords]:
+            if isinstance(a, ast.Starred):
+                a = a.value
+            if not isinstance(a, (ast.Name, ast.Constant)):
+                return f"calls {held} with an argument that is no name or constant: {ast.unparse(a)[:40]}", None
+        keep = (self.doc, self.depth, self.exempt, self.questions, self.traced)    # put back after: the row's
+        self.doc, self.depth, self.exempt = "seacast", 0, ()                       #   other tests set their own
+        self.questions, self.traced = QUESTIONS_Seacast, TRACED_Seacast
+        try:
+            return None, self.around(node, fn, held, at[0])
+        finally:
+            self.doc, self.depth, self.exempt, self.questions, self.traced = keep
+
+    def around(self, node, fn, held, at):
+        """adapter_test's list: what the layer does before and after its call of `held`, the statement `at`."""
+        scope = self.own_scope(node, fn.qual, fn.scope)
+        out = []
+        for side, stmts in (("before", node.body[:at]), ("after", node.body[at + 1:])):
+            for st in stmts:
+                for n in ast.walk(st):
+                    targets = []
+                    if isinstance(n, (ast.Assign, ast.Delete)):
+                        targets = n.targets
+                    elif isinstance(n, (ast.AugAssign, ast.AnnAssign)):
+                        targets = [n.target]
+                    for t in targets:
+                        for tt in (t.elts if isinstance(t, ast.Tuple) else [t]):
+                            if isinstance(tt, ast.Name) and not isinstance(n, ast.AugAssign):
+                                continue        # a local name bound
+                            if isinstance(tt, (ast.Attribute, ast.Subscript)) and self.own_object(tt.value, scope) \
+                                    and not self.ns_rooted(tt, scope):
+                                continue        # a field of its own new object (`r.chunks = …`)
+                            verb = "deletes" if isinstance(n, ast.Delete) else "writes"
+                            out.append((side, f"{verb} {ast.unparse(tt)[:60]}"))
+                    if not isinstance(n, ast.Call):
+                        continue
+                    k = self.called_name(n.func, scope, held)
+                    if k is not None:
+                        out.append((side, f"calls {k}"))
+                    elif isinstance(n.func, ast.Name) and scope.lookup(n.func.id, "funcs") is not None:
+                        out.append((side, f"calls {n.func.id}, a local function the test does not follow"))
+                    elif isinstance(n.func, ast.Attribute) and self.ns_rooted(n.func.value, scope, bare=True):
+                        if n.func.attr in MUTATORS:
+                            out.append((side, f"mutates {ast.unparse(n.func.value)[:60]} by {n.func.attr}"))
+                        elif n.func.attr not in self.reads_anywhere:
+                            out.append((side, f"calls {n.func.attr} on {ast.unparse(n.func.value)[:60]}"))
+        return out
 
     def table_arg(self, call, scope):
         return next((a for a in list(call.args) + [k.value for k in call.keywords]
@@ -1634,12 +1725,16 @@ def scan(toy, skip=(), off=()):
 
 
 def line(r):
+    """A row as the scan prints it. An adapter-shaped layer is printed as an adapter, with what it does around its
+    call (adapter_test) in place of the layer's reason."""
     v = r["value"]
     val = f"{v['qual']}@{v['line']} {v['sha256'][:12]}" if isinstance(v, dict) else repr(v)
     extra = f" holds {r['holds']}" if "holds" in r else ""
-    why = f" ({r['why']})" if "why" in r else ""
+    cls, why = r["class"], f" ({r['why']})" if "why" in r else ""
+    if "adapter" in r:
+        cls, why = "adapter", f" ({'; '.join(f'{w}, {s}' for s, w in r['adapter']) or 'nothing around the call'})"
     return (f"{r['file']}:{r['line']} {r['in']} {r['form']}{'/' + r['via'] if 'via' in r else ''} {r['name']} = "
-            f"{val}{extra} {r['class']}{why}{' v2-only' if r['seacast_only'] else ''}")
+            f"{val}{extra} {cls}{why}{' v2-only' if r['seacast_only'] else ''}")
 
 
 def fn_key(v):
@@ -1727,10 +1822,13 @@ def lists(sc, T):
     # LAYERS against every node.py binding of a name traced under v2, function by function: an observer; the node's
     # own helper; a function bound inside another's body, during its call (a binding in a local function that runs
     # at the construction would be named so too, and the install would stop on it: loud); a swapped draw; a
-    # closure-dependent layer by its split; any other is changing
+    # closure-dependent layer by its split; any other is changing. A changing layer the scan finds adapter-shaped
+    # (adapter_test) may be listed as an adapter or as changing: the scan states the shape, LAYERS the judgment, and
+    # each listed changing is named on a line of its own. An adapter in LAYERS whose row is not adapter-shaped is
+    # refused
     if layers is not None:
         kind = {"observer": T.OBSERVER, "own": T.CHANGING, "layer": T.CHANGING}
-        want = {}
+        want, shaped = {}, set()
         if tuple(DRAWS) != tuple(T.DRAWS):
             other += 1
             out.append(f"DRAWS: {list(DRAWS)} here, {list(T.DRAWS)} in trace3.py")
@@ -1749,17 +1847,27 @@ def lists(sc, T):
                 k = kind.get(r["class"])
             if k is not None:
                 want[fn_key(r["value"])] = (r["name"], k)
+                if k == T.CHANGING and "adapter" in r:
+                    shaped.add(fn_key(r["value"]))
             elif r not in rows:         # (one in `rows` is named above)
                 other += 1
                 out.append(f"{r['class']} {r['name']} {r['value']['qual']}: NOT one kind, which LAYERS needs "
                            f"({r['file']}:{r['line']})")
+        adapter = getattr(T, "ADAPTER", None)
         for (fl, q, ln), v in sorted(want.items(), key=lambda kv: (kv[0][0], kv[0][2])):
-            if layers.get((fl, q, ln)) == v:
+            got = layers.get((fl, q, ln))
+            if (fl, q, ln) in shaped and adapter is not None and got == (v[0], adapter):
+                out.append(f"layer {v[0]} {at(fl, q, ln)}: {adapter}, as LAYERS")
+            elif (fl, q, ln) in shaped and got == v:
+                out.append(f"layer {v[0]} {at(fl, q, ln)}: adapter-shaped, listed changing")
+            elif got == v:
                 out.append(f"layer {v[0]} {at(fl, q, ln)}: {v[1]}, as LAYERS")
             else:
                 other += 1
                 out.append(f"layer {v[0]} {at(fl, q, ln)}: {v[1]}, NOT so in LAYERS"
-                           + (f" (there {layers[(fl, q, ln)]})" if (fl, q, ln) in layers else ""))
+                           + (f" (there {got})" if got is not None else "")
+                           + (": listed as an adapter, and its row is not adapter-shaped"
+                              if adapter is not None and got == (v[0], adapter) and (fl, q, ln) not in shaped else ""))
         for (fl, q, ln), v in sorted(layers.items(), key=lambda kv: (kv[0][0], kv[0][2])):
             if (fl, q, ln) not in want:
                 other += 1
@@ -2898,6 +3006,115 @@ def carried_self_test(report):
             report(f"carried: c_{p} an observer", c == "observer", f"got {c} ({why})")
 
 
+# the adapter test's cases (adapter_test): two adapter-shaped layers, with what they do around their call; the layer
+# controls (a write between two calls of the document's function, two calls); and each other refusal by its words
+ADAPTERS = '''\
+class Node:
+    def plant(self, ns):
+        def helper(x):
+            ns["t"][x] = 1
+        doc_a1 = ns["a1"]
+        doc_a2 = ns["a2"]
+        doc_a3 = ns["a3"]
+        doc_a4 = ns["a4"]
+        doc_a5 = ns["a5"]
+        doc_a6 = ns["a6"]
+        doc_a7 = ns["a7"]
+        doc_a8 = ns["a8"]
+
+        def a1(p, x):
+            ns["t"][p] = x
+            y = ns["q"](x)
+            out = doc_a1(p, y)
+            ns["u"][p].add(x)
+            return out
+
+        def a2(p):
+            doc_a2(p)
+            ns["t"][p] = 1
+            return doc_a2(p)
+
+        def a3(p):
+            doc_a3(p)
+            return doc_a3(p)
+
+        def a4(p):
+            helper(p)
+            return doc_a4(p)
+
+        def a5(p):
+            ns["t"][p] = 1
+            xs = list(x for x in p)
+            return doc_a5(xs)
+
+        def a6(p):
+            ns["t"][p] = (lambda: 1)()
+            return doc_a6(p)
+
+        def a7(p):
+            ns["t"][p] = 1
+            if p:
+                return doc_a7(p)
+
+        def a8(p):
+            ns["t"][p] = 1
+            return doc_a8(p + 1)
+        ns.update(a1=a1, a2=a2, a3=a3, a4=a4, a5=a5, a6=a6, a7=a7, a8=a8)
+'''
+
+
+def adapter_self_test(report):
+    """The adapter test's cases (ADAPTERS), each layer adapter-shaped with what it does around its call, or refused
+    by its own words; then the lists' three ways with LAYERS for an adapter-shaped row and the refusal of an adapter
+    over a row that is not, with its control. It sets the name sets itself; self_test restores them."""
+    names = {f"a{i}" for i in range(1, 9)}
+    for s, v in ((QUESTIONS_DOC, {"q"}), (QUESTIONS_Seacast, {"q"}), (TRACED, set()), (TRACED_Seacast, set()),
+                 (DEFS_DOC, names), (RETURNS_DOC, names), (CALLABLES, names), (FNS_DOC, {}), (FNS_Seacast, {})):
+        s.clear()
+        s.update(v)
+    src = ADAPTERS.splitlines()
+    at = lambda text: next(i for i, x in enumerate(src, 1) if text in x)    # noqa: E731: a line of ADAPTERS
+    want = {"a1": [("before", "writes ns['t'][p]"), ("before", "calls q"), ("after", "mutates ns['u'][p] by add")],
+            "a4": [("before", "calls helper, a local function the test does not follow")],
+            "a2": "calls doc_a2 2 times, and names it 2 times",       # a write between two calls
+            "a3": "calls doc_a3 2 times, and names it 2 times",
+            "a5": f"makes a generatorexp at line {at('x for x in p')}",
+            "a6": f"makes a lambda at line {at('lambda: 1')}",
+            "a7": f"calls doc_a7 at line {at('return doc_a7(p)')}, in no statement of its body's top level",
+            "a8": "calls doc_a8 with an argument that is no name or constant: p + 1"}
+    with tempfile.TemporaryDirectory() as d:
+        (Path(d) / "adapters.py").write_text(ADAPTERS)
+        rows = scan(d).rows
+        for name, w in want.items():
+            got = [r for r in rows if r["name"] == name and r["form"] == "update-keyword"]
+            g = (got[0]["class"], got[0].get("adapter"), got[0].get("not_adapter")) if len(got) == 1 else len(got)
+            if isinstance(w, list):
+                report(f"adapter: {name} adapter-shaped, {'; '.join(f'{x}, {s}' for s, x in w)}",
+                       g == ("layer", w, None), f"got {g}")
+            else:
+                report(f"adapter: {name} not adapter-shaped, \"{w}\"", g == ("layer", None, w), f"got {g}")
+    T = type("T", (), {"WRAPPERS": {}, "NODE_OWN": {}, "REPLACEABLE": (), "REPLACEABLE_WHOLE": (), "DRAWS": DRAWS,
+                       "OBSERVER": "observer", "NODE_HELPER": "node's own", "CHANGING": "changing",
+                       "SWAPPED_DRAW": "swapped draw", "DURING_CALL": "bound during a call", "ADAPTER": "adapter"})
+    row = {"file": "node.py", "line": 5, "in": "Node.p", "form": "subscript", "name": "trf", "seacast_only": True,
+           "class": "layer", "value": {"qual": "Node.p.<locals>.trf", "file": "node.py", "line": 6, "sha256": "0" * 64}}
+    TRACED_Seacast.clear()
+    TRACED_Seacast.add("trf")
+    key = ("node.py", "Node.p.<locals>.trf", 6)
+    for shaped, kind, line_, n in (
+            (True, "adapter", "layer trf Node.p.<locals>.trf@6: adapter, as LAYERS", 0),
+            (True, "changing", "layer trf Node.p.<locals>.trf@6: adapter-shaped, listed changing", 0),
+            (False, "adapter", "layer trf Node.p.<locals>.trf@6: changing, NOT so in LAYERS (there ('trf', 'adapter')): "
+                               "listed as an adapter, and its row is not adapter-shaped", 1),
+            (False, "changing", "layer trf Node.p.<locals>.trf@6: changing, as LAYERS", 0)):
+        T.LAYERS = {key: ("trf", kind)}
+        r = dict(row, **({"adapter": [("after", "writes x")]} if shaped else {}))
+        out, other = lists(type("S", (), {"rows": [r]}), T)
+        report(f"{'control: ' if not shaped and kind == 'changing' else ''}the lists, a row "
+               f"{'' if shaped else 'not '}adapter-shaped and listed {kind}: \"{line_[33:]}\"",
+               line_ in out and other == n, f"got {other}: {out}")
+
+
 def self_test():
     bad = 0
 
@@ -2991,6 +3208,7 @@ def self_test():
         follow_self_test(report)
         fail_closed_self_test(report)
         carried_self_test(report)
+        adapter_self_test(report)
     finally:
         for s, v in zip(sets + more, saved + saved_more):
             s.clear()
