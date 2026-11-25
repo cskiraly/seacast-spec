@@ -807,7 +807,7 @@ def w_wt3(rng, nd, ns, B):
 
 
 def w_n1(rng, nd, ns, B):
-    """N1: an answer a full queue refused, owed to p, the window full. -> queue_owed_relations: nothing owed;
+    """N1: p has an owed answer and the byte window is full. -> queue_owed_relations: nothing owed;
     next_to_send: an owed answer enqueued; choose: the rarest (RAREST on H); acquire_room: in line; next_to_send: in
     line."""
     p, g, i, _ = on_window(rng, nd, ns)
