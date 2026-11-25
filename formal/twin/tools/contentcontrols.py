@@ -199,7 +199,8 @@ def main(argv):
             f"the replay {'passes it' if passes(out) else 'does NOT pass it'}",
             "the change taken; rc=0, every byte TRACE's, passed")
     same("a document's version line changed", "seacast-lite.md",
-         sub_once(r"\*\*DRAFT v[0-9.]+, [0-9]{4}-[0-9]{2}-[0-9]{2}\.\*\*", "**DRAFT v9.9.9, 2099-01-01.**"))
+         sub_once(r"\*\*DRAFT v[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?, [0-9]{4}-[0-9]{2}-[0-9]{2}\.\*\*",
+                  "**DRAFT v9.9.9, 2099-01-01.**"))    # a pre-release's line too, as v0.13.0-rc.1's
     same("a document's prose changed", "seacast-lite.md",
          edit("This document defines what a node does", "This document says what a node does"))
     same("the other document's prose with a line more", "seacast.md",
