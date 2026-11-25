@@ -373,6 +373,9 @@ TABLE = {
     "window_timeout": ("key, at", lambda tr, key, at: [send_key(tr, key), word(at, "window_timeout's time")], none),
     "noted": ("p, e", lambda tr, p, e: [peer(tr, p), opt_entry(tr, e)], opt_entry),
     "next_to_send": ("p", lambda tr, p: [peer(tr, p)], next_entry),
+    # §4.2's gate for cells: what came before it, tested once it opens (§4.5's drop_outside), and the gate itself
+    "drop_outside": ("g", g_only, none),
+    "on_header_validated": ("root", lambda tr, root: [root_key(root)], none),
 }
 
 if set(TABLE) != set(manifest_seacast.COVERED):
@@ -530,7 +533,7 @@ def stand_in():
         "acquire_room": (one(4, 11660), True), "leave_line": (one(4), None),
         "track_in_flight": (one(4, f, 11660), None), "window_release": (one(4, g, 1), None),
         "window_timeout": (one((4, g, 1), 2.5), None), "noted": (one(4, entry) + one(4, None), entry),
-        "next_to_send": (one(4), tr.WAIT),
+        "next_to_send": (one(4), tr.WAIT), "drop_outside": (one(g), None), "on_header_validated": (one(root), None),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_seacast: the check's stubs are not the table's names: "

@@ -6,8 +6,10 @@ a draw of peers, an order, the two levels whose order is asked (probe_waiting[g]
 eight names a node can replace (asked_enc_seacast); then the four questions §4.5's on_want asks (own_id,
 admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc); then the six §4.1's upkeep asks
 (runs_type, our_join, candidates, in_pushers, out_pushees, uplink_class); then the three §4.11's writer asks
-(pop_owed_answer, whose writer is Tracer3.pop_owed_enc, wire_size and offers_in); and last the ninth name a node can
-replace, filter_entry, asked since §4.11 covers next_to_send; 75 rows in all. Each line is the twin's
+(pop_owed_answer, whose writer is Tracer3.pop_owed_enc, wire_size and offers_in); then the ninth name a node can
+replace, filter_entry, asked since §4.11 covers next_to_send; and last the four §4.2's gate asks (cell_groups, the
+order of on_header_validated's groups, and the keys of `standing[g]` and of `want_p` where drop_outside iterates
+them); 79 rows in all. Each line is the twin's
 form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
@@ -297,6 +299,12 @@ def rows(f0, d, w=None):
         # the ninth name a node can replace, asked since §4.11 covers next_to_send: the entry handed over, and the
         # entry it returns
         ("filterEntryNode", "filter_entry", asked["filter_entry"], pushed, (4, pushed), {}),
+        # §4.2's gate: the block's cell groups, the order of on_header_validated's set of them (its members groups),
+        # and the two levels drop_outside iterates, whose keys go on the tape there
+        ("cellGroups", "cell_groups", q["cell_groups"], [g, g2], (root,), {}),
+        ("groupsOrder", "order", lambda r: tail("order", order_entry("on_header_validated", [g2, g])), None, (), {}),
+        ("standingOrder", "keys", lambda r: tail("keys", keys_entry(ts["standing"], (g,), [5, 2, 9])), None, (), {}),
+        ("wantPOrder", "keys", lambda r: tail("keys", keys_entry(ts["want_p"], (), [7, 2, 4])), None, (), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 

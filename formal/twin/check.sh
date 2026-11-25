@@ -506,8 +506,8 @@ s_tables() {
   local rv=$OUT/twin/SpecTwin/Seacast/Replay.lean c why said
   (cd "$T" && $PY records_seacast.py "$rv") > "$OUT/arities.txt" 2>&1 \
     || no "a record writer's arity is not runSeacast's case's (arities.txt)"
-  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_seacast: 93 covered names, 0 difference(s)" ] \
-    || no "the arity check's last line is not 93 covered names and no difference (arities.txt)"
+  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_seacast: 95 covered names, 0 difference(s)" ] \
+    || no "the arity check's last line is not 95 covered names and no difference (arities.txt)"
   # its default path (no argument: the tree's own Replay.lean) gives the same lines as the build's copy
   (cd "$T" && $PY records_seacast.py) > "$OUT/arities-default.txt" 2>&1
   if cmp -s "$OUT/arities-default.txt" "$OUT/arities.txt"; then rm -f "$OUT/arities-default.txt"

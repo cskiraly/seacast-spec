@@ -589,7 +589,13 @@ NOASK_Seacast = tuple(n for n in manifest_seacast.REPLACEABLE if n not in ASKED_
 # A record's own code iterating either set writes ["order", place, [q...]] (OrderProxy); TRACE3_ORDER=off, for the
 # cost measure alone, writes none, and shows in no trace
 ORDER_PLACES_Seacast = ("fill", "serve_standing", "check_completion", "known_in_scope", "known_across", "reconsider",
-                   "origin_written", "offer_at_publish", "origin_acked")
+                   "origin_written", "offer_at_publish", "origin_acked", "drop_outside", "on_header_validated")
+# §4.2's gate: drop_outside iterates `standing[g]`'s indices, each index's peers and `want_p`'s peers, each
+# written where its own frame iterates them (OrderPopView, WantKeysView: ["keys", ...] for the two levels, ["order",
+# "drop_outside", ...] for the peers); on_header_validated iterates its set of groups, whose order is written as groups
+# (Gate). Its members are groups, written as their 64 hex digits; every other place's are peers
+ORDER_GROUPS_Seacast = ("on_header_validated",)
+GATE_NAMES = ("on_header_validated", "drop_outside")      # the calls Gate is around, in a record
 JOIN_FIELDS_Seacast = frozenset(("object_type", "interest", "custody_count", "duty", "colours"))     # seacast.md's Join
 # Under SEACAST, the questions an object type answers (its functions, wrapped per node on the type: type_enc_seacast; its
 # parameters' three are Tracer3.TYPE_FUNCTIONS, param_enc_seacast), and the manifest's questions whose rows an adapter
@@ -2884,6 +2890,142 @@ def orders_self_test():
         fault("the members sorted by their raw values", lambda: snap([a1, a2, sid]) is None)
     finally:
         F.SET_ORDER_ENCODED[0] = was
+    # R10, §4.2's gate. drop_outside's three entries where its own frame iterates (OrderPopView with its
+    # keys writer, DropPeers, WantKeysView), each level the document's way, empty ones included; nothing where another
+    # frame iterates the same levels (drop_wants_beyond), nor inside a question; `discard` goes to the set itself
+    def drop_outside(standing, want_p, g):          # seacast.md :1573-1579's iterations, `outside` a test of q
+        for i in list(standing[g]):
+            for q in [q for q in standing[g][i] if q != 5]:
+                standing[g][i].discard(q)
+        return [q for q in want_p if g in want_p[q]]
+
+    def drop_wants_beyond(standing, want_p, g):     # the same levels, in another frame: none of the gate's entries
+        for i in [i for i in standing[g] if i >= 4]:
+            pass
+        return [q for q in want_p if g in want_p[q]]
+
+    def gate_views(views=True, ext=0, fn=drop_outside):
+        rec, st = F.Recorder(), state(ext=ext)
+        raw_standing = {g1: {3: {5, 2}, 4: set()}}
+        bits = namedtuple("Bits", "v")          # an interest's bitmap, as the toy's Bits is read (its `v`)
+        ns = {"standing": raw_standing, "want_p": {7: {g1: bits(1)}, 9: {g2: bits(1)}}}
+        F.install(rec, ns, [ts["standing"], ts["want_p"]])
+        rec.on, rec.tape = True, tape(st)
+        if views:
+            keys = keys_writer(rec, st)
+            ns["standing"] = OrderPopView(ns["standing"], writer(st, rec), keys)
+            ns["want_p"] = WantKeysView(ns["want_p"], keys)
+        r = fn(ns["standing"], ns["want_p"], g1)
+        return tape(st), r, sorted(raw_standing[g1][3])
+    want_gate = ([["keys", "standing", [g1.hex()], [3, 4]], ["order", "drop_outside", list({5, 2})],
+                  ["order", "drop_outside", []], ["keys", "want_p", [], [7, 9]]], [7], [5])
+    case("drop_outside: standing[g]'s keys, each index's peers (one empty), want_p's keys; the discard on the set",
+         gate_views(), want_gate)
+    fault("the plain views, as before the gate", lambda: gate_views(views=False) != want_gate)
+    case("the same levels iterated in drop_wants_beyond: nothing on the tape", gate_views(fn=drop_wants_beyond)[0], [])
+
+    class AnyFrame(WantKeysView):       # the planted fault: want_p's keys written whatever the frame
+        __slots__ = ()
+
+        def __iter__(self):
+            ks = list(F.View.__iter__(self))
+            self._keys(self._t, self._p, ks)
+            return iter(ks)
+
+    def p10a():
+        rec, st = F.Recorder(), state()
+        ns = {"want_p": {7: {g1: namedtuple("Bits", "v")(1)}}}
+        F.install(rec, ns, [ts["want_p"]])
+        rec.on, rec.tape = True, tape(st)
+        drop_wants_beyond({g1: {}}, AnyFrame(ns["want_p"], keys_writer(rec, st)), g1)
+        return tape(st) != []
+    fault("want_p's keys written in any frame", p10a)
+    case("drop_outside inside a question: nothing on the tape", gate_views(ext=1)[0], [])
+    # the groups' order (Gate): a document compiled apart (its frames are not this file's, as seacast.md's are not),
+    # its calls wrapped as the install wraps them: the record's frame at depth 1, drop_outside one deeper, cell_groups
+    # a question of the frame; drop_outside puts a marker on the tape, so that the order's place shows
+    doc = """
+def on_header_validated(root):
+    groups = set(cell_groups(root))
+    for g in PASS(groups):
+        drop_outside(g)
+
+def drop_outside(g):
+    TAPE.append(["marker", g.hex()])
+"""
+
+    def gate_run(groups, pass_=lambda gs: gs, gate_cls=Gate, ask=True):
+        st = dict(state(), depth=0)
+        gate = gate_cls("stub", st, writer(st))
+        dns = {"TAPE": tape(st), "PASS": pass_}
+        exec(compile(doc, "<the gate's self-test>", "exec"), dns)
+
+        def wrap(name):
+            fn = dns[name]
+
+            def w(*a):
+                st["depth"] += 1
+                try:
+                    return gate.call(name, a[0], lambda: fn(*a))
+                finally:
+                    st["depth"] -= 1
+            return w
+
+        def cell_groups(root):
+            r = list(groups)
+            if ask:
+                gate.answered(r)
+            return r
+        dns["cell_groups"] = cell_groups
+        dns["drop_outside"] = wrap("drop_outside")
+        try:
+            wrap("on_header_validated")(bytes(32))
+        except SystemExit as e:
+            return "stopped: " + str(e).split(": ", 3)[-1]      # the words after "on_header_validated: "
+        return tape(st)
+    gs = [bytes([j]) * 32 for j in (3, 1, 2)]
+
+    def pass_of(got):                   # the pass's order, read from its markers
+        return [e[1] for e in got if e[0] == "marker"]
+    got = gate_run(gs)
+    case("on_header_validated's pass over three groups: the order first, then the pass, in that order",
+         (got[0][:2], got[0][2] == pass_of(got), len(got)), (["order", "on_header_validated"], True, 4))
+
+    class AtReturn(Gate):               # the planted fault: the order written at the frame's return
+        def drop(self, fr, g):
+            fr["k"] += 1
+            fr["written"] = True
+
+        def call(self, name, g, run):
+            r = super().call(name, g, run)
+            if name == "on_header_validated":
+                fr_order = list(set(gs))
+                self.note("on_header_validated", fr_order)
+            return r
+
+    def p10b():
+        got = gate_run(gs, gate_cls=AtReturn)
+        return isinstance(got, str) or got[0][0] != "order"
+    fault("the order written at the frame's return", p10b)
+    case("no groups: the order, empty, at the frame's return", gate_run([]), [["order", "on_header_validated", []]])
+    stop1 = "stopped: drop_outside's call 1 names "
+    got = gate_run(gs, pass_=lambda s: list(s)[::-1])
+    case("a pass in another order than the set's: the tracer stops at its first call",
+         got[:len(stop1)] if isinstance(got, str) else got, stop1)
+
+    class Unchecked(Gate):              # the planted fault: the order written, the calls not checked
+        def drop(self, fr, g):
+            if not fr["written"]:
+                self.note("on_header_validated", fr["order"])
+                fr["written"] = True
+            fr["k"] += 1
+    fault("the pass's groups not checked against the order",
+          lambda: not str(gate_run(gs, pass_=lambda s: list(s)[::-1], gate_cls=Unchecked)).startswith("stopped"))
+    case("a pass that stops after one group: the tracer stops",
+         gate_run(gs, pass_=lambda s: list(s)[:1]), "stopped: its groups' pass called drop_outside for 1 of its 3 "
+         "groups")
+    case("cell_groups not answered in the frame: the tracer stops", gate_run(gs, ask=False),
+         "stopped: drop_outside was called before cell_groups was answered")
     return bad
 
 
@@ -3006,6 +3148,7 @@ class Tracer3(Tracer):
         # node keeps its own state, as before
         self.vst = {"depth": 0, "ext": 0, "cur": None, "node": None, "supp": 0} if self.doc_seacast else None
         self.rec_of = {}    # under SEACAST, each node's recorder, by node: the open record's observer mode (sim_guard)
+        self.gate_of = {}   # under SEACAST, each node's Gate (§4.2's groups' order), by node
         self.bare = Counter()
         # under SEACAST, every call of a traced name, by where it ran (count_call), the IWANTs that IW_NAMES' calls enqueue
         # (count_iwants), and how often one of IW_NAMES runs inside another: a file beside the trace (OUT.calls.json),
@@ -3835,6 +3978,8 @@ class Tracer3(Tracer):
             # §4.5's: on_want's admission of p's group, and our_interest_for's own id (its DERIVED case)
             "admitted_group": lambda r, p, g: [[n(p), g_(g)], boolean(r)],
             "own_id": lambda r: [[], bytes(r).hex()],
+            # §4.2's gate: a block's column and row groups, as the binding lists them (§3's helper), in its order
+            "cell_groups": lambda r, root: [[bytes(root).hex()], [g_(g) for g in self.listed(r, "cell_groups")]],
             # §4.1's upkeep (FormsRows' askOf): the node's types, its JOIN, its candidates and pushers, its uplink
             "runs_type": lambda r, tid: [[self.type_word(tid)], boolean(r)],
             "our_join": lambda r, T: [[t(T)], self.rel_msg(r, "join")],
@@ -3869,6 +4014,12 @@ class Tracer3(Tracer):
         type (member_seacast), records (keep_floor's floor candidates) as well as peers."""
         return (lambda xs, k: [[self.member_seacast(q) for q in xs], self.nat(k)],
                 lambda r: [self.member_seacast(q) for q in r])
+
+    @staticmethod
+    def listed(r, name):                # an answer that is a list, read again later (Gate): no iterator, which the
+        if not isinstance(r, list):     #   encoding would use up
+            raise TypeError(f"trace3: {name} answered a {type(r).__name__}, not a list")
+        return r
 
     @staticmethod
     def none_listed(r):                 # deferred_offers' answer: the toy's is always empty, the only form agreed
@@ -4285,6 +4436,8 @@ class Tracer3(Tracer):
                     st["cur"]["tape"].append([name, calls[name][0](*args, **kw), {"raises": type(raised).__name__}])
             row = tr.tape_row(enc, r, args, kw, early)
             st["cur"]["tape"].append([name, *row] + call_log(cr, cw, notes))
+            if name == "cell_groups" and tr.doc_seacast:   # §4.2's gate: the groups' order, where its frame asked
+                tr.gate_of[int(nd.id)].answered(r)
             return r
         return w
 
@@ -4759,10 +4912,18 @@ class Tracer3(Tracer):
             ns["interest"] = MissQuestionView(ns["interest"], miss_question(rec, enter, leave))
 
             order_note = order_writer(rec, st, lambda: tr.order_on, nd.id)
-            ns["standing"] = OrderPopView(ns["standing"], order_note)
+            keys_note = keys_writer(rec, st)        # §4.2's gate: drop_outside's levels, and its groups' order
+            ns["standing"] = OrderPopView(ns["standing"], order_note, keys_note)
+            ns["want_p"] = WantKeysView(ns["want_p"], keys_note)
+            gate = tr.gate_of[int(nd.id)] = Gate(nd.id, st, order_note)
+        else:
+            gate = None
 
         def own_call(name, fn, args, kw):   # the name's own function in a record: class 6's mode where observed
             ob = obs_of.get(name)
+            if gate is not None and name in GATE_NAMES:     # §4.2's gate: its frame, or a drop_outside it calls
+                return gate.call(name, args[0] if args else None, lambda: fn(*args, **kw) if ob is None
+                                 else observe(rec, ob, fn, args, kw, mesh_on, mesh_off))
             return fn(*args, **kw) if ob is None else observe(rec, ob, fn, args, kw, mesh_on, mesh_off)
 
         def sec61(name, fn):
@@ -5193,26 +5354,186 @@ def order_writer(rec, st, on, nid):
         if place not in ORDER_PLACES_Seacast:
             raise SystemExit(f"trace3: node {nid}: a set whose order the twin asks is iterated in {place}, at none "
                              f"of its places ({', '.join(ORDER_PLACES_Seacast)})")
-        st["cur"]["tape"].append(["order", place, [int(q) for q in members]])
+        if place in ORDER_GROUPS_Seacast:
+            st["cur"]["tape"].append(["order", place, [group_hex(g) for g in members]])
+        else:
+            st["cur"]["tape"].append(["order", place, [int(q) for q in members]])
     return note
+
+
+def group_hex(g):
+    """A group as an order's member: its 32 bytes as 64 hex digits; anything else stops the trace."""
+    if not isinstance(g, bytes) or len(g) != 32:
+        raise SystemExit(f"trace3: an order's member where a group is: {g!r}")
+    return g.hex()
+
+
+def keys_writer(rec, st):
+    """Where drop_outside's own frame iterates `standing[g]` or `want_p` (OrderPopView, WantKeysView): their keys,
+    ["keys", table, path, [k...]], on the record's tape by the recorder's `keys`, under the order writer's conditions
+    (a record open, the recorder on, no question or replaced name running, no callee's log open, no observer). Unlike
+    an order, it is written with the order off too, as the recorder's own `keys` entries are."""
+    def note(t, prefix, ks):
+        if (not rec.on or st["cur"] is None or st["ext"] or st["supp"] or rec.callee is not None
+                or getattr(rec, "observer", None) is not None):
+            return
+        rec.keys(t, prefix, ks)
+    return note
+
+
+def caller_name():
+    """The name of the function that called the tracer's wrapper this runs in: the first frame out from here whose code
+    is not this file's."""
+    f = sys._getframe(1)
+    while f is not None and f.f_code.co_filename == __file__:
+        f = f.f_back
+    return None if f is None else f.f_code.co_name
+
+
+class Gate:
+    """§4.2's gate under SEACAST: the order of `on_header_validated`'s `for g in groups` (:1219), where groups is
+    `set(cell_groups(root))` (:1198). The Python's set is not seen, so the order is the one `list(set(answer))` gives,
+    `answer` being cell_groups' answer in that frame: two sets built from equal lists in one process iterate alike.
+    It is written as ["order", "on_header_validated", [g...]] just before the first drop_outside the frame calls, or at
+    the frame's return where it calls none; each drop_outside the frame calls is checked against it, the k-th call
+    against the k-th group, and at the return every group must have had its call. A miss stops the trace: the order
+    would then be a prediction that failed. One frame per open call, innermost last (the stack)."""
+
+    def __init__(self, nid, st, note):
+        self.nid, self.st, self.note = nid, st, note
+        self.stack = []
+
+    def stop(self, why):
+        raise SystemExit(f"trace3: node {self.nid}: on_header_validated: {why}")
+
+    def call(self, name, g, run):
+        """Around the call of a gate name in a record (own_call): its frame opened and checked at its return, or, at a
+        drop_outside the innermost frame calls (g its group), the groups' order written and checked."""
+        st = self.st
+        if name == "drop_outside" and self.stack and self.stack[-1]["depth"] + 1 == st["depth"] \
+                and caller_name() == "on_header_validated":
+            self.drop(self.stack[-1], g)
+        if name != "on_header_validated":
+            return run()
+        fr = {"depth": st["depth"], "order": None, "k": 0, "written": False}
+        self.stack.append(fr)
+        try:
+            r = run()
+        finally:
+            self.stack.pop()
+        if fr["order"] is None:
+            self.stop("it returned, and cell_groups was not answered in its frame")
+        if not fr["written"]:
+            if fr["order"]:
+                self.stop(f"its groups' pass called no drop_outside, with {len(fr['order'])} groups")
+            self.note("on_header_validated", [])
+        elif fr["k"] != len(fr["order"]):
+            self.stop(f"its groups' pass called drop_outside for {fr['k']} of its {len(fr['order'])} groups")
+        return r
+
+    def drop(self, fr, g):
+        """A drop_outside called by the innermost frame: the order written before its first, and its group checked."""
+        if fr["order"] is None:
+            self.stop("drop_outside was called before cell_groups was answered")
+        if not fr["written"]:
+            self.note("on_header_validated", fr["order"])
+            fr["written"] = True
+        k = fr["k"]
+        if k >= len(fr["order"]) or fr["order"][k] != g:
+            want = fr["order"][k].hex() if k < len(fr["order"]) else "none"
+            self.stop(f"drop_outside's call {k + 1} names {g.hex() if isinstance(g, bytes) else g!r}, where the "
+                      f"order taken from cell_groups' answer has {want}")
+        fr["k"] = k + 1
+
+    def answered(self, r):
+        """cell_groups answered as a question of a record's own code: where the innermost frame asked it, its
+        groups' order kept."""
+        st = self.st
+        if not self.stack or self.stack[-1]["depth"] != st["depth"] or caller_name() != "on_header_validated":
+            return
+        fr = self.stack[-1]
+        if fr["order"] is not None:
+            self.stop("cell_groups was answered twice in one frame")
+        fr["order"] = list(set(r))
 
 
 class OrderPopView(F.View):
     """`standing` under --doc seacast: an entry popped whole, `standing[g].pop(i, ())`, is handed out as an OrderProxy of
     the popped set, or of the default where the entry is missing, so that serve_standing's iteration notes its order.
-    The pop's own log is the view's. Every level below is one of these."""
-    __slots__ = ("_note",)
+    The pop's own log is the view's. Every level below is one of these. Where drop_outside's own frame iterates
+    `standing[g]` (`list(standing[g])`), its indices go on the tape as ["keys", "standing", [g], [i...]] (`keys`, the
+    install's keys_writer), and where that frame takes `standing[g][i]`, the set is handed out as a DropPeers, whose
+    iteration notes its peers' order there. Anywhere else both are as the view gives them."""
+    __slots__ = ("_note", "_keys")
 
-    def __init__(self, view, note):
+    def __init__(self, view, note, keys=None):
         super().__init__(view._r, view._t, view._p, view._o)
         object.__setattr__(self, "_note", note)
+        object.__setattr__(self, "_keys", keys)
 
     def _sub(self, k, v):
-        return OrderPopView(F.View(self._r, self._t, self._p + (k,), v), self._note)
+        return OrderPopView(F.View(self._r, self._t, self._p + (k,), v), self._note, self._keys)
 
     def pop(self, k, *default):
         r = super().pop(k, *default)
         return OrderProxy(r, self._note) if self._leaf() else r
+
+    def __getitem__(self, k):
+        r = super().__getitem__(k)
+        if self._keys is not None and self._leaf() and sys._getframe(1).f_code.co_name == "drop_outside":
+            return DropPeers(r, self._note)
+        return r
+
+    def __iter__(self):
+        it = super().__iter__()
+        if self._keys is not None and len(self._p) == 1 and sys._getframe(1).f_code.co_name == "drop_outside":
+            ks = list(it)
+            self._keys(self._t, self._p, ks)
+            return iter(ks)
+        return it
+
+
+class DropPeers:
+    """`standing[g][i]` as drop_outside's own frame takes it (OrderPopView): its iteration notes ["order",
+    "drop_outside", [q...]], the members in the order the set itself iterates, empty or not; `discard`, a membership
+    test and `len` go to the set itself, unnoted. Any other use raises. The set is not copied."""
+    __slots__ = ("s", "note")
+
+    def __init__(self, s, note):
+        self.s, self.note = s, note
+
+    def __iter__(self):
+        order = list(self.s)
+        self.note("drop_outside", order)
+        return iter(order)
+
+    def __contains__(self, q):
+        return q in self.s
+
+    def __len__(self):
+        return len(self.s)
+
+    def discard(self, q):
+        self.s.discard(q)
+
+
+class WantKeysView(F.View):
+    """`want_p` under --doc seacast: where drop_outside's own frame iterates its top level (`for q in want_p`), its
+    peers go on the tape as ["keys", "want_p", [], [q...]] (`keys`, the install's keys_writer). Anywhere else, and
+    below the top, it is the view itself."""
+    __slots__ = ("_keys",)
+
+    def __init__(self, view, keys):
+        super().__init__(view._r, view._t, view._p, view._o)
+        object.__setattr__(self, "_keys", keys)
+
+    def __iter__(self):
+        it = super().__iter__()
+        if not self._p and sys._getframe(1).f_code.co_name == "drop_outside":
+            ks = list(it)
+            self._keys(self._t, self._p, ks)
+            return iter(ks)
+        return it
 
 
 def main(argv):
