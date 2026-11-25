@@ -11,7 +11,10 @@ the line does not name it; nor does it name a directory called `__pycache__`. So
 heading over a code block included), or of any file here but a README, makes every earlier trace a trace of
 another tree, and the traces are made again. An edit of a document's other prose, or of a README, does not.
 
-## What each file is
+## What the files are
+
+The table does not name every file: most of the tools for `seacast.md` say what they are in their own heads alone.
+`../check.sh` runs neither `pull_only.py` nor `unlogged_seacast.py`.
 
 | file | what it is |
 |---|---|
@@ -25,7 +28,7 @@ another tree, and the traces are made again. An edit of a document's other prose
 | `gen/gen.py`, `gen/makers.py` | the generated Lean files, held to the schema and the manifest (`gen.py`); where the built replay makes a `Tables` value (`makers.py`) |
 | `cells3.py` | the toy's cells (those of its `check.py`), traced and replayed; the header and the nodes line of each |
 | `header3.py` | the check that the first line of a trace is the content line of this tree, and that its header is of a known kind |
-| `directed*.py` | the directed sets: the toy's own functions called on generated states. There are 22 sets. `directed3.py` runs the samples of `directed61.py`, `directed44.py` runs with and without its limits, and `directed7.py` runs three ways |
+| `directed*.py` | the directed sets: the toy's own functions called on generated states. There are 22 sets under `seacast-lite.md`, and 12 under `seacast.md` (`directed_seacast.py`). `directed3.py` runs the samples of `directed61.py`, `directed44.py` runs with and without its limits, and `directed7.py` runs three ways |
 | `mutants3.py` | the mutants (twins with one rule changed, in the lists below), built and replayed; a matrix made in parts, read as one (`--merge`); the run of a draft (`--sample drafts`). `--sample-make` makes `sample_drafts.txt` from a matrix, and `--sample-check` checks it |
 | `sample_drafts.txt` | the sample for drafts, each mutant with its reason. On the cells, the run of a draft replays these mutants alone; on the directed sets, it replays every mutant |
 | `against.py` | the manifest of a run against that of a record, with one of three results: as recorded; another content and the same bodies; or not the record's. `--matrix`: the traces of a matrix against those of a record, by body. `--bodies`: every trace of two manifests, by body, both ways, counted by directory (also for a record of an earlier kit). `--bodies-in`: each trace of a list of hashes against a record, by body |

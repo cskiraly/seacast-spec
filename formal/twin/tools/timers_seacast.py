@@ -9,7 +9,8 @@ records they arm.
                                       (twenty-six of the checks, each with its reasons' words; six of the header's
                                       document; two runs that stopped; two lookups that stop the checker)
 
-`deferred_offers` is a question of NodeSeacast's (design.md §5.1). `on_offer` asks it while the group is younger than its
+`deferred_offers` is a question of NodeSeacast's, a helper that seacast.md names and does not write out (§4.3).
+`on_offer` asks it while the group is younger than its
 type's START_DELAY (seacast.md's on_offer, [D8]). The toy's binding records the offers and arms one timer per
 newly wanted index: `after(max(0, known_at[g] + START_DELAY - now) + 1e-6, retry_offer, a)`, once per ask
 (node._retry_armed, never cleared). The trace writes each such timer as a note on the question's tape entry, in its
