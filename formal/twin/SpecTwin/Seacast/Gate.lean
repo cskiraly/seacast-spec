@@ -55,6 +55,10 @@ def dropOutside (g : Group) : M2 m Unit := do
       discardFrom routedStanding? setRoutedStanding g i q    -- `routed_standing[g][i].discard(q)`
       branch "drop_outside: a standing request outside, dropped"
   -- `for q in [q for q in want_p if g in want_p[q]]:`, built whole
+  -- A limit: a record the Python makes can be refused. Example: the toy's `release_places` deletes a peer's last
+  -- group and keeps its empty `want_p` row; the Python's loop puts that peer on the tape, the twin's tables hold no
+  -- empty row, and `wantPOrder` refuses the record. No recorded cell calls the gate (`on_header_validated`, this
+  -- function's one caller), and no K4 draw has such a row.
   let all ← allWantPAll
   let mut qs : List Peer := []
   for q in ← NodeSeacast.wantPOrder (all.map (·.1)) do
