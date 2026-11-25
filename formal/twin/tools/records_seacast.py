@@ -10,6 +10,9 @@ how each argument and the return are read; TABLE below writes exactly that, one 
   `on_pace_tick` and `on_block_installed`), so that a keyword is put in its place; any other shape of the call is a
   TypeError, and so is any leaf the twin's reader would not take. `forward` and `ask_sample` have two cases in
   runSeacast, with and without their last (default) argument: the record has the last one exactly where the call gave it.
+  `may_be_asked` has one, of four: where the call leaves `routed` to its default, the record writes the default, as
+  the table's parameters give it (which the arity check compares with seacast.md's `def`). So no record tells a
+  call that left it out from one that gave False.
 - The leaves are Tracer3's encoders where theirs is what the twin reads (`tr.chunk`, `tr.wchunk`, `tr.descriptor`,
   `tr.key`, `tr.ask_seacast`, `tr.qentry` under v2, `tr.rel_msg`, `tr.nat`, `tr.integer`, `tr.flag`, `tr.nothing`), and
   small functions here, each named for the Lean reader it matches, where the tracer has none: a HAVE, a node's
@@ -231,6 +234,12 @@ def ask_sample_args(tr, g, i, first=_UNSET):            # two cases: `first` whe
     return out if first is _UNSET else out + [tr.flag(first, "ask_sample's first")]
 
 
+def may_be_asked_args(tr, p, g, i, routed=_UNSET):      # one case: `routed` written where the call left it to its
+    if routed is _UNSET:                                #   default too, the default the table's parameters give
+        routed = SIGS["may_be_asked"].parameters["routed"].default
+    return [peer(tr, p), group(g), tr.nat(i), tr.flag(routed, "may_be_asked's routed")]
+
+
 def relation_args(tr, p, T, fam, c, d):                 # prune, yes, no: [p, T, family, colour, direction]
     return [peer(tr, p), type_id(T), tr.integer(fam), tr.nat(c), direction(d)]
 
@@ -359,7 +368,7 @@ TABLE = {
     # §4.5's serving and §4.10's route_want: on_want's asks as askSeacastOf reads them, its answers narrow, in order
     "index_bound": ("g", g_only, nat),
     "our_interest_for": ("p, g", p_g, bits_int),
-    "outside": ("p, g, i, routed", lambda tr, p, g, i, routed: [peer(tr, p), group(g), tr.nat(i),
+    "outside":("p, g, i, routed", lambda tr, p, g, i, routed: [peer(tr, p), group(g), tr.nat(i),
                                                                 tr.flag(routed, "outside's routed")], boolean),
     "route_want": ("p, g, i, hops", lambda tr, p, g, i, hops: [peer(tr, p), group(g), tr.nat(i), tr.nat(hops)],
                    boolean),
@@ -391,6 +400,8 @@ TABLE = {
     "on_frame": ("p, frame", lambda tr, p, fr: [peer(tr, p), frame(tr, fr)], none),
     "on_heartbeat": ("", lambda tr: [], none),
     "publish": ("block, d, shards", publish_args, none),
+    # §4.5's may_be_asked (P7), which no code of the documents calls: its directed records alone
+    "may_be_asked": ("p, g, i, routed=False", may_be_asked_args, boolean),
 }
 
 if set(TABLE) != set(manifest_seacast.COVERED):
@@ -540,7 +551,8 @@ def stand_in():
         "resample": (one(g, 1, 4, True), None), "sample": (one(g, Bits(6)), None),
         "on_pace_tick": (one(), None), "on_block_installed": (one(root), None),
         "joined": (one(4, T), True), "drop_wants_beyond": (one(g), None),
-        "index_bound": (one(g), 4), "our_interest_for": (one(4, g), Bits(-1)), "outside": (one(4, g, 1, True), False),
+        "index_bound": (one(g), 4), "our_interest_for": (one(4, g), Bits(-1)),
+        "outside": (one(4, g, 1, True), False),
         "route_want": (one(4, g, 1, 2), True), "on_want": (one(4, [ask, flagged, f.mid]), [f]),
         "relation_room": (one(4, T, 5, 0), True), "graft": (one(7, T, 5, 0, "IN"), None),
         "on_prune": (one(4, prune), None), "on_graft": (one(4, graft), None),
@@ -554,6 +566,7 @@ def stand_in():
         "on_heartbeat": (one(), None),
         "publish": (one(NS(slot=1, body=None), d, [NS(index=0, proof=[bytes(32)], data=Blob(11660, ("payload", 1)))]),
                     None),
+        "may_be_asked": (one(4, g, 1) + one(4, g, 1, True) + one(4, g, 1, routed=False), True),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_seacast: the check's stubs are not the table's names: "

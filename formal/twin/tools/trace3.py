@@ -4242,6 +4242,9 @@ class Tracer3(Tracer):
             # §4.5's: on_want's admission of p's group, and our_interest_for's own id (its DERIVED case)
             "admitted_group": lambda r, p, g: [[n(p), g_(g)], boolean(r)],
             "own_id": lambda r: [[], bytes(r).hex()],
+            # §4.5's may_be_asked (P7): whether p offered us index i of g (the binding's; the toy reads `offers`,
+            # an own table, so the row carries that read as its log)
+            "offered_us": lambda r, p, g, i: [[n(p), g_(g), n(i)], boolean(r)],
             # §4.2's gate: a block's column and row groups, as the binding lists them (§3's helper), in its order
             "cell_groups": lambda r, root: [[bytes(root).hex()], [g_(g) for g in self.listed(r, "cell_groups")]],
             # §4.1's upkeep (FormsRows' askOf): the node's types, its JOIN, its candidates and pushers, its uplink

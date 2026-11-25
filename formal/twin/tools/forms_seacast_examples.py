@@ -7,10 +7,11 @@ eight names a node can replace (asked_enc_seacast); then the four questions §4.
 admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc); then the six §4.1's upkeep asks
 (runs_type, our_join, candidates, in_pushers, out_pushees, uplink_class); then the three §4.11's writer asks
 (pop_owed_answer, whose writer is Tracer3.pop_owed_enc, wire_size and offers_in); then the ninth name a node can
-replace, filter_entry, asked since §4.11 covers next_to_send; and last the four §4.2's gate asks (cell_groups, the
+replace, filter_entry, asked since §4.11 covers next_to_send; then the four §4.2's gate asks (cell_groups, the
 order of on_header_validated's groups, and the keys of `standing[g]` and of `want_p` where drop_outside iterates
-them); then the four §4.8's heartbeat asks (joined_peers, joined_types, related and sampled_types); and last the tenth
-name a node can replace, on_want, asked since on_frame's records call it; 84 rows in all. Each line is the twin's
+them); then the four §4.8's heartbeat asks (joined_peers, joined_types, related and sampled_types); then the tenth
+name a node can replace, on_want, asked since on_frame's records call it; and last the question §4.5's
+may_be_asked asks, offered_us; 85 rows in all. Each line is the twin's
 form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
@@ -317,6 +318,8 @@ def rows(f0, d, w=None):
         # on_want, the tenth name a node can replace, asked since on_frame's records call it: the asks handed over,
         # and the chunks it answers
         ("onWantNode", "on_want", asked["on_want"], [fa], (4, [WantIndex(g, 0)]), {}),
+        # §4.5's may_be_asked (P7): whether p offered us an index of g, the binding's question
+        ("offeredUs", "offered_us", q["offered_us"], True, (4, g, 1), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 
