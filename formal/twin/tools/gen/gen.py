@@ -659,8 +659,14 @@ def replay():
         elif t.value == "lane":                    # there and empty is a value
             va.append(f"  | {c} => {got_opt}.map (.lane ·)")
             put.append(f"  | {c}, .lane es => pure {{ s with {f} := {ins('es')} }}")
-        elif t.value == "waits":
-            va += [f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.waits l)"]
+        elif t.value == "waits":                   # `pending` alone: the empty list's limit, stated where it reads
+            va += [
+                   "  -- An empty list of waits is no entry, as the tracer writes it (trace3.py's waits encoder). A limit: a record the",
+                   "  -- Python makes can be refused. Example: where every copy that waited is of the root's groups,",
+                   '  -- `on_header_validated` stores `pending[root] = []`, which keeps the root a key; a later `drop_stale_waits` at that',
+                   '  -- node iterates it (`for root in list(pending)`), and the twin, which holds no such key, refuses that record at',
+                   "  -- `pendingOrder`. No recorded cell calls the gate, and K4's gate draws restore the state before each draw.",
+                   f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.waits l)"]
             put.append(f"  | {c}, .waits w => pure {{ s with {f} := {ins('w')} }}")
         elif t.value == "jobs":
             va += [f"  | {c} => match {got_def} with", "    | [] => none", "    | l => some (.jobs l)"]
