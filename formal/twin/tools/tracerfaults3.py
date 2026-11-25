@@ -933,8 +933,10 @@ def calls_nested_off_seacast():
 
 def calls_iwants_off_seacast():
     """Under v2, plant (v): the calls sidecar counts no IWANT, nor any call of respond, retry_offer or ask_parked
-    among its IWANT counts. calls_seacast.py's by-fn control must refuse it where those names' records enqueue one (seacast/
-    hand5's respond). Counted once for each call left out."""
+    among its IWANT counts. calls_seacast.py's by-fn control must refuse it where those names enqueue one, in a
+    record of their own or inside another's. On hand5 (seacast/hand5's arguments) respond has no record of its own:
+    it runs inside on_frame's records (88 calls when this was written, one of them with an IWANT), so the control
+    refuses the plant at "respond in on_frame", by that one IWANT. Counted once for each call left out."""
     tracer_instance()
 
     def count_iwants(self, name, branch, rows, host=None):

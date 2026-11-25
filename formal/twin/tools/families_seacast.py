@@ -9,7 +9,7 @@ send_relation writes no record of its own: its calls fall inside the records of 
 records of on_graft hold them, by yes() and no(), and each takes the family from the message it receives
 (seacastdirected/upkeep_h's do). The copy changes two of them:
 - the first record of on_graft that answers with one GRAFT and writes a table keyed by the family;
-- the first record of on_graft that answers with one PRUNE.
+- after it, the first record of on_graft that answers with one PRUNE (one before the first is not taken).
 In each, the received message's family f, of type T, is made −1 at every place it holds by position: the message's
 family (args[1], and the sent message of the `send` row); the family argument of the questions in_pushers,
 out_pushees and wants_family ([T, f, ...]); the family key [p, T, f, ...] of push_in, push_out, grafted_in,

@@ -1932,8 +1932,14 @@ EOF_BO
       || ! has -x "fn on_graft: $nog records, $((nog - 2)) ok" "$OUT/fcases/fam-argsonly.replay" \
       || ! has -x "fn counted: 1 records, 1 ok" "$OUT/fcases/fam-argsonly.replay"; then
     echo "S1-8b, the plant with the −1 in args alone: not its two records mismatched: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-argsonly.replay" 2> /dev/null)  <-- NOT" >> "$OUT/c-fcases.txt"
+  elif [ "$(grep -c '^mismatch ' "$OUT/fcases/fam-argsonly.replay")" != 2 ] \
+      || ! has -E '^mismatch on_graft: tape: in_pushers\["[a-z_]+",\["-",1\],[0-9]+\] asked, SpecTwin\.Replay\.Entry\.call "in_pushers" .* logged: 1$' "$OUT/fcases/fam-argsonly.replay" \
+      || ! has -E '^mismatch on_graft: tape: send\[[0-9]+,\["prune","[a-z_]+",\["-",1\],[0-9]+,"[A-Z]+"\],(true|false)\] asked, SpecTwin\.Replay\.Entry\.call "send" .* logged: 1$' "$OUT/fcases/fam-argsonly.replay"; then
+    # the GRAFT's record fails at its first question, in_pushers, asked of the family in its args; the PRUNE's at its
+    # send, whose message holds the family of its args: each reason with the −1 the copy put in
+    echo "S1-8b, the plant with the −1 in args alone: its two records not refused at the GRAFT's in_pushers and the PRUNE's send  <-- NOT" >> "$OUT/c-fcases.txt"
   else
-    echo "S1-8b, the plant with the −1 in args alone: as it must: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-argsonly.replay"), the two on_graft records" >> "$OUT/c-fcases.txt"; oka=1
+    echo "S1-8b, the plant with the −1 in args alone: as it must: $(grep -m 1 '^replay: ' "$OUT/fcases/fam-argsonly.replay"), the two on_graft records, the GRAFT's at its in_pushers question and the PRUNE's at its send" >> "$OUT/c-fcases.txt"; oka=1
   fi
   if [ -z "$r0" ] || [ -z "$lines" ] || [ "$(sed -n -E "s/^families_seacast: writekept: $(fam_line "$pg0" "$pp0")/\\1 \\2 \\3/p" "$OUT/fcases/fam-writekept.out" 2> /dev/null)" != "$lines" ] \
       || [ "$(cat "$OUT/fcases/fam-writekept.replay.rc" 2> /dev/null)" = 0 ]; then
@@ -2624,9 +2630,10 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # exit check must stop (c-rows.txt)
   replaced_rows
   # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask ((p): choose, on
-  # hand5-line), and its control on seacast/hand5; point 6's, a binding live across a record, on seacast/hand5 under
-  # --source-offers off: at the entry (D3), at the exit with the entry check removed (q), and with both removed, the
-  # trace written to its end, a stated limit (c-stops.txt)
+  # hand5-line), and its control on seacast/hand5; point 6's, a binding live across a record, planted on hand5-v2
+  # (seacast/hand5's arguments): at the entry (D3), at the exit with the entry check removed (q), and with both
+  # removed, the trace written to its end, a stated limit (D5's control); and hand5-off (--source-offers off), whose
+  # publish is replaced at every node, written to its end and replayed clean (c-stops.txt)
   stops
   # the carried cases (piece E): R7's tracer-wide depth on custody-floor-churn1, where node c's calls inside another
   # node's question run bare, and its planted fault (r), a depth per node, whose record the replay accepts (a stated

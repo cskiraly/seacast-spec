@@ -8,20 +8,21 @@ chains/das-samplers-mcoff	must	das	the chain cases' cell: the samplers, the memb
 chains/fam-plain	copy	-	the families' reader: the plain copy of seacastdirected/upkeep_h (families_seacast.py)
 chains/fam-signed	copy	-	the families' reader: the signed copy of seacastdirected/upkeep_h (families_seacast.py)
 chains/hand5-line	stopped	-	point 5's cell (p): --answers-first line replaces choose, which the tracer must stop
-chains/hand5-off	stopped	-	D3's cell: the source's announce bound through publish, which the tracer must stop
+chains/hand5-off	must	-	hand5 with --source-offers off: publish's layer listed as changing, so publish runs bare; written to its end
 chains/hand5-peer	must	-	the chain cases' cell: hand5 with --promise-mode peer
 chains/plant-a	plant	-	plant (a): close_promises' chain cut on hand5-peer (chaincases.py --cut)
 chains/plant-b	plant	-	plant (b): chain-filter-observer-v2 on hand5-peer
 chains/plant-c	plant	das	plant (c): chain-bindings-v2 on das-hoardcol-w16
 chains/plant-d	plant	das	plant (d): chain-owed-observer-v2 on das-samplers-mcoff
-chains/plant-d5	plant	-	D5's control: bindings-checks-off-v2 on hand5-off
+chains/plant-d3	plant	-	D3's plant: live-binding-v2 on hand5-v2
+chains/plant-d5	plant	-	D5's control: bindings-checks-off-v2 on hand5-v2
 chains/plant-e	plant	-	plant (e): chain-owed-changing-v2 on hand5-peer
 chains/plant-h	plant	das	plant (h): owed-flipped-observer-v2 on das-samplers
 chains/plant-i	plant	das	plant (i): owed-flipped-changing-v2 on das-samplers
 chains/plant-j	plant	das	plant (j): known-replaced-v2 on das-samplers-mcoff
 chains/plant-l	plant	das	plant (l): verdict-replaced-v2 on das-hoardcol-w16
 chains/plant-pc	plant	-	plant (p)'s control: noask-in-record-v2 on hand5-v2
-chains/plant-q	plant	-	plant (q): entry-check-off-v2 on hand5-off
+chains/plant-q	plant	-	plant (q): entry-check-off-v2 on hand5-v2
 chains/plant-r	plant	-	plant (r): per-node-depth-v2 on custody-floor-churn1
 chains/plant-s	plant	-	plant (s): suppressed-filter-v2 on hand5-peer
 chains/plant-t	plant	-	plant (t): suppressed-filter-v2-off on hand5-peer

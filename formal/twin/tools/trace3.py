@@ -821,7 +821,13 @@ class Adapter:
     """An adapter layer of a traced name at a node (ADAPTER): its stops' words, the code made inside it, and, while
     one of its calls runs, how many times that call has called the document's function. The record is that inner call;
     the adapter's own frame waits in it, so its own code can run inside the record only as code it made, which the
-    document's code reaches (a callback, a property, a generator): a write there stops the tracer (write_check)."""
+    document's code reaches (a callback, a property, a generator): a write there stops the tracer (write_check).
+
+    What write_check can miss: it runs at the Recorder's write hook alone. A change made in place on a value a view
+    handed out does not pass that hook. For example, a property of the adapter's that calls `.set(i)` on a bitmap read
+    from a table: the read is logged, the bitmap changes, and footprint finds the change at the record's end without
+    calling write_check. node.py's one adapter runs none of its own code while its call is open: its JOINs come
+    before and its `unwanted[p].add` after."""
     __slots__ = ("nid", "name", "where", "codes", "calls")
 
     def __init__(self, nid, name, f):
@@ -4868,7 +4874,13 @@ class Tracer3(Tracer):
         desc = self.descriptor          # the descriptor whole: the twin's code calls §1's N and K of it, and this
         #                                   encoder calls nothing
 
-        # the twin's own tables: one line each in gen/schema.py; then the other sections' that §6.1 reads
+        # the twin's own tables: one line each in gen/schema.py; then the other sections' that §6.1 reads.
+        # waits: an empty wait list is written as absent (`or None`), and the twin reads an absent row as no key. A
+        # limit, by example: §4.2's gate leaves `pending[root] = []` where every cell that waited is in the root's
+        # groups (seacast.md's on_header_validated), and a later on_heartbeat at that node, in drop_stale_waits,
+        # iterates `list(pending)` with the root in it, where the twin's `pending` has no such key: that record is
+        # refused at its order (pendingOrder). It can refuse a record, never pass a wrong one. No recorded cell calls
+        # the gate, and K4's gate sets restore the node's state at each draw (directed_seacast.py).
         tables = schema.python_tables(F, key, fbits, lane=self.lane,
                                       waits=lambda w: [[int(p), self.wchunk(f)] for p, f in w] or None,
                                       jobs=lambda js: [[int(q), [key(m) for m in ids], fbits(at)]
@@ -5799,7 +5811,12 @@ class DropPeers:
 class WantKeysView(F.View):
     """`want_p` under --doc seacast: where drop_outside's own frame iterates its top level (`for q in want_p`), its
     peers go on the tape as ["keys", "want_p", [], [q...]] (`keys`, the install's keys_writer). Anywhere else, and
-    below the top, it is the view itself."""
+    below the top, it is the view itself.
+
+    A limit, by example: the toy's release_places deletes `want_p[p][h]` and keeps p's row, empty (toy/node.py). A
+    later drop_outside's `for q in want_p` puts p on the tape, where the twin's `want_p` has no row for p, so its
+    wantPOrder refuses the record. It can refuse a record, never pass a wrong one, and it acts only inside
+    drop_outside, whose one caller is §4.2's gate, which no recorded cell calls."""
     __slots__ = ("_keys",)
 
     def __init__(self, view, keys):

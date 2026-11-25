@@ -75,6 +75,7 @@ import sys
 FULL = re.compile(r'"[0-9a-f]{112}"')
 CHUNK_FNS = ("on_chunk", "on_validated",          # and the deferral path's, whose code asks them too
              "defer", "tie", "tie_room", "on_block_installed", "drop_stale_waits",
+             "on_header_validated",               # §4.2's gate: the cells that waited resume there (release, ...)
              "on_frame",                          # on_chunk runs inside a frame's record
              "committed_descriptor")              # level 1: its second argument is the chunk
 ANSWER_FNS = ("on_iwant", "on_frame", "on_want")  # their code resolves an ask to our chunk (on_want: seacast.md's)
@@ -337,6 +338,10 @@ def self_test():
          {"fn": "on_validated", "args": [4, chunk, "DEFER"], "tape": [["reserve", [4, chunk], True]]}),
         ("a chunk on release's tape entry, under on_block_installed", 0,
          {"fn": "on_block_installed", "args": ["22" * 32], "tape": [["release", [4, chunk], None]]}),
+        ("a cell that waited resumes at §4.2's gate (V1): its chunk on release's and content_id's tape entries, and "
+         "its id on seen's, under on_header_validated", 0,
+         {"fn": "on_header_validated", "args": ["22" * 32],
+          "tape": [["release", [4, chunk], None], ["content_id", [chunk], "ab" * 20], ["seen", [mid], False]]}),
         ("a chunk on validate_chunk's tape entry, under drop_stale_waits' (none asks it there, but the place is "
          "one of the deferral path's)", 0,
          {"fn": "drop_stale_waits", "args": [], "tape": [["validate_chunk", [chunk], "ACCEPT"]]}),
