@@ -8,7 +8,7 @@ chains/das-samplers-mcoff	must	das	the chain cases' cell: the samplers, the memb
 chains/fam-plain	copy	-	the families' reader: the plain copy of seacastdirected/upkeep_h (families_seacast.py)
 chains/fam-signed	copy	-	the families' reader: the signed copy of seacastdirected/upkeep_h (families_seacast.py)
 chains/hand5-line	stopped	-	point 5's cell (p): --answers-first line replaces choose, which the tracer must stop
-chains/hand5-off	must	-	hand5 with --source-offers off: publish's layer listed as changing, so publish runs bare; written to its end
+chains/hand5-off	must	-	hand5 with --source-offers off: publish's layer listed as changing, so publish's callees run bare; written to its end
 chains/hand5-peer	must	-	the chain cases' cell: hand5 with --promise-mode peer
 chains/plant-a	plant	-	plant (a): close_promises' chain cut on hand5-peer (chaincases.py --cut)
 chains/plant-b	plant	-	plant (b): chain-filter-observer-v2 on hand5-peer

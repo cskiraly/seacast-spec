@@ -5685,10 +5685,10 @@ class Gate:
     """§4.2's gate under SEACAST: the order of `on_header_validated`'s `for g in groups` (:1221), where groups is
     `dict.fromkeys(cell_groups(root))` (:1198): cell_groups' answer in that frame without its repeats, in the answer's
     own order, so the order is `list(dict.fromkeys(answer))`, the same in every process (a set's order would follow
-    the hash seed). It is written as ["order", "on_header_validated", [g...]] just before the first drop_outside the frame calls, or at
-    the frame's return where it calls none; each drop_outside the frame calls is checked against it, the k-th call
-    against the k-th group, and at the return every group must have had its call. A miss stops the trace: the order
-    would then be a prediction that failed. One frame per open call, innermost last (the stack)."""
+    the hash seed). It is written as ["order", "on_header_validated", [g...]] just before the first drop_outside the
+    frame calls, or at the frame's return where it calls none; each drop_outside the frame calls is checked against
+    it, the k-th call against the k-th group, and at the return every group must have had its call. A miss stops the
+    trace: the order would then be a prediction that failed. One frame per open call, innermost last (the stack)."""
 
     def __init__(self, nid, st, note):
         self.nid, self.st, self.note = nid, st, note

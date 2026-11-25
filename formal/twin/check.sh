@@ -1550,7 +1550,8 @@ stops() {               # piece D: point 5's stop, (p) on hand5-line, and its co
   # the stop and counted what it kept would pass on the trailer's own count. A change of the toy or the tracer that
   # moves the records before the stop fails here, and the count is then set anew. (Until the roots were traced the
   # case was the toy's own, hand5-off's layer over announce bound through publish, met at node 1's group_id record
-  # after 53; since LAYERS lists that publish layer as changing, publish runs bare there and no record opens inside it)
+  # after 53; since LAYERS lists that publish layer as changing, publish runs outside every record there, its callees
+  # bare, and no record opens inside it)
   local D3_RECORDS=5
   mkdir -p "$OUT/chains"; : > "$OUT/c-stops.txt"
   par stop_cell chains hand5-line
