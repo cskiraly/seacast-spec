@@ -1784,7 +1784,7 @@ def nAnswer : String := rec2 "next_to_send" "[5]"
 #guard fails3r "tape: filter_entry: its answer: a chunk here is narrow"
   (nAsked.replace s!"[5, {eC}], {eC}" s!"[5, {eC}], [[{gq}, 3, 1, \"{root}\", \"{id3}\", 1], null, false]")
 /-- A timer that the node's own `filter_entry` armed, as the question's log notes it: §6.1's `promise_due` for the
-ask `[g, 3]` of peer 5, PROMISE and the time it is due as their words -/
+ask `[g, 3]` of peer 5, PROMISE and the time it was armed as their words (`after(PROMISE, promise_due, a, p, now)`) -/
 def promiseNote : String := s!"[\"after\", {f1}, \"promise_due\", [[{gq}, 3], 5, {f2}]]"
 /-- The toy's alarm, as the question's log notes it: its group, index, peer and time -/
 def alarmNote : String := s!"[\"after\", {f1}, \"Node._alarm.<locals>.alarm_due\", [{gq}, 3, 5, {f2}]]"

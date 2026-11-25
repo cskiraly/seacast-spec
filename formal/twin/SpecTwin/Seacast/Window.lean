@@ -63,7 +63,8 @@ def freeRoom (need : Nat) : M2 m Unit := do
 /-- `acquire_room(p, need)` (§4.11): true, p's writer may send `need` bytes now; false, it waits in line -/
 def acquireRoom (p : Peer) (need : Nat) : M2 m Bool := do
   enter "acquire_room"
-  let n ← inFlight .count
+  let n ← inFlight .count                                     -- read once: the Python reads `in_flight` again after
+                                                              --   `front()`: the same unless `writing` writes it
   let under := match (← read).c2.W_BYTES with                 -- `in_flight + need <= W_BYTES`
     | none => true
     | some w => n + need ≤ (w : Int)
