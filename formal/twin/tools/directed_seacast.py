@@ -25,8 +25,9 @@ A scenario draws the tables its function reads, through the views or the toy's o
 so that nothing of the drawing is logged. It then sets `now` and calls the name the install wrapped. It rebinds
 nothing: the install wrapped the node's traced names, questions and type functions, and a name rebound after it would
 be refused at the close (final_check) or missing from the tape, which the replay refuses. So a question's answer is
-the node's own, from the drawn state, and every random draw is the toy's, on the tape. The window's three tables are
-not installed under SEACAST, and no scenario draws them. In every set but `control`, each record starts from the
+the node's own, from the drawn state, and every random draw is the toy's, on the tape. The window's three tables
+(`in_flight`, a count, `waiters` and `sent`) are installed under SEACAST as under seacast-lite.md, and the window's
+scenarios draw them: the count through its cell's holder. In every set but `control`, each record starts from the
 state the build left (on D, after the publish): the tables the scenarios touch are put back to that state first, and
 the asker places of `admitted_group` (`node.want_unknown`, no table) are emptied.
 
@@ -56,6 +57,18 @@ The sets:
   FORWARD); and no peer is in any relation of ours, has a GRAFT of ours unanswered, or is in a backoff, and nothing
   is owed: each record starts with the six relation tables empty at its node (the toy's static mesh fills
   `push_in` and `push_out` at the build) and the JOIN tables as built.
+- **window_h** (H, nodes 2 to 4), the window of §4.11 and the writer of §7.2, A1 to N1: `acquire_room`,
+  `leave_line`, `track_in_flight`, `window_timeout` and `next_to_send`, each on a state whose path is one and the
+  same for every record of the scenario. Each record starts with the window empty (`in_flight` 0, nobody in line,
+  nothing in `sent`) and nothing planned, held as origin, owed, stored or described at its node. W_BYTES is H's, the
+  window on (card 14). Then a last step, C1, made once: the toy's close of a link (`sim.close_link`) at a recording
+  node, to a peer that records nothing, with a chunk of ours in flight to it and another peer in line. The close
+  calls the document's `claims_close` and `leave_line` at both ends, and `free_room` for the chunk: five records, as
+  the toy makes them at a close under --churn.
+
+Beside the trace, OUT.scenarios has a line per record in the trace's order: its number from 1, its line in the trace
+(the content line the first), its node, its function, and the key of the scenario whose call made it (`setup` for the
+publish's records, the last step's key for its records).
 """
 import argparse
 import sys
@@ -80,6 +93,9 @@ RESET = ("join_recv", "join_sent", "owed_relations", "desc", "state", "mine", "p
          "served_hb", "offered_to", "forwarded", "park", "T_of", "chunks", "known_id")
 # the relation tables, emptied before each record of the relation scenarios; the JOIN tables are put back as built
 RELATIONS = ("push_in", "push_out", "grafted_in", "grafted_out", "backoff", "owed_relations")
+# the tables the window's scenarios draw or their calls write, put back before each record (the window's count and
+# line, which are no dicts, by window_start)
+WINDOW_RESET = ("sent", "planned", "origin", "owed_answers", "owed", "owed_relations", "chunks", "known_id", "desc")
 CTX = {}                              # the frame: the simulator, the toy's modules, the tracer
 
 
@@ -136,6 +152,16 @@ def restore(raw, saved):
         cur = raw[k]
         cur.clear()
         cur.update(row)
+
+
+def window_start(nid, ns, build=False):
+    """The window's count at 0 and its line empty, as the build leaves them: at the build (`build`), checked."""
+    holder, line = ns["in_flight"]._h, F.unwrap(ns["waiters"])
+    if build and (holder.count != 0 or line):
+        raise SystemExit(f"directed_seacast: node {nid}: the window is not empty after the build (in_flight "
+                         f"{holder.count}, {len(line)} in line)")
+    holder.count = 0
+    line.clear()
 
 
 def descriptor(count):
@@ -702,6 +728,109 @@ def m4(rng, nd, ns, B):
     return "maintain_relations", (P,)
 
 
+# ---- the window's scenarios, A1 to N1 and the close C1: seacast.md §4.11's window in bytes and §7.2's writer
+
+def window(ns, in_flight, waiters=(), sent=()):
+    """The window's three tables drawn: the count through its cell's holder (the cell is the name's value, footprint's
+    CountCell), the line's deque, and `sent`'s entries, each (peer, group, index) -> (send time, bytes)."""
+    ns["in_flight"]._h.count = in_flight
+    F.unwrap(ns["waiters"]).extend(waiters)
+    for key, e in sent:
+        F.unwrap(ns["sent"])[key] = e
+
+
+def wire_chunk(ns, g, i):
+    """A chunk of g at index i, stored as `store` stores one, whose bytes on the wire the toy can count: its data a
+    blob of CHUNK_BYTES under store's tag and its proof empty (wire.py's chunk_wire takes both lengths). Its id is
+    store's, since content_id reads the data's tag alone."""
+    f = store(ns, g, i)
+    f.data = CTX["Wm"].Blob(ns["CHUNK_BYTES"], f.data.tag)
+    f.proof = []
+    return f
+
+
+def on_window(rng, nd, ns):
+    """The window's defaults: p a peer, g a group of GROUPS, i an index below 8, and a size of 1 to 2 chunks' bytes."""
+    return rng.choice(sorted(nd.peers)), rng.choice(GROUPS), rng.randrange(8), rng.randint(1, 2 * ns["CHUNK_BYTES"])
+
+
+def w_a1(rng, nd, ns, B):
+    """A1: a chunk larger than the window, into an empty one. -> acquire_room: an empty window, over W_BYTES;
+    wake_front: no room; acquire_room: room."""
+    p = rng.choice(sorted(nd.peers))
+    window(ns, 0)
+    return "acquire_room", (p, ns["W_BYTES"] + 1)
+
+
+def w_l1(rng, nd, ns, B):
+    """L1: p alone in line, the window full. -> wake_front: no room; leave_line: left the line."""
+    p = rng.choice(sorted(nd.peers))
+    window(ns, ns["W_BYTES"], [p])
+    return "leave_line", (p,)
+
+
+def w_t1(rng, nd, ns, B):
+    """T1: a second copy of a chunk still in flight. -> wake_front: nobody in line can write; track_in_flight: a
+    second copy."""
+    p, g, i, need = on_window(rng, nd, ns)
+    window(ns, 2 * need, sent=[((p, g, i), (rng.choice([0.25, 0.75]), need))])
+    return "track_in_flight", (p, wire_chunk(ns, g, i), need)
+
+
+def w_wt1(rng, nd, ns, B):
+    """WT1: the copy's own timeout, of a group we do not plan. -> wake_front: nobody in line can write;
+    window_timeout: released."""
+    p, g, i, need = on_window(rng, nd, ns)
+    at = rng.choice([0.25, 0.75])
+    window(ns, need, sent=[((p, g, i), (at, need))])
+    return "window_timeout", ((p, g, i), at)
+
+
+def w_wt2(rng, nd, ns, B):
+    """WT2: WT1, of a group we plan, whose index our holding names already. -> wake_front: nobody in line can write;
+    origin_acked: acknowledged before; window_timeout: released."""
+    p, g, i, need = on_window(rng, nd, ns)
+    at = rng.choice([0.25, 0.75])
+    window(ns, need, sent=[((p, g, i), (at, need))])
+    others = [q for q in sorted(nd.peers) if q != p]
+    F.unwrap(ns["planned"])[g] = {i: set(rng.sample(others, rng.randrange(3)))}
+    F.unwrap(ns["origin"])[g] = B.Bits(1 << i)
+    return "window_timeout", ((p, g, i), at)
+
+
+def w_wt3(rng, nd, ns, B):
+    """WT3: a timeout of an earlier copy, the entry now another's. -> window_timeout: stale."""
+    p, g, i, need = on_window(rng, nd, ns)
+    at = rng.choice([0.25, 0.75])
+    window(ns, need, sent=[((p, g, i), (at + rng.choice([-0.125, 0.125]), need))])
+    return "window_timeout", ((p, g, i), at)
+
+
+def w_n1(rng, nd, ns, B):
+    """N1: an answer a full queue refused, owed to p, the window full. -> queue_owed_relations: nothing owed;
+    next_to_send: an owed answer enqueued; choose: the first; acquire_room: in line; next_to_send: in line."""
+    p, g, i, _ = on_window(rng, nd, ns)
+    window(ns, ns["W_BYTES"])
+    wire_chunk(ns, g, i)
+    F.unwrap(ns["owed_answers"])[p][g].set(i)      # the toy's LazyBits: pop_owed_answer clears it
+    return "next_to_send", (p,)
+
+
+def w_c1(rng, nd, ns, B):
+    """C1, the last step: the toy's close of a link (sim.close_link) whose peer q has a chunk of ours in flight, with
+    q2 in line. q is a peer that records nothing (1 or 5 on H), so its window is as built. -> at the node:
+    claims_close(q); leave_line(q): not in line; free_room (its wake_front wakes q2). At q: claims_close and
+    leave_line: not in line. Returns the closing peer."""
+    sim = CTX["sim"]
+    q = rng.choice(sorted(set(nd.peers) - set(CTX["nodes"])))
+    q2 = rng.choice(sorted(set(nd.peers) - {q}))
+    g, i, need = rng.choice(GROUPS), rng.randrange(8), rng.randint(1, 2 * ns["CHUNK_BYTES"])
+    window(ns, need, [q2], [((q, g, i), (ns["now"], need))])
+    sim.nodes[q].ns["now"] = ns["now"]
+    sim.close_link(nd.id, q)
+    return q
+
+
 SETS = {     # name: (frame, the nodes its records are made at, its scenarios, what each record starts from)
     "control": ("H", (2, 3, 4), {"note_claim": note_claim}, None),
     "serve_h": ("H", (2, 3, 4), {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "S5": s5, "S6": s6, "S7": s7, "S8": s8,
@@ -715,10 +844,13 @@ SETS = {     # name: (frame, the nodes its records are made at, its scenarios, w
     "upkeep_r": ("R", (2, 3, 4), {"G3": g3, "Q4": q4, "Q5": q5, "A1": a1}, "upkeep"),
     "upkeep_w": ("W", (2, 3, 4), {"G7": g7, "M4": m4}, "upkeep"),
     "upkeep_wu": ("WU", (2, 3, 4), {"G12": g12, "G13": g13, "G14": g14, "M1": m1, "M2": m2, "M3": m3}, "upkeep"),
+    "window_h": ("H", (2, 3, 4), {"A1": w_a1, "L1": w_l1, "T1": w_t1, "WT1": w_wt1, "WT2": w_wt2, "WT3": w_wt3,
+                                  "N1": w_n1}, "window"),
 }
+LAST = {"window_h": ("C1", w_c1)}     # a set's last step, made once after its records: its key and its scenario
 # what a record starts from: the tables put back as the build left them (all but the JOIN tables empty then), and
-# the tables emptied
-STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS)}
+# the tables emptied; under "window" the window's count and line too (window_start)
+STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS), "window": (WINDOW_RESET, ())}
 FRAMES = {   # name: (run.py's arguments, the config's additions, a block published, each recording node's peers)
     "H": (HAND5, None, False, 4), "H+": (HAND5, {"MAX_PENDING_GROUPS": 1, "SERVE_BUDGET": 2}, False, 4),
     "D": (DAS30, None, True, None), "R": (HAND5 + ["--prune-backoff", "1"], {"MAX_RELATIONS": 2}, False, 4),
@@ -737,6 +869,16 @@ def main(argv):
     toy = Path(a.toy).resolve()
     tr = trace3.Tracer3(toy, a.out, ["directed_seacast", "--doc", "seacast", f"--n={a.n}", f"--seed={a.seed}",
                                      f"--set={a.set}"], whole=True)
+    lines, current, made = [2], ["setup"], []   # the content line and the header are written by now
+    write = tr.write
+
+    def counted(rec):                   # every line the tracer writes from here, counted: a record's line, node and
+        write(rec)                      #   function, with the key of the scenario whose call made it
+        lines[0] += 1
+        if "fn" in rec:
+            made.append((lines[0], rec["n"], rec["fn"], current[0]))
+
+    tr.write = counted
     try:
         args, config, publish, npeers = FRAMES[frame]
         sim = build(tr, args, config, publish)
@@ -748,9 +890,27 @@ def main(argv):
         import random
         import wire as Wm               # noqa: E402
         CTX.update(sim=sim, Wm=Wm, tr=tr, column=sorted(g for g, t in sim.gtype.items() if t == "column"),
-                   row=sorted(g for g, t in sim.gtype.items() if t == "row"))
+                   row=sorted(g for g, t in sim.gtype.items() if t == "row"), nodes=nodes)
         kept, emptied = STARTS[start] if start else ((), ())
         saved = {k: {name: save(k, name, F.unwrap(sim.nodes[k].ns[name])) for name in kept} for k in nodes}
+        if start == "window":
+            for k in nodes:
+                window_start(k, sim.nodes[k].ns, build=True)
+
+        def begin(k, nd, ns):           # the build's state, and no asker places; nothing an earlier record queued
+            for name in kept:
+                restore(F.unwrap(ns[name]), saved[k][name])
+            for name in emptied:
+                F.unwrap(ns[name]).clear()
+            if start == "window":
+                window_start(k, ns)
+            nd.want_unknown.clear()
+            queues = F.unwrap(ns["queue"])
+            for q in nd.peers:
+                if q in queues:
+                    queues[q].urgent.clear()
+                    queues[q].normal.clear()
+
         rng = random.Random(a.seed)
         calls = Counter()
         keys = sorted(scenarios)
@@ -760,20 +920,23 @@ def main(argv):
             ns = nd.ns
             ns["now"] = rng.choice([1.0, 3.25])
             key = rng.choice(keys)
-            if start:                   # the build's state, and no asker places; nothing an earlier record queued
-                for name in kept:
-                    restore(F.unwrap(ns[name]), saved[k][name])
-                for name in emptied:
-                    F.unwrap(ns[name]).clear()
-                nd.want_unknown.clear()
-                queues = F.unwrap(ns["queue"])
-                for q in nd.peers:
-                    if q in queues:
-                        queues[q].urgent.clear()
-                        queues[q].normal.clear()
+            if start:
+                begin(k, nd, ns)
             name, fargs = scenarios[key](rng, nd, ns, B)
+            current[0] = key
             ns[name](*fargs)
             calls[key] += 1
+        last = None
+        if a.set in LAST:               # the last step, once: its own call, which may make several records
+            key, step = LAST[a.set]
+            k = rng.choice(nodes)
+            nd = sim.nodes[k]
+            ns = nd.ns
+            ns["now"] = rng.choice([1.0, 3.25])
+            begin(k, nd, ns)
+            current[0], before = key, len(made)
+            step(rng, nd, ns, B)
+            last = (key, len(made) - before)
     except BaseException as stop:       # trace3.py's main: the trace closed with the first reason in its trailer
         try:
             tr.close(stopped=(f"{type(stop).__name__}: {stop}".splitlines() or [""])[0])
@@ -786,7 +949,12 @@ def main(argv):
               file=sys.stderr)
     for key in sorted(calls, key=lambda s: (len(s), s)):
         print(f"directed_seacast: {key}: {calls[key]}", file=sys.stderr)
+    if last:
+        print(f"directed_seacast: last: {last[0]}, {last[1]} records", file=sys.stderr)
     print(f"directed_seacast: {sum(tr.counts.values())} records, {dict(sorted(tr.counts.items()))}", file=sys.stderr)
+    with open(f"{a.out}.scenarios", "w") as f:  # each record's scenario: its number, its trace line (the content line
+        for j, (ln, n, fn, key) in enumerate(made, 1):    # the first), its node and function, and the scenario's key
+            f.write(f"{j} {ln} {n} {fn} {key}\n")
 
 
 if __name__ == "__main__":
