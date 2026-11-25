@@ -321,6 +321,10 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
     return Json.bool <$> NodeSeacast.related (m := R) q
   | "sampledTypes", #[] => do
     return typesJson <$> NodeSeacast.sampledTypes (m := R)
+  -- §4.5's may_be_asked: whether p offered us index i of g, the binding's
+  | "offeredUs", #[p, g, i] => do
+    let p ← nat p; let g ← Replay.groupKey g; let i ← nat i
+    return Json.bool <$> NodeSeacast.offeredUs (m := R) p g i
   -- on_want as the node binds it, which on_frame asks where the node's line names it as replaced
   | "onWantNode", #[p, asks] => do
     let p ← nat p; let asks ← (← arr asks).mapM askSeacastOf
@@ -441,6 +445,8 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   | "joinedTypes" => p "[\"column\",\"column\"]"
   | "related" => p "0"
   | "sampledTypes" => p "[\"\"]"
+  -- §4.5's may_be_asked: offered_us's null, refused by its kind: nothing where a Boolean is
+  | "offeredUs" => p "null"
   -- the answers `on_want` returns where the node replaces it: the first chunk with a sixth member, refused by the
   -- chunk's reader, which takes it narrow; an empty answer, which has no first chunk, gets a number where a chunk is
   | "onWantNode" => match ans with
@@ -466,8 +472,9 @@ the file's at spec 287d575; the next 17 cover the methods of `NodeSeacast` that 
 §4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`; the next is `filter_entry` as the node binds it, which
 `next_to_send` asks where the node's line names it as replaced; the next 4 are §4.2's gate's: `cell_groups`, the order
 of `on_header_validated`'s groups, and the key orders of `standing[g]` and `want_p` in `drop_outside`; the next 4 are
-§4.8's heartbeat's: `joined_peers`, `joined_types`, `related` and `sampled_types`; the last is `on_want` as the node
-binds it, which `on_frame` asks where the node's line names it as replaced. -/
+§4.8's heartbeat's: `joined_peers`, `joined_types`, `related` and `sampled_types`; the next is `on_want` as the node
+binds it, which `on_frame` asks where the node's line names it as replaced; the last is `offered_us`, which §4.5's
+`may_be_asked` asks. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -493,7 +500,9 @@ def labels : List String :=
    -- §4.8's heartbeat: the four questions it asks of the node
    "joinedPeers", "joinedTypes", "related", "sampledTypes",
    -- and on_want, which on_frame asks where the node replaces it
-   "onWantNode"]
+   "onWantNode",
+   -- §4.5's may_be_asked: offered_us, the binding's
+   "offeredUs"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)

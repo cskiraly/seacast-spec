@@ -5,7 +5,8 @@ import SpecTwin.Sec61
 
 The twin of §4.5's `on_want` and the three it calls, `outside`, `index_bound` and `our_interest_for`, and of §4.10's
 `route_want`, which `on_want` calls for a routed sample request it cannot answer. Each comes after every function it
-calls (`Seacast/Relations.lean`'s rule).
+calls (`Seacast/Relations.lean`'s rule). It also holds §4.5's `may_be_asked`, P7's definition, which no function
+calls: its records are directed ones.
 
 - **`on_want`'s three maps.** `answers` is a dict by id, in insertion order: no id is set twice in it, since an id
   already there is skipped first, and its values are returned in that order. `probes` is built by a comprehension
@@ -56,6 +57,32 @@ def ourInterestFor (p : Peer) (g : Group) : M2 m IBits := do
     -- `T.derived_interest(g, hdr.get(g), own_id(), j)`: the arguments left to right
     NodeSeacast.derivedInterest T g (← desc g) (← NodeSeacast.ownId) j
   | .declared => return 0                                     -- `EMPTY`: a sampler is asked only for what it holds
+
+/-- `may_be_asked(p, g, i, routed=False)` (§4.5, P7): which asks of ours p may take. The four operands of the `or`
+are asked in order, each only where those before it are false -/
+def mayBeAsked (p : Peer) (g : Group) (i : Nat) (routed : Bool) : M2 m Bool := do
+  enter "may_be_asked"
+  let T ← NodeSeacast.typeOfGroup g                            -- `T = type_of_group(g)`, before the `return`
+  if ← NodeSeacast.offeredUs p g i then                        -- `offered_us(p, g, i)`, the binding's
+    branch "may_be_asked: offered us"
+    return true
+  if (← interestOfPeer p g).has i then                         -- `interest_of_peer(p, g).has(i)`
+    branch "may_be_asked: in its interest"
+    return true
+  if ((← peerHasEntry? p g).getD {}).claimAll then             -- `peer_has[p][g].claim_all`: no entry reads as none
+    branch "may_be_asked: claimed whole"
+    return true
+  -- `routed and join_recv[p][T].duty == FORWARD`: [D12] a routed request may go to any forwarding node.
+  -- `interest_of_peer` read the same entry, so its absence raised there first.
+  if routed then
+    let some j ← joinRecv? p T | crash s!"KeyError: type {T} (may_be_asked: join_recv[p][T])"
+    if j.duty == .forward then
+      branch "may_be_asked: routed to a forwarding node"
+      return true
+    branch "may_be_asked: routed, not to a forwarding node"
+    return false
+  branch "may_be_asked: none of the four"
+  return false
 
 /-- `outside(p, g, i, routed)` (§4.5): `may_be_asked` as p reads us is false, once we can tell -/
 def outside (p : Peer) (g : Group) (i : Nat) (routed : Bool) : M2 m Bool := do

@@ -278,7 +278,7 @@ def callNamesSeacast : List String :=
    "open_sampling_link", "choice", "own_interest", "send_have", "serve_standing", "owed_missing", "repair_verdict",
    "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join", "candidates", "in_pushers",
    "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in", "filter_entry", "cell_groups",
-   "joined_peers", "joined_types", "related", "sampled_types", "on_want"]
+   "joined_peers", "joined_types", "related", "sampled_types", "on_want", "offered_us"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
@@ -508,6 +508,8 @@ instance : NodeSeacast R where
   sampledTypes := askCall "sampled_types" [] (typeList "sampled_types")
   joinedPeers := askCall "joined_peers" [] (peerList "joined_peers")
   related q := askCall "related" [(q : Json)] boolOf
+  -- §4.5's may_be_asked: the binding's offers, read by the toy's helper (its entry logs that read)
+  offeredUs p g i := askCall "offered_us" [(p : Json), Json.str g, (i : Json)] boolOf
   -- the names a node's line can give as replaced: asked where it does, the document's body run elsewhere
   forwardNode f p axes :=
     askCall "forward" [chunkJson f, (p : Json), optJson (fun l => Json.arr (l.map giJson).toArray) axes] nothing
@@ -663,6 +665,8 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     -- §4.5's serving, and §4.10's routed request
     | "index_bound", #[g] => do exec (indexBound (← Replay.groupKey g)) (retIs r.ret nat)
     | "our_interest_for", #[p, g] => do exec (ourInterestFor (← nat p) (← Replay.groupKey g)) (retIs r.ret intOf)
+    | "may_be_asked", #[p, g, i, b] => do          -- `routed` left to its default is written false
+      exec (mayBeAsked (← nat p) (← Replay.groupKey g) (← nat i) (← boolOf b)) (retIs r.ret boolOf)
     | "outside", #[p, g, i, b] => do
       exec (outside (← nat p) (← Replay.groupKey g) (← nat i) (← boolOf b)) (retIs r.ret boolOf)
     | "route_want", #[p, g, i, h] => do

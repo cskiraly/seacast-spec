@@ -326,17 +326,19 @@ def maxRelationsLine (v : Json) := line2 (entry [("types", some (maxRelations v)
 #guard ["with_owed", "build_group", "outstanding", "held"].all (routeSeacast · == .kept)
 #guard ["no_such_function", "acquire_slot", "free_slot"].all (routeSeacast · == .refused)
 #guard ["on_frame", "on_heartbeat", "publish"].all (routeSeacast · == .seacast)               -- the roots
+#guard routeSeacast "may_be_asked" == .seacast                                  -- §4.5's, called by no function
 #guard ["wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
         "window_timeout", "noted", "next_to_send"].all (routeSeacast · == .seacast)   -- §4.11's ten
 #guard routeSeacast "front" == .kept                                            -- seacast-lite.md's, called unchanged
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
 #guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
-#guard fnsSeacast.length == 96                                                  -- v0.11.1's joined, drop_wants_beyond;
+#guard fnsSeacast.length == 97                                                  -- v0.11.1's joined, drop_wants_beyond;
                                                                                 --   §4.5's serving, §4.10's route_want;
                                                                                 --   §4.1's relations, §6.3's room;
                                                                                 --   §4.11's window and writer;
-                                                                                --   §4.2's gate for cells; the roots
+                                                                                --   §4.2's gate for cells; the roots;
+                                                                                --   §4.5's may_be_asked
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused

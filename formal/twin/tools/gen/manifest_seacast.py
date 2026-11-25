@@ -68,7 +68,8 @@ COVERED = [
     "wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
     "window_timeout", "noted", "next_to_send",
     "drop_outside", "on_header_validated",
-    "on_frame", "on_heartbeat", "publish"]
+    "on_frame", "on_heartbeat", "publish",
+    "may_be_asked"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
@@ -125,6 +126,8 @@ QUESTIONS = [
     "pop_owed_answer", "wire_size", "offers_in",
     # §4.2's gate for cells: the block's column and row groups
     "cell_groups",
+    # §4.5's may_be_asked: whether p offered us the ask, the binding's (seacast.md does not define it)
+    "offered_us",
     # the callables of a type's parameters (`T.params`)
     "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
     # the object type's functions, which covered functions call on a type

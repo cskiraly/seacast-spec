@@ -276,6 +276,9 @@ class NodeSeacast (m : Type → Type) where
   joinedPeers : m (List Peer)
   /-- `related(q)`: whether q is in a relation with the node, which leaves it out of the heartbeat's gossip -/
   related : Peer → m Bool
+  /-- `offered_us(p, g, i)` (§4.5's `may_be_asked`): whether p offered us index i of g, as the binding keeps the
+  offers; seacast.md does not define it -/
+  offeredUs : Peer → Group → Nat → m Bool
   -- The ten names that a node can replace, by a binding of its own that changes what the function does, and that
   -- have a call site inside the replayed closure: eight of the 71, `filter_entry`, which §4.11's `next_to_send`
   -- calls, and `on_want`, which §4's `on_frame` calls. Where the node's line names one as replaced, the Python asks
@@ -374,6 +377,7 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   sampledTypes := f sampledTypes
   joinedPeers := f joinedPeers
   related a := f (related a)
+  offeredUs a b c := f (offeredUs a b c)
   forwardNode a b c := f (forwardNode a b c)
   pushRebuiltNode a b := f (pushRebuiltNode a b)
   sendHaveNode a b := f (sendHaveNode a b)
