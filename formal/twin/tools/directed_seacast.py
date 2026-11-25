@@ -72,6 +72,14 @@ The sets:
   each of R's 132 groups, so it is over ten times the size of one of gate_o's, and gate_v is made at a smaller n
   (check.sh's sdir_shape). That pass iterates a set of bytes (seacast.md's `groups`), so its order is the hash
   seed's: gate_v's trace differs from one process to another in that order alone, and its replay does not.
+- **asked_h** (H, nodes 2 to 4), §4.5's `may_be_asked` (P7), MB1 to MB8: `may_be_asked(p, g, i)`, with `routed`
+  given or left to its default, which no code of the documents calls. Each record is on a state whose path is one and
+  the same for every record of the scenario, and starts from the serving sets' state with `offers` emptied. By
+  default p is a link of g's type as built, and g is one of three groups the simulator does not know, of the default
+  type, with a drawn descriptor of 1 to 8 chunks and an index below it. MB8's state takes p's JOIN of the type back,
+  so that interest_of_peer raises KeyError at `join_recv[p][T]`: the loop takes that raise, and that raise alone, as
+  MB8's path (RAISES), and stops the set at an MB8 call that does not raise. The tracer writes the record with
+  `raises`. Any other raise stops the set, as in every set.
 
 Beside the trace, OUT.scenarios has a line per record in the trace's order: its number from 1, its line in the trace
 (the content line the first), its node, its function, and the key of the scenario whose call made it (`setup` for the
@@ -1055,6 +1063,139 @@ def o6(rng, nd, ns, B):
     return "drop_outside", (cg,)
 
 
+# ---- §4.5's may_be_asked (P7), MB1 to MB8: our view of p (its offers to us, its JOIN, its holding), each record's
+# path one and the same for its scenario
+
+def offer(ns, g, i, q):
+    """q in `offers[Ask(g, i)]`, appended as the toy's add_offer appends: the list joins its map and keeps `listed`."""
+    F.unwrap(ns["offers"])[ns["Ask"](g, i)].append(q)
+
+
+def asked_call(rng, p, g, i, routed=None):
+    """may_be_asked's call: `routed` as the scenario fixes it ("out": left to its default), or drawn among left out,
+    False and True, a third each."""
+    r = routed if routed is not None else rng.choice(["out", False, True])
+    return "may_be_asked", ((p, g, i) if r == "out" else (p, g, i, r))
+
+
+def not_offered(rng, nd, ns, p, g, i, n):
+    """p has not offered us index i of g: `offers` empty; `offers[Ask(g, i)]` holding another peer alone; or, where g
+    has two chunks or more, `offers[Ask(g, j)]` holding p for another index j."""
+    r = rng.randrange(3 if n >= 2 else 2)
+    if r == 1:
+        offer(ns, g, i, rng.choice([q for q in sorted(nd.peers) if q != p]))
+    elif r == 2:
+        offer(ns, g, rng.choice([j for j in range(n) if j != i]), p)
+
+
+def declared(rng, ns, p, g, i, n, P, B, duty="FORWARD", want=False):
+    """p's JOIN of P DECLARED, with the duty given; `want_p[p][g]` holds i (`want`), or does not: no row for g, or a
+    bitmap without i."""
+    ns["join_recv"][p][P] = join(P, "DECLARED", duty=duty)
+    if want:
+        ns["want_p"][p][g] = B.Bits(rng.randrange(1 << n) | 1 << i)
+    elif rng.random() < 0.5:
+        ns["want_p"][p][g] = B.Bits(rng.randrange(1 << n) & ~(1 << i))
+
+
+def holding(rng, ns, p, g, i, n, B, claim=None):
+    """p's holding of g (`peer_has[p][g]`): with `claim_all` (claim True); without it, as no entry or as an entry whose
+    bits hold i (claim False); or either, half each (claim None)."""
+    if claim is None:
+        claim = rng.random() < 0.5
+    if claim:
+        e = F.unwrap(ns["peer_has"])[p][g]
+        e.bits = B.Bits(rng.randrange(1 << n))      # its HAVE's bitmap: the entry joins its map (bits.py)
+        e.claim_all = True
+    elif rng.random() < 0.5:
+        F.unwrap(ns["peer_has"])[p][g].bits = B.Bits(rng.randrange(1 << n) | 1 << i)
+
+
+def mb1(rng, nd, ns, B):
+    """MB1 (H): p in `offers[Ask(g, i)]`, alone or with one or two other peers, in a drawn order; p's JOIN of P as
+    built, DECLARED, or taken back; `claim_all` drawn. -> may_be_asked: offered us."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    qs = [p] + rng.sample([q for q in sorted(nd.peers) if q != p], rng.randrange(0, 3))
+    rng.shuffle(qs)
+    for q in qs:
+        offer(ns, g, i, q)
+    r = rng.randrange(3)
+    if r == 1:
+        ns["join_recv"][p][P] = join(P, "DECLARED")
+    elif r == 2:
+        F.unwrap(ns["join_recv"])[p].pop(P, None)
+    holding(rng, ns, p, g, i, n, B)
+    return asked_call(rng, p, g, i)
+
+
+def mb2(rng, nd, ns, B):
+    """MB2 (H): not offered; p's JOIN of P as built (interest ALL); `claim_all` drawn. -> may_be_asked: in its
+    interest."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    holding(rng, ns, p, g, i, n, B)
+    return asked_call(rng, p, g, i)
+
+
+def mb3(rng, nd, ns, B):
+    """MB3 (H): not offered; p's JOIN of P DECLARED, and `want_p[p][g]` holds i; `claim_all` drawn. -> may_be_asked:
+    in its interest."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    declared(rng, ns, p, g, i, n, P, B, duty=rng.choice(["FORWARD", "NONE"]), want=True)
+    holding(rng, ns, p, g, i, n, B)
+    return asked_call(rng, p, g, i)
+
+
+def mb4(rng, nd, ns, B):
+    """MB4 (H): not offered; DECLARED, i not wanted; `peer_has[p][g].claim_all` true. -> may_be_asked: claimed
+    whole."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    declared(rng, ns, p, g, i, n, P, B, duty=rng.choice(["FORWARD", "NONE"]))
+    holding(rng, ns, p, g, i, n, B, claim=True)
+    return asked_call(rng, p, g, i)
+
+
+def mb5(rng, nd, ns, B):
+    """MB5 (H): not offered; DECLARED with duty FORWARD, i not wanted; no claim; `routed` True. -> may_be_asked:
+    routed to a forwarding node."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    declared(rng, ns, p, g, i, n, P, B)
+    holding(rng, ns, p, g, i, n, B, claim=False)
+    return asked_call(rng, p, g, i, True)
+
+
+def mb6(rng, nd, ns, B):
+    """MB6 (H): MB5 with duty NONE. -> may_be_asked: routed, not to a forwarding node."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    declared(rng, ns, p, g, i, n, P, B, duty="NONE")
+    holding(rng, ns, p, g, i, n, B, claim=False)
+    return asked_call(rng, p, g, i, True)
+
+
+def mb7(rng, nd, ns, B):
+    """MB7 (H): MB5 with `routed` left out or False, half each, and the duty drawn. -> may_be_asked: none of the
+    four."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    declared(rng, ns, p, g, i, n, P, B, duty=rng.choice(["FORWARD", "NONE"]))
+    holding(rng, ns, p, g, i, n, B, claim=False)
+    return asked_call(rng, p, g, i, rng.choice(["out", False]))
+
+
+def mb8(rng, nd, ns, B):
+    """MB8 (H): not offered; p's JOIN of P taken back; `claim_all` drawn. -> may_be_asked: interest_of_peer raises
+    KeyError at `join_recv[p][T]` (RAISES)."""
+    p, g, i, n, P = on_h(rng, nd, ns)
+    not_offered(rng, nd, ns, p, g, i, n)
+    F.unwrap(ns["join_recv"])[p].pop(P, None)
+    holding(rng, ns, p, g, i, n, B)
+    return asked_call(rng, p, g, i)
+
+
 SETS = {     # name: (frame, the nodes its records are made at, its scenarios, what each record starts from)
     "control": ("H", (2, 3, 4), {"note_claim": note_claim}, None),
     "serve_h": ("H", (2, 3, 4), {"S1": s1, "S2": s2, "S3": s3, "S4": s4, "S5": s5, "S6": s6, "S7": s7, "S8": s8,
@@ -1073,12 +1214,15 @@ SETS = {     # name: (frame, the nodes its records are made at, its scenarios, w
     "gate_o": ("D", tuple(range(2, 31)), {"O1": o1, "O2": o2, "O3": o3, "O4": o4, "O5": o5, "O6": o6}, "gate"),
     "gate_v": ("D", tuple(range(2, 31)), {"V1": v1, "V2": v2, "V3": v3, "V4": v4, "V5": v5, "V6": v6, "V7": v7,
                                           "V8": v8}, "gate"),
+    "asked_h": ("H", (2, 3, 4), {"MB1": mb1, "MB2": mb2, "MB3": mb3, "MB4": mb4, "MB5": mb5, "MB6": mb6, "MB7": mb7,
+                                 "MB8": mb8}, "asked"),
 }
 LAST = {"window_h": ("C1", w_c1)}     # a set's last step, made once after its records: its key and its scenario
+RAISES = {"asked_h": {"MB8": KeyError}}   # a scenario each of whose calls raises this, a record with `raises`
 # what a record starts from: the tables put back as the build left them (all but the JOIN tables empty then), and
 # the tables emptied; under "window" the window's count and line too (window_start)
 STARTS = {"serve": (RESET, ()), "upkeep": (("join_recv", "join_sent"), RELATIONS), "window": (WINDOW_RESET, ()),
-          "gate": (RESET, GATE_EMPTIED)}
+          "gate": (RESET, GATE_EMPTIED), "asked": (RESET, ())}
 FRAMES = {   # name: (run.py's arguments, the config's additions, a block published, each recording node's peers)
     "H": (HAND5, None, False, 4), "H+": (HAND5, {"MAX_PENDING_GROUPS": 1, "SERVE_BUDGET": 2}, False, 4),
     "D": (DAS30, None, True, None), "R": (HAND5 + ["--prune-backoff", "1"], {"MAX_RELATIONS": 2}, False, 4),
@@ -1132,9 +1276,10 @@ def main(argv):
                 empty(F.unwrap(ns[name]))
             if start == "window":
                 window_start(k, ns)
-            if start == "gate":         # the offers' lists and the store's reservations, which no table holds
-                ns["offers"]._d.clear()
+            if start in ("gate", "asked"):     # the offers' lists, and under "gate" the store's reservations,
+                ns["offers"]._d.clear()         #   which no table holds
                 ns["offers"].listed.clear()
+            if start == "gate":
                 nd.reserved.clear()
             nd.want_unknown.clear()
             queues = F.unwrap(ns["queue"])
@@ -1144,7 +1289,7 @@ def main(argv):
                     queues[q].normal.clear()
 
         rng = random.Random(a.seed)
-        calls = Counter()
+        calls, raised, raises = Counter(), Counter(), RAISES.get(a.set, {})
         keys = sorted(scenarios)
         for _ in range(a.n):
             k = rng.choice(nodes)
@@ -1156,7 +1301,16 @@ def main(argv):
                 begin(k, nd, ns)
             name, fargs = scenarios[key](rng, nd, ns, B)
             current[0] = key
-            ns[name](*fargs)
+            if key in raises:           # the raise is the scenario's path: the tracer wrote the record with `raises`
+                try:
+                    ns[name](*fargs)
+                except raises[key]:
+                    raised[key] += 1
+                else:
+                    raise SystemExit(f"directed_seacast: {a.set}: a call of {key} did not raise "
+                                     f"{raises[key].__name__}")
+            else:
+                ns[name](*fargs)
             calls[key] += 1
         last = None
         if a.set in LAST:               # the last step, once: its own call, which may make several records
@@ -1181,6 +1335,8 @@ def main(argv):
               file=sys.stderr)
     for key in sorted(calls, key=lambda s: (len(s), s)):
         print(f"directed_seacast: {key}: {calls[key]}", file=sys.stderr)
+    for key in sorted(raised, key=lambda s: (len(s), s)):
+        print(f"directed_seacast: raised: {key} {raises[key].__name__} {raised[key]}", file=sys.stderr)
     if last:
         print(f"directed_seacast: last: {last[0]}, {last[1]} records", file=sys.stderr)
     print(f"directed_seacast: {sum(tr.counts.values())} records, {dict(sorted(tr.counts.items()))}", file=sys.stderr)
