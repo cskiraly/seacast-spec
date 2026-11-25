@@ -1195,7 +1195,9 @@ def defer(p, f):                                      # seacast-lite.md §4.2's,
     # refused: the copy is not kept, so a later copy is evaluated afresh; its sender stays tied
 
 def on_header_validated(root):                       # (P2) a block's cell header, validated once: the cells'
-    groups = set(cell_groups(root))                   #   gate, as installation is the payload's (seacast-lite.md §4.2)
+    groups = dict.fromkeys(cell_groups(root))         #   gate, as installation is the payload's (seacast-lite.md §4.2);
+                                                      #   a dict, not a set, only so that the last pass runs in
+                                                      #   cell_groups' order, the same on every run; it adds no rule
     cells = [(p, f) for p, f in pending[root] if f.group in groups]
     pending[root] = [(p, f) for p, f in pending[root] if f.group not in groups]   # the payload waits for the block
     for p, f in cells:                                # the cells that waited resume level 1
