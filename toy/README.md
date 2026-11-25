@@ -553,9 +553,9 @@ lawful cases that the `budget`, `window` and `late` entries name:
   yet held), timed at `may_ask`, where the harness's request ledger times its asks too;
 - `late`: a chunk sent to a mesh peer whose HAVE for it (in an IDONTWANT, the only carrier that feeds
   `peer_has`) had reached the sender earlier in the message, held or since expired, as the harness's
-  ledger reads it. Under `--churn` it also counts a HAVE the sender never held: the recorder notes a
-  frame as it arrives, before the simulator discards one whose connection closed while it travelled.
-  `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
+  ledger reads it. Under `--churn` it also counts a chunk sent after a HAVE the sender never held:
+  the recorder notes a frame as it arrives, before the simulator discards one whose connection
+  closed while it travelled. `late_live` counts those whose HAVE the sender still held. Cancel (card 8), when
   it is on, drops such a send, and under `seacast.md` it lets a probe's exempt answer through; a
   send that cancel would not drop complies with card 8;
 - `fault`: a chunk from a silent node, or an answer from a withholder.
