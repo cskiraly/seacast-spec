@@ -3000,7 +3000,7 @@ def orders_self_test():
     # R10, §4.2's gate. drop_outside's three entries where its own frame iterates (OrderPopView with its
     # keys writer, DropPeers, WantKeysView), each level the document's way, empty ones included; nothing where another
     # frame iterates the same levels (drop_wants_beyond), nor inside a question; `discard` goes to the set itself
-    def drop_outside(standing, want_p, g):          # seacast.md :1573-1579's iterations, `outside` a test of q
+    def drop_outside(standing, want_p, g):          # seacast.md :1575-1581's iterations, `outside` a test of q
         for i in list(standing[g]):
             for q in [q for q in standing[g][i] if q != 5]:
                 standing[g][i].discard(q)
@@ -3053,7 +3053,7 @@ def orders_self_test():
     # a question of the frame; drop_outside puts a marker on the tape, so that the order's place shows
     doc = """
 def on_header_validated(root):
-    groups = set(cell_groups(root))
+    groups = dict.fromkeys(cell_groups(root))
     for g in PASS(groups):
         drop_outside(g)
 
@@ -3097,6 +3097,10 @@ def drop_outside(g):
     got = gate_run(gs)
     case("on_header_validated's pass over three groups: the order first, then the pass, in that order",
          (got[0][:2], got[0][2] == pass_of(got), len(got)), (["order", "on_header_validated"], True, 4))
+    got = gate_run(gs + [gs[0]])
+    case("an answer that repeats a group: the order is the answer's without the repeat, and the pass goes in it",
+         (got[0][2] if isinstance(got, list) else got, pass_of(got) if isinstance(got, list) else None),
+         ([g.hex() for g in gs], [g.hex() for g in gs]))
 
     class AtReturn(Gate):               # the planted fault: the order written at the frame's return
         def drop(self, fr, g):
@@ -3106,7 +3110,7 @@ def drop_outside(g):
         def call(self, name, g, run):
             r = super().call(name, g, run)
             if name == "on_header_validated":
-                fr_order = list(set(gs))
+                fr_order = list(dict.fromkeys(gs))
                 self.note("on_header_validated", fr_order)
             return r
 
@@ -3117,7 +3121,7 @@ def drop_outside(g):
     case("no groups: the order, empty, at the frame's return", gate_run([]), [["order", "on_header_validated", []]])
     stop1 = "stopped: drop_outside's call 1 names "
     got = gate_run(gs, pass_=lambda s: list(s)[::-1])
-    case("a pass in another order than the set's: the tracer stops at its first call",
+    case("a pass in another order than the answer's: the tracer stops at its first call",
          got[:len(stop1)] if isinstance(got, str) else got, stop1)
 
     class Unchecked(Gate):              # the planted fault: the order written, the calls not checked
@@ -5666,10 +5670,10 @@ def caller_name():
 
 
 class Gate:
-    """§4.2's gate under SEACAST: the order of `on_header_validated`'s `for g in groups` (:1219), where groups is
-    `set(cell_groups(root))` (:1198). The Python's set is not seen, so the order is the one `list(set(answer))` gives,
-    `answer` being cell_groups' answer in that frame: two sets built from equal lists in one process iterate alike.
-    It is written as ["order", "on_header_validated", [g...]] just before the first drop_outside the frame calls, or at
+    """§4.2's gate under SEACAST: the order of `on_header_validated`'s `for g in groups` (:1221), where groups is
+    `dict.fromkeys(cell_groups(root))` (:1198): cell_groups' answer in that frame without its repeats, in the answer's
+    own order, so the order is `list(dict.fromkeys(answer))`, the same in every process (a set's order would follow
+    the hash seed). It is written as ["order", "on_header_validated", [g...]] just before the first drop_outside the frame calls, or at
     the frame's return where it calls none; each drop_outside the frame calls is checked against it, the k-th call
     against the k-th group, and at the return every group must have had its call. A miss stops the trace: the order
     would then be a prediction that failed. One frame per open call, innermost last (the stack)."""
@@ -5729,7 +5733,7 @@ class Gate:
         fr = self.stack[-1]
         if fr["order"] is not None:
             self.stop("cell_groups was answered twice in one frame")
-        fr["order"] = list(set(r))
+        fr["order"] = list(dict.fromkeys(r))
 
 
 class OrderPopView(F.View):

@@ -46,7 +46,7 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       chunk with two or more records beyond its timers at one (node, t) of a heartbeat, in either branch and
       across epochs (two markers at one t). The limit: a timer lost whose fire falls on a heartbeat, for an ask held
       back in the epoch that heartbeat closes and not yet retried, is taken for the heartbeat's retry.
-      on_offer is held_back's one writer (seacast.md's :1319), and its one caller, on_frame (:621), is not traced,
+      on_offer is held_back's one writer (seacast.md's :1321), and its one caller, on_frame (:621), is not traced,
       so wherever on_offer is traced each call of it is a record of its own, and its writes are on that record. A
       trace whose header's traced names do not hold on_offer (an older head's tracer, which recorded neither it nor
       on_heartbeat, or a header with no traced names) cannot show the second condition. There K4 takes the first
