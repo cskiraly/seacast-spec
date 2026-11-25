@@ -416,6 +416,8 @@ def main(argv):
                ALARM_WAIT=a.alarm_wait, ALARM_JITTER=a.alarm_jitter, ALARM_NEXT=a.alarm_next, ALARM_MAX=a.alarm_max)
     if a.fault.startswith("hoardcol") and a.rebuilt_seen != "on":
         ap.error("--fault hoardcol is meant strict: with --rebuilt-seen on")
+    if a.xcheck and a.setting in ("custody", "rows"):
+        ap.error("--xcheck counts tier 4's events (variant C's too): not under --setting custody or rows")
     if a.sample_outstanding < 1:
         ap.error("--sample-outstanding: SAMPLE_OUTSTANDING's bound is at least 1 (seacast.md §6.3)")
     if a.payload:
