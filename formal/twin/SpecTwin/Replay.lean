@@ -122,8 +122,8 @@ structure Record where
   tape : List TapeItem
   ret : Json
   raises : Option String
-  raisesKey : Option String               -- a `KeyError`'s missing key, as the twin's crash names it: where the
-                                          --   Python raised
+  raisesKey : Option String               -- a `KeyError`'s missing key, as the twin's crash names it; `judge`
+                                          --   compares it, not the read that raised
   reached : List String                   -- the traced functions the call reached, itself among them
   tables : List String                    -- the own tables its reads, scans and writes name
 
@@ -427,7 +427,7 @@ def record (j : Json) (doc : Doc := {}) : Except String Record := do
   let raisesKey ← match field j "raises_key" with
     | some x => some <$> doc.raisesKey x
     | none => pure none
-  if (raises == some "KeyError") != raisesKey.isSome then      -- the place a KeyError was raised, always
+  if (raises == some "KeyError") != raisesKey.isSome then      -- a KeyError's key, always
     throw "raises_key goes with a KeyError, and with nothing else"
   let ret? := field j "ret"              -- a return value (null for None) or an exception: one of them
   if ret?.isSome == raises.isSome then throw "a record has ret or raises, one of them"
@@ -955,8 +955,11 @@ def judge (traced : List String) (r : Record) (res : Except String (State × Boo
     Except String (Array String × Nat) := do
   match r.raises, res with
   | some x, .error e =>
-    -- the Python raised: the twin must raise the same, at the same place (a KeyError's key), with the tape used
-    -- up, and its state as the Python left it
+    -- the Python raised: the twin must raise the same exception, with the tape used up and its state as the Python
+    -- left it. The crash is compared by the exception's name and, for a KeyError, its key: the text up to " (".
+    -- A limit: the read named after that is not compared. Example: in a function that reads `join_recv[p][T]` twice
+    -- with no question and no write between the two reads, a twin that raised at the second read instead of the
+    -- first passes: its tape, its `reached` and its state at the raise are the record's.
     let want : String := match r.raisesKey with
       | some q => s!"crash: {x}: {q} ("
       | none => s!"crash: {x}:"

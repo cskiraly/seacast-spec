@@ -29,7 +29,8 @@ calls: its records are directed ones.
   with its kind (`type T`), where the Python loads them, as `interest_of_peer` does.
 - **Questions:** `admitted_group(p, g)` and `own_id()`, SEACAST's; `resolve(a)`, `chunk_of(mid)`, `expired(g)`,
   `authenticable(g)` and `penalise(p)`, the node's store and helpers, as `seacast-lite.md`'s `on_iwant` asks them.
-  `own_id()` is asked only in `our_interest_for`'s DERIVED case, where the Python calls it. -/
+  `own_id()` is asked only in `our_interest_for`'s DERIVED case, where the Python calls it. `may_be_asked` asks
+  `type_of_group(g)` first, then the binding's `offered_us(p, g, i)`. -/
 
 namespace SpecTwin.Seacast
 
@@ -59,7 +60,11 @@ def ourInterestFor (p : Peer) (g : Group) : M2 m IBits := do
   | .declared => return 0                                     -- `EMPTY`: a sampler is asked only for what it holds
 
 /-- `may_be_asked(p, g, i, routed=False)` (§4.5, P7): which asks of ours p may take. The four operands of the `or`
-are asked in order, each only where those before it are false -/
+are asked in order, each only where those before it are false.
+
+A limit: the twin holds P7's definition, not the relation P7 states, that every ask the ask paths send satisfies it.
+No check holds an ask to it, since no function calls it. Example: a change to `ask_sample` that sent an ask
+`may_be_asked` refuses, made in seacast.md and in the twin alike, gives records that replay clean. -/
 def mayBeAsked (p : Peer) (g : Group) (i : Nat) (routed : Bool) : M2 m Bool := do
   enter "may_be_asked"
   let T ← NodeSeacast.typeOfGroup g                            -- `T = type_of_group(g)`, before the `return`

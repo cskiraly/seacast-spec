@@ -28,12 +28,11 @@ import SpecTwin.Seacast.Manifest
   one codec, injective there. An IWANT that `seacast-lite.md`'s code enqueues on its own reads into `Msg.iwant`, and
   `respond`'s entry, whose IWANT a lane holds as `.iwantSeacast`, is built so by its v2 form.
 - **The functions.** `runSeacast` routes a record by the manifest (`routeSeacast`, `Seacast/Manifest.lean`). It runs
-  SEACAST's functions (`fnsSeacast`, 91 with §4.1's relations and §4.11's window and writer) by their Python names,
-  hands a record of one of `seacast-lite.md`'s functions that v2 keeps, or of the node's own `held` (`keptSeacast`), to
-  `Replay.run`, runs the three that take another form under v2 (`keptFormsSeacast`) in their v2 forms
-  (`Seacast/Kept.lean`), and refuses every other name, among them the ones v2 redefines and this cycle does not
-  cover (`on_frame`, `on_heartbeat`). A record of a name the node's line replaces is refused, as `run` refuses
-  one. -/
+  SEACAST's functions (`fnsSeacast`, 97: the manifest's covered names but `on_pace_tick` and `on_block_installed`)
+  by their Python names, hands a record of one of `seacast-lite.md`'s functions that v2 keeps, or of the node's own
+  `held` (`keptSeacast`), to `Replay.run`, runs the three that take another form under v2 (`keptFormsSeacast`) in
+  their v2 forms (`Seacast/Kept.lean`), and refuses every other name. A record of a name the node's line replaces is
+  refused, as `run` refuses one. -/
 
 namespace SpecTwin.Seacast
 
@@ -508,7 +507,9 @@ instance : NodeSeacast R where
   sampledTypes := askCall "sampled_types" [] (typeList "sampled_types")
   joinedPeers := askCall "joined_peers" [] (peerList "joined_peers")
   related q := askCall "related" [(q : Json)] boolOf
-  -- §4.5's may_be_asked: the binding's offers, read by the toy's helper (its entry logs that read)
+  -- §4.5's may_be_asked: the binding's offers, read by the toy's helper (its entry logs that read). A limit: the
+  -- answer is the tape's. Its log's read of `offers` is held to the twin's table, but the answer is not computed
+  -- from it. Example: an entry whose log reads `offers` of the ask as null and whose answer is true passes.
   offeredUs p g i := askCall "offered_us" [(p : Json), Json.str g, (i : Json)] boolOf
   -- the names a node's line can give as replaced: asked where it does, the document's body run elsewhere
   forwardNode f p axes :=
@@ -543,8 +544,8 @@ the 66, main's `fill` and `serve_standing`, v0.11.1's `joined` and `drop_wants_b
 (`index_bound`, `our_interest_for`, `outside`, `route_want`, `on_want`), §4.1's relations with §6.3's limit
 (`relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `on_join`), and §4.11's window and writer
 (`wake_front`, `write_waits`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`,
-`noted`, `free_room`, `next_to_send`), §4.2's gate for cells (`drop_outside`, `on_header_validated`), and the roots
-(`on_frame`, `on_heartbeat`, `publish`): 96. -/
+`noted`, `free_room`, `next_to_send`), §4.2's gate for cells (`drop_outside`, `on_header_validated`), the roots
+(`on_frame`, `on_heartbeat`, `publish`), and §4.5's `may_be_asked`: 97. -/
 def fnsSeacast : List String := Manifest.covered.filter (!keptFormsSeacast.contains ·)
 
 /-- The functions of `seacast-lite.md` that a record under v2 may name, which `Replay.run` serves (but `respond`, a kept
