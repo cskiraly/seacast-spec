@@ -6,9 +6,10 @@ are the outputs of the runs: the manifest of the traces, the reports of the repl
 the reports of the controls, with the log of the script that started the quick check. Each is as the runs wrote
 it, but for one substitution in four files, which the end of this file names. `FILES.sha256` gives the SHA-256
 hash of every other file in this directory, this file included. `FILES.sha256` was made when the record was
-frozen, and its line for this file was made again on 2026-11-22, when v0.12.0 added the sentences on its names.
-The traces themselves are not kept, because they take about 50 GB uncompressed (`manifest/sizes.txt`).
-`record.sh` makes them again, and the hashes in the manifest tell whether a new run made the same traces.
+frozen. Its line for this file was made again on 2026-11-22, when v0.12.0 added the sentences on its names, and
+on 2026-11-25, when v0.13.0-rc.1 added the bullet on that release. The traces themselves are not kept, because
+they take about 50 GB uncompressed (`manifest/sizes.txt`). `record.sh` makes them again, and the hashes in the
+manifest tell whether a new run made the same traces.
 
 This file uses the terms of the twin's README (`../README.md`). The toy (`toy/`) runs the Python in the code
 blocks of the documents directly. The tracer runs the toy and writes a trace: one record for each top-level call,
@@ -49,6 +50,11 @@ through the mutant mismatches a record, or leaves unmade a read that the Python 
   `--doc seacast`. The list of the twin's sources differs from `manifest/twin-sources.txt` too, since the rename
   changed comments in the twin's Lean files and names in `check.sh`. Built from v0.12.0's sources with Lean 4.35.0,
   the replay's SHA-256 is still the one in the manifest's `replay` line.
+- **v0.13.0-rc.1 carries this record too, with no new run.** The sentences of this file describe the runs from
+  `9f33f60` and the trees of v0.11.1 and v0.12.0, and no later tree. The record does not cover the changes that
+  the twin and its tools have had since v0.12.0, nor the changes since then to the code of the documents and to
+  the toy. On the tree of v0.13.0-rc.1, the list of the twin's sources differs from v0.12.0's, and the replay
+  built from those sources with Lean 4.35.0 has another SHA-256 than the manifest's `replay` line.
 - **These files show the clone and the toolchain of some of the runs.** The record's Lean is in
   `controls/check.txt` and its Python in the manifest. The quick check's clone, Lean and Python are in
   `quick-check/run.log`. The clone of the record's run, and the clone, Lean and Python of each part of the matrix,
