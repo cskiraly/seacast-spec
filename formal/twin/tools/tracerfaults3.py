@@ -469,8 +469,8 @@ def rebound_scanned_seacast():
 
 def rebind_tape_seacast():
     """Under v2: a tape name bound again after the install to the function the tracer wrapped as its question (as
-    `_repair_bias` writes back its captured `shuffled`). final_check, which under v2 holds every installed slot, must
-    stop it."""
+    `_repair_bias` wrote back the `shuffled` it captured at the build, before 7c64c4d's batch). final_check, which under
+    v2 holds every installed slot, must stop it."""
     def wrap(tr, ns):
         q = ns["peer_id_bytes"]
         ns["peer_id_bytes"] = getattr(q, "__wrapped__", q)
@@ -783,12 +783,13 @@ def known_replaced_seacast():
 
 def verdict_replaced_seacast():
     """Under v2, R3-9's plant (l): a fixture for the rows of `repair_verdict`, as (j) is for `known_in_scope`. The toy's
-    one layer that replaces it, `--repair-bias`'s, cannot be traced: it restores a `shuffled` it took before the
-    install (node.py's `_repair_bias`), and the record's exit check stops it. At every node, a layer of this tool's own
-    over `repair_verdict`, bound before the install and holding what the node held (the member check's observer over
-    the document's): it calls it and returns its answer unchanged, and it is listed in LAYERS as changing. So the run is
-    the cell's own (the same digest), and each call of `repair_verdict` inside a record is a question, its answer on the
-    tape. Counted once for each node (planted) and once for each call ("calls")."""
+    one layer that replaces it, `--repair-bias`'s, is traced since 7c64c4d's batch, which made it read `shuffled` at
+    each call; check.sh's (m) takes its rows from that cell. This plant stays the ten names' fixture. At every node, a
+    layer of this tool's own over `repair_verdict`, bound before the install and holding what the node held (the
+    member check's observer over the document's): it calls it and returns its answer unchanged, and it is listed in
+    LAYERS as changing. So the run is the cell's own (the same digest), and each call of `repair_verdict` inside a
+    record is a question, its answer on the tape. Counted once for each node (planted) and once for each call
+    ("calls")."""
     SEEN["calls"] = 0
 
     def plant(ns):

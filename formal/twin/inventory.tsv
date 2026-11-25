@@ -28,7 +28,7 @@ chains/plant-s	plant	-	plant (s): suppressed-filter-v2 on hand5-peer
 chains/plant-t	plant	-	plant (t): suppressed-filter-v2-off on hand5-peer
 rows/das-alarm	must	das	the alarm's cell
 rows/das-claim	must	das	the replaced names' rows: send_have at the liars
-rows/das-hoardcol-bias	stopped	das	control (m): the bias cell, which the tracer must stop
+rows/das-hoardcol-bias	must	das	(m): the bias cell, traced to its end: repair_verdict's rows from a real cell
 rows/das-keeper-ignore	must	das	the replaced names' rows: note_claim at the supernodes
 rows/plant-k	plant	-	plant (k): push_rebuilt's last argument left out (chaincases.py --drop-arg)
 seacast/announce	must	seacastcells	a cell under seacast.md (cells3.py)

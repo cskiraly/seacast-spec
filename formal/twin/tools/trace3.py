@@ -3746,9 +3746,9 @@ class Tracer3(Tracer):
         Under SEACAST the install is at the end of the node's construction, the namespace's last binding: every installed
         slot is held, a traced name to the tracer's own wrapper (no listed wrapper over it: one there means an install
         before the toy's bindings), a tape name to its question adapter and a table to its view (so that a slot the toy
-        writes back, as `_repair_bias` writes its captured `shuffled`, or a view replaced by its raw table, is seen);
-        and the two aliases must still be the installed objects (`repoint_aliases`); and each object type's
-        questions still the tracer's."""
+        writes back, as `_repair_bias` wrote the `shuffled` it captured at the build before 7c64c4d's batch, or a view
+        replaced by its raw table, is seen); and the two aliases must still be the installed objects
+        (`repoint_aliases`); and each object type's questions still the tracer's."""
         for nd, obj, a, w in self.type_slots:
             if getattr(obj, a, None) is not w:
                 raise SystemExit(f"trace3: node {nd.id}: an object type's {a} was bound again after the tracer was "

@@ -1085,7 +1085,7 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     das-claim) echo "$DAS30 --fault claim10" ;;                # send_have, at the liars
     das-keeper-ignore) echo "$DAS30 --keeper-claims ignore" ;; # note_claim, at the supernodes
     das-hoardcol-bias) echo "$DAS30 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --withhold 16 --repair-bias 0.5" ;;
-    #                     control (m): the bias layer restores a shuffled taken before the install, and the tracer stops
+    #                     (m): the bias layer reads shuffled at each call, and the cell is traced to its end
     # the alarm's cell (alarm_cell): --alarm-wait's filter_entry, a replaced name, entered outside every record at the
     # honest nodes; its custodians alarm, and no member asks a claimant, so alarm_due is never armed
     das-alarm) echo "--doc seacast --setting rows --nodes 30 --degree 8 --msgs 1 --row-subnets 4 --blobs 4 --withhold 64 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --alarm-wait 3.5 --seed 22" ;;
@@ -1417,11 +1417,32 @@ print(t["records"], t["by_fn"].get("on_frame", 0))' 2> /dev/null)
 rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's rows on its tapes, to rows/NAME.rows
   $PY "$T/chaincases.py" --rows "$1" "$OUT/$2.jsonl.gz" > "$OUT/rows/$1.rows" 2>&1
 }
+bias_cell() {           # (m): the bias cell, rows/das-hoardcol-bias, as small() traced it: its digest the untraced
+  #                       run's, its replay clean, and repair_verdict's rows on its tapes (to
+  #                       rows/repair_verdict-bias.rows): one at least, and none at a node that does not replace it.
+  #                       Its line goes to c-rows.txt and the rows' count to the caller's bn; the status is 0 when all
+  #                       of it holds
+  local fx=rows/das-hoardcol-bias r=$OUT/rows/repair_verdict-bias.rows m="(m) the bias cell" why n
+  if ! grep -q ': the same$' "$OUT/$fx.digest" 2> /dev/null; then
+    echo "$m: not traced to its end, or its digest is not the untraced run's  <-- NOT" >> "$OUT/c-rows.txt"; return 1
+  fi
+  if ! why=$(replay_clean "$fx"); then echo "$m: its replay: $why  <-- NOT" >> "$OUT/c-rows.txt"; return 1; fi
+  $PY "$T/chaincases.py" --rows repair_verdict "$OUT/$fx.jsonl.gz" > "$r" 2>&1
+  n=$(sed -n -E 's/^chaincases: repair_verdict on the tapes: ([0-9]+) rows.*/\1/p' "$r")
+  bn=${n:-0}
+  if [ "$bn" = 0 ]; then echo "$m: no repair_verdict row on its tapes  <-- NOT" >> "$OUT/c-rows.txt"; return 1; fi
+  if ! has -E '; rows at other nodes: 0$' "$r"; then
+    echo "$m: repair_verdict's rows at nodes that do not replace it: $(cut -c13- "$r")  <-- NOT" >> "$OUT/c-rows.txt"
+    return 1
+  fi
+  echo "$m: traced to its end, the untraced run's digest; $(cut -c13- "$r");" \
+    "$(grep -m 1 '^replay: ' "$OUT/$fx.replay"); bare calls counted: $(bare_count "$fx")" >> "$OUT/c-rows.txt"
+}
 replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's tapes, where a node replaces it; plant
-  #                       (k), a row with an argument left out, which the replay must refuse; and control (m), the
-  #                       bias cell, which the record's exit check must stop
+  #                       (k), a row with an argument left out, which the replay must refuse; and (m), the bias
+  #                       cell, traced to its end, its repair_verdict rows a real cell's (bias_cell)
   local names="forward push_rebuilt filter_entry on_want" name fx n calls c d plain k=0 counts= why rec pr m nr nw sum
-  local stop also mwant caught=0 stopped=0
+  local mwant caught=0 traced=0 bn=
   local untied=
   rm -rf "$OUT/rows"; mkdir -p "$OUT/rows"; : > "$OUT/c-rows.txt"
   if [ -z "$NODAS" ]; then
@@ -1431,7 +1452,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
     { for c in das-claim das-keeper-ignore das-alarm; do par small "$c" rows "" $(chain_args "$c"); done
       par chain_plant j known-replaced-v2 das-samplers-mcoff
       par chain_plant l verdict-replaced-v2 das-hoardcol-w16
-      par stop_cell rows das-hoardcol-bias; }
+      par small das-hoardcol-bias rows "" $(chain_args das-hoardcol-bias); }
     par_end || true     # each run's status and digest are read below
   fi
   fixture() {           # $1: a name: its fixture, a trace without .jsonl.gz
@@ -1510,29 +1531,23 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
     echo "(k) the argument left out: caught: $(grep -m 1 '^replay: ' "$OUT/rows/plant-k.replay"); $(grep -m 1 '^mismatch ' "$OUT/rows/plant-k.replay" | cut -c1-160); $pr rows in $m records" >> "$OUT/c-rows.txt"
     caught=1
   fi
-  # (m) the bias cell: --repair-bias's layer restores the shuffled it took before the install (node.py's _repair_bias),
-  # so the record's exit check must stop the tracer at node 2's first reconsider that asks repair_verdict, with
-  # final_check's words after the stop: plant (g)'s pair, made by the toy's own layer
-  stop="^trace3: node 2: shuffled is bound to Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\) at the exit of reconsider's record, not to the tracer's own binding: a binding made after the install or during a call, which the twin would not run\$"
-  also="^trace3: \\(at the close, after the stop\\) SystemExit: trace3: node 2: shuffled was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: Node\\._namespace\\.<locals>\\.shuffled \\(node\\.py:[0-9]+\\)\$"
-  if [ -z "$NODAS" ]; then
-    if [ "$(cat "$OUT/rows/das-hoardcol-bias.rc" 2> /dev/null)" = 0 ] || [ ! -f "$OUT/rows/das-hoardcol-bias.rc" ]; then
-      echo "(m) the bias cell: not run, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-rows.txt"
-    elif has -E "$stop" "$OUT/rows/das-hoardcol-bias.err" && has -E "$also" "$OUT/rows/das-hoardcol-bias.err"; then
-      echo "(m) the bias cell: stopped, as it must: $(grep -m 1 -E "$stop" "$OUT/rows/das-hoardcol-bias.err" | cut -c1-200)" >> "$OUT/c-rows.txt"
-      stopped=1
-    else echo "(m) the bias cell: the tracer stopped without the words it must give  <-- NOT" >> "$OUT/c-rows.txt"; fi
-  fi
+  # (m) the bias cell: --repair-bias's layer reads shuffled at each call (node.py's _repair_bias, since 7c64c4d's
+  # batch), so the cell is traced to its end and replayed clean, and repair_verdict's rows come from a real cell
+  [ -n "$NODAS" ] || { bias_cell && traced=1; }
   if grep -q '<-- NOT' "$OUT/c-rows.txt"; then no "the replaced names' rows (c-rows.txt)"; fi
-  local said="plant (k) caught" bias="the bias cell stopped at its binding, as it must"
+  local said="plant (k) caught" bias="the bias cell traced to its end with the untraced run's digest and replayed clean"
+  bias="$bias, with $bn rows of repair_verdict"
   [ "$caught" = 1 ] || said="plant (k) not caught"
-  [ "$stopped" = 1 ] || bias="the bias cell not stopped as it must be"
+  [ "$traced" = 1 ] || bias="the bias cell not traced and replayed as it must be"
   local tied="each name's rows at nodes that replace it alone, and at each of das-claim's 3 liars and das-keeper-ignore's 3 keepers"
   [ -n "$NODAS" ] && tied="each name's rows at nodes that replace it alone"
   [ -z "$untied" ] || tied="a name's rows at a node that does not replace it, or a liar or keeper without rows"
   if [ -n "$NODAS" ]; then
     echo "  the replaced names' rows: $k of 10 names with rows where a node replaces them ($counts), each replay clean; $tied; $said (--no-das: the six DAS names and the bias cell skipped)"
-  else echo "  the replaced names' rows: $k of 10 names with rows where a node replaces them ($counts), each replay clean; $tied; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
+  else
+    echo "  the replaced names' rows: $k of 10 names with rows where a node replaces them ($counts), each replay" \
+      "clean; $tied; $said; $bias"
+  fi
 }
 whole_replay() {        # whole_replay RC N FILE: a replay of N records, whole: exit 0 and FILE's summary line N of N ok
   [ "$1" = 0 ] && [ -n "$2" ] && has -x -F "replay: $2 records, $2 ok, 0 mismatched" "$3"
@@ -2627,8 +2642,8 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   arities_plant
   # the replaced names' rows (R3-9): each of the ten names the twin asks, with rows on a fixture's tapes where a
   # node replaces it (repair_verdict's and known_in_scope's fixtures are plants (l) and (j), layers of tracerfaults3's
-  # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, which the record's
-  # exit check must stop (c-rows.txt)
+  # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, traced to its end,
+  # with repair_verdict's rows from a real cell (c-rows.txt)
   replaced_rows
   # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask ((p): choose, on
   # hand5-line), and its control on seacast/hand5; point 6's, a binding live across a record, planted on hand5-v2
