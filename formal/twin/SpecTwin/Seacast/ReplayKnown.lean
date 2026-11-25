@@ -1981,4 +1981,33 @@ def r6 : String :=
 
 end Gate
 
+/-! ## §4.7's `publish`: its two early returns, and its limit
+
+`publish(block, d, shards)` asks `group_of(block, d)`, then `expired(g)`, and `live(block.slot)` where the group
+has not expired, as `or` short-circuits. Either one returns before any table is read or written. A descriptor of no
+chunk is a limit the twin names, before any question. -/
+
+namespace Roots
+
+def blk : String := "[1, null, null]"
+def desc1 : String := s!"[1, 0, 0, 1, 4, 4, {rootq}]"
+def goQ : String := s!"[\"group_of\", [{blk}, {desc1}], {gq}]"
+def expQ (b : String) : String := s!"[\"expired\", [{gq}], {b}]"
+def pub (tape : String) (d : String := desc1) : String :=
+  line "publish" s!"[{blk}, {d}, []]" "[]" "[]" "[]" tape (ret "null") "[\"publish\"]" "[]"
+
+#guard passes (pub s!"[{goQ}, {expQ "true"}]")                                  -- the group expired
+#guard passes (pub s!"[{goQ}, {expQ "false"}, [\"live\", [1], false]]")         -- past its live window
+
+/-! ### The ones that must fail -/
+
+-- not expired, and the tape over: the twin asks live(block.slot)
+#guard failsWith "tape: live(1) asked, the tape is over logged" (pub s!"[{goQ}, {expQ "false"}]")
+-- expired, and a live entry after it: the twin does not ask it
+#guard failsWith "tape: the toy asked more: " (pub s!"[{goQ}, {expQ "true"}, [\"live\", [1], true]]")
+-- a descriptor of no chunk
+#guard failsWith "crash: limit: publish of a descriptor of no chunk" (pub "[]" s!"[1, 0, 0, 0, 4, 4, {rootq}]")
+
+end Roots
+
 end SpecTwin.Seacast.ReplayKnown
