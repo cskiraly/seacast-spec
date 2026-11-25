@@ -327,10 +327,10 @@ def colour_of(g, i) -> int:
 ```
 
 A node keeps, per family it has duty in and per colour, at least `F_LO` and at most `F_HI` peers in
-its in-relation: this is the **floor** per colour. Colours are proposed from the proposer's
-least-used colours (balanced colouring at GRAFT, §4.1). The floor needs links to form on: a node
-also keeps, per family it has duty in, at least `F_LO` links to peers whose interest holds the
-family, and opens more where churn leaves it short (`keep_floor`, §4.1).
+its in-relation: this is the **floor** per colour. Each colour keeps its floor by GRAFTs of its
+own (`maintain_relations`, §4.1), so no colour is chosen over another. The floor needs links to
+form on: a node also keeps, per family it has duty in, at least `F_LO` links to peers whose
+interest holds the family, and opens more where churn leaves it short (`keep_floor`, §4.1).
 
 ### 1.5 Holdings, offers, claims, completion and evidence
 
@@ -568,7 +568,7 @@ own id),
 `out_pushees(T, fam, c)` (the peers whose relation holds that colour), `candidates(T, fam, c, d)`
 (joined peers with duty whose interest holds the family, by `link_cover`; not yet in the relation of
 colour `c` and direction `d`, with `BOTH` in neither; with no GRAFT of ours for it unanswered; and
-out of its backoff, with `BOTH` for both directions; §4.1), `least_used_colour(T, fam)`,
+out of its backoff, with `BOTH` for both directions; §4.1),
 `families_with_duty(T)`, `wants_family(T, fam)`, `duty_for(g)`, `uplink_class()` (card 17),
 `send(p, msg, urgent)` (a message into the bounded per-peer queue of `seacast-lite.md` §7; the binding's
 job; true if the queue admitted it, as v0.5's `enqueue`; the asks of a `Want` sent through it are
@@ -782,9 +782,6 @@ def queue_owed_relations(p):                           # the writer, before anyt
     while owed_relations[p] and has_room(p):
         m = owed_relations[p].pop(0)
         send(p, m, urgent=isinstance(m, Join))
-
-def propose_colour(T, fam) -> int:                     # balanced colouring
-    return least_used_colour(T, fam)
 
 def serves(q, g, i) -> bool:                           # §1.3: q's interest holds index i of g, so q will hold it
     T = type_of_group(g)

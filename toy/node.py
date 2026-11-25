@@ -1486,9 +1486,6 @@ class Node:
             node._uprng.shuffle(qs)
             return qs
 
-        def least_used_colour(T, fam):
-            return 0
-
         def families_with_duty(T):
             if T is P:
                 return [0]
