@@ -1334,13 +1334,22 @@ chain_cases() {         # the chain cases: the nodes line's chains on real cells
   fi
 }
 swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell that enters its layer, and two plants
-  local hand nd why stop also n=0
+  local hand nd why stop also n=0 kf recs mm
   : > "$OUT/c-draws.txt"
   # keep_floor's: seacast/hand5 (small's trace), the records that reach keep_floor
   $PY "$T/chaincases.py" --rows sample_without_replacement "$OUT/seacast/hand5.jsonl.gz" keep_floor > "$OUT/c-draws-hand5.rows"
   hand=$(sed -n -E 's/.*reach keep_floor: ([0-9]+) rows.*/\1/p' "$OUT/c-draws-hand5.rows")
   if [ "${hand:-0}" -ge 1 ]; then echo "seacast/hand5: $(cut -c13- "$OUT/c-draws-hand5.rows")" >> "$OUT/c-draws.txt"
   else echo "seacast/hand5: no keep_floor draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
+  # keep_floor's own draws. Since the roots are records, the records that reach keep_floor are on_heartbeat's, whose
+  # tapes hold another draw of sample_without_replacement too, so the rows above are not keep_floor's alone. Its
+  # calls are read from the trace's calls file instead: every one in a record (none bare, outside, by an observer or
+  # asked), and one in each record that reaches it (chaincases' count of those records)
+  recs=$(sed -n -E 's/.* the ([0-9]+) records that reach keep_floor: .*/\1/p' "$OUT/c-draws-hand5.rows")
+  kf=$($PY -c 'import json, sys
+c = json.load(open(sys.argv[1]))["calls"]["keep_floor"]
+if c["bare"] == c["ext"] == c["outer"] == c["observer"] == 0 and not c["asked"]:
+    print(c["record"] + sum(c["in"].values()))' "$OUT/seacast/hand5.jsonl.gz.calls.json" 2> /dev/null)
   # defer_on_claim@1775's: das-samplers-mcoff (the chain cases' trace), the records that reach defer_on_claim
   if [ -z "$NODAS" ]; then
     if [ -f "$OUT/chains/das-samplers-mcoff.replay" ] && replay_clean chains/das-samplers-mcoff > /dev/null; then
@@ -1350,29 +1359,45 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
       else echo "das-samplers-mcoff: no defer_on_claim draw on its tapes  <-- NOT" >> "$OUT/c-draws.txt"; fi
     else echo "das-samplers-mcoff: not traced, or its replay not clean (the chain cases')  <-- NOT" >> "$OUT/c-draws.txt"; fi
   fi
-  # (f) the re-wrap off: the trace written to its end, every keep_floor record without its draw, which the replay
-  # must refuse there and nowhere else, with its words, the first at node 1's keep_floor
+  # (f) the re-wrap off: the trace written to its end, every keep_floor call without its draw, which the replay must
+  # refuse at each record that reaches keep_floor and nowhere else, with its words: the draw asked where the tape
+  # holds another entry (which entry follows from the toy, and is not pinned)
   rm -f "$OUT/c-draws-f".*
-  if ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-rewrap-off-v2 . "$OUT/c-draws-f.jsonl.gz" > "$OUT/c-draws-f.out" 2> "$OUT/c-draws-f.err"); then
+  if [ -z "$kf" ] || [ "$kf" != "${recs:-none}" ]; then
+    echo "(f) the re-wrap off: keep_floor's calls on seacast/hand5 (${kf:-not all in records}) are not one in each" \
+      "of the ${recs:-?} records that reach it (its calls file)  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-rewrap-off-v2 . "$OUT/c-draws-f.jsonl.gz" \
+      > "$OUT/c-draws-f.out" 2> "$OUT/c-draws-f.err"); then
     echo "(f) the re-wrap off: the run did not end with 0  <-- NOT" >> "$OUT/c-draws.txt"
-  elif ! has -E "^tracerfaults3: draws-rewrap-off-v2, planted $hand times?\$" "$OUT/c-draws-f.err"; then
-    echo "(f) the re-wrap off: not planted once for each of hand5's $hand keep_floor draws  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! has -E "^tracerfaults3: draws-rewrap-off-v2, planted $kf times?\$" "$OUT/c-draws-f.err"; then
+    echo "(f) the re-wrap off: not planted once for each of hand5's $kf keep_floor calls  <-- NOT" >> "$OUT/c-draws.txt"
   elif replay_of c-draws-f; then
     echo "(f) the re-wrap off: the replay passed it  <-- NOT" >> "$OUT/c-draws.txt"
   elif ! parsed_whole "$OUT/c-draws-f.replay"; then
     echo "(f) the re-wrap off: the parser refused a line of it, not the twin  <-- NOT" >> "$OUT/c-draws.txt"
-  elif ! has -E "^replay: [0-9]+ records, [0-9]+ ok, $hand mismatched\$" "$OUT/c-draws-f.replay"; then
-    echo "(f) the re-wrap off: the replay mismatched otherwise than at hand5's $hand keep_floor records: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay")  <-- NOT" >> "$OUT/c-draws.txt"
-  elif [ "$(grep -c '^mismatch ' "$OUT/c-draws-f.replay")" != 1 ] \
-      || ! has -x -F "mismatch keep_floor: tape: sample_without_replacement[[],0] asked, the tape is over logged: $hand" "$OUT/c-draws-f.replay"; then
-    echo "(f) the re-wrap off: the replay refused it otherwise than by its words alone, keep_floor's at each of its $hand records  <-- NOT" >> "$OUT/c-draws.txt"
+  elif ! has -E "^replay: [0-9]+ records, [0-9]+ ok, $kf mismatched\$" "$OUT/c-draws-f.replay"; then
+    echo "(f) the re-wrap off: the replay mismatched otherwise than at hand5's $kf records that reach keep_floor:" \
+      "$(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay")  <-- NOT" >> "$OUT/c-draws.txt"
+  elif [ "$(grep -c '^mismatch ' "$OUT/c-draws-f.replay")" != 1 ]; then
+    echo "(f) the re-wrap off: the replay refused it by more than one mismatch  <-- NOT" >> "$OUT/c-draws.txt"
   else
-    echo "(f) the re-wrap off: caught: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay"); $(grep -m 1 -F 'tape: sample_without_replacement[[],0] asked, the tape is over logged' "$OUT/c-draws-f.replay" | cut -c1-160)" >> "$OUT/c-draws.txt"
-    n=$((n + 1))
+    mm=$(grep -m 1 '^mismatch ' "$OUT/c-draws-f.replay")
+    case "$mm" in
+      "mismatch on_heartbeat: tape: sample_without_replacement[[],0] asked, "*" logged: $kf")
+        echo "(f) the re-wrap off: caught: $(grep -m 1 '^replay: ' "$OUT/c-draws-f.replay");" \
+          "$(echo "$mm" | cut -c1-160)" >> "$OUT/c-draws.txt"
+        n=$((n + 1)) ;;
+      *) echo "(f) the re-wrap off: the replay refused it otherwise than by keep_floor's draw asked where the tape" \
+           "holds another entry, at each of its $kf records: $(echo "$mm" | cut -c1-160)  <-- NOT" \
+           >> "$OUT/c-draws.txt" ;;
+    esac
   fi
-  # (g) the swap left unrestored: the record's exit check must stop the tracer, final_check's words after the stop
+  # (g) the swap left unrestored: the record's exit check must stop the tracer, final_check's words after the stop.
+  # keep_floor runs inside on_heartbeat's records, since the roots are records, so the check at that record's exit
+  # meets the swap
   rm -f "$OUT/c-draws-g".*
-  stop="^trace3: node 1: sample_without_replacement is bound to draws_unrestored_seacast\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\) at the exit of keep_floor's record, not to the tracer's own binding"
+  stop="^trace3: node 1: sample_without_replacement is bound to draws_unrestored_seacast\.<locals>\..*<lambda> "\
+"\(tracerfaults3\.py:[0-9]+\) at the exit of on_heartbeat's record, not to the tracer's own binding"
   also="^trace3: \(at the close, after the stop\) SystemExit: trace3: node 1: sample_without_replacement was bound again after the tracer was installed, which under SEACAST must be the namespace's last binding: draws_unrestored_seacast\.<locals>\..*<lambda> \(tracerfaults3\.py:[0-9]+\)$"
   if (cd "$TOY" && $PY "$T/tracerfaults3.py" --draws-unrestored-v2 . "$OUT/c-draws-g.jsonl.gz" > "$OUT/c-draws-g.out" 2> "$OUT/c-draws-g.err"); then
     echo "(g) the swap unrestored: the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-draws.txt"
@@ -1384,8 +1409,10 @@ swapped_draws() {       # K13: each swapped draw's draws on the tape of a cell t
   local said="2 plants each caught"
   [ "$n" = 2 ] || said="$n of 2 plants caught"
   if [ -n "$NODAS" ]; then
-    echo "  the swapped draws: ${hand:-0} keep_floor draws on seacast/hand5, and $said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
-  else echo "  the swapped draws: ${hand:-0} keep_floor draws on seacast/hand5 and ${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
+    echo "  the swapped draws: ${kf:-0} keep_floor draws on seacast/hand5, one in each record that reaches it, and" \
+      "$said (--no-das: das-samplers-mcoff's defer_on_claim draws skipped)"
+  else echo "  the swapped draws: ${kf:-0} keep_floor draws on seacast/hand5, one in each record that reaches it, and" \
+    "${nd:-0} defer_on_claim draws on das-samplers-mcoff, and $said"; fi
 }
 stop_cell() {           # $1: a directory under $OUT; $2: a cell of chain_args: traced alone there, its status kept (a
   local d=$1 c=$2       #   cell the tracer must stop)
@@ -2191,8 +2218,9 @@ inv_needs() {           # inventory_seacast.py's declaration: --needs, the decla
 }
 calls_summary() {       # piece (b): each SEACAST trace's reached names, and the IWANTs respond, retry_offer and ask_parked
   #                       enqueue, by their records and by their calls, with the calls file's four controls
-  #                       (c-reached.txt, which the pull carries); plants (u), (v) and (w), each refused by its control
-  #                       alone, and (w)'s control; the IWANT makers, from the documents (c-iwant-makers.txt); and
+  #                       (c-reached.txt, which the pull carries); plants (u), (v) and (w), each refused by its
+  #                       controls alone ((u) by reach and by-fn), and (w)'s control; the IWANT makers, from the
+  #                       documents (c-iwant-makers.txt); and
   #                       every trace held to formal/twin/inventory.tsv by inventory_seacast.py, the needs line first
   #                       (c-inventory.txt; the inventory's copy, inventory.tsv, which the pull carries too)
   local rel rels g n=0 s=0 bad= p ok=0 why= inv=
@@ -2222,14 +2250,22 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   else
     echo "c-reached: $n traces read, $s skipped; the controls hold in every one" >> "$OUT/c-reached.txt"
   fi
-  for p in u:calls-nested-off-v2:reach v:calls-iwants-off-v2:by-fn w:calls-paired-off-v2:by-fn; do
-    local l=${p%%:*} q=${p#*:} f c
+  # each plant refused by the controls named (C, comma-separated) and by no other. (u) by reach and by-fn: since the
+  # roots are records, respond runs inside on_frame's records, so dropping the nested calls shows in by-fn too, and
+  # no plant here is refused by reach alone
+  for p in u:calls-nested-off-v2:reach,by-fn v:calls-iwants-off-v2:by-fn w:calls-paired-off-v2:by-fn; do
+    local l=${p%%:*} q=${p#*:} f c x off=
     c=${q#*:}; q=${q%%:*}; f=$OUT/reached/plant-$l
+    for x in K4a asked reach by-fn; do
+      case ",$c," in
+        *",$x,"*) has -E "^reached/plant-$l: controls: NOT: (.*; )?$x: " "$f.txt" || off=1 ;;
+        *) ! has -E "^reached/plant-$l: controls: NOT: .*$x: " "$f.txt" || off=1 ;;
+      esac
+    done
     if [ "$(cat "$f.rc")" != 0 ] || ! has -x -E "tracerfaults3: $q, planted [1-9][0-9]* times?" "$f.err"; then
       why="$why ($l) not planted, or its run stopped;"
-    elif [ "$(cat "$f.crc")" != 1 ] || ! has -E "^reached/plant-$l: controls: NOT: $c: " "$f.txt" \
-        || has -E "^reached/plant-$l: controls: NOT: .*(K4a|asked|$( [ "$c" = reach ] && echo by-fn || echo reach)): " "$f.txt"; then
-      why="$why ($l) not refused by $c alone;"
+    elif [ "$(cat "$f.crc")" != 1 ] || [ -n "$off" ]; then
+      why="$why ($l) not refused by ${c/,/ and } alone;"
     else
       ok=$((ok + 1))
     fi
@@ -2252,7 +2288,10 @@ calls_summary() {       # piece (b): each SEACAST trace's reached names, and the
   $PY "$T/inventory_seacast.py" $(inv_needs) "$OUT/inventory.tsv" "$OUT/c-reached.txt" > "$OUT/c-inventory.txt" 2>&1 && inv=ok \
     || no "the calls summary against the inventory (c-inventory.txt)"
   if [ -z "$bad" ] && [ "$ok" = 4 ] && [ -n "$mk" ] && [ -n "$inv" ]; then
-    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plants (u), (v) and (w) each refused by their control alone, (w)'s control holding; the IWANT makers: respond, retry_offer and ask_parked, one site each under no loop (c-iwant-makers.txt); the inventory: $(grep -v -c '^#' "$OUT/inventory.tsv") lines, each as it must be (c-inventory.txt)"
+    echo "  the calls summary: $n traces read, $s skipped, the controls hold in each (c-reached.txt); plant (u)" \
+      "refused by reach and by-fn alone, (v) and (w) each by by-fn alone, (w)'s control holding; the IWANT makers:" \
+      "respond, retry_offer and ask_parked, one site each under no loop (c-iwant-makers.txt); the inventory:" \
+      "$(grep -v -c '^#' "$OUT/inventory.tsv") lines, each as it must be (c-inventory.txt)"
   else
     echo "  the calls summary: not as it must be"
   fi
@@ -2642,8 +2681,8 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # changed and on nothing else (c-chains.txt)
   chain_cases
   # the swapped draws (K13): keep_floor's on seacast/hand5 and defer_on_claim's on das-samplers-mcoff, each on its records'
-  # tapes; (f) the re-wrap off, which the replay must refuse at each keep_floor record; (g) the swap left unrestored,
-  # which the record's exit check must stop (c-draws.txt)
+  # tapes; (f) the re-wrap off, which the replay must refuse at each record that reaches keep_floor; (g) the swap left
+  # unrestored, which the record's exit check must stop (c-draws.txt)
   swapped_draws
   # a record writer's arguments not runSeacast's case's: on_frame's without p, which the replay must refuse (c-arity.*)
   arities_plant
