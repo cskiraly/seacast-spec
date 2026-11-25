@@ -133,7 +133,7 @@ private def pastServeLimit (p : Peer) (g : Group) : M2 m Bool := do
   return natGeFloat n lim                                    -- Python's int-to-float `>=`, exactly
 
 /-- `s[g][i].discard(p)` on a lazy set table: a missing entry is left missing, a present one keeps its set -/
-private def discardFrom (get : Group → Nat → M2 m (Option (Std.HashSet Peer)))
+def discardFrom (get : Group → Nat → M2 m (Option (Std.HashSet Peer)))
     (set : Group → Nat → Std.HashSet Peer → M2 m Unit) (g : Group) (i : Nat) (p : Peer) : M2 m Unit := do
   if let some s ← get g i then
     if s.contains p then set g i (s.erase p)

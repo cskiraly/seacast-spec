@@ -12,7 +12,7 @@ The lists:
   `route_want`, and `on_want`, then §4.1's relations and §6.3's limit on them: `relation_room`, `graft`, `on_prune`,
   `on_graft`, `maintain_relations` and `on_join`, then §4.11's window and writer: `wake_front`, `write_waits`,
   `free_room`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`, `noted` and
-  `next_to_send`.
+  `next_to_send`, then §4.2's gate for cells: `drop_outside` and `on_header_validated`.
 - KEPT: seacast-lite.md's functions that a record under seacast.md may name: those seacast-lite.md keeps all the way down
   under v2 (trace3.py's `seacast_kept` over the toy's two documents), less NODE_OWN's names. Of §7.1's window it
   holds `front` alone, which seacast.md's window calls unchanged.
@@ -65,7 +65,8 @@ COVERED = [
     "index_bound", "our_interest_for", "outside", "route_want", "on_want",
     "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join",
     "wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
-    "window_timeout", "noted", "next_to_send"]
+    "window_timeout", "noted", "next_to_send",
+    "drop_outside", "on_header_validated"]
 
 KEPT = [
     "K", "N", "add_offer", "announcers", "ask_parked", "build_group", "choose_push", "close_promises",
@@ -119,6 +120,8 @@ QUESTIONS = [
     "uplink_class", "valid_have", "wake", "wants_family",
     # §4.11's writer: the owed answer popped, an entry's bytes on the wire, the offers an entry carries
     "pop_owed_answer", "wire_size", "offers_in",
+    # §4.2's gate for cells: the block's column and row groups
+    "cell_groups",
     # the callables of a type's parameters (`T.params`)
     "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO",
     # the object type's functions, which covered functions call on a type

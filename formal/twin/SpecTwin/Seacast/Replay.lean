@@ -3,6 +3,7 @@ import SpecTwin.Seacast.Sample
 import SpecTwin.Seacast.Writer
 import SpecTwin.Seacast.Kept
 import SpecTwin.Seacast.Serve
+import SpecTwin.Seacast.Gate
 import SpecTwin.Seacast.Upkeep
 import SpecTwin.Seacast.Manifest
 
@@ -265,7 +266,7 @@ def callNamesSeacast : List String :=
    "merge_waiting", "deferred_offers", "open_group_source", "release_wanted_groups", "open_link",
    "open_sampling_link", "choice", "own_interest", "send_have", "serve_standing", "owed_missing", "repair_verdict",
    "note_claim", "known_in_scope", "own_id", "admitted_group", "runs_type", "our_join", "candidates", "in_pushers",
-   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in", "filter_entry"]
+   "out_pushees", "uplink_class", "pop_owed_answer", "wire_size", "offers_in", "filter_entry", "cell_groups"]
 
 /-- SEACAST's own timers, the targets `after` names beside `seacast-lite.md`'s four. -/
 def timersSeacast : List String := ["reconsider", "ask_sample", "resample"]
@@ -289,6 +290,10 @@ def entrySeacast (j : Json) : Option (Except String Entry) :=
     some (pure (.call "keys" (Json.arr #[Json.str "probe_waiting", Json.arr #[g]]).compress ks.compress))
   | .ok #[.str "keys", .str "claims", .arr #[], ks] =>
     some (pure (.call "keys" (Json.arr #[Json.str "claims", Json.arr #[]]).compress ks.compress))
+  | .ok #[.str "keys", .str "standing", .arr #[g], ks] =>
+    some (pure (.call "keys" (Json.arr #[Json.str "standing", Json.arr #[g]]).compress ks.compress))
+  | .ok #[.str "keys", .str "want_p", .arr #[], ks] =>
+    some (pure (.call "keys" (Json.arr #[Json.str "want_p", Json.arr #[]]).compress ks.compress))
   | .ok #[.str "read", .str "chunks", path, v] => some (chunksReadSeacast path v)
   | .ok #[.str name, args@(.arr as), r] =>
     let call : Option (Except String Entry) := some (pure (.call name args.compress r.compress))
@@ -474,6 +479,19 @@ instance : NodeSeacast R where
         | .arr #[x], some e => match qentry x .seacast with | .ok e' => e' == e | .error _ => false
         | _, _ => false)
       (pairs "group and bits" Replay.groupKey nat)
+  -- §4.2's gate: the block's cell groups, as the binding lists them, a group there twice taken as the Python's `set`
+  -- takes it; and the orders of its loops, each a permutation of what the twin holds
+  cellGroups r := askCall "cell_groups" [Json.str r] fun j => do (← arr j).mapM Replay.groupKey
+  groupsOrder place gs := do
+    permOf s!"the order at {place}" gs (← askCall "order" [Json.str place] (groupList s!"the order at {place}"))
+  standingOrder g is := do
+    let ks ← askCall "keys" [Json.str "standing", Json.arr #[Json.str g]] fun j => do
+      let l ← natList j
+      nodup "keys of standing" l
+      return l
+    permOf s!"standing[{g}]'s keys" is ks
+  wantPOrder qs := do
+    permOf "want_p's keys" qs (← askCall "keys" [Json.str "want_p", Json.arr #[]] (peerList "keys of want_p"))
   -- the names a node's line can give as replaced: asked where it does, the document's body run elsewhere
   forwardNode f p axes :=
     askCall "forward" [chunkJson f, (p : Json), optJson (fun l => Json.arr (l.map giJson).toArray) axes] nothing
@@ -614,6 +632,8 @@ def runSeacast (c : Consts) (c2 : ConstsSeacast) (params : TypeId → Option Typ
     | "serve_probe", #[p, g, f] => do exec (serveProbe (← nat p) (← Replay.groupKey g) (← chunkN f)) none_
     | "serve_standing", #[g, i] => do exec (serveStanding (← Replay.groupKey g) (← nat i)) none_
     | "drop_wants_beyond", #[g] => do exec (dropWantsBeyond (← Replay.groupKey g)) none_
+    | "drop_outside", #[g] => do exec (dropOutside (← Replay.groupKey g)) none_
+    | "on_header_validated", #[root] => do exec (onHeaderValidated (← rootKey root)) none_
     | "serve_waiting_probe", #[g, i] => do exec (serveWaitingProbe (← Replay.groupKey g) (← nat i)) none_
     | "known_in_scope", #[g] => do exec (knownInScope (← Replay.groupKey g)) (retIs r.ret nat)
     | "known_across", #[g] => do exec (knownAcross (← Replay.groupKey g)) (retIs r.ret nat)

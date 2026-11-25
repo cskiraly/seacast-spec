@@ -1814,4 +1814,171 @@ def nNoted : String := withNotes s!"{promiseNote}, {alarmNote}"
 
 end Window
 
+/-! ## §4.2's gate for cells: `on_header_validated` and `drop_outside`
+
+Hand-written records, each written from the Python's order of reads and questions (seacast.md:1197-1221 and
+:1573-1579), and each passing with "fewer" 0 and exactly the branch labels it was written for, in order:
+- a root with no pending cell and no tie, whose one group has no standing request and no `want_p` entry: `tied`'s
+  keys entry at :1205 and again at :1216, each empty, and nothing at :1218, where the pop finds no row;
+- peer 7's tie of indices 3 and 4 of g, whose count is 4 by now: index 3, at `index_count - 1`, offered again,
+  and index 4, at `index_count`, dropped; the peer emptied, with its slot, and the root's row popped;
+- the tie of an expired group; a tie on a link not joined for the type, the count not known; a tied index the node
+  holds, which peer 7 was asked as a last resort;
+- a tie that also holds a group outside the block: that one stays, so nothing is emptied and nothing popped;
+- `drop_outside` with a complemented `want_p` bitmap, whose iteration raises `ValueError`; and with a standing
+  request outside, dropped, an interest bit outside, dropped, and one the node holds, kept.
+
+The cells that waited for the header and resume level 1 are left to the directed set made from
+`seacast_carried_known.py`. Four must fail: :1216's keys entry missing, the order of the groups naming another
+group, `cell_groups` answering a key of 63 hex digits, and index 4 offered too.
+
+What a record shows, and what it does not, is as in the sections above. A `pending` entry and an `asked_parked`
+entry left empty are written as no entry, as the twin's state reads them. Each record is a seeded state, written
+for the branches it reaches; none claims a way the toy's code reaches that state. -/
+
+namespace Gate
+
+open Serve (rd replay1 takes fails1 tog expQ authQ desc2 gp pg)
+open Upkeep (rec2 sc)
+
+/-- A second group, of no cell of the block -/
+def g2 : String := String.ofList (List.replicate 64 'c')
+def g2q : String := s!"\"{g2}\""
+def cgQ (gs : String) : String := s!"[\"cell_groups\", [{rootq}], {gs}]"
+def tiedK (path ks : String) : String := s!"[\"keys\", \"tied\", {path}, {ks}]"
+def ordQ (gs : String) : String := s!"[\"order\", \"on_header_validated\", {gs}]"
+def ordD (ps : String) : String := s!"[\"order\", \"drop_outside\", {ps}]"
+def stK (ks : String) : String := s!"[\"keys\", \"standing\", [{gq}], {ks}]"
+def wpK (ks : String) : String := s!"[\"keys\", \"want_p\", [], {ks}]"
+def ctpQ (ps : String) : String := s!"[\"connected_topic_peers\", [], {ps}]"
+def linksQ (ps : String) : String := s!"[\"links\", [\"row\"], {ps}]"
+def icQ (n : Nat) : String := s!"[\"index_count\", [\"row\", {desc2}], {n}]"
+def listedQ (p n : Nat) : String := s!"[\"listed\", [{p}], {n}]"
+def jnD : String := "[\"join\", \"row\", \"DECLARED\", 0, \"NONE\", 1]"
+/-- `tied[root]`, `tied[root][7]` and `tied[root][7][g]`, as read and as written -/
+def tr : String := s!"[{rootq}]"
+def tr7 : String := s!"[{rootq}, 7]"
+def tr7g : String := s!"[{rootq}, 7, {gq}]"
+def slot7 : String := s!"[[{rootq}, 7]]"
+/-- The scans of a gate with peer 7's tie under the root, and the groups' pass over g with nothing standing -/
+def scans7 : List String := [sc "tied" tr, sc "tied" tr7, sc "standing" gp, sc "want_p" "[]"]
+/-- The end of the gate: :1216's keys entry, :1218's pop of the emptied row, and the groups' pass over g with
+nothing standing, no `want_p` entry and an empty ledger -/
+def end7 : List String :=
+  [tiedK tr "[7]", tiedK tr "[]", ordQ s!"[{gq}]", stK "[]", wpK "[]", ctpQ "[]"]
+/-- What a gate that empties peer 7 and the root writes, besides its own -/
+def gone7 : List String :=
+  [rd "pending" tr "null", rd "tied" tr7g "null", rd "tied" tr7 "null", rd "tied" tr "null", rd "tie_slot" slot7 "null"]
+def reads7 (bits : String) : List String :=
+  [rd "pending" tr "null", rd "tied" tr "true", rd "tied" tr7 "true", rd "tied" tr7g bits]
+
+def lExpired : String := "on_header_validated: a tie of an expired group"
+def lBeyond : String := "on_header_validated: an index beyond the count learnt meanwhile"
+def lNotJoined : String := "on_header_validated: a tie on a link not joined for the type"
+def lHeld : String := "on_header_validated: a tied index held"
+def lAgain : String := "on_header_validated: an offer again"
+def lPeerGone : String := "on_header_validated: a sender's last tie under the root gone, with its slot"
+def lRootGone : String := "on_header_validated: the root's ties gone"
+def lDropped : String := "drop_outside: a standing request outside, dropped"
+def lBits : String := "drop_outside: interest bits outside, dropped"
+def lKept : String := "drop_outside: interest kept"
+
+/-! ### on_header_validated -/
+
+-- no pending cell, no tie: :1205's and :1216's keys entries empty, no pop at :1218, where the row is read absent
+def r0 : String :=
+  rec2 "on_header_validated" s!"[{rootq}]" [rd "pending" tr "null", rd "tied" tr "null"]
+    [sc "tied" tr, sc "standing" gp, sc "want_p" "[]"] [rd "pending" tr "null"]
+    [cgQ s!"[{gq}]", tiedK tr "[]", tiedK tr "[]", ordQ s!"[{gq}]", stK "[]", wpK "[]", ctpQ "[]"]
+    (ret "null") ["on_header_validated", "drop_outside", "ledger"]
+#guard takes r0 ["ledger: empty"]
+
+-- peer 7's tie of indices 3 and 4, g's count 4 known by now: 3 (count - 1) offered again, 4 (the count) dropped
+def r1 : String :=
+  rec2 "on_header_validated" s!"[{rootq}]"
+    (reads7 "24" ++ [rd "park" (pg 7) "null", rd "asked_parked" s!"[[{gq}, 3]]" "null",
+      rd "asked_parked" s!"[[{gq}, 4]]" "null", rd "desc" gp desc2, rd "mine" gp "null", rd "offered" (pg 7) "null",
+      rd "offers" s!"[[{gq}, 3]]" "null", rd "tie_slot" slot7 "5"])
+    scans7 (gone7 ++ [rd "offered" (pg 7) "8", rd "offers" s!"[[{gq}, 3]]" "[7]"])
+    ([cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{gq}]", expQ "false", tog, linksQ "[7]", tog, icQ 4,
+      listedQ 7 0, tog, icQ 4] ++ end7)
+    (ret "null") ["on_header_validated", "joined", "add_offer", "drop_outside", "ledger"]
+#guard takes r1 ["add_offer: listed", lAgain, lBeyond, lPeerGone, lRootGone, "ledger: empty"]
+
+-- the tie of an expired group: released, nothing offered, no park or last-resort count touched
+def r2 : String :=
+  rec2 "on_header_validated" s!"[{rootq}]" (reads7 "8" ++ [rd "tie_slot" slot7 "5"]) scans7 gone7
+    ([cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{gq}]", expQ "true"] ++ end7)
+    (ret "null") ["on_header_validated", "drop_outside", "ledger"]
+#guard takes r2 [lExpired, lPeerGone, lRootGone, "ledger: empty"]
+
+-- indices 2 and 3 tied on a link not joined for the type, the count not known: no count asked, `mine` not read
+def r3a : String :=
+  rec2 "on_header_validated" s!"[{rootq}]"
+    (reads7 "12" ++ [rd "park" (pg 7) "null", rd "asked_parked" s!"[[{gq}, 2]]" "null",
+      rd "asked_parked" s!"[[{gq}, 3]]" "null", rd "desc" gp "null", rd "tie_slot" slot7 "5"])
+    scans7 gone7
+    ([cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{gq}]", expQ "false", tog, linksQ "[]"] ++ end7)
+    (ret "null") ["on_header_validated", "joined", "drop_outside", "ledger"]
+#guard takes r3a [lNotJoined, lNotJoined, lPeerGone, lRootGone, "ledger: empty"]
+
+-- a tied index the node holds, on a joined link; peer 7 was asked it as a last resort, and that count clears
+def r3b : String :=
+  rec2 "on_header_validated" s!"[{rootq}]"
+    (reads7 "8" ++ [rd "park" (pg 7) "null", rd "asked_parked" s!"[[{gq}, 3]]" "[7]", rd "desc" gp "null",
+      rd "mine" gp "8", rd "tie_slot" slot7 "5"])
+    scans7 (gone7 ++ [rd "asked_parked" s!"[[{gq}, 3]]" "null"])
+    ([cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{gq}]", expQ "false", tog, linksQ "[7]"] ++ end7)
+    (ret "null") ["on_header_validated", "joined", "drop_outside", "ledger"]
+#guard takes r3b [lHeld, lPeerGone, lRootGone, "ledger: empty"]
+
+-- peer 7's tie holds g, of the block, and g2, of no cell of it: g's tie goes and g2's stays, so peer 7 is not
+-- emptied, :1216 deletes nothing and :1218 pops nothing
+def r6 : String :=
+  rec2 "on_header_validated" s!"[{rootq}]" (reads7 "8" ++ [rd "tied" s!"[{rootq}, 7, {g2q}]" "4"]) scans7
+    [rd "pending" tr "null", rd "tied" tr7g "null"]
+    [cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{g2q}, {gq}]", expQ "true", tiedK tr "[7]", ordQ s!"[{gq}]",
+     stK "[]", wpK "[]", ctpQ "[]"]
+    (ret "null") ["on_header_validated", "drop_outside", "ledger"]
+#guard takes r6 [lExpired, "ledger: empty"]
+
+/-! ### drop_outside -/
+
+-- a complemented `want_p` bitmap: its iteration raises
+#guard takes (rec2 "drop_outside" s!"[{gq}]" [rd "want_p" (pg 5) "[\"-\", 1]"] [sc "standing" gp, sc "want_p" "[]"]
+    [] [stK "[]", wpK "[5]"] [("raises", "\"ValueError\"")] ["drop_outside"])
+  ["raises: ValueError"]
+
+-- peer 4's standing request for index 3, outside (DECLARED, not held), dropped; its interest bit 3 the same; peer
+-- 5's bit 2, which the node holds, kept, and written as it was
+#guard takes (rec2 "drop_outside" s!"[{gq}]"
+    [rd "standing" s!"[{gq}, 3]" "[4]", rd "routed_standing" s!"[{gq}, 3]" "null", rd "origin" gp "null",
+     rd "mine" gp "4", rd "join_sent" "[4, \"row\"]" jnD, rd "want_p" (pg 4) "8", rd "want_p" (pg 5) "4",
+     rd "routed_standing" s!"[{gq}, 2]" "null"]
+    [sc "standing" gp, sc "want_p" "[]"]
+    [rd "standing" s!"[{gq}, 3]" "[]", rd "want_p" (pg 4) "0", rd "want_p" (pg 5) "4"]
+    [stK "[3]", ordD "[4]", tog, authQ "true", tog, wpK "[4, 5]", tog, authQ "true", tog, tog, authQ "true"]
+    (ret "null") ["drop_outside", "outside", "our_interest_for"])
+  ["outside: outside our interest", lDropped, "outside: outside our interest", lBits, "outside: held", lKept]
+
+/-! ### The ones that must fail -/
+
+-- :1216's keys entry missing: the twin asks the order of tied[root]'s peers there, and takes :1218's entry for it
+#guard fails1 "tape: tied[" (rec2 "on_header_validated" s!"[{rootq}]" (reads7 "8" ++ [rd "tie_slot" slot7 "5"]) scans7
+  gone7 ([cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{gq}]", expQ "true", tiedK tr "[]", ordQ s!"[{gq}]", stK "[]",
+    wpK "[]", ctpQ "[]"]) (ret "null") ["on_header_validated", "drop_outside", "ledger"])
+-- the groups' order naming a group the block has not
+#guard fails1 "tape: the order at on_header_validated: the node's order " (r0.replace (ordQ s!"[{gq}]") (ordQ s!"[{g2q}]"))
+-- `cell_groups` answering a key of 63 hex digits
+#guard fails1 "tape: cell_groups: its answer: not a group key: "
+  (r0.replace (cgQ s!"[{gq}]") (cgQ s!"[\"{String.ofList (List.replicate 63 'a')}\"]"))
+-- index 4, at the count, offered too
+#guard fails1 "post: the whole state: " (r1.replace (rd "offered" (pg 7) "8") (rd "offered" (pg 7) "24"))
+-- and each of the three replacements changed its record
+#guard r0.replace (ordQ s!"[{gq}]") (ordQ s!"[{g2q}]") != r0 &&
+  r0.replace (cgQ s!"[{gq}]") (cgQ s!"[\"{String.ofList (List.replicate 63 'a')}\"]") != r0 &&
+  r1.replace (rd "offered" (pg 7) "8") (rd "offered" (pg 7) "24") != r1
+
+end Gate
+
 end SpecTwin.Seacast.ReplayKnown

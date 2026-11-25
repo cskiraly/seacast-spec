@@ -331,10 +331,11 @@ def maxRelationsLine (v : Json) := line2 (entry [("types", some (maxRelations v)
 #guard Manifest.kept.all fun f => routeSeacast f == .kept || routeSeacast f == .form
 #guard Manifest.nodeOwn.all fun (f, _) => routeSeacast f == .kept
 #guard Manifest.covered.all fun f => routeSeacast f == .seacast || routeSeacast f == .form
-#guard fnsSeacast.length == 91                                                  -- v0.11.1's joined, drop_wants_beyond;
+#guard fnsSeacast.length == 93                                                  -- v0.11.1's joined, drop_wants_beyond;
                                                                                 --   §4.5's serving, §4.10's route_want;
                                                                                 --   §4.1's relations, §6.3's room;
-                                                                                --   §4.11's window and writer
+                                                                                --   §4.11's window and writer;
+                                                                                --   §4.2's gate for cells
 
 -- D2, runSeacast by the route: a kept name `keptSeacast` did not hold before (`valid_id`, of an entry not 56 bytes long) goes
 -- to `Replay.run`; a name v2 redefines is refused

@@ -12,6 +12,7 @@ import SpecTwin.Seacast.Receive
 import SpecTwin.Seacast.Sample
 import SpecTwin.Seacast.Writer
 import SpecTwin.Seacast.Kept
+import SpecTwin.Seacast.Gate
 import SpecTwin.Seacast.Replay
 import SpecTwin.Seacast.ReplayKnown
 import SpecTwin.Seacast.KeptKnown

@@ -10,7 +10,7 @@ tape:
    with them in `NodeSeacast R`, over a tape of that one row (`tapeItem` under `docSeacast`). `askCall` compares the
    question's arguments, as the twin writes them, with the row's. The answer is read by the form's reader, the
    tape must be used up, and the value read, written back in the answer's form, must be the row's answer.
-   `choiceOfSet` and the three orders are asked with the row's members reversed, so that only a permutation of them
+   `choiceOfSet` and the orders are asked with the row's members reversed, so that only a permutation of them
    passes.
 2. The same row with its answer replaced by a wrong form of it (`wrongAnswer`) must be refused by the answer's
    reader, with a message that starts `tape: {name}: its answer: `. `shuffledPeers`' row is `seacast-lite.md`'s
@@ -228,6 +228,18 @@ def askOf (form : String) (args : Array Json) (ans : Json) : Except String (R Js
   | "claimsOrder", #[.str "claims", .arr #[]] => do
     let gs ← (← arr ans).mapM Replay.groupKey
     return groupsJson <$> NodeSeacast.claimsOrder (m := R) gs.reverse
+  | "cellGroups", #[r] => do
+    let r ← rootKey r
+    return groupsJson <$> NodeSeacast.cellGroups (m := R) r
+  | "groupsOrder", #[.str place] => do
+    let gs ← (← arr ans).mapM Replay.groupKey
+    return groupsJson <$> NodeSeacast.groupsOrder (m := R) place gs.reverse
+  | "standingOrder", #[.str "standing", .arr #[g]] => do
+    let g ← Replay.groupKey g; let is ← natList ans
+    return natsJson <$> NodeSeacast.standingOrder (m := R) g is.reverse
+  | "wantPOrder", #[.str "want_p", .arr #[]] => do
+    let qs ← peers ans
+    return natsJson <$> NodeSeacast.wantPOrder (m := R) qs.reverse
   | "ownInterest", #[g] => do
     let g ← Replay.groupKey g
     return intJson <$> NodeSeacast.ownInterest (m := R) g
@@ -397,6 +409,12 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
     | _ => throw s!"popOwedAnswer: not a chunk: {ans.compress}"
   | "wireSize" => p "[\"-\",1]"
   | "offersIn" => p s!"[[\"{String.ofList (List.replicate 63 'a')}\",1]]"
+  -- §4.2's gate's four, each refused by its reader's own check: a group of 63 hex digits; a number where a group is;
+  -- a list where an index is; a peer as a string
+  | "cellGroups" => p s!"[\"{String.ofList (List.replicate 63 'a')}\"]"
+  | "groupsOrder" => p "[5]"
+  | "standingOrder" => p "[[7]]"
+  | "wantPOrder" => p "[\"7\"]"
   -- the entry `filter_entry` returns where the node replaces it: its chunk with a sixth member, refused by the
   -- chunk's reader, which takes it narrow
   | "filterEntryNode" => match ans with
@@ -417,8 +435,9 @@ the file's at spec 287d575; the next 17 cover the methods of `NodeSeacast` that 
 `window_release`, went when the twin transcribed §4.11's window); the next 4 are the questions §4.5's serving adds:
 `own_id` and `admitted_group`, and `seacast-lite.md`'s `resolve` and `chunk_of` as `on_want` asks them; the next 6 are
 §4.1's upkeep's: `runs_type`, `our_join`, `candidates`, `in_pushers`, `out_pushees` and `uplink_class`; the next 3 are
-§4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`; the last is `filter_entry` as the node binds it, which
-`next_to_send` asks where the node's line names it as replaced. -/
+§4.11's writer's: `pop_owed_answer`, `wire_size` and `offers_in`; the next is `filter_entry` as the node binds it, which
+`next_to_send` asks where the node's line names it as replaced; the last 4 are §4.2's gate's: `cell_groups`, the order
+of `on_header_validated`'s groups, and the key orders of `standing[g]` and `want_p` in `drop_outside`. -/
 def labels : List String :=
   ["typeOfGroup", "typeOf", "indexCount", "threshold", "verify", "decode", "headerOf", "project", "cross", "family",
    "derivedInterest", "decodeAtK", "decodeLater", "repairTo", "send (a HAVE)", "send (a WANT)", "send (a relation)",
@@ -438,7 +457,9 @@ def labels : List String :=
    -- §4.11's writer: the three questions next_to_send and noted ask
    "popOwedAnswer", "wireSize", "offersIn",
    -- and filter_entry, which next_to_send asks where the node replaces it
-   "filterEntryNode"]
+   "filterEntryNode",
+   -- §4.2's gate: cell_groups, and the orders of three of its loops
+   "cellGroups", "groupsOrder", "standingOrder", "wantPOrder"]
 
 /-- A `send` row's kind, and the wire tags its message may carry (the message's first member). -/
 def sendKind : String → Option (String × List String)

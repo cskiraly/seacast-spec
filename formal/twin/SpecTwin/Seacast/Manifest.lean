@@ -22,7 +22,7 @@ def covered : List String :=
    "on_pace_tick", "on_block_installed", "joined", "drop_wants_beyond", "index_bound", "our_interest_for", "outside",
    "route_want", "on_want", "relation_room", "graft", "on_prune", "on_graft", "maintain_relations", "on_join",
    "wake_front", "write_waits", "free_room", "acquire_room", "leave_line", "track_in_flight", "window_release",
-   "window_timeout", "noted", "next_to_send"]
+   "window_timeout", "noted", "next_to_send", "drop_outside", "on_header_validated"]
 
 /-- `seacast-lite.md`'s functions a record under `seacast.md` may name, kept all the way down. -/
 def kept : List String :=
@@ -75,10 +75,10 @@ def questions : List String :=
    "node_id", "open_group", "open_link", "open_sampling_link", "our_join", "out_pushees", "own_id", "payload_of",
    "penalise", "release", "release_wanted_groups", "reserve", "resolve", "route_next", "runs_type",
    "sample_without_replacement", "seen", "send", "shuffled", "start", "store", "type_of", "type_of_group",
-   "uplink_class", "valid_have", "wake", "wants_family", "pop_owed_answer", "wire_size", "offers_in", "DECODE_AT_K",
-   "DECODE_LATER", "REPAIR_TO", "cross", "decode", "derived_interest", "family", "header_of", "index_count", "project",
-   "threshold", "verify", "group_of", "open_group_source", "own_interest", "writing", "gossip_put", "mesh_has",
-   "gossip_remove_group"]
+   "uplink_class", "valid_have", "wake", "wants_family", "pop_owed_answer", "wire_size", "offers_in", "cell_groups",
+   "DECODE_AT_K", "DECODE_LATER", "REPAIR_TO", "cross", "decode", "derived_interest", "family", "header_of",
+   "index_count", "project", "threshold", "verify", "group_of", "open_group_source", "own_interest", "writing",
+   "gossip_put", "mesh_has", "gossip_remove_group"]
 
 /-- The questions that no covered function loads, each with its reason. -/
 def questionsUnloaded : List (String × String) :=

@@ -253,6 +253,17 @@ class NodeSeacast (m : Type → Type) where
   wireSize : Peer → QEntry → m Nat
   /-- `offers_in(e)` (§3): the offers entry e carries, each a group and its bitmap, in order; none for no entry -/
   offersIn : Option QEntry → m (List (Group × Bits))
+  /-- `cell_groups(root)` (§3's helper, §4.2): the block's column and row groups, as the binding lists them -/
+  cellGroups : Root → m (List Group)
+  /-- the order in which a set of groups iterates at a place of SEACAST's code (`groups` in `on_header_validated`), an
+  `order` entry on the tape: a permutation of the members the twin computed -/
+  groupsOrder : String → List Group → m (List Group)
+  /-- the order in which `standing[g]`'s keys iterate (`list(standing[g])` in `drop_outside`, a `keys` entry on the
+  tape): a permutation of the indices the twin holds -/
+  standingOrder : Group → List Nat → m (List Nat)
+  /-- the order in which `want_p`'s keys iterate (`for q in want_p` in `drop_outside`, a `keys` entry on the tape): a
+  permutation of the peers the twin holds -/
+  wantPOrder : List Peer → m (List Peer)
   -- The nine names that a node can replace, by a binding of its own that changes what the function does, and that
   -- have a call site inside the replayed closure: eight of the 71, and `filter_entry`, which §4.11's `next_to_send`
   -- calls. Where the node's line names one as replaced, the Python asks the node, and the twin asks this question in
@@ -340,6 +351,10 @@ abbrev lift {m n : Type → Type} [NodeSeacast m] (f : ∀ {α : Type}, m α →
   popOwedAnswer a := f (popOwedAnswer a)
   wireSize a b := f (wireSize a b)
   offersIn a := f (offersIn a)
+  cellGroups a := f (cellGroups a)
+  groupsOrder a b := f (groupsOrder a b)
+  standingOrder a b := f (standingOrder a b)
+  wantPOrder a := f (wantPOrder a)
   forwardNode a b c := f (forwardNode a b c)
   pushRebuiltNode a b := f (pushRebuiltNode a b)
   sendHaveNode a b := f (sendHaveNode a b)
