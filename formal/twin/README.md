@@ -40,6 +40,15 @@ asks the rest of the node to do something that writes that entry. If the Python 
 and the twin reads it after, the replay detects the difference only if the value read changes something that the
 replay compares.
 
+**Nor does the replay check that a timer that fires was armed.** Where the twin arms a timer, the replay compares
+the timer's delay, target and arguments with those of the call to `after` on the tape. Where the code that a
+question runs at the node arms one, in a function that the node replaces or in the toy's own code, the question's
+log notes the timer, and the replay checks only that the note names a timer that an `after` arms, with arguments of
+that timer's form. When a timer fires and the function it runs is one that the twin covers, that call's record is
+replayed from what the call read. No earlier record feeds it, and the replay does not look for the `after` or the
+note that armed the timer. So a trace in which a `promise_due` fires with no arming before it replays record by
+record as if the timer had been armed.
+
 ## Scope
 
 Every function that the code blocks of `seacast-lite.md` define has a twin of the same name. The `scope` step of

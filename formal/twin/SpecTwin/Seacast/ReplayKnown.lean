@@ -1769,6 +1769,22 @@ def nAnswer : String := rec2 "next_to_send" "[5]"
 -- its answer's chunk wide, which the entry's reader refuses
 #guard fails3r "tape: filter_entry: its answer: a chunk here is narrow"
   (nAsked.replace s!"[5, {eC}], {eC}" s!"[5, {eC}], [[{gq}, 3, 1, \"{root}\", \"{id3}\", 1], null, false]")
+/-- A timer that the node's own `filter_entry` armed, as the question's log notes it: §6.1's `promise_due` for the
+ask `[g, 3]` of peer 5, PROMISE and the time it is due as their words -/
+def promiseNote : String := s!"[\"after\", {f1}, \"promise_due\", [[{gq}, 3], 5, {f2}]]"
+/-- The toy's alarm, as the question's log notes it: its group, index, peer and time -/
+def alarmNote : String := s!"[\"after\", {f1}, \"Node._alarm.<locals>.alarm_due\", [{gq}, 3, 5, {f2}]]"
+/-- `promiseNote` naming the toy's wrapper of `promise_due`, which no `after` of the documents arms -/
+def wrapperNote : String := s!"[\"after\", {f1}, \"Node._seacast.<locals>.promise_due\", [[{gq}, 3], 5, {f2}]]"
+/-- `nAsked` with `filter_entry`'s log noting the timers `ns` -/
+def withNotes (ns : String) : String :=
+  nAsked.replace s!"\"cw\": [{sentToR "8"}]}" s!"\"cw\": [{sentToR "8"}], \"timers\": [{ns}]}"
+def nNoted : String := withNotes s!"{promiseNote}, {alarmNote}"
+-- the notes of an asked call are read for their form and arm nothing, so the record passes with them as without
+#guard nNoted != nAsked
+#guard takes3r nNoted [lNothingOwed, "choose: the first", lNoRoom, lRoom, ntsWay "a chunk", "noted: no offers"]
+-- a note whose target no `after` arms is refused where the record is read
+#guard fails3r "a timer note's target is not one an after arms: " (withNotes wrapperNote)
 -- and the records these are made from pass as they are
 #guard takes3 nWait [lNothingOwed, "choose: the first", lInLine, ntsWay "in line"] &&
   takes3 nControl [lNothingOwed, "choose: control at the head", ntsWay "control", "noted: no offers"] &&
