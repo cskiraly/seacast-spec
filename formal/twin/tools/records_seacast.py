@@ -368,7 +368,7 @@ TABLE = {
     # §4.5's serving and §4.10's route_want: on_want's asks as askSeacastOf reads them, its answers narrow, in order
     "index_bound": ("g", g_only, nat),
     "our_interest_for": ("p, g", p_g, bits_int),
-    "outside":("p, g, i, routed", lambda tr, p, g, i, routed: [peer(tr, p), group(g), tr.nat(i),
+    "outside": ("p, g, i, routed", lambda tr, p, g, i, routed: [peer(tr, p), group(g), tr.nat(i),
                                                                 tr.flag(routed, "outside's routed")], boolean),
     "route_want": ("p, g, i, hops", lambda tr, p, g, i, hops: [peer(tr, p), group(g), tr.nat(i), tr.nat(hops)],
                    boolean),

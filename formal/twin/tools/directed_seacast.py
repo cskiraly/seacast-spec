@@ -77,9 +77,10 @@ The sets:
   the same for every record of the scenario, and starts from the serving sets' state with `offers` emptied. By
   default p is a link of g's type as built, and g is one of three groups the simulator does not know, of the default
   type, with a drawn descriptor of 1 to 8 chunks and an index below it. MB8's state takes p's JOIN of the type back,
-  so that interest_of_peer raises KeyError at `join_recv[p][T]`: the loop takes that raise, and that raise alone, as
+  so that interest_of_peer raises KeyError at `join_recv[p][T]`: the loop takes a KeyError, and that error alone, as
   MB8's path (RAISES), and stops the set at an MB8 call that does not raise. The tracer writes the record with
-  `raises`. Any other raise stops the set, as in every set.
+  `raises` and `raises_key`, and the replay, against the record's `raises_key`, tells where the error was raised.
+  Any other raise stops the set, as in every set.
 
 Beside the trace, OUT.scenarios has a line per record in the trace's order: its number from 1, its line in the trace
 (the content line the first), its node, its function, and the key of the scenario whose call made it (`setup` for the
