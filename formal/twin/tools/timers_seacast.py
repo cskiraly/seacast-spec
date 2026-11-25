@@ -33,8 +33,13 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       out), and K4 requires R <= A (each record was armed), but for the heartbeat's retries below. No record is
       matched to one note in particular.
       retry_offer has a second caller with no timer: seacast.md's on_heartbeat retries every offer §4.3's limits held
-      back (`for a in held_back.values(): retry_offer(a)`), then clears held_back. on_heartbeat is no record, so
-      those calls are records of their own. Under seacast.md on_heartbeat alone calls drop_stale_waits, after the
+      back (`for a in held_back.values(): retry_offer(a)`), then clears held_back. Since the roots are traced
+      (piece 5), on_heartbeat is a record, and those retries and its drop_stale_waits run inside it and are no
+      records of their own. retry_offer's third caller, on_header_validated (:1223), is a record too, and its
+      retries are no records either. So every retry_offer record is a timer's, no marker is met, and K4 excuses no
+      record. In
+      a trace made before, on_heartbeat was no record, so those calls were records of their own, and the rest of
+      this paragraph is about such a trace. Under seacast.md on_heartbeat alone calls drop_stale_waits, after the
       retries, so its record follows theirs at the same t and ends the node's held_back: it is the heartbeat's
       marker, and it closes the node's epoch. A record beyond the timers at its key is the heartbeat's when both
       hold: the node's next marker in record order (not merely one at the same t) has the record's t, so that the
@@ -46,8 +51,10 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       chunk with two or more records beyond its timers at one (node, t) of a heartbeat, in either branch and
       across epochs (two markers at one t). The limit: a timer lost whose fire falls on a heartbeat, for an ask held
       back in the epoch that heartbeat closes and not yet retried, is taken for the heartbeat's retry.
-      on_offer is held_back's one writer (seacast.md's :1321), and its one caller, on_frame (:621), is not traced,
-      so wherever on_offer is traced each call of it is a record of its own, and its writes are on that record. A
+      on_offer is held_back's one writer (seacast.md's :1321), and its one caller is on_frame (:624). Since piece 5
+      on_frame is traced, so each call of on_offer runs inside an on_frame record, and its writes are among that
+      record's, where the checker reads them (it reads held_back's writes on every record). In a trace made before,
+      on_frame was not traced, and each call of on_offer was a record of its own. A
       trace whose header's traced names do not hold on_offer (an older head's tracer, which recorded neither it nor
       on_heartbeat, or a header with no traced names) cannot show the second condition. There K4 takes the first
       condition alone, with the bound the document gives: at a heartbeat, one record beyond the timers for a chunk
@@ -61,10 +68,10 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       its node's heartbeat for the same ask counts as fired, by the retry (the limit above, seen from K3). No check
       requires each held value to be retried: K4 bounds the records from above, and the heartbeat's retries are
       excused, not required. And a held_back write made outside any record (inside a question at another node) is
-      not seen; the document's one writer is a record of its own wherever it is traced. Nor is one a question
-      makes inside a record, which its tape entry's log holds (`cw`), not the record's writes: none is made now,
-      since held_back's one writer, on_offer, has one caller, on_frame, which is not traced, so each call of
-      on_offer is a record of its own.
+      not seen; the document's one writer runs inside a record wherever it is traced (on_frame's, or, before piece
+      5, a record of its own). Nor is one a question makes inside a record, which its tape entry's log holds (`cw`),
+      not the record's writes: none is made now, since held_back's one writer, on_offer, is no question, and its one
+      caller, on_frame, is a record whose writes hold on_offer's.
 
 The other lines are counts of the trace's other timers: the `enqueue` entries with timers, the notes that name
 `alarm_due`, the records of `promise_due`, the notes of kind `start` (a `start` inside a question), and any other

@@ -24,9 +24,10 @@ and the node's entry says so.
 
 With TRACE3_ONLY=sec61 in its environment it traces §6.1's twelve alone: most of their calls are otherwise inside
 an on_ihave record, and these are the baseline's records. The two readers are then not traced, so their reads are
-the calling record's. With --doc seacast among run.py's arguments it traces the block's names that are seacast-lite.md's all
-the way down (`seacast_kept`, 20 at v0.10). The header's `traced` lists the functions traced, sorted: the block's
-(BLOCK), §6.1's twelve, or SEACAST's kept.
+the calling record's. With --doc seacast among run.py's arguments it traces SEACAST's kept names, the block's names
+that are seacast-lite.md's all the way down (`seacast_kept`), and seacast.md's covered functions (the manifest's
+COVERED). The header's `traced` lists the functions traced, sorted: the block's (BLOCK), §6.1's twelve, or SEACAST's
+kept and covered.
 
 As trace61.py (whose encodings this file uses), nothing changes in TOYDIR: each node's namespace is wrapped after
 the toy's own overrides, and the cell runs as run.py runs it, printing its digest with --digest, so that a run
@@ -4882,8 +4883,9 @@ class Tracer3(Tracer):
         # limit, by example: §4.2's gate leaves `pending[root] = []` where every cell that waited is in the root's
         # groups (seacast.md's on_header_validated), and a later on_heartbeat at that node, in drop_stale_waits,
         # iterates `list(pending)` with the root in it, where the twin's `pending` has no such key: that record is
-        # refused at its order (pendingOrder). It can refuse a record, never pass a wrong one. No recorded cell calls
-        # the gate, and K4's gate sets restore the node's state at each draw (directed_seacast.py).
+        # refused at its order (pendingOrder). The converse is not seen: a twin that deleted `pending[root]` where the
+        # Python stores `[]` would write the same entry and hold the same state, since both read as no key. No
+        # recorded cell calls the gate, and K4's gate sets restore the node's state at each draw (directed_seacast.py).
         tables = schema.python_tables(F, key, fbits, lane=self.lane,
                                       waits=lambda w: [[int(p), self.wchunk(f)] for p, f in w] or None,
                                       jobs=lambda js: [[int(q), [key(m) for m in ids], fbits(at)]
@@ -5818,8 +5820,8 @@ class WantKeysView(F.View):
 
     A limit, by example: the toy's release_places deletes `want_p[p][h]` and keeps p's row, empty (toy/node.py). A
     later drop_outside's `for q in want_p` puts p on the tape, where the twin's `want_p` has no row for p, so its
-    wantPOrder refuses the record. It can refuse a record, never pass a wrong one, and it acts only inside
-    drop_outside, whose one caller is §4.2's gate, which no recorded cell calls."""
+    wantPOrder refuses the record. This shows a refusal, and it bounds nothing in the other direction. It acts only
+    inside drop_outside, whose one caller is §4.2's gate, which no recorded cell calls."""
     __slots__ = ("_keys",)
 
     def __init__(self, view, keys):

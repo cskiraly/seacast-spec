@@ -303,7 +303,7 @@ def rows(f0, d, w=None):
         # the ninth name a node can replace, asked since §4.11 covers next_to_send: the entry handed over, and the
         # entry it returns
         ("filterEntryNode", "filter_entry", asked["filter_entry"], pushed, (4, pushed), {}),
-        # §4.2's gate: the block's cell groups, the order of on_header_validated's set of them (its members groups),
+        # §4.2's gate: the block's cell groups, the order of on_header_validated's pass over them (its members groups),
         # and the two levels drop_outside iterates, whose keys go on the tape there
         ("cellGroups", "cell_groups", q["cell_groups"], [g, g2], (root,), {}),
         ("groupsOrder", "order", lambda r: tail("order", order_entry("on_header_validated", [g2, g])), None, (), {}),

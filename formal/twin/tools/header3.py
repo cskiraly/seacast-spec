@@ -10,8 +10,8 @@ this one is made against the tree itself. cells3.py asks it of each trace it has
 
 What the replay does not check of the header, the second line: the tracer's name, and that the functions traced
 (`traced`) are the block's (trace3.BLOCK), §6.1's twelve (TRACE3_ONLY=sec61), or, for a trace run with --doc seacast,
-the block's names that are seacast-lite.md's all the way down (trace3.seacast_kept), computed here from TOYDIR's documents,
-or §6.1's twelve; and that it claims the whole state exactly where it is a directed set's. Its tables (`own`,
+SEACAST's kept names (trace3.seacast_kept, computed here from TOYDIR's documents) and covered ones (the manifest's
+COVERED), or §6.1's twelve; and that it claims the whole state exactly where it is a directed set's. Its tables (`own`,
 `foreign`) are trace3.py's, or for a trace run with --doc seacast seacast.md's manifest's (`want`). Its envelope
 is the one both readers hold it to: no member twice, nothing beside the header, no member trace3.py does not write,
 the arguments a list of words, and a document word the toy takes (`lite` or `seacast`; a header written before

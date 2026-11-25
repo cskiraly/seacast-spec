@@ -70,8 +70,9 @@ The sets:
   path is one and the same for every record of the scenario. Each record starts from the serving sets' state, with
   the gate's tables (GATE_EMPTIED), the offers and the reservations emptied. A record of gate_v calls drop_outside on
   each of R's 132 groups, so it is over ten times the size of one of gate_o's, and gate_v is made at a smaller n
-  (check.sh's sdir_shape). That pass iterates a set of bytes (seacast.md's `groups`), so its order is the hash
-  seed's: gate_v's trace differs from one process to another in that order alone, and its replay does not.
+  (check.sh's sdir_shape). That pass iterates seacast.md's `groups`, a dict made from `cell_groups(root)`, so it
+  runs in cell_groups' order, the same on every run (seacast.md since 47e1afa). The tracer still writes the pass's
+  order on the tape (["order", "on_header_validated", ...]), and the replay reads it from there.
 - **asked_h** (H, nodes 2 to 4), §4.5's `may_be_asked` (P7), MB1 to MB8: `may_be_asked(p, g, i)`, with `routed`
   given or left to its default, which no code of the documents calls. Each record is on a state whose path is one and
   the same for every record of the scenario, and starts from the serving sets' state with `offers` emptied. By
@@ -79,7 +80,8 @@ The sets:
   type, with a drawn descriptor of 1 to 8 chunks and an index below it. MB8's state takes p's JOIN of the type back,
   so that interest_of_peer raises KeyError at `join_recv[p][T]`: the loop takes a KeyError, and that error alone, as
   MB8's path (RAISES), and stops the set at an MB8 call that does not raise. The tracer writes the record with
-  `raises` and `raises_key`, and the replay, against the record's `raises_key`, tells where the error was raised.
+  `raises` and `raises_key`, and the replay compares the twin's crash with the record's: the error's name and its
+  key (`raises_key`), not the function that raised it.
   Any other raise stops the set, as in every set.
 
 Beside the trace, OUT.scenarios has a line per record in the trace's order: its number from 1, its line in the trace
