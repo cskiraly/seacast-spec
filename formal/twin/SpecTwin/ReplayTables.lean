@@ -337,10 +337,10 @@ def valueAt (s : State) : Cell → Option Val
   | .queue p l => ((s.queue.getD p {}).get? l).map (.lane ·)
   | .queueRow p => if s.queue.contains p then some .flag else none
   -- An empty list of waits is no entry, as the tracer writes it (trace3.py's waits encoder). A limit: a record the
-  -- Python makes can be refused. Example: `on_header_validated` stores `pending[root] = []`, which keeps the root a
-  -- key; a later `drop_stale_waits` at that node iterates it (`for root in list(pending)`), and the twin, which holds
-  -- no such key, refuses that record at `pendingOrder`. No recorded cell calls the gate, and K4's gate draws restore
-  -- the state before each draw.
+  -- Python makes can be refused. Example: where every copy that waited is of the root's groups,
+  -- `on_header_validated` stores `pending[root] = []`, which keeps the root a key; a later `drop_stale_waits` at that
+  -- node iterates it (`for root in list(pending)`), and the twin, which holds no such key, refuses that record at
+  -- `pendingOrder`. No recorded cell calls the gate, and K4's gate draws restore the state before each draw.
   | .pending r => match s.pending.getD r [] with
     | [] => none
     | l => some (.waits l)

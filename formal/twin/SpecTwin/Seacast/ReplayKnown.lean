@@ -1337,7 +1337,7 @@ end Upkeep
 /-! ## §4.11's window, in bytes, and the writer: `wake_front`, `write_waits`, `acquire_room`, `leave_line`,
 `track_in_flight`, `window_release`, `window_timeout`, `noted`, `free_room` and `next_to_send`
 
-Hand-written records, each written from the Python's order of reads and questions (seacast.md:3016-3098, and
+Hand-written records, each written from the Python's order of reads and questions (seacast.md:3018-3100, and
 seacast-lite.md's `front`, which they call), and each passing with "fewer" 0 and exactly the branch labels it was
 written for, in order. A function's labels come after those of the functions it calls before it ends, as the twin
 emits them:
@@ -1400,7 +1400,7 @@ def fails3 (pre : String) (l : String) (c : Consts := c0) (c2' : ConstsSeacast :
   | .ok _ => false
 
 /-- The same at a node whose line replaces `filter_entry` (`--promise-mode peer`'s, say), which `next_to_send` then
-asks (seacast.md:3091) -/
+asks (seacast.md:3093) -/
 def replay3r (l : String) : Except String (Array String × Nat) := do
   runSeacast c0 c3 params ["filter_entry"] traced (← record (← Json.parse l) docSeacast) []
 
@@ -1816,10 +1816,10 @@ end Window
 
 /-! ## §4.2's gate for cells: `on_header_validated` and `drop_outside`
 
-Hand-written records, each written from the Python's order of reads and questions (seacast.md:1197-1221 and
-:1573-1579), and each passing with "fewer" 0 and exactly the branch labels it was written for, in order:
+Hand-written records, each written from the Python's order of reads and questions (seacast.md:1197-1223 and
+:1575-1581), and each passing with "fewer" 0 and exactly the branch labels it was written for, in order:
 - a root with no pending cell and no tie, whose one group has no standing request and no `want_p` entry: `tied`'s
-  keys entry at :1205 and again at :1216, each empty, and nothing at :1218, where the pop finds no row;
+  keys entry at :1207 and again at :1218, each empty, and nothing at :1220, where the pop finds no row;
 - peer 7's tie of indices 3 and 4 of g, whose count is 4 by now: index 3, at `index_count - 1`, offered again,
   and index 4, at `index_count`, dropped; the peer emptied, with its slot, and the root's row popped;
 - the tie of an expired group; a tie on a link not joined for the type, the count not known; a tied index the node
@@ -1829,7 +1829,7 @@ Hand-written records, each written from the Python's order of reads and question
   request outside, dropped, an interest bit outside, dropped, and one the node holds, kept.
 
 The cells that waited for the header and resume level 1 are left to the directed set made from
-`seacast_carried_known.py`. Four must fail: :1216's keys entry missing, the order of the groups naming another
+`seacast_carried_known.py`. Four must fail: :1218's keys entry missing, the order of the groups naming another
 group, `cell_groups` answering a key of 63 hex digits, and index 4 offered too.
 
 What a record shows, and what it does not, is as in the sections above. A `pending` entry and an `asked_parked`
@@ -1862,7 +1862,7 @@ def tr7g : String := s!"[{rootq}, 7, {gq}]"
 def slot7 : String := s!"[[{rootq}, 7]]"
 /-- The scans of a gate with peer 7's tie under the root, and the groups' pass over g with nothing standing -/
 def scans7 : List String := [sc "tied" tr, sc "tied" tr7, sc "standing" gp, sc "want_p" "[]"]
-/-- The end of the gate: :1216's keys entry, :1218's pop of the emptied row, and the groups' pass over g with
+/-- The end of the gate: :1218's keys entry, :1220's pop of the emptied row, and the groups' pass over g with
 nothing standing, no `want_p` entry and an empty ledger -/
 def end7 : List String :=
   [tiedK tr "[7]", tiedK tr "[]", ordQ s!"[{gq}]", stK "[]", wpK "[]", ctpQ "[]"]
@@ -1885,7 +1885,7 @@ def lKept : String := "drop_outside: interest kept"
 
 /-! ### on_header_validated -/
 
--- no pending cell, no tie: :1205's and :1216's keys entries empty, no pop at :1218, where the row is read absent
+-- no pending cell, no tie: :1207's and :1218's keys entries empty, no pop at :1220, where the row is read absent
 def r0 : String :=
   rec2 "on_header_validated" s!"[{rootq}]" [rd "pending" tr "null", rd "tied" tr "null"]
     [sc "tied" tr, sc "standing" gp, sc "want_p" "[]"] [rd "pending" tr "null"]
@@ -1933,7 +1933,7 @@ def r3b : String :=
 #guard takes r3b [lHeld, lPeerGone, lRootGone, "ledger: empty"]
 
 -- peer 7's tie holds g, of the block, and g2, of no cell of it: g's tie goes and g2's stays, so peer 7 is not
--- emptied, :1216 deletes nothing and :1218 pops nothing
+-- emptied, :1218 deletes nothing and :1220 pops nothing
 def r6 : String :=
   rec2 "on_header_validated" s!"[{rootq}]" (reads7 "8" ++ [rd "tied" s!"[{rootq}, 7, {g2q}]" "4"]) scans7
     [rd "pending" tr "null", rd "tied" tr7g "null"]
@@ -1963,7 +1963,7 @@ def r6 : String :=
 
 /-! ### The ones that must fail -/
 
--- :1216's keys entry missing: the twin asks the order of tied[root]'s peers there, and takes :1218's entry for it
+-- :1218's keys entry missing: the twin asks the order of tied[root]'s peers there, and takes :1220's entry for it
 #guard fails1 "tape: tied[" (rec2 "on_header_validated" s!"[{rootq}]" (reads7 "8" ++ [rd "tie_slot" slot7 "5"]) scans7
   gone7 ([cgQ s!"[{gq}]", tiedK tr "[7]", tiedK tr7 s!"[{gq}]", expQ "true", tiedK tr "[]", ordQ s!"[{gq}]", stK "[]",
     wpK "[]", ctpQ "[]"]) (ret "null") ["on_header_validated", "drop_outside", "ledger"])

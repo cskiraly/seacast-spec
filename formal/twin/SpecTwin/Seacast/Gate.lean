@@ -8,9 +8,10 @@ import SpecTwin.Sec61
 The twin of §4.2's `on_header_validated` and of §4.5's `drop_outside`, which it calls. `drop_outside` comes first, as
 each function comes after every function it calls (`Seacast/Relations.lean`'s rule).
 
-- **`groups`** is `set(cell_groups(root))`: the question's answer without repeats. It is read by membership three
-  times, where its order does not show, and iterated once, by the groups' pass, whose calls ask questions: there its
-  order is asked (`groupsOrder`), a permutation of its members.
+- **`groups`** is `dict.fromkeys(cell_groups(root))`: the question's answer without repeats, in the order of each
+  group's first place in it. It is read by membership three times, where its order does not show, and iterated
+  once, by the groups' pass, whose calls ask questions: there its order is read from the tape (`groupsOrder`), a
+  permutation of its members, which the tracer writes in `cell_groups`' order.
 - **The cells that waited** are `pending[root]`'s, in the list's own order. `pending[root]` is then written with the
   rest, an empty list included, as the Python's plain assignment stores it.
 - **`tied[root]`'s levels** are iterated in the node's order, asked as `seacast-lite.md`'s twin asks it where the Python
@@ -77,7 +78,7 @@ def dropOutside (g : Group) : M2 m Unit := do
 the payload's -/
 def onHeaderValidated (root : Root) : M2 m Unit := do
   enter "on_header_validated"
-  let groups := (← NodeSeacast.cellGroups root).eraseDups   -- `groups = set(cell_groups(root))`
+  let groups := (← NodeSeacast.cellGroups root).eraseDups   -- `groups = dict.fromkeys(cell_groups(root))`
   -- `cells = [... if f.group in groups]`; `pending[root] = [... if f.group not in groups]`: the payload waits
   let waits ← pendingOf root
   setPending root (waits.filter fun (_, f) => !groups.contains f.g)
@@ -135,7 +136,7 @@ def onHeaderValidated (root : Root) : M2 m Unit := do
   if (← allTiedRoot root).isEmpty then
     let _ ← lite (popTiedRoot root)
     if there then branch "on_header_validated: the root's ties gone"
-  -- `for g in groups:` every column and row group of the block, in the set's order
+  -- `for g in groups:` every column and row group of the block, in `cell_groups`' order, read from the tape
   for g in ← NodeSeacast.groupsOrder "on_header_validated" groups do
     dropOutside g                                             -- §4.5: the asks that came before the header
     for a in ← lite (ledger g) do                             -- offered meanwhile, or released, asked for now

@@ -255,8 +255,9 @@ class NodeSeacast (m : Type → Type) where
   offersIn : Option QEntry → m (List (Group × Bits))
   /-- `cell_groups(root)` (§3's helper, §4.2): the block's column and row groups, as the binding lists them -/
   cellGroups : Root → m (List Group)
-  /-- the order in which a set of groups iterates at a place of SEACAST's code (`groups` in `on_header_validated`), an
-  `order` entry on the tape: a permutation of the members the twin computed -/
+  /-- the order in which a collection of groups iterates at a place of SEACAST's code (`groups` in
+  `on_header_validated`, a dict's keys in `cell_groups`' order), an `order` entry on the tape: a permutation of the
+  members the twin computed -/
   groupsOrder : String → List Group → m (List Group)
   /-- the order in which `standing[g]`'s keys iterate (`list(standing[g])` in `drop_outside`, a `keys` entry on the
   tape): a permutation of the indices the twin holds -/

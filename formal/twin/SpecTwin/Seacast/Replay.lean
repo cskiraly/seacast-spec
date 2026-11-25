@@ -491,8 +491,8 @@ instance : NodeSeacast R where
         | .arr #[x], some e => match qentry x .seacast with | .ok e' => e' == e | .error _ => false
         | _, _ => false)
       (pairs "group and bits" Replay.groupKey nat)
-  -- §4.2's gate: the block's cell groups, as the binding lists them, a group there twice taken as the Python's `set`
-  -- takes it; and the orders of its loops, each a permutation of what the twin holds
+  -- §4.2's gate: the block's cell groups, as the binding lists them, a group there twice taken as the Python's
+  -- `dict.fromkeys` takes it; and the orders of its loops, each a permutation of what the twin holds
   cellGroups r := askCall "cell_groups" [Json.str r] fun j => do (← arr j).mapM Replay.groupKey
   groupsOrder place gs := do
     permOf s!"the order at {place}" gs (← askCall "order" [Json.str place] (groupList s!"the order at {place}"))
