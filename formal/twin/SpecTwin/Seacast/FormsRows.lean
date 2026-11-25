@@ -444,7 +444,7 @@ def wrongAnswer (form : String) (ans : Json) : Except String Json := do
   -- the answers `on_want` returns where the node replaces it: the first chunk with a sixth member, refused by the
   -- chunk's reader, which takes it narrow; an empty answer, which has no first chunk, gets a number where a chunk is
   | "onWantNode" => match ans with
-    | .arr xs => match xs[0]? with
+    | .arr xs => match (xs[0]? : Option Json) with
       | some (.arr c) => pure (Json.arr #[Json.arr (c.push Json.null)])
       | _ => p "[5]"
     | _ => throw s!"onWantNode: not a list of chunks: {ans.compress}"
