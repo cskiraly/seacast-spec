@@ -1,0 +1,41 @@
+cff-version: 1.2.0
+message: "If you use or refer to SEACAST, please cite it as below."
+type: software
+title: "SEACAST: Segmented, Encoded, Availability-sampled broadCAST (specification)"
+abstract: >-
+  SEACAST (Segmented, Encoded, Availability-sampled broadCAST) is a protocol for
+  getting large objects to many nodes of a peer-to-peer network fast. The source
+  cuts an object into chunks and commits to them, and can compress it and add
+  coded chunks. A node passes each chunk on as soon as it has checked it,
+  without waiting for the whole object: it pushes chunks to some peers,
+  announces them to others, and asks for those it misses. The same protocol
+  serves broadcast, where every node needs the whole object, and sampled
+  diffusion, where a node needs only part of it. It is being developed for
+  Ethereum. This repository holds its specification, written as executable
+  Python-like code, with a simulator that runs it, a Lean version of the
+  specification, and proofs in Veil.
+authors:
+  - family-names: Kiraly
+    given-names: Csaba
+    orcid: "https://orcid.org/0000-0002-6839-5024"
+repository-code: "https://github.com/cskiraly/seacast-spec"
+url: "https://github.com/cskiraly/seacast-spec"
+license: CC0-1.0
+keywords:
+  - Ethereum
+  - broadcast
+  - peer-to-peer
+  - erasure coding
+  - data availability sampling
+  - formal verification
+  - Lean
+references:
+  - type: generic
+    title: "SEACAST: fast, lean, sampled broadcast for Ethereum, with an executable spec and a formal model"
+    authors:
+      - family-names: Kiraly
+        given-names: Csaba
+    url: "https://ethresear.ch/t/seacast-fast-lean-sampled-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167"
+    date-published: 2026-10-21
+    publisher:
+      name: ethresear.ch
