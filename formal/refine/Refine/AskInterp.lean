@@ -3,6 +3,7 @@ import SpecTwin.Sec61
 /-! # The twin's side: an interpreter that keeps the queue, the timers and the asks' numbers
 
 This file imports the twin only, not Veil (a file that imports Veil must not elaborate the twin's monad).
+The `toy/node.py` lines it cites are those of spec 34f60f8.
 
 **The interpreter's contracts:**
 - **The world** is the twin's state and, beside it, what the interpreter keeps: the armed timers, the count of

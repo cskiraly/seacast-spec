@@ -63,7 +63,7 @@ def IBits.toBits? : IBits → Option Bits
 `REPAIR_TO`, which are questions), and the three the code reads beyond the class (`REPAIR_SAMPLE`, `SAMPLE_WAIT`,
 `REPAIR_REASK`). `SAMPLE_OUTSTANDING` is no type's but the node's (`ConstsSeacast`). Each is optional: the toy gives
 its payload and row types no `SAMPLE_RETRY2`, `SAMPLE_COVER`, `COVER_HIGH`, `ROUTE_HOPS` or `FORWARD_LIMIT`
-(`toy/node.py:1231-1243`, `toy/node.py:1318-1339`), and a read of a missing one raises `AttributeError` there, as it
+(`toy/node.py:1236-1251`, `toy/node.py:1331-1356`), and a read of a missing one raises `AttributeError` there, as it
 crashes here. The three limits that can be unbounded are floats, infinity for none: `SERVE_LIMIT`, `FORWARD_LIMIT`
 and `MAX_RELATIONS`, which §1.1 types `int` and the toy sets to `math.inf` unless a run gives it. A finite
 `MAX_RELATIONS` is a count, a float that holds it exactly: the tracer writes no other, and the reader takes no other

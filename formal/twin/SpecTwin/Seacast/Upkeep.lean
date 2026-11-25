@@ -24,7 +24,7 @@ rule): `relation_room`, `graft`, `on_prune`, `on_graft`, `maintain_relations`, `
   first `F_HI`; `cs[:max(0, n)]` takes none for a negative `n`. `relation_room` is called for every candidate, in
   the question's order, before the slice is taken.
 - **`sample_without_replacement(ins, len(ins) - D_OUT)`** is asked with a count that is not negative wherever
-  `F_HI` is at least `D_OUT`, as the toy's 12 and 8 are for every type (toy/node.py:1235, :1285, :1330). A negative
+  `F_HI` is at least `D_OUT`, as the toy's 12 and 8 are for every type (toy/node.py:1237, :1287, :1332). A negative
   count, which the toy's draw refuses with `ValueError`, cannot be put to the twin's question; the twin crashes
   there with a name of its own.
 - **The half-held relations** are `set(in_pushers(…)) ^ set(out_pushees(…))` in `sorted` order: the two lists

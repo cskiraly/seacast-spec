@@ -225,7 +225,7 @@ and exactly the branch labels it was written for, in order:
 - `route_want` with several links in order, one parked, and a fallback past a link that does not forward;
 - `index_bound` at its bounds, known and not, and without the parameter; `our_interest_for`'s three cases;
 - each `KeyError` of a missing JOIN, as the Python raises it. No call through `on_want` reaches one in the toy, since
-  `links(T)` needs both JOINs (toy/node.py:1399-1402) and `on_want` makes these lookups only past `joined`. A direct
+  `links(T)` needs both JOINs (toy/node.py:1401-1404) and `on_want` makes these lookups only past `joined`. A direct
   call of `outside`, `our_interest_for` or `route_want` can reach the lookup of p's JOIN. Each is a record of what the
   Python does in that state.
 
@@ -314,8 +314,8 @@ def id5q : String := s!"\"{id5}\""
 def chunk5 : String := s!"[{gq}, 5, 1, \"{root}\", \"{id5}\"]"
 def chunkQ5 : String := s!"[\"chunk_of\", [{id5q}], {chunk5}]"
 /-- A column group whose index 2 is the cell the row group g holds at index 3. The toy stores the one chunk at both
-places, under the id of its native place, the column's (`store` and `resolve`, toy/node.py:660-662 and :707-713;
-`COL.project`, :1275), so `resolve` gives both asks that id -/
+places, under the id of its native place, the column's (`store` and `resolve`, toy/node.py:663-665 and :709-715;
+`COL.project`, :1277-1278), so `resolve` gives both asks that id -/
 def gH : String := String.ofList (List.replicate 64 'c')
 def hq : String := s!"\"{gH}\""
 def idH2 : String := gH ++ "02000000" ++ String.ofList (List.replicate 40 '0')
@@ -557,7 +557,7 @@ def wP (asks : String) (unw : String := "null") (first : String := chunkQ) : Str
   [inInterest, "on_want: answered"]
 
 -- the two KeyErrors of on_want's own, each past `joined`, which the toy's links(T) passes only with both JOINs
--- (toy/node.py:1399-1402), so the toy cannot reach either: no JOIN sent to p, where the hops are read
+-- (toy/node.py:1401-1404), so the toy cannot reach either: no JOIN sent to p, where the hops are read
 #guard takes (rec1 "on_want" s!"[4, [{askOf 3}]]" [rd "desc" gp "null", rd "join_sent" (pT 4) "null"] []
     [tog, linksQ "[4]", expQ "false", tog, tog]
     [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["on_want", "joined", "index_bound"])
@@ -640,7 +640,7 @@ def out1 (routed : Bool) (reads tape : List String) (r : String) (reached : List
   ["our_interest_for"]) []
 -- no JOIN sent to p: KeyError on the type. No call through on_want reaches it in the toy: on_want asks it, itself
 -- and through outside, only of a link past `joined`, which the toy's links(T) passes only with both JOINs
--- (toy/node.py:1399-1402). A direct call of our_interest_for can
+-- (toy/node.py:1401-1404). A direct call of our_interest_for can
 #guard takes (rec1 "our_interest_for" s!"[4, {gq}]" [rd "join_sent" (pT 4) "null"] [] [tog]
   [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["our_interest_for"]) ["raises: KeyError"]
 
@@ -691,7 +691,7 @@ def servesTape : List String := [tog, linksQ "[4, 5]", tog, tog]
      "[\"route_next\", [\"row\", 0, [5]], [5]]", choice5, sendQ 1 "true"] (ret "true") ["route_want", "serves"])
   ["serves: DECLARED", "serves: DECLARED", "route_want: passed on"]
 -- the two KeyErrors of route_want's own. No JOIN sent to p: on_want asks route_want only past `joined`, which the
--- toy's links(T) passes only with both JOINs (toy/node.py:1399-1402), so no call through on_want reaches it in the
+-- toy's links(T) passes only with both JOINs (toy/node.py:1401-1404), so no call through on_want reaches it in the
 -- toy. A direct call of route_want can
 #guard takes (rec1 "route_want" s!"[4, {gq}, 3, 1]" [rd "join_sent" (pT 4) "null"] [] [tog]
     [("raises", "\"KeyError\""), ("raises_key", "[\"type\", \"row\"]")] ["route_want"])
@@ -737,7 +737,7 @@ and exactly the branch labels it was written for, in order:
   the cap with a draw of 2 and of 0; and a symmetric PRUNE with a backoff, ending both ways with two backoffs;
 - each `KeyError` of a missing JOIN sent, as the Python raises it. The toy reaches none of them: `on_graft` returns
   first unless `joined(p, T)`, which is `p in links(T)`, and the toy's `links(T)` needs both JOINs
-  (toy/node.py:1399-1402). Each record answers `links` with p on its tape, and is a record of what the Python does in
+  (toy/node.py:1401-1404). Each record answers `links` with p on its tape, and is a record of what the Python does in
   that state.
 
 Several must fail: a wrong return, a question out of order, `type_of` answered once where the Python asks it twice,
@@ -758,7 +758,7 @@ The link is peer 4, the family 0 and the colour 0. Five types have parameters: `
 pairs and a backoff of 1.0; `column`, symmetric, with no limit (+∞, the toy's default) and no backoff; `payload`, with
 parameters but no `MAX_RELATIONS`; `sym`, symmetric, with a floor below its cap and a `D_OUT` above both, and a
 backoff of 1.0; and `bare`, with `row`'s parameters but no `M`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and
-`D_OUT_MAX` at 12, 8, 8 and 12 for its three types (toy/node.py:1235, :1285, :1330); the records take smaller values,
+`D_OUT_MAX` at 12, 8, 8 and 12 for its three types (toy/node.py:1237, :1287, :1332); the records take smaller values,
 which §1.1's class allows, so that their lists stay short, and the twin reads each from the context the same way at
 any value. Two symmetric types are outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table), which the toy's `payload`,
 the only type the toy makes symmetric, meets at 6 ≤ 8 < 12: `column`, whose `D_OUT` is below its floor, and `sym`,

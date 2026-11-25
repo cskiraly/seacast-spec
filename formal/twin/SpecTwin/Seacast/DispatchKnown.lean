@@ -252,7 +252,7 @@ def wbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
 #guard passes (line2 (entry [("replaced", some (strs ["filter_entry"])),
                              ("chains", some (chains [("filter_entry", ["Node._peer_promise.<locals>.filter_entry", "doc"])]))])
   false (sortBy (· < ·) ("filter_entry" :: traced43)))
--- §4.5's on_want, REPLACEABLE: a withholder's (toy/node.py:1795, in Node._seacast) is taken, and without its chain refused
+-- §4.5's on_want, REPLACEABLE: a withholder's (toy/node.py:1794, in Node._seacast) is taken, and without its chain refused
 #guard passes (line2 (entry [("replaced", some (strs ["on_want"])),
                              ("chains", some (chains [("on_want", ["Node._seacast.<locals>.<lambda>"])]))])
   false (sortBy (· < ·) ("on_want" :: traced43)))
