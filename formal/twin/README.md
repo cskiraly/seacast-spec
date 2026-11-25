@@ -55,8 +55,10 @@ covered record is refused when the twin entered a function that the node's line 
 ran something else there. The functions the twin asks where a node replaces them are asked, not entered. The tracer
 refuses to write such a record as well, but the replay does not rely on that. The `.kept` route returns through
 `Replay.run` before this check. The refusal of a record of a replaced function still applies there. The three v2
-forms, `on_pace_tick`, `on_block_installed` and `respond`, reach this check. It could miss a future kept caller that
-ran the document's `on_iwant` body at a node that replaced it. The current lite caller asks the node in that case.
+forms, `on_pace_tick`, `on_block_installed` and `respond`, reach this check. Where a node replaced `on_iwant`, the
+current lite caller asks the node. If a future `.kept` caller entered the document's `on_iwant` body at a node that
+replaced it, replay would skip this check. The extra entry would still disagree with `reached` on a trace that
+recorded the replacement as a question.
 
 ## Scope
 
