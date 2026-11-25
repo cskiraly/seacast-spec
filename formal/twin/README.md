@@ -44,22 +44,19 @@ replay compares.
 the timer's delay, target and arguments with those of the call to `after` on the tape. Where the code that a
 question runs at the node arms one through the node's `after` or `start`, which the tracer wraps, in a function that
 the node replaces or in the toy's own code, the question's log notes the timer. The replay checks only the note's
-form: a finite delay, a target that an `after` or a `start` arms, and arguments of that timer's form. A timer that
-the node's code arms by calling the simulator itself, as the writer's kick does, leaves no note, and the replay sees
-nothing of it. When a timer fires and the function it runs is one that the twin covers, that call's record is
-replayed from what the call read. No earlier record feeds it, and the replay does not look for the `after` or the
-note that armed the timer. So a trace in which a `promise_due` fires with no arming before it replays record by
-record as if the timer had been armed.
+form: a finite delay, a target that an `after` or a `start` arms, and arguments of that timer's form. The writer's
+kick calls `sim.after` outside the wrapped `after` or `start` call, so it produces no timer note. When a timer fires
+and the function it runs is one that the twin covers, that call's record is replayed from what the call read. No
+earlier record feeds it, and the replay does not look for the `after` or the note that armed the timer. So a trace
+in which a `promise_due` fires with no arming before it replays record by record as if the timer had been armed.
 
 **A record is refused where the twin ran its own code for a function the node replaced.** Under `seacast.md`, a
 covered record is refused when the twin entered a function that the node's line gives as replaced, since the node
 ran something else there. The functions the twin asks where a node replaces them are asked, not entered. The tracer
-refuses to write such a record as well, but the replay does not rely on that. A record that the replay sends to
-`seacast-lite.md`'s code, through the lite replay, is not given this check. The functions of `seacast-lite.md` that
-take a v2 form (`on_pace_tick`, `on_block_installed` and `respond`) are replayed with SEACAST's own and are given it.
-So the check would miss a record of a kept function in which the twin ran its own code for a name the node
-replaced. Under `seacast-lite.md` each name a node may replace is asked where it is replaced, so no kept function
-runs the twin's own code there today.
+refuses to write such a record as well, but the replay does not rely on that. The `.kept` route returns through
+`Replay.run` before this check. The refusal of a record of a replaced function still applies there. The three v2
+forms, `on_pace_tick`, `on_block_installed` and `respond`, reach this check. It could miss a future kept caller that
+ran the document's `on_iwant` body at a node that replaced it. The current lite caller asks the node in that case.
 
 ## Scope
 

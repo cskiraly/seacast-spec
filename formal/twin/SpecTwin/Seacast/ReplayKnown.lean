@@ -1786,7 +1786,7 @@ def nAnswer : String := rec2 "next_to_send" "[5]"
 /-- A timer that the node's own `filter_entry` armed, as the question's log notes it: §6.1's `promise_due` for the
 ask `[g, 3]` of peer 5, PROMISE and the time it was armed as their words (`after(PROMISE, promise_due, a, p, now)`) -/
 def promiseNote : String := s!"[\"after\", {f1}, \"promise_due\", [[{gq}, 3], 5, {f2}]]"
-/-- The toy's alarm, as the question's log notes it: its group, index, peer and time -/
+/-- A synthetic alarm note for the reader's form test. The arguments are group, index, peer and arming time. -/
 def alarmNote : String := s!"[\"after\", {f1}, \"Node._alarm.<locals>.alarm_due\", [{gq}, 3, 5, {f2}]]"
 /-- `promiseNote` naming the toy's wrapper of `promise_due`, which no `after` of the documents arms -/
 def wrapperNote : String := s!"[\"after\", {f1}, \"Node._seacast.<locals>.promise_due\", [[{gq}, 3], 5, {f2}]]"
