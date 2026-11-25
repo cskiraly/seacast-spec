@@ -80,11 +80,13 @@ PURE_BUILTINS_Seacast = (
     "iter", "len", "list", "map", "max", "min", "next", "range", "reversed", "round", "set", "sorted", "str", "sum",
     "tuple", "zip", "True", "False", "None")
 PURE_Seacast = ("popcount", "all_bits", "bitmap",        # bits.py's
-           "group", "group_index", "index")         # node.py's, each a function of its argument alone
-CONSTRUCTORS_Seacast = ("Ask", "Entry", "Graft", "Have", "Join", "Prune", "Want", "WantIndex")
+           "group", "group_index", "index",         # node.py's, each a function of its argument alone
+           "floor")                                 # math's, which node.py's namespace binds (on_heartbeat's)
+CONSTRUCTORS_Seacast = ("Ask", "Chunk", "Entry", "Graft", "Have", "Join", "Prune", "Want", "WantIndex")
 CONTEXT_Seacast = ("now", "mesh", "gossip_history")
 # each use of a context global, by its receiver and its kind (`uses`), that is a question on the tape
 CONTEXT_USES_Seacast = {("gossip_history", ".put()"): "gossip_put",
+                   ("gossip_history", ".gossip_ids()"): "gossip_ids",
                    ("gossip_history", ".remove_group()"): "gossip_remove_group",
                    ("mesh", "in"): "mesh_has"}
 # each use that is no question, with the reason that it touches no node state
