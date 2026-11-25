@@ -2008,6 +2008,87 @@ def pub (tape : String) (d : String := desc1) : String :=
 -- a descriptor of no chunk
 #guard failsWith "crash: limit: publish of a descriptor of no chunk" (pub "[]" s!"[1, 0, 0, 0, 4, 4, {rootq}]")
 
+/-! ## §4.8's `on_heartbeat`: paced or not, a peer not eligible for gossip, and two `joined_types()` answers
+
+The record is the toy's first heartbeat at node 1 of a run of five nodes that run one type, `payload`, linked to
+peers 2 to 5. Its tables are empty and every peer is related, so no peer is eligible for gossip. With no eligible
+peer, `PACED` decides the label alone, and the record is the one the toy writes under either value. The others
+each change one answer, and what follows from it. In one, peer 5 is not related, and the `gossip_eligible(5)` that
+the twin then asks answers false. In the other, the second `joined_types()` answers no type, so `maintain_relations`
+runs for none: its entries leave the tape, and its name leaves `reached`. -/
+
+/-- The type `payload`: the parameters the heartbeat reads -/
+def paramsP : TypeId → Option TypeParams := fun T =>
+  if T == "payload" then
+    some { M := some 1, F_LO := some 6, F_HI := some 12, D_OUT := some 8, D_OUT_FAST := some 8,
+           SYMMETRIC := some false, EAGER := some true }
+  else none
+
+def paced : Consts := { c0 with PACED := true }
+
+def replayP (l : String) (c : Consts) : Except String (Array String × Nat) := do
+  runSeacast c c2 paramsP [] traced (← record (← Json.parse l) docSeacast) []
+
+/-- The record passes, with no read of the Python's left unmade, through these branch labels in order -/
+def takesP (l : String) (c : Consts) (marks : List String) : Bool :=
+  match replayP l c with
+  | .ok (ms, 0) => ms.toList == marks
+  | _ => false
+
+def failsP (pre : String) (l : String) (c : Consts) : Bool :=
+  match replayP l c with
+  | .error e => e.startsWith pre
+  | .ok _ => false
+
+/-- The toy's record, whole -/
+def hb : String :=
+  "{\"n\":1,\"t\":4591870180066957722,\"fn\":\"on_heartbeat\",\"args\":[],\"tape\":[[\"keys\",\"held_back\",[],[]],[\"release_wanted_groups\",[],null],[\"keys\",\"pending\",[],[]],[\"keys\",\"tie_slot\",[],[]],[\"gossip_ids\",[],[]],[\"joined_types\",[],[\"payload\"]],[\"families_with_duty\",[\"payload\"],[0]],[\"floor_links\",[\"payload\",0],[2,3,4,5]],[\"floor_candidates\",[\"payload\"],[]],[\"sample_without_replacement\",[[],0],[]],[\"joined_types\",[],[\"payload\"]],[\"families_with_duty\",[\"payload\"],[0]],[\"in_pushers\",[\"payload\",0,0],[2,3,4,5],{\"cr\":[[\"push_in\",[2,\"payload\",0],[0]],[\"push_in\",[3,\"payload\",0],[0]],[\"push_in\",[4,\"payload\",0],[0]],[\"push_in\",[5,\"payload\",0],[0]]],\"cw\":[]}],[\"candidates\",[\"payload\",0,0,\"IN\"],[]],[\"out_pushees\",[\"payload\",0,0],[2,3,4,5],{\"cr\":[[\"push_out\",[2,\"payload\",0],[0]],[\"push_out\",[3,\"payload\",0],[0]],[\"push_out\",[4,\"payload\",0],[0]],[\"push_out\",[5,\"payload\",0],[0]]],\"cw\":[]}],[\"uplink_class\",[],\"HOME\"],[\"candidates\",[\"payload\",0,0,\"OUT\"],[]],[\"sampled_types\",[],[]],[\"joined_peers\",[],[2,3,4,5]],[\"related\",[2],true,{\"cr\":[[\"push_out\",[2,\"payload\",0],[0]]],\"cw\":[]}],[\"related\",[3],true,{\"cr\":[[\"push_out\",[3,\"payload\",0],[0]]],\"cw\":[]}],[\"related\",[4],true,{\"cr\":[[\"push_out\",[4,\"payload\",0],[0]]],\"cw\":[]}],[\"related\",[5],true,{\"cr\":[[\"push_out\",[5,\"payload\",0],[0]]],\"cw\":[]}],[\"sample_without_replacement\",[[],0],[]]],\"reads\":[],\"scans\":[[\"held_back\",[]],[\"pending\",[]],[\"tie_slot\",[]]],\"writes\":[],\"rest\":[[\"push_in\",[2,\"payload\",0],[0]],[\"push_in\",[3,\"payload\",0],[0]],[\"push_in\",[4,\"payload\",0],[0]],[\"push_in\",[5,\"payload\",0],[0]],[\"push_out\",[2,\"payload\",0],[0]],[\"push_out\",[3,\"payload\",0],[0]],[\"push_out\",[4,\"payload\",0],[0]],[\"push_out\",[5,\"payload\",0],[0]]],\"ret\":null,\"reached\":[\"drop_stale_waits\",\"keep_floor\",\"maintain_relations\",\"on_heartbeat\"],\"tables\":[\"held_back\",\"pending\",\"tie_slot\"]}"
+
+/-- `related(5)`'s entry, and the second `joined_types()` with `maintain_relations`' six entries after it -/
+def rel5 : String := "[\"related\",[5],true,{\"cr\":[[\"push_out\",[5,\"payload\",0],[0]]],\"cw\":[]}],"
+def rel5no : String := "[\"related\",[5],false,{\"cr\":[[\"push_out\",[5,\"payload\",0],[0]]],\"cw\":[]}],"
+def second : String := "[\"joined_types\",[],[\"payload\"]],[\"families_with_duty\",[\"payload\"],[0]],[\"in_pushers\","
+def seg2 : String :=
+  "[\"joined_types\",[],[\"payload\"]],[\"families_with_duty\",[\"payload\"],[0]],[\"in_pushers\",[\"payload\",0,0],[2,3,4,5],{\"cr\":[[\"push_in\",[2,\"payload\",0],[0]],[\"push_in\",[3,\"payload\",0],[0]],[\"push_in\",[4,\"payload\",0],[0]],[\"push_in\",[5,\"payload\",0],[0]]],\"cw\":[]}],[\"candidates\",[\"payload\",0,0,\"IN\"],[]],[\"out_pushees\",[\"payload\",0,0],[2,3,4,5],{\"cr\":[[\"push_out\",[2,\"payload\",0],[0]],[\"push_out\",[3,\"payload\",0],[0]],[\"push_out\",[4,\"payload\",0],[0]],[\"push_out\",[5,\"payload\",0],[0]]],\"cw\":[]}],[\"uplink_class\",[],\"HOME\"],[\"candidates\",[\"payload\",0,0,\"OUT\"],[]],"
+def mrReached : String := "\"maintain_relations\","
+
+/-- peer 5 neither related nor eligible -/
+def notEligible : String := hb.replace rel5 (rel5no ++ "[\"gossip_eligible\",[5],false],")
+/-- the second `joined_types()` answers no type: `maintain_relations` runs for none -/
+def differ : String := (hb.replace seg2 "[\"joined_types\",[],[]],").replace mrReached ""
+
+/-- the second `joined_types()` answers no type, and `maintain_relations`' entries are left after it -/
+def entriesLeft : String :=
+  hb.replace second "[\"joined_types\",[],[]],[\"families_with_duty\",[\"payload\"],[0]],[\"in_pushers\","
+/-- peer 5 not related, and no `gossip_eligible` entry -/
+def noEntry : String := hb.replace rel5 rel5no
+
+def relLabel : String := "on_heartbeat: a related peer, no gossip"
+def head3 : List String :=
+  ["drop_stale_waits: done", "keep_floor: links opened", "maintain_relations: below the floor, one way"]
+def rel4 : List String := [relLabel, relLabel, relLabel, relLabel]
+
+-- each text replaced is in the record once
+#guard [rel5, second, seg2, mrReached].all fun s => (hb.splitOn s).length == 2
+#guard takesP hb paced (head3 ++ rel4 ++ ["on_heartbeat: gossip paced"])
+#guard takesP hb c0 (head3 ++ rel4 ++ ["on_heartbeat: gossip sent at once"])
+#guard takesP notEligible paced
+  (head3 ++ [relLabel, relLabel, relLabel, "on_heartbeat: a peer not eligible for gossip", "on_heartbeat: gossip paced"])
+#guard takesP differ paced (["drop_stale_waits: done", "keep_floor: links opened"] ++ rel4 ++ ["on_heartbeat: gossip paced"])
+
+/-! ### The ones that must fail -/
+
+-- maintain_relations' entries left after the second answer: the twin asks sampled_types, as it does not take the
+-- first answer for the second
+#guard failsP "tape: sampled_types[] asked, " entriesLeft paced
+-- the twin asks gossip_eligible(5)
+#guard failsP "tape: gossip_eligible[5] asked, " noEntry paced
+-- each label list under the other PACED
+#guard !takesP hb c0 (head3 ++ rel4 ++ ["on_heartbeat: gossip paced"]) &&
+  !takesP hb paced (head3 ++ rel4 ++ ["on_heartbeat: gossip sent at once"])
+-- and each changed record differs from the toy's
+#guard notEligible != hb && differ != hb && entriesLeft != hb && noEntry != hb
+
 end Roots
 
 end SpecTwin.Seacast.ReplayKnown
