@@ -1,11 +1,13 @@
 """One example tape row per form of the questions the tracer writes under seacast.md, made by the tracer's own
 writers (trace3.py's questions_enc_seacast, type_enc_seacast, param_enc_seacast, swr_seacast): the 39 forms of SEACAST's 36 questions
 (`choice` has four, and `send` has a row for each kind of message it takes), and seacast-lite.md's three questions in
-the forms v2 asks them; then 18 more forms the twin reads: SEACAST's `after` (one row per timer), release_wanted_groups,
-window_release, a draw of peers, an order, the two levels whose order is asked (probe_waiting[g], claims), interest's
-miss, and the eight names a node can replace (asked_enc_seacast); then the four questions §4.5's on_want asks
-(own_id, admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc); then the six §4.1's upkeep
-asks (runs_type, our_join, candidates, in_pushers, out_pushees, uplink_class), 72 rows in all. Each line is the twin's
+the forms v2 asks them; then 17 more forms the twin reads: SEACAST's `after` (one row per timer), release_wanted_groups,
+a draw of peers, an order, the two levels whose order is asked (probe_waiting[g], claims), interest's miss, and the
+eight names a node can replace (asked_enc_seacast); then the four questions §4.5's on_want asks (own_id,
+admitted_group, and resolve and chunk_of, whose writers are Tracer3.lookups_enc); then the six §4.1's upkeep asks
+(runs_type, our_join, candidates, in_pushers, out_pushees, uplink_class); then the three §4.11's writer asks
+(pop_owed_answer, whose writer is Tracer3.pop_owed_enc, wire_size and offers_in); and last the ninth name a node can
+replace, filter_entry, asked since §4.11 covers next_to_send; 75 rows in all. Each line is the twin's
 form name (Seacast/Replay.lean's NodeSeacast), a tab, and the row,
 [name, arguments, answer], as compact JSON. The replay reads each row with its question and refuses a wrong form of
 each answer (`replay --forms FILE`, in check.sh's build step).
@@ -106,6 +108,11 @@ class WantIndex:                        # an ask by index, as the toy's wire mod
         self.group, self.index = group, index
 
 
+class HaveBitmap:                       # an IHAVE's bitmap, as the toy's wire module has it (Tracer3.offer tells it apart)
+    def __init__(self, group, bits):
+        self.group, self.bits, self.claim_all, self.complete = group, bits, False, False
+
+
 class Interest(dict):                  # the toy's ALL fixture (node.py's `_seacast`): every index for any group
     def __missing__(self, g):
         return NS(v=-1)
@@ -165,7 +172,8 @@ def rows(f0, d, w=None):
     if not hasattr(w, "doc_seacast"):        # a bare writer: this one, or trace3's self-test's planted one
         w.doc_seacast = True                 # timer_args writes SEACAST's three timers under v2 alone
     if not hasattr(w, "Wm"):
-        w.Wm = NS(WantIndex=WantIndex)       # resolve's ask: Tracer3.key reads the wire module's class
+        w.Wm = NS(WantIndex=WantIndex,       # resolve's ask: Tracer3.key reads the wire module's class; an IHAVE's
+                  is_have_bitmap=lambda x: isinstance(x, HaveBitmap))     # bitmap, Tracer3.offer its function
     G, idx, slot, ROOT, MID = f0
     assert idx == 0 and MID.startswith(G + "00000000"), f0
     g, root = bytes.fromhex(G), bytes.fromhex(ROOT)
@@ -194,6 +202,10 @@ def rows(f0, d, w=None):
     look = w.lookups_enc()
     ts = {t.name: t for t in trace3.schema_seacast.python_tables_seacast(F, w.key, trace3.fbits, w.rel_msg)}
     g2 = hashlib.sha256(b"group" + (2).to_bytes(4, "little")).digest()     # a second group, made up here
+    # two queue entries: a push of the first chunk; owed offers on their own, an IHAVE of two bitmaps (with_owed's)
+    pushed = NS(chunk=fa, control=None, solicited=False)
+    owed = NS(chunk=None, control=NS(items=[NS(kind="ihave", ids=[HaveBitmap(g, bits(5)), HaveBitmap(g2, bits(6))])]),
+              solicited=False)
     after = lambda r, delay, fn, *args: [w.after_row(delay, fn, *args), None]   # noqa: E731: install's encoder
     # (form, tape name, its encoder, the Python answer, the Python arguments, keywords)
     table = [
@@ -244,7 +256,7 @@ def rows(f0, d, w=None):
          {}),
         ("shuffledPairs", "shuffled", q["shuffled"], [(1, fb), (0, fa)], ([(0, fa), (1, fb)],), {}),
         # the forms the twin reads besides: the timers a record arms (one row per v2 timer), seacast.md's
-        # release_wanted_groups and window_release, a draw of peers, an order, the two levels whose order is asked,
+        # release_wanted_groups, a draw of peers, an order, the two levels whose order is asked,
         # interest's miss; then the eight names a node can replace, in NodeSeacast's forms (asked_enc_seacast)
         ("afterSeacast (reconsider)", "after", after, None, (0.5, reconsider, g, 1.25), {}),
         ("afterSeacast (ask_sample)", "after", after, None, (0.25, ask_sample, g, 3), {}),
@@ -256,7 +268,6 @@ def rows(f0, d, w=None):
          None, (), {}),
         ("claimsOrder", "keys", lambda r: tail("keys", keys_entry(ts["claims"], (), [g2, g])), None, (), {}),
         ("ownInterest", "own_interest", lambda r: tail("own_interest", own_interest_entry(g)), None, (), {}),
-        ("windowRelease", "window_release", q["window_release"], None, (4, g, 3), {}),
         ("forwardNode", "forward", asked["forward"], None, (fa, 4), {"axes": [(g, 3)]}),
         ("pushRebuiltNode", "push_rebuilt", asked["push_rebuilt"], None, (g, [3, 5]), {}),
         ("sendHaveNode", "send_have", asked["send_have"], None, (4, g), {}),
@@ -279,6 +290,13 @@ def rows(f0, d, w=None):
         ("inPushers", "in_pushers", q["in_pushers"], [2, 7], (COL, 3, 0), {}),
         ("outPushees", "out_pushees", q["out_pushees"], [4], (COL, 3, 0), {}),
         ("uplinkClass", "uplink_class", q["uplink_class"], "HOME", (), {}),
+        # §4.11's writer: the answer a full queue refused, a chunk's bytes on the wire to p, the offers an entry carries
+        ("popOwedAnswer", "pop_owed_answer", w.pop_owed_enc, fa, (4,), {}),
+        ("wireSize", "wire_size", q["wire_size"], 1200, (4, pushed), {}),
+        ("offersIn", "offers_in", q["offers_in"], [(g, bits(5)), (g2, bits(6))], (owed,), {}),
+        # the ninth name a node can replace, asked since §4.11 covers next_to_send: the entry handed over, and the
+        # entry it returns
+        ("filterEntryNode", "filter_entry", asked["filter_entry"], pushed, (4, pushed), {}),
     ]
     return [(form, c([name, *enc(r, *args, **kw)])) for form, name, enc, r, args, kw in table]
 

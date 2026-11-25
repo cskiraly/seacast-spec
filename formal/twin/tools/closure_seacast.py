@@ -25,8 +25,14 @@ load and the function binds. The scopes are the function's own (its arguments an
 each lambda and comprehension around the load. A comprehension's first iterable, and a lambda's defaults, are read
 in the scope outside it. Python's symtable checks this reading: the names it finds global must be the ones symtable
 calls global and referenced in the function's tables, but for names read in annotations alone. A difference stops
-the check. So does a function whose scopes the reading does not follow: one with a global or nonlocal statement, a
-decorator, a default that is not a constant, a nested class, an async part or a match statement.
+the check. So does a function whose scopes the reading does not follow: one with a nonlocal statement, a global
+statement that names anything but GLOBAL_CELLS_Seacast's, a decorator, a default that is not a constant, a nested
+class, an async part or a match statement.
+
+A global statement over GLOBAL_CELLS_Seacast's names alone is followed. Each such name may be bound in the function by
+`+=` and `-=` alone: any other store of it, a delete, or a binding of another kind (an argument, an except's or an
+import's name) stops the check. A `+=` or `-=` of it is a load of it, where symtable calls it global and assigned
+rather than referenced; the comparison with symtable takes it so.
 
 `derive_questions` gives what the code asks, without the registry. Its four groups are: the globals of COVERED
 functions that no class but a question takes; the `.params` calls; the type's functions called; and the context
@@ -44,6 +50,11 @@ from types import SimpleNamespace
 CLOSURE_ALIASES = {
     "hdr": "desc, a view, under the name seacast.md's code gives it",
     "chunk_id": "message_id, a traced function, under the name seacast.md's code gives it (chunk_id = message_id)"}
+# the globals a covered function may declare with a global statement, each with why its `+=` and `-=` keep the view:
+# the tracer's object stays bound to the name, so every later read and write of it is logged
+GLOBAL_CELLS_Seacast = {
+    "in_flight": "§4.11's window, a count of bytes: the tracer's cell, whose += and -= give back the cell itself "
+                 "(footprint.py's CountCell)"}
 # the nodes entry's constants under v2, as trace3.py's install writes them: trace61's four, the client's three limits,
 # MAX_PLAIN_CHUNKS, the writer's three cards and FAN_IN, §1's three, §6.4's two, the twelve after them, and
 # SEACAST's six
@@ -184,11 +195,13 @@ class Reading:
     """The two documents' top-level functions, seacast.md's over seacast-lite.md's of the same name, each with its
     symtable, and each function's global loads (`loads`), read once. `annotations=False` reads annotations as loads:
     the self-test's control. `drop` names globals whose loads the reading leaves out: the self-test's planted miss,
-    which the comparison with symtable must find."""
+    which the comparison with symtable must find. `cells` names the globals a global statement may declare and the
+    reading follows (GLOBAL_CELLS_Seacast's by default; none, the self-test's control)."""
 
-    def __init__(self, p_src, seacast_src, annotations=True, drop=()):
+    def __init__(self, p_src, seacast_src, annotations=True, drop=(), cells=None):
         self.skip_annotations = annotations
         self.drop = frozenset(drop)
+        self.cells = frozenset(GLOBAL_CELLS_Seacast if cells is None else cells)
         self.defs = {}
         self.classes = {}               # the documents' top-level classes, seacast.md's over seacast-lite.md's
         self.trees = []                 # each document's module, for what binds a name anywhere in it
@@ -221,7 +234,11 @@ class Reading:
         for x in fn.args.defaults + [k for k in fn.args.kw_defaults if k is not None]:
             if not isinstance(x, ast.Constant):
                 stops.append(f"{name}: a default that is not a constant: {ast.unparse(x)[:40]}")
+        followed = set()                # the names of the global statements the reading follows
         for n in ast.walk(fn):
+            if isinstance(n, ast.Global) and set(n.names) <= self.cells:
+                followed |= set(n.names)
+                continue
             if isinstance(n, STOPS):
                 stops.append(f"{name}: a {type(n).__name__} at line {n.lineno}")
             if isinstance(n, ast.FunctionDef) and n is not fn:
@@ -231,16 +248,35 @@ class Reading:
                 stops.append(f"{name}: a lambda's default that is not a constant, at line {n.lineno}")
         if table is None:
             stops.append(f"{name}: no symtable of its own")
-        if stops:
-            return [], stops
-        ann = _annotation_ids(fn) if self.skip_annotations else set()
         parents = {}
         for n in ast.walk(fn):
             for ch in ast.iter_child_nodes(n):
                 parents[id(ch)] = n
+        for n in ast.walk(fn):                  # a followed name is bound by `+=` and `-=` alone
+            if isinstance(n, ast.Name) and n.id in followed and not isinstance(n.ctx, ast.Load):
+                up = parents.get(id(n))
+                if isinstance(n.ctx, ast.Del):
+                    stops.append(f"{name}: the global {n.id} is deleted at line {n.lineno}")
+                elif not (isinstance(up, ast.AugAssign) and up.target is n and isinstance(up.op, (ast.Add, ast.Sub))):
+                    stops.append(f"{name}: the global {n.id} is stored at line {n.lineno}, not by += or -=")
+            elif ((isinstance(n, ast.arg) and n.arg in followed)
+                  or (isinstance(n, ast.ExceptHandler) and n.name in followed)
+                  or (isinstance(n, ast.alias) and (n.asname or n.name).split(".")[0] in followed)):
+                x = n.arg if isinstance(n, ast.arg) else n.name if isinstance(n, ast.ExceptHandler) else (
+                    (n.asname or n.name).split(".")[0])
+                stops.append(f"{name}: the global {x} is bound at line {n.lineno}, not by += or -=")
+        if stops:
+            return [], stops
+        ann = _annotation_ids(fn) if self.skip_annotations else set()
         out = []
 
         def visit(node, chain):
+            if (isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name)
+                    and node.target.id in followed):    # `+=` or `-=` of a followed name: a load of it, then its value
+                if node.target.id not in self.drop:
+                    out.append((node.target, node))
+                visit(node.value, chain)
+                return
             if isinstance(node, ast.Name):
                 if (isinstance(node.ctx, ast.Load) and id(node) not in ann and node.id not in self.drop
                         and not any(node.id in b for b in chain)):
@@ -271,10 +307,13 @@ class Reading:
 
         own = _arg_names(fn.args)
         _binds(fn, own)
+        own -= followed                         # a followed name's `+=` binds it in no scope of fn's
         for st in fn.body:
             visit(st, (own,))
-        # symtable's reading: the names global and referenced in the function's tables
-        sym, todo = set(), [table]
+        # symtable's reading: the names global and referenced in the function's tables, and a followed name global
+        # and assigned in fn's own (its `+=` or `-=`, which symtable does not count as a reference)
+        sym, todo = {s.get_name() for s in table.get_symbols()
+                     if s.get_name() in followed and s.is_global() and s.is_assigned()}, [table]
         while todo:
             t = todo.pop()
             sym |= {s.get_name() for s in t.get_symbols() if s.is_global() and s.is_referenced()}
@@ -618,8 +657,9 @@ def self_test(N, m, schema_values, type_functions):
     """The checks' cases, on synthetic sources and on the toy's documents with copies of the
     lists, each with the findings it must give; then the controls: a check that finds nothing fails exactly the
     planted cases, a reading that does not skip annotations fails exactly the annotations case, a call closure over
-    COVERED alone fails exactly the transitive case, and a context check over COVERED alone fails exactly the KEPT
-    case. Returns the number of lines wrong."""
+    COVERED alone fails exactly the transitive case, a context check over COVERED alone fails exactly the KEPT
+    case, and a reading that follows no global statement fails exactly the four cases of in_flight. Returns the number
+    of lines wrong."""
     import copy
     p_src, seacast_src = N.SPEC_SRC, N.generate(N.DOC2)
     base = {k: copy.deepcopy(list(getattr(m, k)) if k != "QUESTIONS_UNLOADED" else dict(getattr(m, k)))
@@ -731,6 +771,25 @@ def self_test(N, m, schema_values, type_functions):
         ("enum_check, WAIT bound to the string 'WAIT'", "enum", dict(good_ns, WAIT="WAIT"),
          ["WAIT is str 'WAIT', not _Wait WAIT"]),
     ]
+    # a global statement over GLOBAL_CELLS_Seacast's in_flight, followed (§4.11's acquire_room and free_room); the
+    # control below reads them with no name followed
+    cells = [
+        ("global in_flight, then in_flight += n", "closure",
+         synth("def c(n):\n    global in_flight\n    in_flight += n\n", ["c"]), []),
+        ("global in_flight, then in_flight -= n", "closure",
+         synth("def c(n):\n    global in_flight\n    in_flight -= n\n", ["c"]), []),
+        ("global in_flight, then in_flight = 0", "closure",
+         synth("def c():\n    global in_flight\n    in_flight = 0\n", ["c"]),
+         ["c: the global in_flight is stored at line 3, not by += or -="]),
+        ("global in_flight, then del in_flight", "closure",
+         synth("def c():\n    global in_flight\n    del in_flight\n", ["c"]),
+         ["c: the global in_flight is deleted at line 3"]),
+        ("global waiters, a name not followed, then waiters += 1", "closure",
+         synth("def c():\n    global waiters\n    waiters += 1\n", ["c"]), ["c: a Global at line 2"]),
+        ("global in_flight, waiters: one name not followed", "closure",
+         synth("def c(n):\n    global in_flight, waiters\n    in_flight += n\n", ["c"]), ["c: a Global at line 2"]),
+    ]
+    cases += cells
     # the tell of a wire message's field (message_field): two that pass, then the reads it cannot follow
     # the pinned Graft, as MESSAGE_CLASSES has it; cls0, the classes without it, for the cases that bring their own
     graft = ("class Graft(Container):\n    object_type: TypeId\n    family: FamilyId\n    colour: uint16\n"
@@ -820,16 +879,18 @@ def self_test(N, m, schema_values, type_functions):
     ]
     cases += [(what, "types", synth(cls0 + src, ["c"]), want) for what, src, want in pins]
 
-    def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False, field_off=False):
+    def run(kind, arg, ann=True, visit=("COVERED", "KEPT"), over=("COVERED", "KEPT"), stub=False, field_off=False,
+            follow=True):
         """A case's findings. `stub`: every check replaced by one that finds nothing, the case's input made as it
-        is otherwise (the control of the planted cases). `field_off`: no read is a wire message's field."""
+        is otherwise (the control of the planted cases). `field_off`: no read is a wire message's field. `follow`
+        False: no global statement is followed."""
         FIELD_OFF[0] = field_off
         try:
-            return run1(kind, arg, ann, visit, over, stub)
+            return run1(kind, arg, ann, visit, over, stub, follow)
         finally:
             FIELD_OFF[0] = False
 
-    def run1(kind, arg, ann, visit, over, stub):
+    def run1(kind, arg, ann, visit, over, stub, follow=True):
         none = lambda *a, **k: ([], [])       # noqa: E731
         if kind in ("enum", "consts", "attrs"):
             f = {"enum": enum_check, "consts": consts_keys_check,
@@ -837,7 +898,8 @@ def self_test(N, m, schema_values, type_functions):
             return [] if stub else f(arg)
         src, mm = arg
         rd = (real[ann] if src is None else
-              Reading("", src, annotations=ann, drop=("FOO",) if kind == "closure-miss" else ()))
+              Reading("", src, annotations=ann, drop=("FOO",) if kind == "closure-miss" else (),
+                      cells=None if follow else ()))
         if kind in ("closure", "closure-miss"):
             return (none if stub else closure_check)(rd, mm, schema_values, type_functions)[0]
         if kind == "closure-tf":
@@ -875,6 +937,9 @@ def self_test(N, m, schema_values, type_functions):
     control("the tell of a wire message's field off",
             [w for w, k, a, want in cases if k == "types" and a[0] is not None and run(k, a, field_off=True) != want],
             [tell[0][0], tell[1][0], tell[7][0], tell[9][0], pins[0][0]])     # the cases with a read the tell passes
+    control("a reading that follows no global statement",       # in_flight's four: each then a Global's stop
+            [w for w, k, a, want in cases if k == "closure" and run(k, a, follow=False) != want],
+            [w for w, _, _, _ in cells[:4]])
     # the documents as they are, with the lists as they are: no finding
     found, lines = check(real[True], m, schema_values, type_functions)
     ok = not found

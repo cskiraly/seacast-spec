@@ -505,8 +505,8 @@ s_tables() {
   local rv=$OUT/twin/SpecTwin/Seacast/Replay.lean c why said
   (cd "$T" && $PY records_seacast.py "$rv") > "$OUT/arities.txt" 2>&1 \
     || no "a record writer's arity is not runSeacast's case's (arities.txt)"
-  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_seacast: 83 covered names, 0 difference(s)" ] \
-    || no "the arity check's last line is not 83 covered names and no difference (arities.txt)"
+  [ "$(tail -n 1 "$OUT/arities.txt")" = "records_seacast: 93 covered names, 0 difference(s)" ] \
+    || no "the arity check's last line is not 93 covered names and no difference (arities.txt)"
   # its default path (no argument: the tree's own Replay.lean) gives the same lines as the build's copy
   (cd "$T" && $PY records_seacast.py) > "$OUT/arities-default.txt" 2>&1
   if cmp -s "$OUT/arities-default.txt" "$OUT/arities.txt"; then rm -f "$OUT/arities-default.txt"
@@ -1069,6 +1069,9 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     # piece D's stops: seacast/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
     hand5-v2) echo "$HAND5 --doc seacast" ;;
     hand5-off) echo "$HAND5 --doc seacast --source-offers off" ;;
+    # point 5's stop (plant (p)'s place since §4.11 covers next_to_send): --answers-first line replaces choose, which
+    # the twin cannot ask, and next_to_send's own code calls it
+    hand5-line) echo "$HAND5 --doc seacast --answers-first line" ;;
     # piece E's carried 7: a custody cell whose churn makes keep_floor open a link, at node a, inside whose question
     # node c's on_open sends a JOIN and a relation
     custody-floor-churn1) echo "--nodes 30 --degree 8 --msgs 1 --setting custody --blobs 4 --seed 7 --doc seacast --upkeep on --keep-floor on --churn 1" ;;
@@ -1095,9 +1098,9 @@ cases_of() {            # $1: a trace; $2: a cell of the chain cases: its cases 
   $PY "$T/chaincases.py" "$1" "${cs[@]}"
 }
 replay_clean() {        # $1: a trace, without .jsonl.gz: its replay as s_replays reads one, but for bare calls; why
-  local f=$OUT/$1.replay  #   not, on stdout. A chain cell may run a replaced name outside every record (filter_entry
-  #                         under --promise-mode peer, decode_group under --rebuilt-seen on): its callees run bare and
-  #                         are counted, the stated limit; the count is reported (bare_count), not refused
+  local f=$OUT/$1.replay  #   not, on stdout. A chain cell may run a replaced name outside every record
+  #                         (decode_group under --rebuilt-seen on): its callees run bare and are counted, the stated
+  #                         limit; the count is reported (bare_count), not refused
   [ -s "$f" ] || { echo "no replay"; return 1; }
   [ "$(cat "$f.rc" 2> /dev/null)" = 0 ] || { echo "the replay exited $(cat "$f.rc" 2> /dev/null || echo '?')"; return 1; }
   parsed_whole "$f" || { echo "the parser refused a line of it"; return 1; }
@@ -1393,11 +1396,13 @@ rows_to() {             # $1: a name; $2: a trace, without .jsonl.gz: the name's
 replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's tapes, where a node replaces it; plant
   #                       (k), a row with an argument left out, which the replay must refuse; and control (m), the
   #                       bias cell, which the record's exit check must stop
-  local names="forward push_rebuilt" name fx n calls c d plain k=0 counts= why rec pr m nr nw sum stop also mwant caught=0 stopped=0
+  local names="forward push_rebuilt filter_entry" name fx n calls c d plain k=0 counts= why rec pr m nr nw sum
+  local stop also mwant caught=0 stopped=0
   local untied=
   rm -rf "$OUT/rows"; mkdir -p "$OUT/rows"; : > "$OUT/c-rows.txt"
   if [ -z "$NODAS" ]; then
     names="forward push_rebuilt serve_standing owed_missing send_have note_claim repair_verdict known_in_scope"
+    names="$names filter_entry"
     # shellcheck disable=SC2046
     { for c in das-claim das-keeper-ignore das-alarm; do par small "$c" rows "" $(chain_args "$c"); done
       par chain_plant j known-replaced-v2 das-samplers-mcoff
@@ -1414,6 +1419,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
       note_claim) echo rows/das-keeper-ignore ;;
       repair_verdict) echo chains/plant-l ;;
       known_in_scope) echo chains/plant-j ;;
+      filter_entry) echo chains/hand5-peer ;;     # asked in next_to_send's records at every node (§4.11)
     esac
   }
   for name in $names; do par rows_to "$name" "$(fixture "$name")"; done
@@ -1501,14 +1507,14 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
   [ -n "$NODAS" ] && tied="each name's rows at nodes that replace it alone"
   [ -z "$untied" ] || tied="a name's rows at a node that does not replace it, or a liar or keeper without rows"
   if [ -n "$NODAS" ]; then
-    echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $tied; $said (--no-das: the six DAS names and the bias cell skipped)"
-  else echo "  the replaced names' rows: $k of 8 names with rows where a node replaces them ($counts), each replay clean; $tied; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
+    echo "  the replaced names' rows: $k of 9 names with rows where a node replaces them ($counts), each replay clean; $tied; $said (--no-das: the six DAS names and the bias cell skipped)"
+  else echo "  the replaced names' rows: $k of 9 names with rows where a node replaces them ($counts), each replay clean; $tied; $said; $bias: a cell with --repair-bias cannot be traced, because the toy's layer restores a shuffled captured at build (node.py:457, :493)"; fi
 }
 whole_replay() {        # whole_replay RC N FILE: a replay of N records, whole: exit 0 and FILE's summary line N of N ok
   [ "$1" = 0 ] && [ -n "$2" ] && has -x -F "replay: $2 records, $2 ok, 0 mismatched" "$3"
 }
-stops() {               # piece D: point 5's stop, plant (p), and its control; point 6's stop (D3), with its entry check
-  #                       removed (q), and with both checks removed (D5's control); every cell local
+stops() {               # piece D: point 5's stop, (p) on hand5-line, and its control; point 6's stop (D3), with its
+  #                       entry check removed (q), and with both checks removed (D5's control); every cell local
   local n5= f5= nc= fc= rec= nq= plain got why s5 s6 s7 ok5=0 okc=0 ok3=0 okq=0 okr=0
   local line5='s/^tracerfaults3: noask-in-record-v2, planted 1 time; node: ([0-9]+); record: ([a-z_0-9]+)$/\1 \2/p'
   local w6="^trace3: node 1: announce is bound to Node\\._no_source_offers\\.<locals>\\.publish\\.<locals>\\.<lambda> \\(node\\.py:[0-9]+\\) at the"
@@ -1520,20 +1526,24 @@ stops() {               # piece D: point 5's stop, plant (p), and its control; p
   # of the toy or the tracer that moves the records before the stop fails here, and the count is then set anew
   local D3_RECORDS=53
   mkdir -p "$OUT/chains"; : > "$OUT/c-stops.txt"
-  par chain_plant p noask-in-record-v2 hand5-peer
+  par stop_cell chains hand5-line
   par chain_plant pc noask-in-record-v2 hand5-v2
   par chain_plant q entry-check-off-v2 hand5-off
   par chain_plant d5 bindings-checks-off-v2 hand5-off
   par stop_cell chains hand5-off
   par_end || true       # each run's status is read below
-  # (p) on hand5-peer, where filter_entry is replaced: the record's call of it must stop the tracer, with point 5's
-  # words, at the node and record its plant line names
-  read -r n5 f5 < <(sed -n -E "$line5" "$OUT/chains/plant-p.err" 2> /dev/null)
-  if [ -z "$n5" ] || [ "$(cat "$OUT/chains/plant-p.rc" 2> /dev/null)" = 0 ]; then
-    echo "(p) point 5, on hand5-peer: not planted once, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-stops.txt"
-  elif ! has -F -x "trace3: node $n5: filter_entry is replaced here, and $f5's record calls it: the twin has no question for filter_entry, and would run its own code there" "$OUT/chains/plant-p.err"; then
-    echo "(p) point 5, on hand5-peer: the tracer stopped without point 5's words at node $n5's $f5 record  <-- NOT" >> "$OUT/c-stops.txt"
-  else echo "(p) point 5, on hand5-peer: stopped, as it must, at node $n5's $f5 record" >> "$OUT/c-stops.txt"; ok5=1; fi
+  # (p) on hand5-line, where choose is replaced (--answers-first line) and the twin cannot ask it: next_to_send's own
+  # call of it must stop the tracer, with point 5's words. Since §4.11 covers next_to_send, filter_entry is asked where
+  # a node replaces it (hand5-peer), so a planted call of it no longer stops; the run's own call of choose is the case
+  f5=next_to_send
+  local p5="choose is replaced here, and $f5's record calls it"
+  p5="$p5: the twin has no question for choose, and would run its own code there"
+  n5=$(sed -n -E "s/^trace3: node ([0-9]+): $p5\$/\\1/p" "$OUT/chains/hand5-line.err" 2> /dev/null | head -n 1)
+  if [ "$(cat "$OUT/chains/hand5-line.rc" 2> /dev/null)" = 0 ] || [ ! -f "$OUT/chains/hand5-line.rc" ]; then
+    echo "(p) point 5, on hand5-line: not run, or the tracer wrote its trace to its end  <-- NOT" >> "$OUT/c-stops.txt"
+  elif [ -z "$n5" ]; then
+    echo "(p) point 5, on hand5-line: stopped without point 5's words for choose  <-- NOT" >> "$OUT/c-stops.txt"
+  else echo "(p) point 5, on hand5-line: stopped, as it must, at node $n5's $f5 record" >> "$OUT/c-stops.txt"; ok5=1; fi
   # (p)'s control on seacast/hand5, where filter_entry is the document's: the call is the record's own, its writes ones the
   # twin's function does not make, so the replay must refuse that record and no other
   read -r nc fc < <(sed -n -E "$line5" "$OUT/chains/plant-pc.err" 2> /dev/null)
@@ -1666,15 +1676,31 @@ carried() {             # piece E: R7's tracer-wide depth on a real cell (carrie
     echo "(r) per-node depth, on custody-floor-churn1: as it must: .bare.json {}; the body E1's and 1 record of send_join at node $c, its trailer counting it; $(grep -m 1 '^replay: ' "$OUT/chains/plant-r.replay")" >> "$OUT/c-carried.txt"
     e2="per-node depth (r): that send_join a record (its node and function checked, its t not), the counts empty, the body E1's with it alone inserted"
   fi
-  # E3: hand5-peer (chain_cases' trace), each node's filter_entry replaced and entered outside every record: node 2's
-  # held inside it counted bare, once. (s): node s's replaced filter_entry entered from Node._write, calling node s's
-  # held, returning and then raising: no record inside, the two counted, the state restored on both, the body
-  # hand5-peer's. (t): the suppression cleared for that call (the planted fault): two records of held at node s. Each
-  # plant's nodes line is hand5-peer's but for its layer, first in the chain of filter_entry (one entry, every node)
+  # E3: das-hoardcol-w16 (chain_cases' trace), each node's decode_group replaced (--rebuilt-seen on) and entered
+  # outside every record: its one push_rebuilt counted bare, once per entry (seacast.md's decode_group calls it once
+  # unless it returns early). Since §4.11 covers next_to_send, filter_entry is asked inside its records, and the toy
+  # never enters it outside one. (s): node s's replaced filter_entry on hand5-peer, entered by the plant itself from
+  # Node._write at depth 0, calling node s's held, returning and then raising: no record inside, the two counted, the
+  # state restored on both, the body hand5-peer's. (t): the suppression cleared for that call (the planted fault):
+  # two records of held at node s. Each plant's nodes line is hand5-peer's but for its layer, first in the chain of
+  # filter_entry (one entry, every node)
   st='["suppressed_filter_seacast.<locals>.install.<locals>.filter_entry", "Node._peer_promise.<locals>.filter_entry", "doc"]'
-  if ! $PY -c 'import json, sys; sys.exit(0 if json.load(open(sys.argv[1])).get("2 held") == 1 else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" 2> /dev/null; then
-    echo "E3 carried 9, on hand5-peer: its bare counts lack \"2 held\": 1  <-- NOT" >> "$OUT/c-carried.txt"
-  else echo "E3 carried 9, on hand5-peer: as it must: \"2 held\": 1 among its bare counts, the trace written to its end" >> "$OUT/c-carried.txt"; ok3=1; fi
+  local e3c=$OUT/chains/das-hoardcol-w16.jsonl.gz e3w="E3 carried 9, on das-hoardcol-w16"
+  if [ -n "$NODAS" ]; then
+    echo "E3 carried 9: --no-das: das-hoardcol-w16 not traced, its line skipped" >> "$OUT/c-carried.txt"; ok3=1
+  elif ! n3=$($PY -c 'import json, sys
+c = json.load(open(sys.argv[1]))["calls"].get("decode_group", {})
+b = json.load(open(sys.argv[2]))
+n, pr = c.get("outer", 0), sum(v for k, v in b.items() if k.split(" ", 1)[1] == "push_rebuilt")
+print(n)
+sys.exit(0 if n > 0 and pr == n and not c.get("asked") else 1)' "$e3c.calls.json" "$e3c.bare.json" 2> /dev/null); then
+    echo "$e3w: decode_group not entered outside every record, or its push_rebuilt not counted bare once per entry" \
+      " <-- NOT" >> "$OUT/c-carried.txt"
+  else
+    echo "$e3w: as it must: decode_group entered outside every record $n3 times, its push_rebuilt counted bare" \
+      "$n3 times, the trace written to its end" >> "$OUT/c-carried.txt"; ok3=1
+  fi
+  n3=
   for t in s t; do
     s=$(sed -n -E "$([ "$t" = s ] && echo "$ls" || echo "$lt")" "$OUT/chains/plant-$t.err" 2> /dev/null)
     if [ -z "$s" ] || [ "$(cat "$OUT/chains/plant-$t.rc" 2> /dev/null)" != 0 ]; then
@@ -1704,7 +1730,9 @@ sys.exit(0 if a == b else 1)' "$OUT/chains/hand5-peer.jsonl.gz.bare.json" "$OUT/
   if grep -q '<-- NOT' "$OUT/c-carried.txt"; then no "the carried cases (c-carried.txt)"; fi
   [ -n "$e1" ] || e1="carried 7 not as it must be"
   if [ -n "$e2" ]; then e2="$e2, the replay accepting it (the stated limit: R7 is the tracer's rule; that record carries node c's own now, not the question's, and no replay check compares record times across nodes)"; else e2="(r) not as it must be"; fi
-  if [ "$ok3" = 3 ]; then e3="node 2's held inside hand5-peer's replaced filter_entry counted bare; (s) at node $n3, the state restored on return and on raise; (t), the suppression cleared, two records of held inside"
+  if [ "$ok3" = 3 ]; then
+    e3="decode_group entered outside every record on das-hoardcol-w16, its push_rebuilt counted bare; (s) at node $n3,"
+    e3="$e3 the state restored on return and on raise; (t), the suppression cleared, two records of held inside"
   else e3="carried 9, (s) or (t) not as it must be"; fi
   echo "  the carried cases: $e1; $e2; $e3"
 }
@@ -2123,8 +2151,9 @@ timers_all() {          # deferred_offers' timers over exactly the inventory's m
 }
 alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's cell (--alarm-wait, rows/das-alarm), traced
   #                       by the rows step: its digest the untraced run's and its replay clean; its custodians alarm; at
-  #                       the honest nodes its filter_entry, a replaced name, is entered outside every record, so
-  #                       probe_settled, which filter_entry alone calls, runs bare; promise_due's records still come.
+  #                       the honest nodes its filter_entry, a replaced name, is asked inside next_to_send's records
+  #                       (§4.11), so probe_settled, which filter_entry alone calls, runs inside the question (its ext
+  #                       calls); promise_due's records still come.
   #                       A limit, not a check: no cell found asks a claimant (a member asks one only while it defers on
   #                       a verified claim, node.py's _alarm; ten seeds of this cell, with and without the repair sample,
   #                       none did), so no trace holds an alarm_due note and a toy callback's note path stays
@@ -2132,14 +2161,14 @@ alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's ce
   local f=$OUT/rows/das-alarm g=$OUT/timersall/rows__das-alarm sent asks ps pd an why= line
   sent=$(sed -n -E 's/^  alarm: ([0-9]+) sent by .*/\1/p' "$f.out" 2> /dev/null)
   asks=$(sed -n -E 's/^  alarm: .*; ([0-9]+) asks of a claimant .*/\1/p' "$f.out" 2> /dev/null)
-  ps=$($PY -c 'import json, sys; print(json.load(open(sys.argv[1]))["calls"]["probe_settled"]["bare"])' "$f.jsonl.gz.calls.json" 2> /dev/null)
+  ps=$($PY -c 'import json, sys; print(json.load(open(sys.argv[1]))["calls"]["probe_settled"]["ext"])' "$f.jsonl.gz.calls.json" 2> /dev/null)
   pd=$(sed -n 's/^timers_seacast: alarm_due: [0-9]* notes name it; promise_due: \([0-9]*\) records$/\1/p' "$g.txt" 2> /dev/null)
   an=$(sed -n 's/^timers_seacast: alarm_due: \([0-9]*\) notes name it; .*/\1/p' "$g.txt" 2> /dev/null)
   if ! has ': the same$' "$f.digest" 2> /dev/null; then why="not traced, or its digest is not the untraced run's"
   elif ! why=$(replay_clean rows/das-alarm); then why="its replay: $why"
   elif [ -z "$sent" ] || [ "$sent" = 0 ]; then why="no alarm sent"
   elif [ "$asks" != 0 ]; then why="a member asked a claimant (${asks:-?}): alarm_due may be armed, and the limit is no longer as stated"
-  elif [ -z "$ps" ] || [ "$ps" = 0 ]; then why="probe_settled ran bare ${ps:-?} times: filter_entry was not entered outside a record"
+  elif [ -z "$ps" ] || [ "$ps" = 0 ]; then why="probe_settled ran inside the question ${ps:-?} times: filter_entry was not asked at the alarm's nodes"
   elif [ -z "$pd" ] || [ "$pd" = 0 ]; then why="no promise_due record"
   elif [ "$an" != 0 ] || [ "$1" != 0 ]; then why="a note names alarm_due (${an:-?} here, $1 over every trace)"
   fi
@@ -2147,7 +2176,7 @@ alarm_cell() {          # $1: alarm_due's notes over every trace: the alarm's ce
     echo "the alarm's cell (rows/das-alarm): $why  <-- NOT" >> "$OUT/c-timers-all.txt"
     no "the alarm's cell (rows/das-alarm): $why (c-timers-all.txt)"
   else
-    line="the alarm's cell (rows/das-alarm): digest the untraced run's; $(grep -m 1 '^replay: ' "$f.replay"); $sent alarms sent; filter_entry entered outside every record at the alarm's nodes (probe_settled bare $ps); promise_due $pd records; a limit, not a check: no member asks a claimant (0 asks), so alarm_due is never armed (0 notes)"
+    line="the alarm's cell (rows/das-alarm): digest the untraced run's; $(grep -m 1 '^replay: ' "$f.replay"); $sent alarms sent; filter_entry asked inside next_to_send's records at the alarm's nodes (probe_settled ext $ps); promise_due $pd records; a limit, not a check: no member asks a claimant (0 asks), so alarm_due is never armed (0 notes)"
     echo "$line" >> "$OUT/c-timers-all.txt"
     echo "  $line"
   fi
@@ -2449,19 +2478,20 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   swapped_draws
   # a record writer's arguments not runSeacast's case's: on_chunk's without p, which the replay must refuse (c-arity.*)
   arities_plant
-  # the replaced names' rows (R3-9): each of the eight names the twin asks, with rows on a fixture's tapes where a
+  # the replaced names' rows (R3-9): each of the nine names the twin asks, with rows on a fixture's tapes where a
   # node replaces it (repair_verdict's and known_in_scope's fixtures are plants (l) and (j), layers of tracerfaults3's
   # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, which the record's
   # exit check must stop (c-rows.txt)
   replaced_rows
-  # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask (plant (p) on
-  # hand5-peer), and its control on seacast/hand5; point 6's, a binding live across a record, on seacast/hand5 under
+  # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask ((p): choose, on
+  # hand5-line), and its control on seacast/hand5; point 6's, a binding live across a record, on seacast/hand5 under
   # --source-offers off: at the entry (D3), at the exit with the entry check removed (q), and with both removed, the
   # trace written to its end, a stated limit (c-stops.txt)
   stops
   # the carried cases (piece E): R7's tracer-wide depth on custody-floor-churn1, where node c's calls inside another
   # node's question run bare, and its planted fault (r), a depth per node, whose record the replay accepts (a stated
-  # limit); a replaced name entered outside every record on hand5-peer, and its plants (s) and (t) (c-carried.txt)
+  # limit); a replaced name entered outside every record on das-hoardcol-w16 (decode_group), and plants (s) and (t)
+  # on hand5-peer (c-carried.txt)
   carried
   # F's three (piece F): S1-8a's count on churn1 (carried); S1-8b's writer (--self-test-seacast) and reader (families_seacast.py
   # on churn1, signed and plain, and its refusal of seacast/hand5 cut short or stopped); S1-C5's line on seacast/hand5

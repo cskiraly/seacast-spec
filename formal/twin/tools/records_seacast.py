@@ -244,6 +244,20 @@ def g_at(tr, g, at):
     return [group(g), word(at, "a time")]
 
 
+def send_key(tr, k):                    # [nat, groupKey, nat]: §4.11's `sent` key (peer, group, index), as the table's
+    if not isinstance(k, tuple) or len(k) != 3:
+        raise TypeError(f"records_seacast: not a send's key: {k!r}")
+    return [peer(tr, k[0]), group(k[1]), tr.nat(k[2])]
+
+
+def opt_entry(tr, e):                   # optOf qentry: a queue entry in SEACAST's form, or none
+    return None if e is None else tr.qentry(e)
+
+
+def next_entry(tr, r):                  # next_to_send's return: "WAIT" (the toy's WAIT, by identity), an entry, or none
+    return "WAIT" if r is tr.WAIT else opt_entry(tr, r)
+
+
 # name: (the Python's parameters, its record's "args", its record's "ret"), in COVERED's order
 TABLE = {
     # §1.4 and §4.1
@@ -348,6 +362,17 @@ TABLE = {
     "on_graft": ("p, gr", lambda tr, p, gr: [peer(tr, p), tr.rel_msg(gr, "graft")], none),
     "maintain_relations": ("T", lambda tr, T: [type_id(T)], none),
     "on_join": ("p, j", lambda tr, p, j: [peer(tr, p), tr.rel_msg(j, "join")], none),
+    # §4.11's window and writer: a byte count a natural, a chunk narrow, an entry in SEACAST's form (tr.qentry)
+    "wake_front": ("", lambda tr: [], none),
+    "write_waits": ("p", lambda tr, p: [peer(tr, p)], none),
+    "free_room": ("need", lambda tr, need: [tr.nat(need)], none),
+    "acquire_room": ("p, need", lambda tr, p, need: [peer(tr, p), tr.nat(need)], boolean),
+    "leave_line": ("p", lambda tr, p: [peer(tr, p)], none),
+    "track_in_flight": ("p, f, need", lambda tr, p, f, need: [peer(tr, p), tr.chunk(f), tr.nat(need)], none),
+    "window_release": ("p, g, i", p_g_i, none),
+    "window_timeout": ("key, at", lambda tr, key, at: [send_key(tr, key), word(at, "window_timeout's time")], none),
+    "noted": ("p, e", lambda tr, p, e: [peer(tr, p), opt_entry(tr, e)], opt_entry),
+    "next_to_send": ("p", lambda tr, p: [peer(tr, p)], next_entry),
 }
 
 if set(TABLE) != set(manifest_seacast.COVERED):
@@ -446,6 +471,7 @@ def stand_in():
                is_have_bitmap=lambda x: isinstance(x, HaveBitmap))
     tr.N = NS(B=NS(Bits=Bits), GroupIndex=GroupIndex)
     tr.doc_seacast, tr.doc_mid, tr.cur_nid, tr.doc_message_id = True, {}, None, None
+    tr.WAIT = NS()                      # next_to_send's "in line": the toy's WAIT, told by identity
     queue = NS(normal=[], urgent=[])
     tr.cur_queue = {4: queue, 7: NS()}
 
@@ -500,6 +526,11 @@ def stand_in():
         "relation_room": (one(4, T, 5, 0), True), "graft": (one(7, T, 5, 0, "IN"), None),
         "on_prune": (one(4, prune), None), "on_graft": (one(4, graft), None),
         "maintain_relations": (one(T), None), "on_join": (one(4, join), None),
+        "wake_front": (one(), None), "write_waits": (one(4), None), "free_room": (one(11660), None),
+        "acquire_room": (one(4, 11660), True), "leave_line": (one(4), None),
+        "track_in_flight": (one(4, f, 11660), None), "window_release": (one(4, g, 1), None),
+        "window_timeout": (one((4, g, 1), 2.5), None), "noted": (one(4, entry) + one(4, None), entry),
+        "next_to_send": (one(4), tr.WAIT),
     }
     if set(stubs) != set(TABLE):
         raise SystemExit(f"records_seacast: the check's stubs are not the table's names: "

@@ -810,11 +810,13 @@ CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-ow
 def noask_in_record_seacast():
     """Under v2, piece D's plant (p), point 5: at the first table read inside a record, outside any question or
     suppression, at a node whose queue holds an entry with a chunk, that node's own `filter_entry` is called once, with
-    the entry's peer and the entry, both read through the tracer's view (so the reads are the record's). Where the node
-    replaces `filter_entry` (hand5-peer, `--promise-mode peer`), the twin has no question for it: the tracer must stop
-    before the call runs, with point 5's words. Where it is the document's (seacast/hand5, the control), the call is the
-    record's own, and its writes (`sent_to`, or the entry's chunk cleared) are ones the twin's function does not make:
-    the replay must refuse that record alone. Counted once, for the call; its node and record on the line."""
+    the entry's peer and the entry, both read through the tracer's view (so the reads are the record's). Where it is the
+    document's (seacast/hand5, plant (p)'s control), the call is the record's own, and its writes (`sent_to`, or the
+    entry's chunk cleared) are ones the twin's function does not make: the replay must refuse that record alone.
+    Counted once, for the call; its node and record on the line. Where the node replaces `filter_entry` (hand5-peer,
+    `--promise-mode peer`), the twin asks it since §4.11 covers next_to_send, so the call is a question and nothing
+    stops: point 5's stop is read on hand5-line instead, where next_to_send's own call of a replaced `choose` stops the
+    tracer with its words."""
     tracer_instance()
     nss = {}
     _install = T.Tracer3.install
@@ -1045,9 +1047,10 @@ def layer_missing_seacast(toy):
 
 def suppressed_filter_seacast(toy, off):
     """Under v2, piece E's E3 (carried 9), as `--suppressed-entry-v2` is for hand5-own's `on_iwant`: on hand5-peer,
-    where each node replaces `filter_entry` (`--promise-mode peer`) and the toy enters it outside every record. At such
-    a node, a call of its replaced `filter_entry` from outside any record (from the toy's `Node._write`, which the
-    simulator calls at depth 0). A layer of this tool's own, bound before the install and live for that call alone,
+    where each node replaces `filter_entry` (`--promise-mode peer`). The toy itself enters it inside next_to_send's
+    records alone, where the twin asks it (§4.11), so this plant makes the entry outside every record: at such a node,
+    a call of its replaced `filter_entry` from the toy's `Node._write`, which the simulator calls at depth 0, before
+    the toy's own write. A layer of this tool's own, bound before the install and live for that call alone,
     calls the same node's traced `held` with a stored chunk's id, and returns, or raises `Planted`, which the call's
     site catches. The tracer must suppress records inside the entry (no record of `held`, a count "s held") and restore
     its state on the raise (`supp` 0 at the catch). With `off`, the layer clears the suppression for its call of

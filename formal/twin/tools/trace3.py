@@ -145,9 +145,11 @@ FOREIGN = ("known_id",                     # `queue`, `pending_ids` and `stop_pu
 ROW_READS_Seacast = ("owed", "planned", "queue", "tied")
 # under SEACAST, the tape's names whose arguments are written as they are at the call, not after it: a guard against a
 # callee that changes what it was handed before it returns (SEACAST's send sets its IWANT's `want` before it calls
-# enqueue, so there the two forms agree). EAGER_LATE is the planted fault of the self-test (written after the call).
-# No name is both here and in CALLS: a question that raises is written with its arguments as they are at exit
-EAGER_Seacast = ("enqueue",)
+# enqueue, so there the two forms agree; filter_entry, asked where a node replaces it, clears the entry's chunk and
+# drops asks from its IWANTs, and returns that same entry). EAGER_LATE is the planted fault of the self-test (written
+# after the call). No name is both here and in CALLS: a question that raises is written with its arguments as they are
+# at exit
+EAGER_Seacast = ("enqueue", "filter_entry")
 EAGER_LATE = [False]
 # Under --doc seacast, the names whose IWANTs enqueued are counted per call in OUT.calls.json, beside the trace: those
 # found in the enqueue rows the tape gains between a call's entry and its exit, callees included
@@ -174,14 +176,14 @@ DOC_TIMERS = {"after": ("retry_offer", "ask_parked", "promise_due", "window_time
               "start": ("decode_group",)}
 TOY_TIMERS = ("Node._alarm.<locals>.alarm_due",)    # --alarm-wait's (node.py), armed by its filter_entry: (g, i, q, at)
 NOTES_OFF = [False]
-# §7.1's three, the twin's own. Under seacast-lite.md a cell holds the count and views hold the line and the sends;
-# under --doc seacast they are not installed (there the count is bytes and a send's value a pair, and no traced function
-# of seacast-lite.md touches them)
+# §7.1's three, the twin's own. A cell holds the count and views hold the line and the sends, under both documents:
+# under --doc seacast (§4.11) the count is bytes, and a send's value is a pair, schema_seacast.py's `sent` (its `trace`)
+# in place of seacast-lite.md's
 WINDOW = ("in_flight", "waiters", "sent")
 SEACAST_FILE = "seacast.md (extracted)"  # the toy compiles seacast.md's blocks under this name (node.py, spec2)
 # Under --doc seacast, seacast.md's own tables (gen/schema_seacast.py's, in its order): views too, after seacast-lite.md's in
-# the header's `own`
-OWN_Seacast = tuple(t.name for t in schema_seacast.TABLES_Seacast)
+# the header's `own`. A table a record names by seacast-lite.md's name (`trace`) is that name's, which `own` holds once
+OWN_Seacast = tuple(t.name for t in schema_seacast.TABLES_Seacast if not t.trace)
 # Under --doc seacast, a table of seacast.md's §3 that is another one's: §3's `hdr` is seacast-lite.md's `desc`, and the
 # toy binds both names to one dict (repoint_aliases points `hdr` at desc's view)
 ALIASES_Seacast = {"hdr": "desc"}
@@ -325,8 +327,8 @@ def sec3_check(names, seacast=OWN_Seacast, undeclared=UNDECLARED_Seacast, keys=N
 
 def manifest_check(traced, m=manifest_seacast, own=OWN + OWN_Seacast, foreign=FOREIGN, node_own=None):
     """Under --doc seacast, the tracer's own lists against seacast.md's manifest (gen/manifest_seacast.py), which the
-    replay reads the trace by: the traced names (seacast_kept over the two documents, without §7.1's, and SEACAST's covered
-    names) are KEPT, COVERED and NODE_OWN's keys; NODE_OWN is the tracer's; the header's `own` is OWN, in its order,
+    replay reads the trace by: the traced names (seacast_kept over the two documents, of §7.1's `front` alone, and
+    SEACAST's covered names) are KEPT, COVERED and NODE_OWN's keys; NODE_OWN is the tracer's; the header's `own` is OWN, in its order,
     and `foreign` is FOREIGN. What differs, as one line each, naming the names. `traced` None (§6.1's twelve alone,
     TRACE3_ONLY=sec61): the traced names are not compared."""
     node_own = NODE_OWN if node_own is None else node_own
@@ -544,7 +546,7 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           # closure-dependent: --member-check off returns False without the document's call; on, it counts
           ("node.py", "Node._member_check.<locals>.owed_missing", 502): ("owed_missing",
                                                                          ClosureKind("on", OBSERVER, CHANGING)),
-          # changing, over one of the eight names the twin asks where a node replaces it (ASKED_Seacast)
+          # changing, over one of the nine names the twin asks where a node replaces it (ASKED_Seacast)
           ("node.py", "Node.__init__.<locals>.note_claim", 219): ("note_claim", CHANGING),        # a liar's
           ("node.py", "Node._hoard_column.<locals>.push_rebuilt", 256): ("push_rebuilt", CHANGING),   # a hoarder's
           ("node.py", "Node._repair_variants.<locals>.push_rebuilt", 526): ("push_rebuilt", CHANGING),
@@ -558,11 +560,15 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._repair_bias.<locals>.repair_verdict", 471): ("repair_verdict", CHANGING),
           ("node.py", "Node._faults.<locals>.forward", 1106): ("forward", CHANGING),              # a silent node's
           ("node.py", "Node._seacast.<locals>.send_have", 1799): ("send_have", CHANGING),              # a liar's
-          # changing, over a name the manifest makes replaceable and the twin cannot ask (NOASK_Seacast): entered outside
-          # every record alone (iface_of stops a record's own call of one)
+          # filter_entry, asked since §4.11 covers next_to_send, whose own code calls it: --alarm-wait's, and
+          # --promise-mode peer's
           ("node.py", "Node._alarm.<locals>.filter_entry", 350): ("filter_entry", CHANGING),
           ("node.py", "Node._peer_promise.<locals>.filter_entry", 1191): ("filter_entry", CHANGING),
+          # changing, over a name the manifest makes replaceable and the twin cannot ask (NOASK_Seacast): entered
+          # outside every record alone (iface_of stops a record's own call of one)
           ("node.py", "Node._writer_variants.<locals>.choose", 1049): ("choose", CHANGING),
+          # --answers-first line's: an answer its choose chose waits at the head of the line (§4.11's window)
+          ("node.py", "Node._writer_variants.<locals>.acquire_room", 1082): ("acquire_room", CHANGING),
           ("node.py", "Node._rebuilt_seen.<locals>.decode_group", 439): ("decode_group", CHANGING),
           ("node.py", "Node._hoard_column.<locals>.on_want", 260): ("on_want", CHANGING),         # a hoarder's filter
           ("node.py", "Node._alarm.<locals>.on_want", 403): ("on_want", CHANGING),              # --alarm-wait's
@@ -571,12 +577,12 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           # bound during a call: publish's announce under --source-offers off and late
           ("node.py", "Node._no_source_offers.<locals>.publish.<locals>.<lambda>", 997): ("announce", DURING_CALL),
           ("node.py", "Node._late_source_offers.<locals>.publish.<locals>.<lambda>", 1015): ("announce", DURING_CALL)}
-# Under SEACAST: the replaceable names (the manifest's, and the directed sets' validate_chunk); the eight the twin asks as
-# questions where a node replaces them (its NodeSeacast, Seacast/Replay.lean); and those it cannot ask, which a record's own
-# code must not call where they are replaced: the manifest's replaceable covered names but the eight
+# Under SEACAST: the replaceable names (the manifest's, and the directed sets' validate_chunk); the nine the twin asks
+# as questions where a node replaces them (its NodeSeacast, Seacast/Replay.lean); and those it cannot ask, which a
+# record's own code must not call where they are replaced: the manifest's replaceable covered names but the nine
 REPLACEABLE_Seacast = tuple(manifest_seacast.REPLACEABLE) + tuple(manifest_seacast.REPLACEABLE_WHOLE)
 ASKED_Seacast = ("forward", "push_rebuilt", "send_have", "serve_standing", "owed_missing", "repair_verdict", "note_claim",
-            "known_in_scope")
+            "known_in_scope", "filter_entry")
 NOASK_Seacast = tuple(n for n in manifest_seacast.REPLACEABLE if n not in ASKED_Seacast and n not in manifest_seacast.KEPT)
 # Under SEACAST, the places where the twin asks the order of a set of peers (its NodeSeacast.order calls): eight iterate
 # `suppression_scope(g)` (fill its union with the sender's ack), and serve_standing the set it pops from `standing`.
@@ -594,9 +600,15 @@ COVERED_SET = frozenset(manifest_seacast.COVERED)    # the covered names, whose 
 ADAPTED_Seacast = ("gossip_put", "gossip_remove_group", "mesh_has", "own_interest")
 
 
+OWN_THROUGH = [True]    # own_code reads a listed wrapper's closure through the tracer's hand-over (a self-test plant)
+
+
 def own_code(name, fn):
     """What a traced name's function is at a node: ("own", where) for seacast-lite.md's own code, a listed wrapper that
-    holds it, or the node's listed helper; ("replaced", where) for anything else."""
+    holds it, or the node's listed helper; ("replaced", where) for anything else. A wrapper's cell may hold the
+    tracer's hand-over to it (handover, `_trace3_through`: under SEACAST, where LAYERS lists the wrapper as an
+    observer), read as the function it hands over to, as layers_of reads it. Under seacast-lite.md no hand-over is
+    made; under SEACAST the one caller is timer_target, for a timer's target armed inside a question."""
     code = getattr(fn, "__code__", None)
     if code is None:
         return "replaced", f"no Python function ({type(fn).__name__})"
@@ -612,6 +624,8 @@ def own_code(name, fn):
                 inner = cell.cell_contents
             except ValueError:
                 continue
+            while OWN_THROUGH[0] and getattr(inner, "_trace3_through", False):
+                inner = inner.__wrapped__
             ic = getattr(inner, "__code__", None)
             if ic is not None and ic.co_filename == DOC_FILE and ic.co_name == name:
                 return "own", where
@@ -1131,6 +1145,18 @@ def forms_self_test():
         finally:
             EAGER_LATE[0] = False
 
+    def tape_filter(tr, late=False):    # filter_entry's question, asked where a node replaces it: the call drops
+        x = Wm.Entry(control=iwant(True))   # the entry's first ask, as the document drops a stale one, and returns
+        #                                     the entry
+        enc = tr.asked_enc_seacast()["filter_entry"]
+        EAGER_LATE[0] = late
+        try:
+            early = tr.at_call("filter_entry", enc, (7, x), {})
+            x.control.items[0].ids = x.control.items[0].ids[1:]
+            return tr.tape_row(enc, x, (7, x), {}, early)
+        finally:
+            EAGER_LATE[0] = False
+
     claim_words = "SystemExit: trace3: an IHAVE offers a bitmap with a claim set (claim_all True, complete False)"
     seacast_asks = [[[gx, 3], False, 0, False], [[gx, 4], True, 2, True], [sx, False, 0, False]]
     # (what, the encoding, under SEACAST, under seacast-lite.md); a case whose two forms differ is a SEACAST case
@@ -1163,6 +1189,9 @@ def forms_self_test():
         ("a KeyError on a negative integer", lambda tr: tr.missing_key(-2), ["-", 2], -2),
         ("enqueue's IWANT, marked after the call", tape_iwant,
          [[7, [["iwant", seacast_asks, False]], False], True], [[7, [["iwant", [[gx, 3], [gx, 4], sx]]], False], True]),
+        ("filter_entry's entry, its first ask dropped by the call", tape_filter,
+         [[7, [None, [["iwant", seacast_asks, True]], False]], [None, [["iwant", seacast_asks[1:], True]], False]],
+         [[7, [None, [["iwant", [[gx, 4], sx]]], False]], [None, [["iwant", [[gx, 4], sx]]], False]]),
         # the same under both documents
         ("a KeyError on a peer", lambda tr: tr.missing_key(7), 7, 7),
         ("gossipsub's PRUNE", lambda tr: tr.qmsg(Wm.PRUNE([]).items[0]), ["prune", []], ["prune", []]),
@@ -1197,6 +1226,12 @@ def forms_self_test():
     bad += not ok
     print(f"forms self-test, the control of the eager encoding (enqueue's argument written after the call): "
           f"{'holds the later mark, ok' if ok else f'got {got!r}  <-- FAIL'}")
+    got = run(lambda tr: tape_filter(tr, late=True), True)
+    left = [None, [["iwant", seacast_asks[1:], True]], False]
+    ok = got == [[7, left], left]
+    bad += not ok
+    print(f"forms self-test, the control of the eager encoding (filter_entry's argument written after the call): "
+          f"{'holds the entry as the call left it, ok' if ok else f'got {got!r}  <-- FAIL'}")
     # the control: seacast-lite.md's encoder in the SEACAST one's place fails exactly the SEACAST cases
     failed = [what for what, f, want2 in v2cases if not same(run(f, False), want2)]
     ok = failed == [w for w, _, _ in v2cases]
@@ -1321,21 +1356,32 @@ def forms_self_test():
     # writes SERVE_BUDGET by fbits as the other numbers are written, so that +inf is no longer null
     def consts(**kw):
         ns = dict(ANSWERS_FIRST=False, MERGE_HOLDINGS=True, ASK_UPLINK=0.0, SAMPLE_OUTSTANDING=4,
-                  SERVE_BUDGET=math.inf)
+                  SERVE_BUDGET=math.inf, W=math.inf, W_BYTES=math.inf)
         ns.update(kw)
         return Tracer3.consts_seacast(Nd, ns)
-    base = {"ANSWERS_FIRST": False, "MERGE_HOLDINGS": True, "ASK_UPLINK": fbits(0.0), "SAMPLE_OUTSTANDING": 4}
+    base = {"ANSWERS_FIRST": False, "MERGE_HOLDINGS": True, "ASK_UPLINK": fbits(0.0), "SAMPLE_OUTSTANDING": 4,
+            "W_BYTES": None}
+    wb = lambda v, w=10: consts(W=w, W_BYTES=v)["W_BYTES"]     # noqa: E731: §4.11's window, W slots of a chunk
     ccases = [
         ("SERVE_BUDGET +inf, written null", lambda: consts(), dict(base, SERVE_BUDGET=None)),
         ("SERVE_BUDGET 3, and a whole 2.0 as 2", lambda: [consts(SERVE_BUDGET=3)["SERVE_BUDGET"],
                                                           consts(SERVE_BUDGET=2.0)["SERVE_BUDGET"]], [3, 2]),
         ("SAMPLE_OUTSTANDING 1", lambda: consts(SAMPLE_OUTSTANDING=1)["SAMPLE_OUTSTANDING"], 1),
+        ("W_BYTES +inf with W +inf, written null", lambda: consts()["W_BYTES"], None),
+        ("W_BYTES 120000, a whole 120000.0 as 120000, and 0 with W 0", lambda: [wb(120000), wb(120000.0), wb(0, 0)],
+         [120000, 120000, 0]),
     ] + [(f"SERVE_BUDGET {v!r}", (lambda v=v: consts(SERVE_BUDGET=v)),
           f"SystemExit: trace3: node 3: SERVE_BUDGET is no count of at least 1 nor +inf: {v!r}")
          for v in (0, True, 2.5, -math.inf)] + [
         (f"SAMPLE_OUTSTANDING {v!r}", (lambda v=v: consts(SAMPLE_OUTSTANDING=v)),
          f"SystemExit: trace3: node 3: SAMPLE_OUTSTANDING is no count of at least 1: {v!r}")
-        for v in (0, True, 2.0)]
+        for v in (0, True, 2.0)] + [
+        (f"W_BYTES {v!r}", (lambda v=v: wb(v)),
+         f"SystemExit: trace3: node 3: W_BYTES is no count of bytes nor +inf: {v!r}") for v in (-1, 2.5, True, math.nan)] + [
+        ("W 10 with W_BYTES +inf", lambda: wb(math.inf),
+         "SystemExit: trace3: node 3: W_BYTES is inf where W is 10: the window is off in both or in neither"),
+        ("W +inf with W_BYTES 120000", lambda: wb(120000, math.inf),
+         "SystemExit: trace3: node 3: W_BYTES is 120000 where W is inf: the window is off in both or in neither")]
 
     def run_c(f):
         try:
@@ -1463,6 +1509,16 @@ def views_self_test():
          lambda ts: (lambda o: (o["tape"], o["cr"]))(record(
              ts, ["interest"], interest_raw(), lambda ns: ns["interest"][g1], callee=True)),
          ([], [["interest", [g1.hex()], None]])),
+        # §4.11's `sent`, seacast.md's (schema_seacast.py's, by its `trace`): a send's time and its bytes
+        ("sent[(p, g, i)] = (t, n): the write logged, the key [p, g, i], the value [t's word, n]",
+         lambda ts: record(ts, ["sent"], {"sent": {}}, lambda ns: ns["sent"].__setitem__((4, g1, 3), (1.5, 1200)))[
+             "writes"], [["sent", [[4, g1.hex(), 3]], [fbits(1.5), 1200]]]),
+        ("sent[(p, g, i)] = (t, -1): refused",
+         lambda ts: record(ts, ["sent"], {"sent": {}}, lambda ns: ns["sent"].__setitem__((4, g1, 3), (1.5, -1))),
+         "ValueError: a send's bytes: not a natural number: -1"),
+        ("sent[(p, g, i)] = (t, 1200.5): refused",
+         lambda ts: record(ts, ["sent"], {"sent": {}}, lambda ns: ns["sent"].__setitem__((4, g1, 3), (1.5, 1200.5))),
+         "ValueError: a send's bytes: not a natural number: 1200.5"),
     ]
 
     def run(f, ts):
@@ -1501,12 +1557,22 @@ def views_self_test():
         bad += not ok
         print(f"views self-test, planted: {what}: "
               f"{f'gives {got!r}, which its case refuses, ok' if ok else 'not seen  <-- FAIL'}")
-    # the control: seacast-lite.md's install has none of these tables, so every view case fails
+    # the control: seacast-lite.md's install has none of these tables, and its `sent` holds a time, so every view case
+    # fails
     failed = [what for what, f, want in vcases if run(f, p1t) != want]
     ok = len(failed) == len(vcases)
     bad += not ok
     print(f"views self-test, the control (seacast-lite.md's install in SEACAST's place): "
           f"{f'fails all {len(failed)} view cases, ok' if ok else f'fails only {failed}  <-- FAIL'}")
+    # under seacast.md the install has one `sent`, seacast.md's: seacast-lite.md's is not installed beside it
+    tr = object.__new__(Tracer3)
+    tr.Wm, tr.doc_seacast = Wm, True
+    sents = [t for t in tr.schema(None) if t.name == "sent"]
+    got = (len(sents), run(lambda ts: sents[0].value((1.5, 1200)), None))
+    ok = got == (1, [fbits(1.5), 1200])
+    bad += not ok
+    print(f"views self-test, under seacast.md one sent, seacast.md's: "
+          f"{'ok' if ok else f'got {got!r}, must be (1, [the word, 1200])  <-- FAIL'}")
     # the §3 scan, on this repository's seacast.md and on copies with a line planted or removed
     text = (HERE.parents[2] / "seacast.md").read_text()
     anchor = re.search(r"^rsample_final:.*\n", text, re.M)
@@ -1565,7 +1631,7 @@ def manifest_self_test():
     import types
     sys.path.insert(0, str(HERE.parents[2] / "toy"))
     import node as N                    # noqa: E402: the toy beside this repository's documents
-    kept = tuple(n for n in seacast_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+    kept = tuple(seacast_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)))
     traced = kept + tuple(n for n in manifest_seacast.COVERED if n not in kept)     # as Tracer3 traces under SEACAST
     m = manifest_seacast
 
@@ -1581,9 +1647,9 @@ def manifest_self_test():
         ("a KEPT name dropped from the manifest (retry_offer)", lambda chk: chk(traced, copy(
             KEPT=[n for n in m.KEPT if n != "retry_offer"])),
          ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: ['retry_offer']; in them, not traced: []"]),
-        ("a name in the manifest's KEPT that is not traced (window_release)", lambda chk: chk(traced, copy(
-            KEPT=list(m.KEPT) + ["window_release"])),
-         ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: []; in them, not traced: ['window_release']"]),
+        ("a name in the manifest's KEPT that is not traced (acquire_slot)", lambda chk: chk(traced, copy(
+            KEPT=list(m.KEPT) + ["acquire_slot"])),
+         ["traced, not in the manifest's KEPT, COVERED or NODE_OWN: []; in them, not traced: ['acquire_slot']"]),
         # H1: a covered name left out, of the manifest and of the traced names in turn
         ("a COVERED name dropped from the manifest (keep_floor)", lambda chk: chk(traced, copy(
             COVERED=[n for n in m.COVERED if n != "keep_floor"])),
@@ -1871,13 +1937,25 @@ def timers_self_test():
     gx = g.hex()
     check_time = 0.5                    # the stub's CHECK_TIME
     docs, toy = {}, {}                  # the documents' timers under the documents' names; the toy's under node.py
-    exec(compile("def retry_offer(a):\n    pass\ndef ask_parked(a):\n    pass\ndef decode_group(g):\n    pass\n",
-                 DOC_FILE, "exec"), docs)
+    exec(compile("def retry_offer(a):\n    pass\ndef ask_parked(a):\n    pass\ndef decode_group(g):\n    pass\n"
+                 "def promise_due(a, p, at):\n    pass\n", DOC_FILE, "exec"), docs)
     exec(compile("def reconsider(g, at):\n    pass\ndef ask_sample(g, i, first=False):\n    pass\n"
                  "def resample(g, i, q, first):\n    pass\n", SEACAST_FILE, "exec"), docs)
-    exec(compile("def alarm_due(g, i, q, at):\n    pass\ndef _write(p):\n    pass\n", "node.py", "exec"), toy)
+    exec(compile("def alarm_due(g, i, q, at):\n    pass\ndef _write(p):\n    pass\n"
+                 "def promise_due(a, p, at):\n    pass\n"
+                 "def wrap_promise_due(doc_promise_due):\n    def promise_due(a, p, at):\n"
+                 "        return doc_promise_due(a, p, at)\n    return promise_due\n", "node.py", "exec"), toy)
     toy["alarm_due"].__qualname__ = "Node._alarm.<locals>.alarm_due"
     toy["_write"].__qualname__ = "Node._write"
+
+    def listed_wrapper(inner):          # node.py's wrapper of promise_due (WRAPPERS), over the tracer's hand-over to
+        def h(*a, **k):                 #   inner, as handover makes it where LAYERS lists the wrapper as an observer
+            return inner(*a, **k)
+        h._trace3_through, h.__wrapped__ = True, inner
+        w = toy["wrap_promise_due"](h)
+        w.__qualname__ = WRAPPERS["promise_due"]
+        return w
+    wrapped_doc, wrapped_other = listed_wrapper(docs["promise_due"]), listed_wrapper(toy["promise_due"])
 
     class Sim:                          # the toy's simulator: after(node, delay, fn, *args)
         def __init__(self):
@@ -1982,13 +2060,20 @@ def timers_self_test():
     def k_inf(ns, nd):                  # a timer with no finite delay: the twin's note reader would refuse its note
         ns["after"](math.inf, docs["retry_offer"], Wm.WantIndex(g, 3))
 
+    def l_wrapper(ns, nd):              # filter_entry's `after(PROMISE, promise_due, a, p, now)` under SEACAST, where
+        ns["after"](0.25, wrapped_doc, Wm.WantIndex(g, 3), 2, 1.5)    # promise_due is the toy's listed wrapper
+
+    def l_other(ns, nd):                # the same wrapper over a promise_due that is not the document's
+        ns["after"](0.25, wrapped_other, Wm.WantIndex(g, 3), 2, 1.5)
+
     def plain_delay(tr):                # the note's delay written as fbits writes any number, +inf's word too
         tr.note_delay = lambda nd, delay: fbits(delay)
 
     one = ["after", fbits(0.25), "retry_offer", [[gx, 3]]]
     note_c = ["start", fbits(check_time + 0.125), "decode_group", [gx]]
     note_g = ["after", fbits(0.25), "Node._alarm.<locals>.alarm_due", [gx, 4, 9, fbits(1.5)]]
-    orig_log = call_log
+    note_l = ["after", fbits(0.25), "promise_due", [[gx, 3], 2, fbits(1.5)]]
+    orig_log, orig_own = call_log, own_code
 
     def with_log(f):                    # a planted fault in call_log, the module's own function
         def p(tr):
@@ -2033,6 +2118,15 @@ def timers_self_test():
     def raise_drops(tr):
         tr.raised_with_notes = lambda nd, name, e: None
 
+    def through_off(tr):                # own_code as before the fix: a wrapper's cell not read through the hand-over
+        OWN_THROUGH[0] = False
+
+    def closure_unread(tr):             # own_code taking a listed wrapper by its name alone, its closure not read
+        def by_name_alone(n, f):
+            listed = WRAPPERS.get(n) == getattr(f, "__qualname__", None)
+            return ("own", "a listed wrapper") if listed else orig_own(n, f)
+        globals()["own_code"] = by_name_alone
+
     # (case, body, its kwargs, what it must give, its planted fault as run() kwargs, whether it expects a note or a
     # stop inside a question)
     cases = [
@@ -2058,6 +2152,11 @@ def timers_self_test():
         ("k, an infinite delay stops", k_inf, {},
          "SystemExit: trace3: node 1: a timer armed inside a question has the delay inf, which is no finite number",
          dict(patch=plain_delay), True),
+        ("l, a listed wrapper over the document's promise_due, behind the tracer's hand-over", l_wrapper, {},
+         row(note_l), dict(patch=through_off), True),
+        ("l, a listed wrapper over another promise_due stops", l_other, {},
+         "SystemExit: trace3: node 1: a timer armed inside a question calls Node._seacast.<locals>.promise_due "
+         "(node.py:", dict(patch=closure_unread), True),
     ]
 
     def same(got, want):
@@ -2074,7 +2173,7 @@ def timers_self_test():
         try:
             got_p = run(body, **plant)
         finally:
-            globals()["call_log"] = orig_log
+            globals()["call_log"], globals()["own_code"], OWN_THROUGH[0] = orig_log, orig_own, True
         ok = not same(got_p, want)
         bad += not ok
         print(f"timers self-test, {what}, its planted fault: {'fails it, ok' if ok else 'passes  <-- FAIL'}; it gives "
@@ -2940,9 +3039,9 @@ class Tracer3(Tracer):
         if self.only61:
             self.traced = SEC61
         elif self.doc_seacast:
-            # (under SEACAST the window's count is bytes and a send's value a pair, and the three tables are not
-            # installed: the six are not traced there, by name); and SEACAST's covered names, its own functions
-            self.kept = tuple(n for n in seacast_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)) if n not in SEC71)
+            # (of §7.1's window, `front` alone: seacast.md's §4.11 calls it unchanged, and redefines or reaches the
+            # rest through what it redefines); and SEACAST's covered names, its own functions
+            self.kept = tuple(seacast_kept(BLOCK, N.SPEC_SRC, N.generate(N.DOC2)))
             self.traced = self.kept + tuple(n for n in manifest_seacast.COVERED if n not in self.kept)
         else:
             self.traced = BLOCK
@@ -3756,8 +3855,10 @@ class Tracer3(Tracer):
             "choice": lambda r, xs: [[[self.member_seacast(x) for x in xs]], self.member_seacast(r)],
             "send": lambda r, p, m, urgent=False: [[n(p), self.msg_seacast(m), self.flag(urgent, "send's urgent")],
                                                    boolean(r)],
-            # the manifest's CUT: seacast.md's functions the twin does not transcribe, a question at every node
-            "window_release": lambda r, p, g, i: [[n(p), g_(g), n(i)], nothing(r)],
+            # §4.11's writer: an entry's bytes on the wire to p (the binding's), and the offers an entry carries, in the
+            # toy's order (with_owed's entry, or none)
+            "wire_size": lambda r, p, e: [[n(p), self.qentry(e)], n(r)],
+            "offers_in": lambda r, e: [[None if e is None else self.qentry(e)], [[g_(g), n(b.v)] for g, b in r]],
             # seacast-lite.md's two, in SEACAST's forms where SEACAST asks them so (seacast-lite.md's form for an IHAVE's entry)
             "valid_have": lambda r, e: [[self.have_msg_seacast(e) if isinstance(e, Have) else self.offer(e)], bool(r)],
             "shuffled": lambda r, xs: [[[self.member_seacast(a) for a in (xs.m if isinstance(xs, MeshQuestion) else xs)]],
@@ -3799,8 +3900,9 @@ class Tracer3(Tracer):
                 "REPAIR_TO": lambda r, g: [[t, g.hex()], [self.nat(q) for q in r]]}
 
     def asked_enc_seacast(self):
-        """The eight names the twin asks where a node replaces them (ASKED_Seacast), in its NodeSeacast's forms: `forward` with
-        its axes or null, `known_in_scope`'s bitmap as a natural."""
+        """The nine names the twin asks where a node replaces them (ASKED_Seacast), in its NodeSeacast's forms:
+        `forward` with its axes or null, `known_in_scope`'s bitmap as a natural, `filter_entry`'s entry as a lane holds
+        it, and its answer the entry it returns, or null (its argument written at the call: EAGER_Seacast)."""
         n, nothing = self.nat, self.nothing
         return {
             "forward": lambda r, f, p, axes=None: [[self.chunk(f), n(p),
@@ -3812,7 +3914,8 @@ class Tracer3(Tracer):
             "owed_missing": lambda r, g: [[g.hex()], self.boolean(r)],
             "repair_verdict": lambda r, g: [[g.hex()], self.repair_word(r)],
             "note_claim": lambda r, p, g: [[n(p), g.hex()], nothing(r)],
-            "known_in_scope": lambda r, g: [[g.hex()], n(r.v)]}
+            "known_in_scope": lambda r, g: [[g.hex()], n(r.v)],
+            "filter_entry": lambda r, p, entry: [[n(p), self.qentry(entry)], None if r is None else self.qentry(r)]}
 
     @staticmethod
     def repair_word(r):
@@ -4219,6 +4322,12 @@ class Tracer3(Tracer):
         return {"resolve": (lambda a: [self.key(a)], lambda r: None if r is None else r.hex()),
                 "chunk_of": (lambda mid: [mid.hex()], self.chunk)}
 
+    def pop_owed_enc(self, r, p):
+        """pop_owed_answer(p), asked by the writer under both documents (seacast-lite.md §7.2, seacast.md §4.11): the
+        answer a full queue refused, a narrow chunk. install's table of the tape's calls and the forms rows both
+        write it by this."""
+        return [[p], self.chunk(r)]
+
     def ask_seacast(self, a):
         """An ask of a SEACAST IWANT: [key, standing, hops, probe]. A plain ask (a WantIndex, whose class holds the three
         as false, 0 and false) or a structured id (which carries none) is [key, false, 0, false]."""
@@ -4354,7 +4463,10 @@ class Tracer3(Tracer):
             for t in tables:
                 if t.name in have:
                     t.value = self.have_seacast
-            # and seacast.md's own tables, as schema_seacast.py writes them (a JOIN, GRAFT or PRUNE as rel_msg does)
+            # and seacast.md's own tables, as schema_seacast.py writes them (a JOIN, GRAFT or PRUNE as rel_msg does); one
+            # a record names by seacast-lite.md's name (`trace`: §4.11's `sent`) takes the place of that name's
+            traced_as = {t.trace for t in schema_seacast.TABLES_Seacast if t.trace}
+            tables = [t for t in tables if t.name not in traced_as]
             tables += schema_seacast.python_tables_seacast(F, key, fbits, self.rel_msg)
         return tables
 
@@ -4486,8 +4598,9 @@ class Tracer3(Tracer):
         """The node's constants that seacast.md adds, in the nodes line's order, as the namespace holds them after
         load: ANSWERS_FIRST and MERGE_HOLDINGS (booleans); ASK_UPLINK (bits per second: finite, not negative, 0 never
         scales); SAMPLE_OUTSTANDING (the second phase's asks in flight per block, across types: a count of at least
-        1); SERVE_BUDGET (answers to one peer a heartbeat: a count of at least 1, or +inf for none, written null).
-        Anything else stops the tracer, in the constant's words."""
+        1); SERVE_BUDGET (answers to one peer a heartbeat: a count of at least 1, or +inf for none, written null);
+        W_BYTES (§4.11's window in bytes: a count, 0 allowed as W's is, or +inf for none, written null; +inf exactly
+        where W is, as the toy sets both). Anything else stops the tracer, in the constant's words."""
         out = {}
         for c in ("ANSWERS_FIRST", "MERGE_HOLDINGS"):
             if not isinstance(ns[c], bool):
@@ -4501,17 +4614,23 @@ class Tracer3(Tracer):
         if isinstance(s, bool) or not isinstance(s, int) or s < 1:
             raise SystemExit(f"trace3: node {nd.id}: SAMPLE_OUTSTANDING is no count of at least 1: {s!r}")
         out["SAMPLE_OUTSTANDING"] = s
-        b = ns["SERVE_BUDGET"]          # as the client's limits are written (a whole float is its int), but a bool
-        if isinstance(b, float) and math.isinf(b) and b > 0:   # or a value below 1 stops
-            out["SERVE_BUDGET"] = None
-            return out
-        try:
-            whole = not isinstance(b, bool) and b >= 1 and b == int(b)
-        except (OverflowError, ValueError, TypeError):
-            whole = False
-        if not whole:
-            raise SystemExit(f"trace3: node {nd.id}: SERVE_BUDGET is no count of at least 1 nor +inf: {b!r}")
-        out["SERVE_BUDGET"] = int(b)
+        def count_or_inf(c, least, words):  # as the client's limits are written (a whole float is its int), but a bool
+            b = ns[c]                       #   or a value below `least` stops
+            if isinstance(b, float) and math.isinf(b) and b > 0:
+                return None
+            try:
+                whole = not isinstance(b, bool) and b >= least and b == int(b)
+            except (OverflowError, ValueError, TypeError):
+                whole = False
+            if not whole:
+                raise SystemExit(f"trace3: node {nd.id}: {c} is no {words} nor +inf: {b!r}")
+            return int(b)
+        out["SERVE_BUDGET"] = count_or_inf("SERVE_BUDGET", 1, "count of at least 1")
+        out["W_BYTES"] = count_or_inf("W_BYTES", 0, "count of bytes")
+        w = ns.get("W", math.inf)       # seacast-lite.md's W, which the toy turns off with W_BYTES (card 14)
+        if (out["W_BYTES"] is None) != (isinstance(w, float) and math.isinf(w)):
+            raise SystemExit(f"trace3: node {nd.id}: W_BYTES is {ns['W_BYTES']!r} where W is {w!r}: the window is "
+                             f"off in both or in neither")
         return out
 
     def have_seacast(self, e):
@@ -4608,10 +4727,10 @@ class Tracer3(Tracer):
         rec = F.Recorder()
         if self.doc_seacast:
             rec.row_reads = frozenset(ROW_READS_Seacast)
-        views = [t for t in self.schema(ns) if not (self.doc_seacast and t.name in WINDOW)]
+        views = self.schema(ns)
         F.install(rec, ns, views)
-        window = {} if self.doc_seacast else {name: ns[name] for name in WINDOW}    # the installed cell and views: each
-        #                                                                         record's end checks they are still there
+        window = {name: ns[name] for name in WINDOW}    # the installed cell and views, under both documents: each
+        #                                                 record's end checks they are still there
         st = self.vst if self.doc_seacast else {"depth": 0, "ext": 0, "cur": None}
         key, tr = self.key, self
         if self.doc_seacast:     # an observer's own code that arms a timer by the simulator itself stops as one that arms it
@@ -4825,7 +4944,7 @@ class Tracer3(Tracer):
             "bid_group": lambda r, root: [[root.hex()], None if r is None else r.hex()],
             # the writer's questions and calls
             "has_room": lambda r, p: [[p], bool(r)],
-            "pop_owed_answer": lambda r, p: [[p], tr.chunk(r)],
+            "pop_owed_answer": tr.pop_owed_enc,     # (forms_seacast_examples.py makes its row by it)
         }
         blobs = lambda xs: [tr.blob(x) for x in xs]     # noqa: E731
         calls = {   # CALLS' questions: how each one's arguments, and its answer, are written
@@ -4903,9 +5022,9 @@ class Tracer3(Tracer):
                                                       [tr.chunk(f) for f in r]],
                         "push_rebuilt": lambda r, g, new: [[g.hex(), [tr.nat(i) for i in new]], tr.nothing(r)],
                         "validate_chunk": lambda r, f: [[tr.chunk(f)], r]}
-        if tr.doc_seacast:   # under SEACAST: the eight the twin asks, in its forms (asked_enc_seacast); on_iwant, a kept name, and the
-            #             directed sets' validate_chunk in seacast-lite.md's; and no form for a name the twin cannot ask
-            #             (iface_of stops a record's own call of one)
+        if tr.doc_seacast:   # under SEACAST: the nine the twin asks, in its forms (asked_enc_seacast); on_iwant, a
+            #             kept name, and the directed sets' validate_chunk in seacast-lite.md's; and no form for a
+            #             name the twin cannot ask (iface_of stops a record's own call of one)
             replaced_enc = ({n: replaced_enc[n] for n in ("on_iwant", "validate_chunk")} | tr.asked_enc_seacast()
                             | {n: None for n in NOASK_Seacast})
             if set(replaced_enc) != set(REPLACEABLE_Seacast):
