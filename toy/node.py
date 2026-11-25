@@ -454,7 +454,7 @@ class Node:
         kept on the plain draw (peers are numbered as columns are; an earlier build ordered it as well), and a second
         shuffled in one call fails."""
         sim, node, COL = self.sim, self, self._types["column"]
-        spec_repair_verdict, spec_shuffled = ns["repair_verdict"], ns["shuffled"]
+        spec_repair_verdict = ns["repair_verdict"]
 
         def covered(g):
             sub, cols = sim.gsub.get(g), set()
@@ -474,6 +474,8 @@ class Node:
                 return spec_repair_verdict(g)          # the last step's judgement draws nothing
             n = int(share * (steps[k][0] - len(ns["rsample"][g])))
             draws = []
+            spec_shuffled = ns["shuffled"]             # read at the call, as choice is: a binding installed after
+                                                       #   the build (a tracer's) is the one put back below
 
             def shuffled(xs):                          # index i of a row is column i
                 draws.append(1)                        # the extension's draw only: a second one is a leak
