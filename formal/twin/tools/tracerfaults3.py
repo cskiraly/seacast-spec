@@ -1243,21 +1243,24 @@ def hdr_read_seacast(raw):
 
 
 def unscanned_layer_seacast(toy):
-    """Under v2: a layer over `propose_colour`, a name of seacast.md's that no record covers (so that no chain rule
-    reads it first: until the roots were traced the layer was over `on_frame`, which records now cover), that claims
-    to be the toy's (its code compiled as node.py's, at a line where no binding is) and holds the bound
-    `propose_colour` in a closure cell. Bound just before the install: the scan of the toy's bindings names no such function, and the tracer
-    must stop at the install."""
+    """Under v2: a layer over `families_with_duty`, a question of seacast.md's that the toy's binding provides
+    (Node._seacast's, at node.py:1491). Neither namespace_check (BLOCK and the covered names) nor node_chains (the
+    traced names) reads it, so no other check of the install meets the layer first. The layer claims to be the toy's
+    (its code compiled as node.py's, at a line where no binding is) and holds the bound `families_with_duty` in a
+    closure cell. Bound just before the install: the scan of the toy's bindings names no such function, and the tracer
+    must stop at the install. Until the roots were traced the layer was over `on_frame`, which records now cover; then
+    over `propose_colour`, which e4d4822 removed from seacast.md."""
     node_py = str(Path(toy).resolve() / "node.py")
     g = {}
-    exec(compile("def make(doc):\n    def propose_colour(T, fam):\n        return doc(T, fam)\n"
-                 "    return propose_colour\n", node_py, "exec"), g)
+    exec(compile("def make(doc):\n    def families_with_duty(T):\n        return doc(T)\n"
+                 "    return families_with_duty\n", node_py, "exec"), g)
     _install = T.Tracer3.install
 
     @functools.wraps(_install)
     def install(self, nd, ns):
-        assert "propose_colour" not in self.traced, "propose_colour is traced: the plant would meet the chain rule"
-        ns["propose_colour"] = g["make"](ns["propose_colour"])
+        assert "families_with_duty" not in self.traced, \
+            "families_with_duty is traced: the plant would meet the chain rule"
+        ns["families_with_duty"] = g["make"](ns["families_with_duty"])
         PLANTED[0] += 1
         return _install(self, nd, ns)
 

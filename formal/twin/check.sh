@@ -2375,7 +2375,8 @@ s_tracercontrols() {
       raw-chunk-id-v2) want="^trace3: node [0-9]*: chunk_id is not the installed message_id" ;;
       hdr-other-v2) want="^trace3: node [0-9]*: hdr is not the toy's desc before the install" ;;
       alias-missing-v2) want="^trace3: node [0-9]*: chunk_id is missing under SEACAST" ;;
-      unscanned-layer-v2) want="^trace3: node [0-9]*: propose_colour is bound to a function of the toy's that the scan of its bindings does not name: make\.<locals>\.propose_colour \(node\.py:2\)" ;;
+      unscanned-layer-v2) want="^trace3: node [0-9]*: families_with_duty is bound to a function of the toy's that the"
+        want="$want scan of its bindings does not name: make\.<locals>\.families_with_duty \(node\.py:2\)" ;;
       early-install-v2) want="^trace3: node [0-9]*: the closure rule's lists and the node differ: ALL is not in the namespace" ;;
         # An install before _seacast is still refused, and refused first by what it lacks: the install-time check of the
         # closure rule's lists. The last-binding check keeps its coverage through rebind-tape-v2 and rebind-view-v2,
