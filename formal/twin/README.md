@@ -5,9 +5,11 @@ transcription of that Python, function by function. It is not an abstract model,
 Its value is that it can be checked against the Python, which this directory does by trace replay (below), and
 linked to the Veil models, a link that `formal/refine/` begins (below).
 
-The record of the twin is in `record/`. It shows that the twin replays the traces of the toy's cells, of the hand
-runs and of the directed sets with no mismatch, and which mutants of the twin part of those traces tell apart from
-it (below). `record/RECORD.md` says what the record ran, what it shows and what it does not show.
+The record of the twin is in `record/`. It shows that the twin as it stood at v0.11.1 replays the traces of the
+toy's cells, of the hand runs and of the directed sets with no mismatch. It also shows which mutants of the twin
+part of those traces tell apart from it (below). The twin has changed since v0.11.1, and the record says nothing
+about those changes. `record/RECORD.md` says what the record ran, what it shows and what it does not show, and how
+its matrix of mutants, which an earlier version made, is tied to it.
 
 The twin has the same branches as the Python, with these restrictions, which its sources name:
 - An ask is an IWANT for one chunk. In the twin, an ask's id always has a group and an index; the tracer,
