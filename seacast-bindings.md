@@ -5,7 +5,7 @@
 > (§1 to §3); the two bindings onto gossipsub's wires are defined to the field (§4, §5), and the
 > gossipsub binding's extra fields are defined to the byte. The native QUIC binding (§7) is a
 > draft. The toy models the gossipsub binding and the libp2p stream binding.
-> No client speaks these bytes yet, and they are not model-checked.
+> These bytes are not model-checked.
 
 *This document was written on 2026-11-17 from `seacast.md` §7 of that date, which it takes
 over whole, and from the bytes of SEACAST's message encoding and of the libp2p stream and Waggle
@@ -508,10 +508,10 @@ names no sample (`seacast.md` §1.2).
 
 ## 7. The native QUIC binding (draft)
 
-> **Draft.** This section is for study, and no client speaks the binding. The toy has measured a
-> stream per chunk under packet loss, priorities between streams, small chunks in datagrams, and a
-> stream per chunk on libp2p's streams, compared with the native binding. Those figures, and the toy
-> options that produced them, come in a later release.
+> **Draft.** This section is for study. The toy has measured a stream per chunk under packet loss,
+> priorities between streams, small chunks in datagrams, and a stream per chunk on libp2p's streams,
+> compared with the native binding. Those figures, and the toy options that produced them, come in a
+> later release.
 
 The native QUIC binding carries SEACAST directly on QUIC (RFC 9000), on a QUIC connection of its
 own: the *native connection*. It uses the message encoding of §1, and it is meant to keep every

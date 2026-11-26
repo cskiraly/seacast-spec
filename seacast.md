@@ -1,9 +1,10 @@
 # SEACAST: the protocol on its own notions
 
-> This document defines SEACAST, and its decisions are taken (§8). It is checked in the toy only;
-> no client runs it, and the research harness's simulations ran only designs that it contains as
-> settings (§6.2). It is not model-checked, except that §4.1's JOIN and answered GRAFT (messages
-> defined in §2) were checked exhaustively for one link and one relation in small bounds.
+> This document defines SEACAST, and its decisions are taken (§8). The toy runs its code, and the
+> Lean twin replays the toy's traces of it; the research harness's simulations ran only designs that
+> it contains as settings (§6.2). It is not model-checked, except that §4.1's JOIN and answered
+> GRAFT (messages defined in §2) were checked exhaustively for one link and one relation in small
+> bounds.
 
 *SEACAST stands for Segmented, Encoded, Availability-sampled broadCAST (the E could also read
 Elastic). The name dates from 2026-10-19; `seacast-lite.md`'s protocol, now SEACAST Lite, was

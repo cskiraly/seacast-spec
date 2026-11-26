@@ -12,8 +12,8 @@ This repository holds SEACAST's specification, written as Python-like code in th
 Ethereum's consensus specs; a small simulator, the toy, runs that code as written. The
 specification defines two protocols:
 
-- **SEACAST**, in [`seacast.md`](seacast.md), is the main one. It is checked by running its code, in
-  the toy and in the Lean twin's replay of the toy's traces, and no client runs it yet.
+- **SEACAST**, in [`seacast.md`](seacast.md), is the main one. The toy runs its code, and the Lean
+  twin replays the toy's traces of it.
 - **SEACAST Lite**, in [`seacast-lite.md`](seacast-lite.md), diffuses an execution payload over
   gossipsub. It is the one that was measured and proved: the measurements ran a research
   implementation of it, and the proofs are of models of its rules. SEACAST contains it as one of
@@ -79,8 +79,8 @@ that implementation differs from the text.
   results record names the code it ran. [`formal/README.md`](formal/README.md) says what each check
   of it shows: the proofs, the Lean twin with its record, and the first piece of a refinement.
 - **SEACAST** (`seacast.md`) is checked by running its code: the toy runs it, and the Lean twin
-  replays the toy's traces of it. No client runs it, and the research implementation's simulations
-  ran only designs that SEACAST contains as settings.
+  replays the toy's traces of it. The research implementation's simulations ran only designs that
+  SEACAST contains as settings.
 - **Results.** The announcement post, *[SEACAST: fast, lean, sampled broadcast for Ethereum, with an
   executable spec and a formal model](https://ethresear.ch/t/seacast-fast-lean-sampled-broadcast-for-ethereum-with-an-executable-spec-and-a-formal-model/26167)*
   (2026), stays as published. Its text is kept current, with the latest results and the data and

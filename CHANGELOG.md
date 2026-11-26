@@ -64,6 +64,9 @@ as it was, under either document.
   that names the mesh then reads the union of the colours' meshes, and that under `--churn`, `late`
   also counts a chunk sent after a HAVE the sender never held. `toy/xcheck.py`'s docstring says the
   last too.
+- The opening notes of `seacast.md` and `seacast-lite.md` and the SEACAST section of `toy/README.md`
+  say that the toy runs SEACAST's code and the Lean twin replays the toy's traces of it, where they
+  said it was checked in the toy only.
 - `formal/twin/tools/trace3.py` traces `seacast.md`'s own functions under `--doc seacast`, where
   v0.12.0 traced only the toy's helper `held` and the functions that `seacast.md` keeps from
   `seacast-lite.md`. It writes one record for each top-level call of a traced function, the roots
@@ -126,6 +129,8 @@ as it was, under either document.
 - `seacast.md` §4.1 no longer has `propose_colour`, which nothing called. `least_used_colour`, a
   helper not written out that only `propose_colour` called, leaves §3's list of helpers. The toy's
   own `least_used_colour` in `toy/node.py`, which nothing called, goes too.
+- `README.md`, the opening notes of `seacast.md` and `seacast-bindings.md`, and the note on
+  `seacast-bindings.md` §7 no longer say whether clients run SEACAST or speak its bindings.
 
 ## v0.12.0 — 2026-11-22 (`ca0bbb0`)
 

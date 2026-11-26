@@ -5,11 +5,11 @@
 > the research implementation (Prysm and a go-libp2p-pubsub fork) and revised after a review
 > against it; section 9 lists where the measured runs differ from what is written here.
 
-*This is SEACAST Lite, the protocol that was measured and proved: the measurements ran a
-research implementation of it (§9), and the proofs are of models of its rules at v0.8 with four
-later changes ([`formal/`](formal/README.md)). SEACAST itself is defined in
-[`seacast.md`](seacast.md), which is checked in the toy only. SEACAST contains this
-protocol as its tier 4 setting, with the differences that `seacast.md` §6.1 lists.*
+*This is SEACAST Lite, the protocol that was measured and proved: the measurements ran a research
+implementation of it (§9), and the proofs are of models of its rules at v0.8 with four later changes
+([`formal/`](formal/README.md)). SEACAST itself is defined in [`seacast.md`](seacast.md); the toy
+runs its code, and the Lean twin replays the toy's traces of it. SEACAST contains this protocol as
+its tier 4 setting, with the differences that `seacast.md` §6.1 lists.*
 
 ## 0. How to read this
 

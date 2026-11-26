@@ -665,11 +665,12 @@ fixed in `seacast-lite.md` since the window is v0.3's:
 
 ## SEACAST (`--doc seacast`)
 
-*SEACAST is checked in this toy only (its banner). Figures below from fewer than ten
-seeds, a single seed unless stated, are toy checks of a mechanism, not measurements. Those of runs
-with a payload (tier 4, variant C) were recorded before 2026-10-23, under the descriptor's group id
-as the payload's name; under the group's key their exact values move as any renaming's do
-("Checking a change"). Column and row groups are named as before.*
+*This toy runs SEACAST's code, and the Lean twin replays the toy's traces of it (`seacast.md`'s
+opening note). Figures below from fewer than ten seeds, a single seed unless stated, are toy checks
+of a mechanism, not measurements. Those of runs with a payload (tier 4, variant C) were recorded
+before 2026-10-23, under the descriptor's group id as the payload's name; under the group's key
+their exact values move as any renaming's do ("Checking a change"). Column and row groups are named
+as before.*
 
 [`seacast.md`](../seacast.md) is run on top of `seacast-lite.md`: `extract.py` pulls both
 documents' blocks, v0.3's are executed first and SEACAST's after them in the same namespace, so
