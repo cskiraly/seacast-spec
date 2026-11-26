@@ -9,8 +9,8 @@ perturb nothing), every record replays, and its first line is this tree's conten
 cell's kind (header3.py). The replay is given the tree's content line (content.py), written once to OUTDIR.
 
 With --doc seacast the cells are seacast.md's (check.py --doc seacast, against golden-seacast.txt). Their records are
-replayed too: trace3.py traces under SEACAST only the names that are seacast-lite.md's all the way down, so each record is
-of the twin's seacast-lite.md, called in SEACAST's states.
+replayed too: trace3.py traces seacast.md's covered functions (the manifest's COVERED) and the names that are
+seacast-lite.md's all the way down: each record is of the twin's SEACAST, or of its seacast-lite.md in SEACAST's states.
 
 Each run is a plain child, under the caller's limits.
 """

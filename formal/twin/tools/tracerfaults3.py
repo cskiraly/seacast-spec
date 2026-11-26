@@ -810,7 +810,7 @@ CHAIN_PLANTS = ("--chain-filter-observer-v2", "--chain-bindings-v2", "--chain-ow
 
 
 def noask_in_record_seacast():
-    """Under v2, piece D's plant (p), point 5: at the first table read inside a record, outside any question or
+    """Under v2, plant (p), point 5: at the first table read inside a record, outside any question or
     suppression, at a node whose queue holds an entry with a chunk, that node's own `filter_entry` is called once, with
     the entry's peer and the entry, both read through the tracer's view (so the reads are the record's). Where it is the
     document's (seacast/hand5, plant (p)'s control), the call is the record's own, and its writes (`sent_to`, or the
@@ -851,7 +851,7 @@ def noask_in_record_seacast():
 
 
 def live_binding_seacast(toy, count=True):
-    """Under v2, piece D's point 6 (D3), planted since LAYERS lists publish's layer under --source-offers off as
+    """Under v2, point 6 (D3), planted since LAYERS lists publish's layer under --source-offers off as
     changing: the toy's own case, its lambda over `announce` bound through publish, now runs inside a replaced name
     entered outside every record, where no record opens. At node 1's first heartbeat after the nodes line (which is
     written at the trace's first record, with its own check of every binding: there it would stop first), the
@@ -880,7 +880,7 @@ def live_binding_seacast(toy, count=True):
 
 
 def bindings_checks_off_seacast(both):
-    """Under v2, piece D's plant (q) (`both` false) and point 6's control (`both` true), each over point 6's planted
+    """Under v2, plant (q) (`both` false) and point 6's control (`both` true), each over point 6's planted
     binding (live_binding_seacast): trace3's record binding check (`bindings_check`) skipped at each record's entry,
     or at its entry and its exit. The planted lambda over `announce`, live through node 1's first heartbeat, is then
     met at the exit of the record it is bound across (q), or not at all (the control). Counted once for each check
@@ -896,7 +896,7 @@ def bindings_checks_off_seacast(both):
 
 
 def per_node_depth_seacast():
-    """Under v2, piece E's plant (r), E2: each install gets a depth state of its own (step 1's per-node depth, the
+    """Under v2, plant (r), E2: each install gets a depth state of its own (step 1's per-node depth, the
     planted fault), and the plant makes no call of its own. On a cell where a question at node a reaches node c's
     traced code (custody-floor-churn1: node a's `keep_floor` opens a link, and node c's `on_open` sends its JOIN and a
     relation inside a's `open_link` question), those calls at c are then records of c's own, which start inside a's
@@ -1080,7 +1080,7 @@ def layer_missing_seacast(toy):
 
 
 def suppressed_filter_seacast(toy, off):
-    """Under v2, piece E's E3 (carried 9), as `--suppressed-entry-v2` is for hand5-own's `on_iwant`: on hand5-peer,
+    """Under v2, E3 (carried 9), as `--suppressed-entry-v2` is for hand5-own's `on_iwant`: on hand5-peer,
     where each node replaces `filter_entry` (`--promise-mode peer`). The toy itself enters it inside next_to_send's
     records alone, where the twin asks it (§4.11), so this plant makes the entry outside every record: at such a node,
     a call of its replaced `filter_entry` from the toy's `Node._write`, which the simulator calls at depth 0, before

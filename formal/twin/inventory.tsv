@@ -2,7 +2,7 @@
 # class: must (read, its controls hold), stopped (a run the tracer stops), plant or copy (each skipped as such).
 # needs: - (every run), das (absent under --no-das), seacastcells (the cells under seacast.md, all of them).
 # Readers refuse a file that is not sorted, holds a path twice, an unknown word, or a line without four fields.
-chains/custody-floor-churn1	must	-	piece E's real cell: the tracer-wide depth (carried 7)
+chains/custody-floor-churn1	must	-	the real cell of the tracer-wide depth (carried 7)
 chains/das-hoardcol-w16	must	das	the chain cases' cell: the hoarders
 chains/das-samplers-mcoff	must	das	the chain cases' cell: the samplers, the member check off
 chains/fam-plain	copy	-	the families' reader: the plain copy of seacastdirected/upkeep_h (families_seacast.py)

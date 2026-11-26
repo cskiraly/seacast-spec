@@ -31,7 +31,7 @@ Python's meanings kept on purpose:
   Python's change in place is no write then;
 - `on_validated` and `defer` call each other. The recursion is cut by a fuel, `deferDepth`: at zero the twin
   stands where the Python would recurse again, with a crash. In the node, what bounds the depth is validate_chunk's
-  own ask of `installed_block` (seacast-lite.md:342). That ask runs inside a call on the tape, past the tracer's
+  own ask of `installed_block`. That ask runs inside a call on the tape, past the tracer's
   one-answer check. So the tracer also counts a record's chain of defers and stops at the third.
   The replay would report a crash at zero fuel as a mismatch, so no wrong twin passes.
 

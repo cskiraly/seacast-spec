@@ -13,7 +13,9 @@ each function comes after every function it calls (`Seacast/Relations.lean`'s ru
   once, by the groups' pass, whose calls ask questions: there its order is read from the tape (`groupsOrder`), a
   permutation of its members, which the tracer writes in `cell_groups`' order.
 - **The cells that waited** are `pending[root]`'s, in the list's own order. `pending[root]` is then written with the
-  rest, an empty list included, as the Python's plain assignment stores it.
+  rest, an empty list included, as the Python's plain assignment stores it. A twin that deleted `pending[root]` where
+  the rest is empty would pass the same records: the tracer writes an empty list as no entry, so both would write
+  the same entry and hold the same state (`ReplayTables.lean`'s `valueAt`).
 - **`tied[root]`'s levels** are iterated in the node's order, asked as `seacast-lite.md`'s twin asks it where the Python
   iterates one of them (`Sec42.lean`): the peers at the loop's start, and each peer's groups as its turn builds the
   list of those in `groups`. The second scan, of the peers left with nothing, asks the peers' order again, every

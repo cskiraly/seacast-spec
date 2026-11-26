@@ -1,8 +1,8 @@
 #!/bin/bash
-# The record's run of the twin: check.sh with --record. Every cell of the toy under both documents, the three
-# hand traces and the 22 directed sets, each traced and replayed under the quick check's contract; the tools' own
-# controls; the seeds' retrace; and the manifest of the record's 67 traces by their two hashes. Hours on a
-# server, where the quick check takes minutes.
+# The record's run of the twin: check.sh with --record. Every cell of the toy under both documents, the three hand
+# traces, the 22 directed sets under seacast-lite.md and the 12 under seacast.md, each traced and replayed under the
+# quick check's contract; the tools' own controls; the seeds' retrace; and the manifest of the record's 67 traces
+# by their two hashes. Hours on a server, where the quick check takes minutes.
 #
 #   bash formal/twin/record.sh [--toy DIR] [--out DIR] [-j N] [--steps a,b,...]
 #

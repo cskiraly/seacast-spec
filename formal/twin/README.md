@@ -106,8 +106,9 @@ own make. It names every trace of every cell of the toy's `check.py` under both 
 directed sets, each by its hashes; the traces themselves are not kept. A directed set is a set of generated
 states, made to reach what the cells do not, with the toy's own functions called on them. The record also holds
 the reports of the replays and of the controls. The matrix shows which mutants the replay tells apart from the
-twin on the cells under `seacast-lite.md`, two hand traces and the directed sets. `record.sh` makes the traces again,
-and `record.sh --matrix K/N` makes each part of the matrix; `tools/mutants3.py --merge` reads the parts as one.
+twin on the cells under `seacast-lite.md`, two hand traces and the directed sets. `record.sh` run from a fresh clone
+of `9f33f60`, as the record's run was, makes the traces again, and `record.sh --matrix K/N` makes each part of the
+matrix; `tools/mutants3.py --merge` reads the parts as one.
 
 ## The link to the Veil models
 

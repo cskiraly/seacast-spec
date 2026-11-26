@@ -266,8 +266,8 @@ class NodeSeacast (m : Type → Type) where
   permutation of the peers the twin holds -/
   wantPOrder : List Peer → m (List Peer)
   -- §4.8's heartbeat: four helpers that `on_heartbeat` calls and the documents do not write out. seacast.md's list
-  -- of helpers names `joined_types()` and `sampled_types()`; `joined_peers()` and `related(q)` are in neither
-  -- document's list.
+  -- of helpers names all four, and says what three of them return: `sampled_types()`, `joined_peers()` and
+  -- `related(q)`; `joined_types()` is named alone.
   /-- `joined_types()`: the types whose floor and relations the heartbeat keeps, in the node's order -/
   joinedTypes : m (List TypeId)
   /-- `sampled_types()`: the object types the node samples, in the node's order -/

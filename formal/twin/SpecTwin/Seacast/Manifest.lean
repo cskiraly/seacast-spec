@@ -9,7 +9,7 @@ trace's header and nodes line. `gen/manifest_seacast.py` says what each list hol
 
 namespace SpecTwin.Seacast.Manifest
 
-/-- `seacast.md`'s functions the twin transcribes, each a record of its own. -/
+/-- The functions the twin transcribes under `seacast.md`, each of which can be a record of its own. -/
 def covered : List String :=
   ["colour_of", "send_relation", "send_join", "prune", "yes", "no", "queue_owed_relations", "interest_of_peer",
    "wants_from_me", "serves", "counted", "keep_coverage", "keep_floor", "fills", "note_push", "suppression_scope",

@@ -5,15 +5,16 @@ file byte for byte. The replay routes a record of a trace under seacast.md by th
 header and nodes line against them. The tracer's own lists under --doc seacast are to be these (trace3.py).
 
 The lists:
-- COVERED: seacast.md's functions the twin transcribes, each a record of its own. The 66 that the cycle's 71
-  call, main's `fill` and `serve_standing`, then `on_pace_tick` and `on_block_installed`, which seacast.md
-  redefines and the twin serves in their v2 forms, then `joined` and `drop_wants_beyond`, which v0.11.1 adds on
+- COVERED: the functions the twin transcribes under seacast.md, each of which can be a record of its own (a call
+  inside another record is that record's). The 66 that the cycle's 71 call, main's `fill` and `serve_standing`,
+  then `on_pace_tick` and `on_block_installed`, which seacast-lite.md defines and seacast.md inherits, and which the
+  twin serves in their v2 forms, then `joined` and `drop_wants_beyond`, which v0.11.1 adds on
   `on_holding`'s path and `fill`'s, then §4.5's serving: `index_bound`, `our_interest_for`, `outside`, §4.10's
   `route_want`, and `on_want`, then §4.1's relations and §6.3's limit on them: `relation_room`, `graft`, `on_prune`,
   `on_graft`, `maintain_relations` and `on_join`, then §4.11's window and writer: `wake_front`, `write_waits`,
   `free_room`, `acquire_room`, `leave_line`, `track_in_flight`, `window_release`, `window_timeout`, `noted` and
   `next_to_send`, then §4.2's gate for cells: `drop_outside` and `on_header_validated`, then the roots: `on_frame`,
-  `on_heartbeat` and `publish`.
+  `on_heartbeat` and `publish`, then `may_be_asked`, which asks `offered_us` as a question.
 - KEPT: seacast-lite.md's functions that a record under seacast.md may name: those seacast-lite.md keeps all the way down
   under v2 (trace3.py's `seacast_kept` over the toy's two documents), less NODE_OWN's names. Of §7.1's window it
   holds `front` alone, which seacast.md's window calls unchanged.
@@ -145,7 +146,7 @@ QUESTIONS_UNLOADED = {
 
 # the lists, in the order Manifest.lean has them, each with its Lean name and its doc comment there
 LISTS = (("COVERED", "covered",
-          "`seacast.md`'s functions the twin transcribes, each a record of its own."),
+          "The functions the twin transcribes under `seacast.md`, each of which can be a record of its own."),
          ("KEPT", "kept",
           "`seacast-lite.md`'s functions a record under `seacast.md` may name, kept all the way down."),
          ("NODE_OWN", "nodeOwn",

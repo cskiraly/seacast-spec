@@ -31,8 +31,8 @@
 #             matrixdiff.py, trace3.py's of the names seacast.md keeps, gen/schema_seacast.py's encoders,
 #             keptcopy.py's, labcites.py's, scan_bindings.py's, timers_seacast.py's, calls_seacast.py's and inventory_seacast.py's); and no line of the twin's sources (the
 #             build's copy), of its tools or of the prose beside them (every *.md but out/'s and record/'s)
-#             cites the notes beside which they were developed (labcites.py), a citation planted in
-#             README.md's copy reported
+#             cites the notes beside which they were developed or names the reviews, sessions and plans behind
+#             them (labcites.py), a citation planted in README.md's copy reported
 #   tables    the twin's generated files are the schema's (gen.py, makers.py); Seacast/Kept.lean's copies of seacast-lite.md's
 #             functions are their originals with the named differences alone (keptcopy.py); the record writers'
 #             arities are runSeacast's cases', each count a case takes given by a stub call (records_seacast.py), with two
@@ -73,8 +73,8 @@
 #
 # With --record (record.sh): the record's run, hours on a server. The same steps under the same contract, and:
 #   cells     every cell of the toy's check.py, not `none` alone: each digest golden.txt's, each replayed
-#   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of the
-#             names that are seacast-lite.md's all the way down); the tracer's self-test of those names
+#   seacastcells   every cell under seacast.md: each digest golden-seacast.txt's, each replayed (its records are of
+#             seacast.md's covered functions and seacast-lite.md's kept names); the tracer's self-test of the kept ones
 #   seacastdirected, seacastdirectedreplays  as above: the 12 directed sets under seacast.md, read by replays and
 #             headers too, and among the record's 67 traces below
 #   schemacontrols   the schema's and the makers' checks on planted changes: each must fail them
@@ -471,13 +471,13 @@ EOF_SELF
   echo "  $n of 15 tools' own cases as they must be (selftests.txt)"
   # the twin's text: its sources as the build copied them, its tools, and the prose beside them (every *.md but
   # out/'s, record/'s and .lake/'s, which the copy leaves out; tools/' own are read with tools/): none cites the
-  # notes beside which it was developed
+  # notes beside which it was developed or names the reviews, sessions and plans behind it
   local md lc=$OUT/labcites-control n
   md=$(cd "$HERE" && find . \( -path ./out -o -path ./record -o -path ./tools -o -name .lake \) -prune \
     -o -name '*.md' -type f -print | LC_ALL=C sort | sed "s#^\./#$HERE/#")
   # shellcheck disable=SC2086
   $PY "$T/labcites.py" "$OUT/twin" "$T" $md > "$OUT/labcites.txt" 2>&1 \
-    || no "a file of the twin, of its tools or beside them cites the notes beside which it was developed (labcites.txt)"
+    || no "a file of the twin, of its tools or beside them cites the notes beside which it was developed or names the reviews, sessions and plans behind it (labcites.txt)"
   tail -n 1 "$OUT/labcites.txt" | sed 's/^/  /'
   # its control: a lab citation planted in README.md's copy is reported, on that line (the line is built from parts,
   # since the guard reads this script)
@@ -1095,13 +1095,13 @@ chain_args() {          # $1: a cell of the chain cases: run.py's arguments
     # the alarm's cell (alarm_cell): --alarm-wait's filter_entry, a replaced name, entered outside every record at the
     # honest nodes; its custodians alarm, and no member asks a claimant, so alarm_due is never armed
     das-alarm) echo "--doc seacast --setting rows --nodes 30 --degree 8 --msgs 1 --row-subnets 4 --blobs 4 --withhold 64 --fault hoardcol20 --rebuilt-seen on --repair-sample 3:1,6:2 --alarm-wait 3.5 --seed 22" ;;
-    # piece D's stops: seacast/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
+    # the stops: seacast/hand5's arguments (plant (p)'s control), and with --source-offers off (point 6)
     hand5-v2) echo "$HAND5 --doc seacast" ;;
     hand5-off) echo "$HAND5 --doc seacast --source-offers off" ;;
     # point 5's stop (plant (p)'s place since §4.11 covers next_to_send): --answers-first line replaces choose, which
     # the twin cannot ask, and next_to_send's own code calls it
     hand5-line) echo "$HAND5 --doc seacast --answers-first line" ;;
-    # piece E's carried 7: a custody cell whose churn makes keep_floor open a link, at node a, inside whose question
+    # carried 7: a custody cell whose churn makes keep_floor open a link, at node a, inside whose question
     # node c's on_open sends a JOIN and a relation
     custody-floor-churn1) echo "--nodes 30 --degree 8 --msgs 1 --setting custody --blobs 4 --seed 7 --doc seacast --upkeep on --keep-floor on --churn 1" ;;
   esac
@@ -1585,7 +1585,7 @@ replaced_rows() {       # R3-9: each name the twin asks with rows on a fixture's
 whole_replay() {        # whole_replay RC N FILE: a replay of N records, whole: exit 0 and FILE's summary line N of N ok
   [ "$1" = 0 ] && [ -n "$2" ] && has -x -F "replay: $2 records, $2 ok, 0 mismatched" "$3"
 }
-stops() {               # piece D: point 5's stop, (p) on hand5-line, and its control; point 6's stop (D3), planted on
+stops() {               # point 5's stop, (p) on hand5-line, and its control; point 6's stop (D3), planted on
   #                       hand5-v2, with its entry check removed (q), and with both checks removed (D5's control);
   #                       hand5-off, whose publish is replaced since the roots are traced; every cell local
   local n5= f5= nc= fc= rec= nq= plain got why s5 s6 s7 s8 ok5=0 okc=0 ok3=0 okq=0 okr=0 oko=0
@@ -1729,7 +1729,7 @@ sys.exit(1)' "$OUT/chains/hand5-off.jsonl.gz" 2> /dev/null; then
   [ "$oko" = 1 ] || s8="hand5-off not as it must be"
   echo "  the stops: $s5; $s6; $s7; $s8"
 }
-carried() {             # piece E: R7's tracer-wide depth on a real cell (carried 7) and its plant (r); a replaced name
+carried() {             # R7's tracer-wide depth on a real cell (carried 7) and its plant (r); a replaced name
   #                       entered outside every record on a real cell (carried 9) and its plants (s) and (t); local
   local c= why s= e1= e2= e3= ok3=0 n3=
   local ls='s/^tracerfaults3: suppressed-filter-v2, planted 2 times; node s: ([0-9]+); entry 1: returned; supp after the return: 0; bare s held: 2; entry 2: raised; supp after the raise: 0$/\1/p'
@@ -1868,7 +1868,7 @@ fam_line() {            # $1: the GRAFT's record's places; $2: the PRUNE's: fami
   #                       a pattern, the copy's three lines captured
   echo "node [0-9]+'s on_graft from [0-9]+, answered with a GRAFT: its family [0-9]+ of [a-z_]+ made the −1 family at $1; a counted record put in after it, at node [0-9]+; node [0-9]+'s on_graft from [0-9]+, answered with a PRUNE: its family [0-9]+ of [a-z_]+ made the −1 family at $2; the trailer counts the record put in; the copy's lines ([0-9]+), ([0-9]+), ([0-9]+)\$"
 }
-f_cases() {             # piece F: S1-8a on seacastdirected/upkeep_h, S1-8b in both halves, S1-C5's line, each with its
+f_cases() {             # S1-8a on seacastdirected/upkeep_h, S1-8b in both halves, S1-C5's line, each with its
   #                       planted fault; local, after carried
   local sd=seacastdirected/upkeep_h fc=$OUT/fcases r0 nog nop m rc tl lines refused rows rowsp s8a s8b s5 c fw
   local ok8a=0 okw=0 oks=0 okp=0 oka=0 okk=0 ok5=0 okc=0
@@ -2691,18 +2691,18 @@ sys.exit(2)' "$OUT/c-chains-omit.jsonl.gz" "$nm"; then
   # own); (k) a row with an argument left out, which the replay must refuse; (m) the bias cell, traced to its end,
   # with repair_verdict's rows from a real cell (c-rows.txt)
   replaced_rows
-  # the stops (piece D): point 5's, a record's own call of a replaced name the twin cannot ask ((p): choose, on
+  # the stops: point 5's, a record's own call of a replaced name the twin cannot ask ((p): choose, on
   # hand5-line), and its control on seacast/hand5; point 6's, a binding live across a record, planted on hand5-v2
   # (seacast/hand5's arguments): at the entry (D3), at the exit with the entry check removed (q), and with both
   # removed, the trace written to its end, a stated limit (D5's control); and hand5-off (--source-offers off), whose
   # publish is replaced at every node, written to its end and replayed clean (c-stops.txt)
   stops
-  # the carried cases (piece E): R7's tracer-wide depth on custody-floor-churn1, where node c's calls inside another
+  # the carried cases: R7's tracer-wide depth on custody-floor-churn1, where node c's calls inside another
   # node's question run bare, and its planted fault (r), a depth per node, whose record the replay accepts (a stated
   # limit); a replaced name entered outside every record on das-hoardcol-w16 (decode_group), and plants (s) and (t)
   # on hand5-peer (c-carried.txt)
   carried
-  # F's three (piece F): S1-8a on seacastdirected/upkeep_h, its backoff leaves counted and +inf planted in one; S1-8b's
+  # f_cases' three: S1-8a on seacastdirected/upkeep_h, its backoff leaves counted and +inf planted in one; S1-8b's
   # writer (--self-test-seacast) and reader (families_seacast.py on upkeep_h's on_graft records, signed and plain, its
   # two plants, and its refusal of seacast/hand5 cut short or stopped); S1-C5's line on seacast/hand5, by function, and
   # its plant (c-fcases.txt)

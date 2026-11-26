@@ -3403,7 +3403,7 @@ class Tracer3(Tracer):
         self.doc_message_id = None      # the document's message_id: the tracer's own way to a chunk's id,
         #                                   untraced, storing nothing on the chunk
         # what is traced: §6.1's twelve alone (TRACE3_ONLY=sec61); under --doc seacast, the block's names that are
-        # seacast-lite.md's all the way down; otherwise the block
+        # seacast-lite.md's all the way down, and seacast.md's covered functions (COVERED); otherwise the block
         self.doc_seacast = doc_of(argv) == "seacast"
         F.SET_ORDER_ENCODED[0] = self.doc_seacast    # under SEACAST a set's members are listed by their encoded key
         # under SEACAST, one tracer-wide state of the record and question depth: inside any question, every traced

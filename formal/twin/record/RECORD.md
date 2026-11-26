@@ -6,10 +6,11 @@ are the outputs of the runs: the manifest of the traces, the reports of the repl
 the reports of the controls, with the log of the script that started the quick check. Each is as the runs wrote
 it, but for one substitution in four files, which the end of this file names. `FILES.sha256` gives the SHA-256
 hash of every other file in this directory, this file included. `FILES.sha256` was made when the record was
-frozen. Its line for this file was made again on 2026-11-22, when v0.12.0 added the sentences on its names, and
-on 2026-11-25, when v0.13.0-rc.1 added the bullet on that release. The traces themselves are not kept, because
-they take about 50 GB uncompressed (`manifest/sizes.txt`). `record.sh` makes them again, and the hashes in the
-manifest tell whether a new run made the same traces.
+frozen. Its line for this file was made again on 2026-11-22, when v0.12.0 added the sentences on its names, on
+2026-11-25, when v0.13.0-rc.1 added the bullet on that release, and on 2026-11-26, when the last sentence of this
+paragraph came to name `9f33f60`. The traces themselves are not kept, because they take about 50 GB uncompressed
+(`manifest/sizes.txt`). `record.sh` run from a fresh clone of `9f33f60`, as the record's run was, makes them
+again, and the hashes in the manifest tell whether a new run made the same traces.
 
 This file uses the terms of the twin's README (`../README.md`). The toy (`toy/`) runs the Python in the code
 blocks of the documents directly. The tracer runs the toy and writes a trace: one record for each top-level call,

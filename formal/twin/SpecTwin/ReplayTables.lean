@@ -342,6 +342,8 @@ def valueAt (s : State) : Cell → Option Val
   -- `on_header_validated` stores `pending[root] = []`, which keeps the root a key; a later `drop_stale_waits` at that
   -- node iterates it (`for root in list(pending)`), and the twin, which holds no such key, refuses that record at
   -- `pendingOrder`. No recorded cell calls the gate, and K4's gate draws restore the state before each draw.
+  -- The other way, a wrong twin can pass: one that deleted `pending[root]` where the Python stores `[]` writes the
+  -- same entry and holds the same state, since both read as no entry here.
   | .pending r => match s.pending.getD r [] with
     | [] => none
     | l => some (.waits l)
