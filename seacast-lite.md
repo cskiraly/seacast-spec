@@ -1491,6 +1491,8 @@ peer is known to hold it, or until `WINDOW_TIMEOUT` or the queue's closing frees
   and finds no chunk to send gives it back too (`release_unused_slot`).
 - **What bypasses it:** urgent control (HAVEs, acknowledgements, decode claims) never waits for a
   slot.
+- **Open:** whether the normal lane's control (IHAVE, IWANT, GRAFT and PRUNE) should bypass the
+  window too.
 - **At the source,** the first HAVE naming a chunk, from any peer, or else the first window timeout
   of a copy of it, is the chunk's acknowledgement: at `SOURCE_OFFERS = ACK` its announcements to the
   mesh go out and it joins the source's HAVE (§5.1).
