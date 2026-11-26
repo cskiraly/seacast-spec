@@ -429,8 +429,8 @@ protobuf field or a gossipsub message type. The toy runs `seacast.md` on it.
 
 ## 5. The partial-messages binding
 
-This binding is gossipsub with the Partial Messages Extension: it is the binding for columns while
-the extension is the deployed path. It keeps the rollout inside existing topics.
+This binding is gossipsub with the Partial Messages Extension, and it carries columns. It uses only
+gossipsub's existing topics, so a network can adopt it without new subscriptions.
 
 - **What it gives up** (`seacast.md` §7's capabilities):
   - it gives up interest without subscription, but for a sampler's (§6);

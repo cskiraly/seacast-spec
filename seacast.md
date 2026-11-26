@@ -7,12 +7,15 @@
 > bounds.
 
 *SEACAST stands for Segmented, Encoded, Availability-sampled broadCAST (the E could also read
-Elastic). The name dates from 2026-10-19; `seacast-lite.md`'s protocol, now SEACAST Lite, was
-published at v0.4 as Informed Diffusion, which now names SEACAST's diffusion part (§0, "The
-parts"). Up to v0.11.1 this file was `protocol-v2.md` and `seacast-lite.md` was `protocol.md`. The
-toy runs this document with `--doc seacast`.*
+Elastic). The toy runs this document with `--doc seacast`.*
 
-*This document began as draft 1, of 2026-10-07. It is a sibling of [`seacast-lite.md`](seacast-lite.md),
+*The name dates from 2026-10-19; `seacast-lite.md`'s protocol, now SEACAST Lite, was
+published at v0.4 as Informed Diffusion, which now names SEACAST's diffusion part (§0, "The
+parts"). Up to v0.11.1 this file was `protocol-v2.md` and `seacast-lite.md` was `protocol.md`.*
+
+*This document began as draft 1, of 2026-10-07.*
+
+*This document is a sibling of [`seacast-lite.md`](seacast-lite.md),
 which defines SEACAST Lite; SEACAST contains that protocol as its tier 4 setting, with the
 differences that §6.1 lists. That document was draft v0.3 when this was written and has been
 v0.13.0-rc.1 since 2026-11-25, with the same section numbers. Below, `seacast-lite.md` means that document
@@ -78,8 +81,8 @@ defines what happens on those connections. On the bindings that run on libp2p, t
 connection and its framing are assumed. The native QUIC binding, a draft, runs on a QUIC connection
 of its own, with framing of its own (`seacast-bindings.md` §7). Gossipsub itself is *not*
 assumed: what it provided, the pusher set, suppression, announcements and pulls, is defined here,
-and the bindings (§7, `seacast-bindings.md`) say how the result is carried on gossipsub's wire
-where that is the deployed path. `seacast-lite.md`'s code is assumed where §5 says a function carries
+and the bindings that run on gossipsub (§7, `seacast-bindings.md`) say how the result is carried on
+its wire. `seacast-lite.md`'s code is assumed where §5 says a function carries
 over: this document redefines what changes and names what it keeps.
 
 **What is normative.** Sections 1 to 3, the notions, the messages and the state, are what both ends
@@ -1640,6 +1643,7 @@ and offers.
   node's live window, and more where `GROUP_TTL` outlasts the window.
 
 Neither is penalised, and neither keeps a standing request or a bit of a `DECLARED` peer's interest.
+
 Without them, a WANT for an index that does not exist kept a standing request that nothing could
 answer, and WANTs for groups that never come kept entries that `expired` never reaches, since such a
 group has no lifetime.
@@ -2082,7 +2086,9 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   axis where the node has duty `FORWARD`. With the rebuilt cell marked seen, such a copy is a
   duplicate, which is acknowledged and forwarded no further.
 - **A custodian's alarm** (option: `ALARM_WAIT`, with `ALARM_NEXT` and `ALARM_MAX`; for networks
-  without an honest supernode). The sample allows a lost cell at its last step, since a custodian
+  without an honest supernode).
+
+  The sample allows a lost cell at its last step, since a custodian
   may not yet hold a repaired cell when asked. So a claimant that repairs every withheld column of
   its row but one passes every member's sample with certainty, and the custodians of that column
   stay short. Only they see which cell is missing.
@@ -3795,9 +3801,9 @@ Rendezvous and discovery are outside the bindings (§0).
 
 **Where the gains are.** The libp2p stream and Waggle bindings are where X2's gains are had:
 interest without subscription, a push relation per family and colour with a floor and a direction,
-and scoring on these messages. The partial-messages binding gives up the first two, but for a
-sampler's interest, and keeps the rollout inside existing topics; it is the binding for columns
-while the extension is the deployed path. A mixed network needs a bridge between a binding and the
+and scoring on these messages. The partial-messages binding, which carries columns, gives up the
+first two, but for a sampler's interest. It uses only gossipsub's existing topics, so a network can
+adopt it without new subscriptions. A mixed network needs a bridge between a binding and the
 stock path that does not double the bytes; it is outside this version (`[D1]`, §8).
 
 **A fetch outside the links** `[D12]` (possible, binding-dependent). A binding may offer one

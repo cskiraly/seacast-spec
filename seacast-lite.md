@@ -839,6 +839,10 @@ node dropped (§4.6).
 ask always arrives before the claim it would contradict (Rationale), so an ask after the claim is a
 protocol violation.
 
+Both lanes of a peer's queue feed one ordered writer, the asker drops its queued asks for chunks it
+holds just before writing them (§7.2), and frames are handled in stream order, with IWANT before
+IDONTWANT within one (§4.1).
+
 **A group past its active lifetime stays expired**, so a node never asks for it again. The group's
 tombstone keeps it out until its slot leaves the live window, and the window from then on (§8.1).
 Controls for an expired group are ignored without penalty. A restart is not an exception: it is a
@@ -847,10 +851,7 @@ new connection, with no claims.
 #### Rationale
 
 **Why an honest ask comes before the claim.** Claims are made only for chunks that passed level 1,
-and within a group's active lifetime (§8.1) a node's holdings only grow. Both lanes of a peer's
-queue feed one ordered writer, the asker drops its queued asks for chunks it holds just before
-writing them (§7.2), and frames are handled in stream order, with IWANT before IDONTWANT within one
-(§4.1).
+and within a group's active lifetime (§8.1) a node's holdings only grow.
 
 **Why an expired group stays expired.** A node's claims of the group can outlive the expiry: a HAVE
 still queued leaves after it, and a peer keeps a claim for `HAVE_TTL`. Taking the group up again
