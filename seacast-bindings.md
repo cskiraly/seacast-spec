@@ -14,7 +14,7 @@ capabilities the bindings differ in.*
 
 ## 0. How to read this
 
-`seacast.md` defines the protocol on its own messages (its §2) and what any binding must provide
+`seacast.md` defines the protocol on its own messages (its §2) and what any binding MUST provide
 (its §7). This document defines the bindings:
 - it says how each binding carries the messages;
 - it gives the rules that hold on one binding only;
@@ -28,7 +28,7 @@ capabilities the bindings differ in.*
 
 §6 has the rules on both of gossipsub's wires. A fifth binding, **the native QUIC binding** (§7),
 carries the same protocol directly on QUIC, and is a draft. §8 has the transports of a fetch
-outside the links. A node may speak more than one binding, and negotiates per link which one a
+outside the links. A node MAY speak more than one binding, and negotiates per link which one a
 peer takes.
 
 **Terms.**
@@ -53,6 +53,15 @@ peer takes.
 - §7, the native QUIC binding, is a draft, and not normative.
 
 The sizes in §1.5 are informative.
+
+**Key words.** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
+interpreted as described in BCP 14 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
+[RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)) when, and only when, they appear in all
+capitals, as shown here. Most rules are stated without them, in the indicative. In the sections the
+list above calls normative, such a rule binds every node that speaks the binding as a MUST does,
+except for how a node schedules its writes, which is its own, as `seacast.md` §0 says. In §7, the
+draft, the key words say what that binding would require.
 
 **At a glance**, the table below shows the bindings message by message (`M`: `seacast.md` §1.4).
 The native QUIC binding is not in it: §7.2 shows that binding message by message.
@@ -169,7 +178,7 @@ class CellChunk(Container):            # 0x07
   p2p-interface.md`, at `2ea9d96a`). The header is optional as partial columns make it optional: a
   list of zero or one.
 - **The fork** (`seacast.md` §7). A link carries an object type only where both ends' JOINs
-  for it name the same `fork_digest`, as their `colours` must match. At a fork a node sends its new
+  for it name the same `fork_digest`, as their `colours` MUST match. At a fork a node sends its new
   JOIN.
   - *Open:* this draft leaves open what a link's relations do from the fork until both ends' JOINs
     name the new digest. Also open is how the new JOIN sits with the rule that a node sends its JOIN
@@ -442,7 +451,7 @@ gossipsub's existing topics, so a network can adopt it without new subscriptions
   each end holds it from a PRUNE it sends or receives, and refuses the peer's GRAFT within it.
   (`seacast.md`'s own `PRUNE_BACKOFF` is held only by the end that receives a PRUNE, and it
   refuses no GRAFT. It needs neither the hold at both ends nor the refusal, since its GRAFT is
-  answered.) The ends must be able to rely on gossipsub's backoff, so it must outlast the link's
+  answered.) The ends must be able to rely on gossipsub's backoff, so it MUST outlast the link's
   longest round trip at each end that may prune (`seacast-rationale.md` §4.1). With a
   shorter one, a GRAFT that crosses a PRUNE can reach its peer as the backoff ends and be accepted
   at that end alone; at exactly the round trip it turns on whether a GRAFT at the backoff's last
@@ -612,7 +621,7 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   when the last write has returned. Where a write returns once its bytes are sent, this keeps
   `seacast-lite.md` §7.3's rule (less than one chunk unsent per connection) as one stream per peer keeps
   it. Where the implementation buffers a stream's bytes and returns sooner, as quic-go can, the
-  writer must count the connection's unsent bytes itself. How it does so is open (§7.9).
+  writer MUST count the connection's unsent bytes itself. How it does so is open (§7.9).
 - **A chunk's size** (`wire_size(p, entry)`, `seacast.md` §3) is its encoded message's length,
   with the header when its write carries one.
 - **A cell group's header** travels in the form its object type fixes (§1.6). Where it is a header
@@ -627,14 +636,14 @@ own control where the QUIC listener allows that (§7.9), and priorities between 
   `[c8]`), the sender resets the chunk's stream if the chunk is already written. QUIC then sends
   none of the stream's bytes not yet sent, and resends none of those lost (RFC 9000 §3.1, §13.3). A
   reset takes back nothing already delivered. Once all of a stream's bytes and its end are sent
-  (QUIC's "Data Sent" state), the sender may let the stream finish instead, and resets it if any of
+  (QUIC's "Data Sent" state), the sender MAY let the stream finish instead, and resets it if any of
   those bytes are declared lost. An answer to the peer's probe is exempt, as it is from cancel.
   Since `filter_entry` clears the probe's mark once the answer is written, the sender marks the
   answer's stream as exempt when it writes the answer.
-- **A receiver may stop a chunk stream** (QUIC's `STOP_SENDING`) whose chunk it already holds,
+- **A receiver MAY stop a chunk stream** (QUIC's `STOP_SENDING`) whose chunk it already holds,
   except the answer to a probe of its own that is not yet judged (`seacast.md` §4.6). The
   sender then resets the stream as RFC 9000 §3.5 requires. If some of the stream's bytes, or its
-  end, are not yet sent, it resets the stream at once. Once all are sent, it may wait until they are
+  end, are not yet sent, it resets the stream at once. Once all are sent, it MAY wait until they are
   acknowledged or declared lost: it resets the stream if any are declared lost, and lets it finish
   if all are acknowledged. The receiver discards the stopped copy before it computes the copy's
   chunk id (§1.2), validates it or passes it to `on_chunk`, even if more of its bytes arrive at
@@ -670,9 +679,9 @@ This version sends no datagrams (RFC 9221). Two uses are considered:
   so a later holding supersedes a lost one. The last holding of a group has no successor and would
   also go on the control stream.
 - **Payload chunks as datagrams,** where an encoded chunk fits in one. A datagram is never
-  fragmented. The encoded chunk, with the DATAGRAM frame's own bytes, must fit the largest datagram
+  fragmented. The encoded chunk, with the DATAGRAM frame's own bytes, MUST fit the largest datagram
   frame the peer accepts (`max_datagram_frame_size`, RFC 9221 §3). The UDP payload that carries it,
-  with QUIC's overhead, must fit both the path's packet size and the largest UDP payload the peer
+  with QUIC's overhead, MUST fit both the path's packet size and the largest UDP payload the peer
   accepts (`max_udp_payload_size`, RFC 9000 §18.2). At the packet sizes the study assumed, this
   leaves the encoded chunk about 1 160 to 1 415 bytes. A cell's encoded message is 2 140 bytes
   before compression, with its kind byte and without a header (§1.5), and does not fit unless it
@@ -697,7 +706,7 @@ Datagrams count against the connection's congestion window like any data (RFC 92
 - **Its end.** The connection closes once the answer has come, or once the sampler's wait for that
   sample has passed (`SAMPLE_RETRY` or `SAMPLE_RETRY2`, `seacast.md` §4.10).
 - **The server's limits.** A server admits connections for fetches up to a limit of its own, and
-  may validate a client's address first (QUIC's Retry, RFC 9000 §8.1).
+  MAY validate a client's address first (QUIC's Retry, RFC 9000 §8.1).
 
 ### 7.7 What it gives up and adds
 
@@ -724,7 +733,7 @@ The binding also adds three rows to that table. Its own answers are these:
 - **An implementation feature the standard recommends:** priorities between streams (§7.4). quic-go
   has them from v0.62.0. Without them the binding still works, and the implementation shares the
   connection between streams in its own way.
-- **An optional standard extension:** datagrams (RFC 9221), for §7.5.
+- **An OPTIONAL standard extension:** datagrams (RFC 9221), for §7.5.
 - **No TCP form.** The libp2p stream binding over TCP stays the fallback.
 
 ### 7.9 What is open

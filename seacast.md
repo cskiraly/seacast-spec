@@ -84,14 +84,23 @@ its wire. `seacast-lite.md`'s code is assumed where §5 says a function carries
 over: this document redefines what changes and names what it keeps.
 
 **What is normative.** Sections 1 to 3, the notions, the messages and the state, are what both ends
-of a link must agree on. Section 4 combines each node's local scheduling with the meaning of the
-messages: what a holding, an offer, an ask, a claim and an acknowledgement promise. A client may
+of a link MUST agree on. Section 4 combines each node's local scheduling with the meaning of the
+messages: what a holding, an offer, an ask, a claim and an acknowledgement promise. A client MAY
 schedule differently without breaking interoperability, provided those meanings hold. Section 5
 names `seacast-lite.md`'s scheduling that carries over, section 6 the settings, section 7 the
 bindings and section 8 the decisions, with what was not taken.
 
+**Key words.** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
+interpreted as described in BCP 14 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
+[RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)) when, and only when, they appear in all
+capitals, as shown here. Most rules are stated without them, in the indicative ("an ask beyond the
+limit is ignored"). Such a rule binds as the paragraph above says: the definitions of sections 1 to
+3, and what each message means, bind every node as a MUST does, and a client MAY change the
+scheduling while those meanings hold. Capitals inside quotation marks are the quoted documents' own.
+
 **The parts.** SEACAST has six parts, named for what they do. Three carry message semantics that
-both ends must share; two are local policy, which a client may change while the meanings hold; the
+both ends MUST share; two are local policy, which a client MAY change while the meanings hold; the
 last says how the messages travel. Named mechanisms inside a part keep their own names.
 
 | part | what it does | sections | mechanisms inside |
@@ -218,7 +227,7 @@ per link and object type at JOIN (§2):
 - `DERIVED`: computed by both ends from the node id and the JOIN's `custody_count`
   (`T.derived_interest`), so a custodian never has to say what it wants;
 - `DECLARED`: told per group and per peer, in a WANT (§2); a sample is declared this way. The WANT
-  may precede the chunks: it is a standing request, answered when the peer holds them (§4.10), so a
+  MAY precede the chunks: it is a standing request, answered when the peer holds them (§4.10), so a
   sampler needs no offer and no promise timer, and the peer learns nothing about the sampler's
   other samples.
 
@@ -292,7 +301,7 @@ its own that serves the index: it does so if its own duty is `FORWARD`, within i
 for the asker, to such a link other than the asker that it has not parked for the group (§4.5,
 `route_want`). That is the trivial structure, which needs no routing neighbours; its one forwarding
 step is the request's default. With steps left (the request's `hops` above 1 when it arrives:
-`ROUTE_HOPS` above 1 at the sampler), a forwarder that has no such link may pass the request on
+`ROUTE_HOPS` above 1 at the sampler), a forwarder that has no such link MAY pass the request on
 toward the family in turn, to another forwarding link, under the same duty and limit (§4.5).
 
 ### 1.4 Colours and the floor
@@ -339,7 +348,7 @@ custodian is complete at every index of its column. A row member is complete at 
 pulling and exposes what it has, EIP-8371), and it decodes only if its duty says so. A sampler is
 complete when its declared indices have arrived.
 
-**Evidence** is an object a node may publish about a group it found inconsistent at level 2, if the
+**Evidence** is an object a node MAY publish about a group it found inconsistent at level 2, if the
 object type defines one `[D6]`; this document carries it and does not define it. No object type
 defines one in this version (§8).
 
@@ -537,7 +546,7 @@ every index under `ALL`, its derived interest under `DERIVED` (every index of a 
 custodies, or of its own subnet's row, and none of another), the cells it drew to sample under
 `DECLARED`, whether or not it has asked a peer for them yet (§4.10), and, for a supernode, every
 row besides (§4.6, the second phase). A
-node may hold state for a group it has no interest in, when it holds chunks of it or a peer's
+node MAY hold state for a group it has no interest in, when it holds chunks of it or a peer's
 interest names it (a reconstructor's non-custodied columns, R4); the number of such groups per slot
 is bounded (§6.3).
 
@@ -1418,7 +1427,7 @@ def drop_outside(g):                                   # §4.5: what came before
 ```
 
 **A node serves what it holds**, received or rebuilt, to anyone who asks, within the serving limit
-per peer and group `[R6]`, whatever the asker's duty. An ask may go to a peer that offered the index
+per peer and group `[R6]`, whatever the asker's duty. An ask MAY go to a peer that offered the index
 or whose derived interest includes it (a custodian can be asked without offering, PeerDAS's "knows
 exactly what a peer should be able to respond to"); an ask outside both is ignored (below), unless
 it is a routed request and goes to a peer with duty `FORWARD`. A promise is made by an offer, and a
@@ -1496,7 +1505,7 @@ heartbeat. Its bound (§6.3) covers what honest peers ask through one peer in a 
 on the node's offers. Without it, where `SERVE_LIMIT` is unbounded, a peer could have a node answer
 every chunk it holds up to three times an id, every heartbeat.
 
-**A routed sample request** (a WANT with `hops` above zero, §4.10) may also go to a peer with duty
+**A routed sample request** (a WANT with `hops` above zero, §4.10) MAY also go to a peer with duty
 `FORWARD` that neither offered the index nor custodies it `[D12]`. That peer answers it from what it
 holds, and, at most `FORWARD_LIMIT` times per asking peer and slot, passes it one step on: to a link
 that serves the index, with `hops` 0, or, where none does and steps are left, to the link nearest
@@ -1801,7 +1810,7 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   not look at the limit, so a member that has already pulled `SERVE_LIMIT`
   chunks from the claimant it draws has its probe refused, and that claimant is judged as one that
   does not answer: it is penalised, the probe having been written, unless its own push of the cell
-  comes in time. A client may prefer a claimant it has pulled less from, or keep one ask in
+  comes in time. A client MAY prefer a claimant it has pulled less from, or keep one ask in
   reserve.
 - **The probe is marked, and its cell drawn at random** (R5). Three rules keep the verdict on the
   claimant fair to an honest one and hard to meet for a dishonest one. Three more say when the
@@ -2111,7 +2120,7 @@ it.
   holding grows at each chunk's first write (`origin_written`), as before v0.9; an acknowledgement
   then does nothing (`origin_acked`), not even for a chunk a peer rebuilt before the source wrote
   it. A source that wants P4's cover toward its pool offers at the acknowledgement (`seacast-rationale.md` §4.7). A client
-  may key the choice on its uplink, as striping is (`STRIPE_UPLINK`); this document does not
+  MAY key the choice on its uplink, as striping is (`STRIPE_UPLINK`); this document does not
   (`seacast-rationale.md` §4.7).
 - **A chunk that no peer wants** is pushed to no one and never acknowledged. That costs nothing: its
   offers would have gone to no one either.
@@ -2298,7 +2307,7 @@ claimant takes the probe's promise too (§4.6), which the option, having no code
 more than one of the node's samples; §8 gives the reasons, selective disclosure first.
 
 **The WANT is standing:** the peer answers from what it holds and, for the rest, when the chunks
-arrive (§4.5), so the WANT may go out at block arrival, before any cell has reached the custodian;
+arrive (§4.5), so the WANT MAY go out at block arrival, before any cell has reached the custodian;
 in the toy it does. The duplicate that a peer may still deliver after the sampler moved on is
 acknowledged like any duplicate.
 
@@ -2326,7 +2335,7 @@ declared then, and goes to the second phase after the same wait. The hunt for a 
 arrives, when no link is left to ask (each has been asked for a sample, is parked for the group, or
 neither serves the sample nor forwards) or when the group expires, so an unavailable block costs a
 bounded number of asks. Where the
-binding offers a fetch from a node that is not a link (§7), the second phase may use it before a
+binding offers a fetch from a node that is not a link (§7), the second phase MAY use it before a
 routed request, under the same rule: one sample per node.
 
 **Routed sample requests** `[D12]`: a routed request is a sample request with a hop limit. Where no
@@ -2455,12 +2464,12 @@ Without this, a peer that stops reading while its writer heads the line holds al
 node sends no chunk to any other peer.
 
 **A writer in line whose control write waits wakes the next,** as `seacast-lite.md` §7.1's does. A
-writer in line may write control, which takes no room: an urgent entry, owed offers on their own, or
+writer in line MAY write control, which takes no room: an urgent entry, owed offers on their own, or
 a control-only entry of the normal lane. It keeps its place in line. When the transport does not
 take that write at once (`seacast-lite.md` §7.3), the writer calls `write_waits` as it starts to wait,
 and the window wake lets the first writer in line that can write try again, if room is free. A write
 that completes at once does not call `write_waits`. A client that cannot tell when a write starts
-to wait, as with a blocking write call, may call `write_waits` before a control write from the line,
+to wait, as with a blocking write call, MAY call `write_waits` before a control write from the line,
 once it has marked the write pending (`writing(p)` true, as from `next_to_send`'s return). That is
 safe: `front` then skips the writer, and admission is unchanged: a writer takes room only while
 room is free, and never ahead of a writer in line that can write. Its cost is a change of
@@ -2476,7 +2485,7 @@ the writer, for example an urgent entry for its peer, another writer leaving the
 a holding or a window timeout frees. Waking the front writer when a discard changes its entry is a
 rule change, for a later release.
 
-**Below the writer** (v0.9 §7.3, as written). A writer should hand a chunk to the transport only
+**Below the writer** (v0.9 §7.3, as written). A writer SHOULD hand a chunk to the transport only
 while the connection has less than one chunk unsent. The backlog then waits in the queue, where
 cancel, projection and §4.12's order act on it.
 - **v0.9 §7.3 says the rest:** what the rule bounds and what it does not, what follows when it is
@@ -2563,7 +2572,7 @@ below `ASK_UPLINK`, and stays as `seacast-lite.md` set it above it. The promise 
 | §4.4 an IHAVE's bitmap held to a HAVE's limits (v0.10) | §4.3 `on_offer` | an offer's bitmap, ignored and counted beyond them (since 2026-11-16) |
 | §4.4 gossipsub's IHAVE limits (v0.7): `over_ihave_limits`, `ihave_frames`, `ihave_asked`, `held_back` | §4 `on_frame`, §4.3 `on_offer`, §4.8 | counted per offer-bearing frame and per ask in reply to offers, per peer over every object type; what they hold back is retried at the next heartbeat (since 2026-10-27) |
 | §4.6 `drop_group` | §4.6 | plus evidence `[D6]`; a later chunk is not forwarded or offered on the dropped axis, where the draft did (§4.4 `on_validated`, `forward`; since 2026-11-18) |
-| §5.1 batch order, striping, the paced source HAVE [P4] | §4.7 | candidates filtered by interest; P4 per group, its claims with the bitmap; v0.7's single offer (since 2026-11-04); a pull-only type's source pushes nothing and offers every chunk at publish (`offer_at_publish`, since 2026-11-18); any source may offer at publish, its own choice (`SOURCE_OFFERS`, since 2026-11-18) |
+| §5.1 batch order, striping, the paced source HAVE [P4] | §4.7 | candidates filtered by interest; P4 per group, its claims with the bitmap; v0.7's single offer (since 2026-11-04); a pull-only type's source pushes nothing and offers every chunk at publish (`offer_at_publish`, since 2026-11-18); any source MAY offer at publish, its own choice (`SOURCE_OFFERS`, since 2026-11-18) |
 | §5.3 `choose_push`, `guard_fails`, `note_push` | §4.4, §4.7 | candidates come from the relation |
 | §5.4 `on_mesh_join` (v0.8) | §4.1 `join_push` | at a GRAFT the node accepts into a push relation, the relation's colour, and at the yes to its own GRAFT, a round trip after v0.8's (§4.1); on gossipsub's wires at its own GRAFT, as v0.8 |
 | §6.1 `may_ask`, `retry_offer`, `promise_due`, `parked`, the offer table | from §4.3's `on_offer` | offers from any link; `IWANT([a])` read as a WANT, a pull on an offer (not `want`, §3); start delay `[D8]`; `IWANT_WINDOW` scaled by the node's uplink (§4.13); v0.5's offers kept per connection and group (`add_offer`, `announcers`) and its last resort when every announcer is parked (`last_resort`, `ask_parked`); v0.8's ties and no second ask of a peer while one is outstanding (`tied_to_root`, `outstanding`; §4.2 here), and the asks that go with an announcer's dropped offers (`drop_offer`, 2026-10-28) |
@@ -2710,9 +2719,9 @@ cross-fill ones under the row setting, the last by `check.py --doc seacast`.
 | sampling-only links accepted | node | inbound links joined `(DECLARED, NONE)` that a node accepts (§1.3) | `[D12]`; X6: a bound, each node's within it (`seacast-lite.md` §8.3's kinds), stated: high enough that the network's samplers each keep `SAMPLE_COVER` links per family they sample. The value is the client's; no limit in the measurements, and the serving load not measured |
 | `ASK_UPLINK` | node | the uplink at and above which `IWANT_WINDOW` keeps `seacast-lite.md`'s value; below it the window scales by `ASK_UPLINK / UPLINK` (§4.13); 50 Mbps | scaling by the asked peer's link is open (below) |
 | `IWANT_WINDOW` | node | `seacast-lite.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |
-| `MERGE_HOLDINGS` | node | a holding of a group the node publishes that is still in its queue takes the newer chunks instead of a second holding (§4.2; v0.4 §5.1 allows it) | permitted: a source may merge (local policy, as v0.4 words it); the toy keeps it off so that its recorded cells stay comparable |
+| `MERGE_HOLDINGS` | node | a holding of a group the node publishes that is still in its queue takes the newer chunks instead of a second holding (§4.2; v0.4 §5.1 allows it) | permitted: a source MAY merge (local policy, as v0.4 words it); the toy keeps it off so that its recorded cells stay comparable |
 | `HAVE_TTL`, `PUSH_TTL`, `GROUP_TTL`, `PARK_TTL`, offers, `GUARD_GRACE`, `RTT_REF`, `TARGET`, `WINDOW_TIMEOUT`, pace tick, `GOSSIP_RETRANSMISSION` | – | `seacast-lite.md` §8.3 unchanged | – |
-| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (`seacast-rationale.md` §6.3) |
+| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *RECOMMENDED* on the libp2p stream binding: not gossipsub's 10 (`seacast-rationale.md` §6.3) |
 
 **Open, for later study:**
 - *`M`:* the values 1 < M < N are open.
@@ -2746,7 +2755,7 @@ a draft:
 - the native QUIC binding, a draft, carries them directly on QUIC, with a stream per chunk
   (`seacast-bindings.md` §7).
 
-A node may speak more than one binding, and negotiates per link which one a peer takes. This
+A node MAY speak more than one binding, and negotiates per link which one a peer takes. This
 section says what every binding provides, and what the rules do where a binding lacks a capability.
 
 **What every binding provides:**
@@ -2800,7 +2809,7 @@ Rendezvous and discovery are outside the bindings (§0).
 | a written chunk can be cancelled | no | no | no | yes, by a reset of its stream | cancel reaches only queued chunks (`[c8]`) |
 | a chunk's lost bytes leave a gap only in that chunk's delivery | no: on the libp2p stream binding, every later frame on the stream waits; on Waggle over QUIC, the later messages of the chunk's type wait | no | no | yes: lost bytes leave a gap only on their own stream | lost bytes hold up every later frame on their stream until they are resent, and on TCP every later byte on the connection; on every binding, loss can also slow the connection's sending (congestion control) |
 
-**A fetch outside the links** `[D12]` (possible, binding-dependent). A binding may offer one
+**A fetch outside the links** `[D12]` (possible, binding-dependent). A binding MAY offer one
 capability beyond its links: fetching a sample quickly from a node of the known node set that is
 not a link. The sampler computes the custody of such a node from its node id.
 - *What the protocol needs:* it needs only the notion of such a fetch, a WANT answered by a CHUNK

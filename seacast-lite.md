@@ -33,11 +33,20 @@ and §8's state, limits and helpers.
   document; the list is in [`seacast-lite-rationale.md`](seacast-lite-rationale.md) §9.
 
 **What is normative.** Sections 1 to 3 are the consensus-side and wire definitions that both ends
-must agree on. Sections 4 to 7 combine each node's local scheduling with the meaning of the messages
-it exchanges: what a HAVE, an ask, a decode claim and an acknowledgement promise. A client may
+MUST agree on. Sections 4 to 7 combine each node's local scheduling with the meaning of the messages
+it exchanges: what a HAVE, an ask, a decode claim and an acknowledgement promise. A client MAY
 schedule differently without breaking interoperability, provided those meanings hold. The
 measurements are of the scheduling written here. Of §8.3's constants, only the limits are shared by
 every node; a node sets the others itself, the bounds within what §8.3 states.
+
+**Key words.** The key words "MUST", "MUST NOT", "REQUIRED", "SHALL", "SHALL NOT", "SHOULD",
+"SHOULD NOT", "RECOMMENDED", "NOT RECOMMENDED", "MAY", and "OPTIONAL" in this document are to be
+interpreted as described in BCP 14 ([RFC 2119](https://www.rfc-editor.org/rfc/rfc2119),
+[RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)) when, and only when, they appear in all
+capitals, as shown here. Most rules are stated without them, in the indicative ("the node drops the
+group"). Such a rule binds as the paragraph above says: the definitions of sections 1 to 3, and what
+each message means, bind every node as a MUST does, and a client MAY change the scheduling while
+those meanings hold.
 
 **Reading it.** An implementer can read §1 to §7 in order, with §8 at hand for the state, limits and
 constants each section uses. Where a section has code, its prose says what the code does, a rule to
@@ -696,7 +705,7 @@ limits: the retry, the last resort and the asks at installation do not. Every en
 read, where a stock implementation may stop after `MAX_IHAVE_LENGTH` ids of one IHAVE. The limits'
 values are the client's (§8.2), and §8.3 gives reference values.
 
-**Over a limit a node may read an IHAVE's bitmaps without the loop above.** Their indices join
+**Over a limit a node MAY read an IHAVE's bitmaps without the loop above.** Their indices join
 `offered`, for a group not expired and within §8.2's limits on offers, and `held_back`, for a group
 an installed block's bid commits. The heartbeat's retry does the rest: it skips what is held,
 stopped or expired, and arms the last resort when every announcer is parked. This differs from the
@@ -967,7 +976,7 @@ peer that a full queue refuses is offered to it instead (§5.2).
   first write, and the HAVE then goes to the mesh, as a forwarding node's does when a chunk arrives.
   A peer the source pushes to is also sent a HAVE naming the first chunk queued for it, just ahead
   of it, as a forwarding node's HAVE precedes its pushes. HAVEs to the mesh that would leave
-  together may be merged into one, as the research implementation merges those of the chunks sent
+  together MAY be merged into one, as the research implementation merges those of the chunks sent
   between two of its router's turns.
 
 **Open: a chunk that is never acknowledged.** At `SOURCE_OFFERS = ACK` the source announces a chunk
@@ -1415,7 +1424,7 @@ has left, is dropped.
 The gossip history holds the chunks the source published and the chunks a node received and
 forwarded. It does not hold the chunks a decoded node rebuilt, which are pushed instead of announced
 (§4.6). A full bitmap held back can mean a retry per chunk where one IWANT would have carried the
-asks; the retries to one peer may go in one IWANT.
+asks; the retries to one peer MAY go in one IWANT.
 
 ## 7. Sending: the per-peer queue and the window
 
@@ -1513,7 +1522,7 @@ owed offers on their own, without a slot (§7.2). Whenever a write does not comp
 writer calls `write_waits` as it starts to wait for its transport; a write that completes at once
 does not. If the writer is in line and a slot is free, `write_waits` wakes the first writer in line
 that can write (`wake_front`), which may then take the slot. A client that cannot tell when a write
-starts to wait, such as one whose write call blocks (§7.3), may instead call `write_waits` before
+starts to wait, such as one whose write call blocks (§7.3), MAY instead call `write_waits` before
 each control write of a writer in line, once that write is pending: `writing` holds from the moment
 `next_to_send` returns the entry. That is safe. `front` then skips the writer, and the woken writer
 takes a slot only if it is the first writer in line that can write and a slot is free. The early
@@ -1521,8 +1530,8 @@ call can queue a run of the next writer even when the write then completes at on
 
 ### 7.2 Choosing what to send, at the moment of sending [c8, c9, c12, c14]
 
-One writer per peer. A queue entry carries at most one chunk, and may also carry control; the writer
-writes it as one frame (§2). A client may merge the control of several entries into one frame, as
+One writer per peer. A queue entry carries at most one chunk, and MAY also carry control; the writer
+writes it as one frame (§2). A client MAY merge the control of several entries into one frame, as
 §5.1 (HAVEs), §5.4 and §8.3 (announcements) and §6.4 (asks) allow. Each time the previous write to
 that peer has completed, and whenever the writer is woken (a slot is free for it, or an urgent entry
 arrived), it calls `next_to_send`: an entry to write, `None` when there is nothing to send, or
@@ -1623,7 +1632,7 @@ writer starts again from the urgent lane.
   has meanwhile claimed the chunk, and it is not counted against `GOSSIP_RETRANSMISSION` again. A
   bit owed lives until it leaves, until the peer claims the chunk, or until the group is dropped or
   expires or the connection closes, with no lifetime of its own: an answer refused through a long
-  backpressure must not expire unsent.
+  backpressure MUST NOT expire unsent.
 - **Rarest at pop** [c9] sends first the queued chunk the fewest of our peers hold. It only reorders
   chunks ahead of the first control-only entry.
 - **The slot is taken before the chunk is chosen**, so the window never decides which chunk; the
@@ -1638,7 +1647,7 @@ act.
 
 *The reasons and history behind this section: [`seacast-lite-rationale.md`](seacast-lite-rationale.md), its §7.3.*
 
-- **A writer should hand a chunk to the transport only while the connection has less than one chunk
+- **A writer SHOULD hand a chunk to the transport only while the connection has less than one chunk
   unsent.** The write of §7.2 then completes when the transport has taken all but about one chunk,
   and the queue holds the rest: cancel, projection and rarest-first act on what has not left (§7.2),
   the window counts what no peer is yet known to hold (§7.1), and the queue's order is the link's.
@@ -1691,7 +1700,7 @@ act.
 | the window's line (`waiters`) | node, a place per peer's writer | while the writer waits for a slot | when the writer takes a slot (`acquire_slot`) or finds no chunk to send (`release_unused_slot`), or when the peer's queue closes; the first writer in line that can write then tries again, if a slot is free (`wake_front`) |
 
 - **Per-connection state** is reset when the connection closes. A restarted peer usually keeps its
-  peer id, so this state must not be keyed by peer id alone.
+  peer id, so this state MUST NOT be keyed by peer id alone.
 - **Within a group's active lifetime a node's holdings only grow:** it never drops a chunk it has
   claimed (§4.5). Past it, the group is expired for good (`expired`): the node keeps only its key and
   slot, as a tombstone, until the live window has passed it (below), never asks for its chunks
@@ -1708,14 +1717,14 @@ act.
   node that holds nothing of a group still knows the group's slot wherever it could take the group
   up: a chunk names it, and an ask needs an installed block whose bid commits the group (§4.4).
 - **How long a window.** `LIVE_WINDOW` sets how long diffusion works on a group: past it a node
-  neither takes up, asks for nor serves the group. It must exceed what a group needs to reach every
+  neither takes up, asks for nor serves the group. It MUST exceed what a group needs to reach every
   honest node, counted from the start of its slot: the block's propagation, which comes first, the
   group's diffusion, and the clock disparity between nodes. A node still short of the group by then
   gets the payload by other means. Above that, a longer window costs only state: a node keeps the
   groups, tombstones and deferred chunks of `LIVE_WINDOW` slots, besides what §8.2 bounds for groups
   not yet tied to a block. Nodes need not agree on `LIVE_WINDOW` or on the current slot.
 - **Without a slot.** Where groups carry no slot, which no group of this document does, there is no
-  window, and the tombstone is kept for `TOMBSTONE_TTL` after the expiry instead. It must outlast
+  window, and the tombstone is kept for `TOMBSTONE_TTL` after the expiry instead. It MUST outlast
   the node's claims of the group: longer than a HAVE already queued can wait, plus the time a frame
   takes to reach the peer and be handled, plus the peer's `HAVE_TTL` and one of its heartbeats. This
   document bounds neither of the first two and leaves the third to each node, so a deployment that
@@ -1775,7 +1784,7 @@ act.
 - `has_room`: the queue would admit one now;
 - `pop_owed_answer`: takes the lowest owed answer and returns its chunk;
 - `handle_graft_prune`: stock;
-- `penalise`: the client's peer scoring, if it has one; a client may ignore it;
+- `penalise`: the client's peer scoring, if it has one; a client MAY ignore it;
 - `tiebreak` and `peer_id_bytes`: §5.3;
 - `own_order`: §6.1's list of peers in the node's own order for an ask's chunk. Any order that no
   peer can predict or arrange will do. The reference, for comparing implementations in tests, sorts
