@@ -531,11 +531,12 @@ do**, under Q1's assumptions, among them at `ACK` the acknowledgement on the sou
   by inspection.
 
 `NoStallAskAdv.lean` has v0.7's asking. Its known answer is the last-resort count kept per chunk
-instead of per announcer (`ka_count_per_chunk`, the case §6.1's Rationale names): the last resort is
-spent on an adversary that announced first, and an honest announcer parked by another chunk is never
-asked again. Non-vacuity: an honest node's ask to an adversary, left in flight in a quiet state; in
-the transport, a false claim and an adversary's offer left in a quiet state; and a control for the
-known answer, the last resort going on from the adversary to the honest announcer.
+instead of per announcer (`ka_count_per_chunk`, the case `seacast-lite-rationale.md` §6.1 names):
+the last resort is spent on an adversary that announced first, and an honest announcer parked by
+another chunk is never asked again. Non-vacuity: an honest node's ask to an adversary, left in
+flight in a quiet state; in the transport, a false claim and an adversary's offer left in a quiet
+state; and a control for the known answer, the last resort going on from the adversary to the
+honest announcer.
 
 **v0.8's asking with adversaries** is `NoStallEquivAdv.lean`: `NoStallEquiv.lean` with the same
 adversaries and §4.2's ties by root. An adversary's waiting copy ties it to the builder's root before

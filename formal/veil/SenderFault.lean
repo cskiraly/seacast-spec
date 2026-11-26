@@ -48,7 +48,7 @@ same group or different ones.
   chunk that passes level 1 against the block it names, as it came, and defers one whose block is
   not installed, checking it when the block installs (§4.2); claims at its decode (§4.6); rebuilds a
   chunk only once level 2 has passed, naming a block whose bid commits the group, and that block's
-  slot (§4.6: "the source's chunk, byte for byte"); sends any chunk it stores, to any peer, at any
+  slot (§4.6: the source's chunk, byte for byte); sends any chunk it stores, to any peer, at any
   time (forwarding, answers, repair and the source's pushes, §4.1, §4.6, §5); sends a HAVE bit for
   any index in `mine`, which grows by the chunks that passed level 1 and the decode claim's N bits
   (§4.2, §4.6, §5.1; the source's paced HAVE names a subset); and announces, as an IHAVE bit, any

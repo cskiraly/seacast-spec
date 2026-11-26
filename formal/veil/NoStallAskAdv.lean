@@ -81,8 +81,8 @@ from honest holders, as above. Resetting the last-resort counts is a switch with
 kept across the close, an announcer whose last resort the close lost is never asked again.
 
 Known answer for the adversaries: the last-resort count kept per chunk instead of per announcer
-(§6.1's rationale names this case), the last resort is spent on an adversary that announced first,
-and an honest announcer parked by another chunk is never asked again.
+(`seacast-lite-rationale.md` §6.1 names this case), the last resort is spent on an adversary that
+announced first, and an honest announcer parked by another chunk is never asked again.
 
 Not modelled here: how offers come about (the transport: `NoStallTransport.lean`), lifetimes. -/
 
