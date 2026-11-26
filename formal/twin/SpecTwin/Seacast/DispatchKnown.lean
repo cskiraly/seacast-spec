@@ -220,7 +220,7 @@ def wbIs (v : String) : Except String (List (Nat × NodeSeacastCfg)) :=
 #guard (match wbIs "null" with
   | .ok ((_, cfg) :: _) => cfg.c2.W_BYTES == none
   | _ => false)
--- a v2 header of before the sync, whose type still carries the cap, is refused (fv-67's note 2)
+-- a v2 header of before the sync, whose type still carries the cap, is refused
 #guard failsWith "nodes: types: payload: not a type parameter: SAMPLE_OUTSTANDING"
   (line2 (entry [("types", some (Json.mkObj [("payload", Json.mkObj [("SAMPLE_OUTSTANDING", jn 4)])]))]))
 

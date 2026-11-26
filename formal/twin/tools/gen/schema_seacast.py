@@ -429,7 +429,7 @@ def self_test():
     case("probe_served's False", by["probe_served"].value(False), None)
     case("rsample, in order", by["rsample"].value([3, 1, 2]), [3, 1, 2])
     case("held_samples", by["held_samples"].value([(g, 3)]), [[g.hex(), 3]])
-    # an ask by index and a structured id that name one chunk are two members (a5's round t3)
+    # an ask by index and a structured id that name one chunk are two members
     sid = g + (3).to_bytes(4, "little") + bytes(20)
     case("a member of probe_asks, by index", by["probe_asks"].keys[0](WantIndex(group=g, index=3)), [g.hex(), 3])
     case("a member of probe_asks, a structured id", by["probe_asks"].keys[0](sid), sid.hex())

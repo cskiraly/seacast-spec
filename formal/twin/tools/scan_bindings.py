@@ -2423,7 +2423,7 @@ def follow_self_test(report):
         report("control: f_l3b with the clause draw-call off a swapped draw", m is True, f"got {m}")
 
 
-# fail-closed followed code: each reviewer's probe (r2n), planted where a question's binding or a document function
+# fail-closed followed code: each probe, planted where a question's binding or a document function
 # the follow reads holds it. FC_DOC is the document's code, FC the toy's
 FC_DOC = '''\
 def tr_chain(g):
@@ -2715,7 +2715,7 @@ class Node:
 # each layer: the end of its reason, and its control: the clauses off (off) or the readers skipped (skip) under which
 # it reads an observer
 FC_LAYERS = {
-    # F1's three, Codex and Fable: a timer, a draw stream, a node field; a field stored; a mutable argument
+    # F1's three: a timer, a draw stream, a node field; a field stored; a mutable argument
     "c_timer": ("calls node.sim.after, which the follow cannot establish as a read, in q_timer", {"off": ("call",)}),
     "c_rng": ("calls node.sim.floor_rng.random, which the follow cannot establish as a read, in q_rng",
               {"off": ("call",)}),
@@ -2757,7 +2757,7 @@ FC_LAYERS = {
                  {"off": ("effect",)}),
     "c_nested": ("writes node.held, which the follow cannot establish as its own new object, in q_nested",
                  {"off": ("effect",)}),
-    # a toy class's constructor (fv-67's guards): an __init__ with an effect, a __new__, a decorated class
+    # a toy class's constructor: an __init__ with an effect, a __new__, a decorated class
     "c_reg": ("mutates REGISTRY by append, which the follow cannot establish as its own new object, in "
               "Registered.__init__, in q_reg", {"off": ("ctor-init",)}),
     "c_new": ("calls WithNew, a class whose making the follow does not read, in q_new", {"off": ("ctor-guard",)}),
