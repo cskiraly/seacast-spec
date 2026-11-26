@@ -2,7 +2,7 @@
 
 This file holds the figures behind SEACAST, [`seacast.md`](seacast.md), and
 behind its decision record, [`seacast-decisions.md`](seacast-decisions.md).
-Both documents state the rules and their reasons in words, and they point here for the numbers, as
+Both state the rules and their reasons in words (`seacast.md`'s reasons are in [`seacast-rationale.md`](seacast-rationale.md)), and they point here for the numbers, as
 `(seacast-figures.md, §4.1)`, or as `(seacast-figures.md, §4.6, "The probe")` for a part of
 an entry. The entries are grouped by the section that cites them, under that section's number and
 heading, in the document's order. The decision record's own figures close the file, each under its
@@ -628,7 +628,7 @@ seed 7. The rules are those of the supernodes' runs.
 
 ## §4.7 The source
 
-§4.7's Rationale draws on five campaigns: the checks of the writer's order of 2026-10-07, the runs
+`seacast-rationale.md` §4.7 draws on five campaigns: the checks of the writer's order of 2026-10-07, the runs
 of 2026-10-21 on P4 (`seacast.md` §0) and merging, the single offer's recording of 2026-11-04,
 the toy check of v0.9's source rules of 2026-11-10, and the `SOURCE_OFFERS` runs of 2026-11-18. Each
 sub-entry gives its own conditions. A figure from fewer than ten seeds is a toy check of a
@@ -1120,7 +1120,7 @@ changed since are P4 and v0.5 (2026-10-21), v0.9's source rules (2026-11-11), th
 **Conditions.** The figures come from the regression cells in `toy/check.py`. For each cell, the
 script runs `toy/run.py --nodes 60 --degree 30 --msgs 3 --seed 7` with that cell's flags, so each
 cell uses one seed. A figure is a cell's warm median and warm 99th percentile, or its warm copies.
-Each bullet of §6.1's Rationale compares this document's recording (`toy/golden-seacast.txt`,
+Each bullet of `seacast-rationale.md` §6.1 compares this document's recording (`toy/golden-seacast.txt`,
 `check.py --doc seacast`) with `seacast-lite.md`'s (`toy/golden.txt`) as both stood after the change the
 bullet names, on the rules of that date. `loss-thin` runs at a 20 Mbps uplink. Before 2026-11-15
 every cell took every write at once (`--send-buffer 0`); the bullet of 2026-11-15 ran with

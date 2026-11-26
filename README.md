@@ -55,7 +55,7 @@ release it belongs to.
 
 The numbers come from the announcement post, which calls SEACAST Lite simply SEACAST. The
 four protocols ran in one simulator, on a virtual clock. SEACAST Lite ran there as its
-research implementation (Prysm with a modified gossipsub library), and `seacast-lite.md` §9 lists where
+research implementation (Prysm with a modified gossipsub library), and `seacast-lite-rationale.md` §9 lists where
 that implementation differs from the text.
 
 ## What to read
@@ -64,6 +64,7 @@ that implementation differs from the text.
 |---|---|
 | learn SEACAST, the main protocol | [`seacast.md`](seacast.md); its §0 says how to read it |
 | carry it on a transport | [`seacast-bindings.md`](seacast-bindings.md) |
+| see why the rules are as they are, and their history | [`seacast-rationale.md`](seacast-rationale.md) and [`seacast-lite-rationale.md`](seacast-lite-rationale.md) |
 | see SEACAST's decisions and the figures behind them | [`seacast-decisions.md`](seacast-decisions.md) and [`seacast-figures.md`](seacast-figures.md) |
 | read SEACAST Lite, which the measurements and the proofs are about | [`seacast-lite.md`](seacast-lite.md); its §0 says how to read it |
 | run either protocol, or try a rule before implementing it | [`toy/`](toy/) |

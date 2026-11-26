@@ -443,7 +443,7 @@ gossipsub's existing topics, so a network can adopt it without new subscriptions
   (`seacast.md`'s own `PRUNE_BACKOFF` is held only by the end that receives a PRUNE, and it
   refuses no GRAFT. It needs neither the hold at both ends nor the refusal, since its GRAFT is
   answered.) The ends must be able to rely on gossipsub's backoff, so it must outlast the link's
-  longest round trip at each end that may prune (`seacast.md` §4.1's Rationale). With a
+  longest round trip at each end that may prune (`seacast-rationale.md` §4.1). With a
   shorter one, a GRAFT that crosses a PRUNE can reach its peer as the backoff ends and be accepted
   at that end alone; at exactly the round trip it turns on whether a GRAFT at the backoff's last
   instant is within it, which gossipsub does not say. With a longer one, the ends agree in every

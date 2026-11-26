@@ -3,7 +3,7 @@
 This is the decision record of SEACAST, [`seacast.md`](seacast.md). It lists the design
 decisions `[D1]` to `[D12]` and the others that SEACAST took: when each was decided, what was not
 taken and why, and the runs behind it. It also lists the versions of [`seacast-lite.md`](seacast-lite.md)
-that SEACAST has carried. `seacast.md` states the rules and gives their reasons; the comments in
+that SEACAST has carried. `seacast.md` states the rules, and [`seacast-rationale.md`](seacast-rationale.md) gives their reasons; the comments in
 its code cite these labels where each decision bites.
 
 In this file, a section number (§) without the name of a document refers to `seacast.md`'s

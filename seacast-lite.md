@@ -30,7 +30,7 @@ and §8's state, limits and helpers.
   window (§7).
 - §8 lists the state a node keeps and for how long, its limits and its constants.
 - §9 lists where the research implementation, on which the measurements ran, differs from this
-  document.
+  document; the list is in [`seacast-lite-rationale.md`](seacast-lite-rationale.md) §9.
 
 **What is normative.** Sections 1 to 3 are the consensus-side and wire definitions that both ends
 must agree on. Sections 4 to 7 combine each node's local scheduling with the meaning of the messages
@@ -41,7 +41,7 @@ every node; a node sets the others itself, the bounds within what §8.3 states.
 
 **Reading it.** An implementer can read §1 to §7 in order, with §8 at hand for the state, limits and
 constants each section uses. Where a section has code, its prose says what the code does, a rule to
-a paragraph. A section with reasoning to give ends with an unnumbered *Rationale*: why its rules are
+a paragraph. A section with reasoning to give has its *Rationale* in the same section of [`seacast-lite-rationale.md`](seacast-lite-rationale.md): why its rules are
 as they are, and the alternatives that were not taken, with the reason for each. A paragraph that
 opens with **Open:** names a question this version leaves open. The constants (`PROMISE`) are listed
 in §8.3, with their values and the reasons for them, and the limits a client sets in §8.2. `R_NODE`
@@ -184,7 +184,7 @@ the group id is only its hash. Two designs work, and the choice is not made:
 - **B, descriptor in the bid:** the bid carries the descriptor itself instead of its hash, and
   chunks carry only the key.
 
-Section 3 is written for either. What the choice decides is in the Rationale below.
+Section 3 is written for either. What the choice decides is in `seacast-lite-rationale.md` §1.
 
 The builder makes the group at bid time:
 
@@ -744,7 +744,7 @@ frame too). One frame draws at most one answer per id. `resolve` returns nothing
 node dropped (§4.6).
 
 **An ask for a chunk the asker claimed is dropped: the claim wins.** On a live connection an honest
-ask always arrives before the claim it would contradict (Rationale), so an ask after the claim is a
+ask always arrives before the claim it would contradict (`seacast-lite-rationale.md` §4.5), so an ask after the claim is a
 protocol violation.
 
 Both lanes of a peer's queue feed one ordered writer, the asker drops its queued asks for chunks it
@@ -961,7 +961,7 @@ peer that a full queue refuses is offered to it instead (§5.2).
   its HAVE grows at each chunk's first write (`origin_written`); the acknowledgement does nothing.
   This is the source before v0.9. The research implementation offers so too, and its rerun of
   Figures 4 and 5 paces the HAVE at the write (§9). No rule at another node needs either setting
-  (Rationale).
+  (`seacast-lite-rationale.md` §5.1).
 - **The source's HAVE is paced** [P4], for the source's privacy. It names the chunks acknowledged so
   far, or at `PUBLISH` those written so far: a chunk joins it at its acknowledgement, or at its
   first write, and the HAVE then goes to the mesh, as a forwarding node's does when a chunk arrives.
@@ -1245,7 +1245,7 @@ def ask_parked(a):
         if parked(pick, a): asked_parked[k].add(pick)     # counted once the queue has taken the ask
 ```
 
-The rules follow. Why each is as it is comes after them, under *Rationale*.
+The rules follow. Why each is as it is comes in `seacast-lite-rationale.md` §6.1.
 
 **Offers.** Every announcement of a chunk is recorded as an offer (`add_offer`), within §8.2's
 limits on offers. That includes an announcement from a parked peer, and one in an IHAVE over
@@ -1859,7 +1859,7 @@ versions and code, N = 2K for a coded group, the tree and the ids.
 |---|---|---|---|---|
 | `R`, `R_FAST` | at least 1 | 2, 6 | 3, 11, 17 | a source with `R` = 0 pushes nothing, and at `SOURCE_OFFERS = ACK` offers its mesh no chunk, since §5.1's offers then wait for a chunk's acknowledgement: only a peer that joins its mesh (§5.4), or heartbeat gossip outside it (§6.4), is offered anything, so the group's diffusion may never start. §5.3's guard also reads the first push to a peer, which a budget of 0 never makes. 2: the coded group needs less fan-in; 3 without the code at 1 MiB. 6: the knee, beyond which receivers' downlinks bind |
 | `GUARD_GRACE` | longer than a push takes to leave this node's queue and reach the peer, plus the peer's first HAVE coming back: about the round trip to the peer where queues are short | 200 ms | 16 | so that an honest peer is not demoted before its first HAVE can arrive (§5.3). A peer whose copies wait for their block sends no HAVE until it installs (§4.2), and one whose queue to this node is full can drop its HAVE (§8.2): either can be demoted meanwhile, until its first HAVE |
-| `GOSSIP_RETRANSMISSION` | at least 3 | 3, stock gossipsub | – | while its park and the last resort's count last, §6.1's rules ask a provider for a chunk at most twice before the root its copies name installs, and leave its third answer for after the switch to that block (§6.1's Rationale) |
+| `GOSSIP_RETRANSMISSION` | at least 3 | 3, stock gossipsub | – | while its park and the last resort's count last, §6.1's rules ask a provider for a chunk at most twice before the root its copies name installs, and leave its third answer for after the switch to that block (`seacast-lite-rationale.md` §6.1) |
 | `GROUP_TTL` | at least 7 heartbeats and the seen cache's lifetime, after the group's last chunk or its completion | not fixed | – | so that a group outlives its diffusion. That is not assured: a decode, which this document does not bound, can outlast the group (§4.6), as can what is still queued for it (§7.2), and the live window can end the group sooner (§8.1) |
 | `LIVE_WINDOW` | more slots than a group needs to reach every honest node from the start of its slot (the block's propagation, the group's diffusion, the clock disparity), and no more than a node can keep groups, tombstones and deferred chunks for (§8.2 bounds the groups not yet tied to a block) | not fixed | – | diffusion's deadline; an expired group never comes back (§8.1) |
 | `TOMBSTONE_TTL` | only where groups have no slot: more than a queued HAVE can wait, plus a frame's time to its peer, plus the peer's `HAVE_TTL` and one of its heartbeats, after the expiry; a deployment that relies on it states these (§8.1) | not fixed | – | the tombstone outlasts the node's claims (§8.1) |

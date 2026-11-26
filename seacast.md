@@ -46,7 +46,9 @@ reasons, each with its conditions.*
 - §8 points to the record of the decisions.
 - The glossary, after §8, defines the document's terms and its labels.
 
-**Three companion documents** go with this one:
+**Four companion documents** go with this one:
+- [`seacast-rationale.md`](seacast-rationale.md) gives the reasons behind the rules and their history, under this document's
+  section numbers.
 - [`seacast-bindings.md`](seacast-bindings.md) defines the bindings: how each carries the
   messages, SEACAST's message encoding, and the bytes of the libp2p stream and Waggle bindings.
 - [`seacast-decisions.md`](seacast-decisions.md) records each decision: when it was taken,
@@ -2108,9 +2110,9 @@ it.
   publish, by the rule it would use at the acknowledgement, to its pool as it stands then, and its
   holding grows at each chunk's first write (`origin_written`), as before v0.9; an acknowledgement
   then does nothing (`origin_acked`), not even for a chunk a peer rebuilt before the source wrote
-  it. A source that wants P4's cover toward its pool offers at the acknowledgement (below). A client
+  it. A source that wants P4's cover toward its pool offers at the acknowledgement (`seacast-rationale.md` §4.7). A client
   may key the choice on its uplink, as striping is (`STRIPE_UPLINK`); this document does not
-  (below).
+  (`seacast-rationale.md` §4.7).
 - **A chunk that no peer wants** is pushed to no one and never acknowledged. That costs nothing: its
   offers would have gone to no one either.
 - **A pull-only type's source** (`EAGER` off) pushes nothing, so no acknowledgement can come. It
@@ -2710,7 +2712,7 @@ cross-fill ones under the row setting, the last by `check.py --doc seacast`.
 | `IWANT_WINDOW` | node | `seacast-lite.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |
 | `MERGE_HOLDINGS` | node | a holding of a group the node publishes that is still in its queue takes the newer chunks instead of a second holding (§4.2; v0.4 §5.1 allows it) | permitted: a source may merge (local policy, as v0.4 words it); the toy keeps it off so that its recorded cells stay comparable |
 | `HAVE_TTL`, `PUSH_TTL`, `GROUP_TTL`, `PARK_TTL`, offers, `GUARD_GRACE`, `RTT_REF`, `TARGET`, `WINDOW_TIMEOUT`, pace tick, `GOSSIP_RETRANSMISSION` | – | `seacast-lite.md` §8.3 unchanged | – |
-| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (below) |
+| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (`seacast-rationale.md` §6.3) |
 
 **Open, for later study:**
 - *`M`:* the values 1 < M < N are open.
