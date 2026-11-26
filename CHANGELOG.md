@@ -4,15 +4,38 @@ Each release is a tag, and `seacast-lite.md` names its version at the top. A rel
 names the tag's commit from the next release on, since a commit cannot name itself. Changes after
 the latest tag are on `main`; when there are any, this file's first entry names them. A release
 changes the text and its checks, not earlier measurements: each measurement says which code it ran
-(`seacast-lite.md` §9 for the SEACAST post's figures).
+(`seacast-lite-rationale.md` §9 for the SEACAST post's figures).
 
 From v0.13.0-rc.1 on, each entry gives the essence of a release in a few lines: a summary, then the
 changes that a reader needs to know. Changes to the rules, which change what a node does under
 `seacast-lite.md`, `seacast.md` or its bindings, come first. The details are in the commit messages,
-and the reasons are in the documents, most of them in their Rationales. The entries up to v0.12.0
-list their changes by kind (**Rules**, **Added**, **Changed**, **Fixed** and **Removed**). The
-detailed notes of every release up to v0.10.8 are in
+and the reasons are in the rationale files, `seacast-lite-rationale.md` and `seacast-rationale.md`.
+The entries up to v0.12.0 list their changes by kind (**Rules**, **Added**, **Changed**, **Fixed**
+and **Removed**). The detailed notes of every release up to v0.10.8 are in
 [the changelog at the v0.10.8 tag](https://github.com/cskiraly/seacast-spec/blob/v0.10.8/CHANGELOG.md).
+
+## After v0.13.0-rc.1 — not yet released
+
+The rules and their reasons are now in separate files. No rule changed, and every digest of
+`toy/check.py` is as it was, under either document.
+
+- **Each document has a rationale file.** `seacast-lite.md` and `seacast.md` keep their rules,
+  settings, definitions, code and Opens, under the same section numbers. The reasons behind the
+  rules, and their history, are now in [`seacast-lite-rationale.md`](seacast-lite-rationale.md) and
+  [`seacast-rationale.md`](seacast-rationale.md), under the same numbers, and each section with a
+  part there points to it. They hold the Rationale that closed many sections, and
+  `seacast-lite.md` §9's list of where the research implementation differs.
+- **No rule left with its reason.** Sentences that state a rule were first taken out of the reasons,
+  in the same words: for example, in `seacast-lite.md` §4.5, the ordering that makes an ask arrive
+  before the claim it would contradict, and in `seacast.md` §4.5, that a WANT ignored at either of
+  its two bounds is not penalised. `seacast-lite.md` §7.1 now says that whether the normal lane's
+  control should bypass the window is open, which only §9 said before.
+- **Obligation words are BCP 14 key words** (RFC 2119, RFC 8174) where they bind, such as MUST,
+  SHOULD and MAY, in capitals. §0 of each document, the bindings' included, says how a rule stated
+  without one binds.
+- Three passages no longer say that gossipsub or its Partial Messages Extension is the deployed path:
+  `seacast.md` §0, `seacast-bindings.md` §5, and the reason behind `seacast.md` §7, now in
+  `seacast-rationale.md` §7.
 
 ## v0.13.0-rc.1 — 2026-11-25
 
