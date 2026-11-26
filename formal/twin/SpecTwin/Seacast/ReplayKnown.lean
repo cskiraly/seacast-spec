@@ -760,7 +760,7 @@ parameters but no `MAX_RELATIONS`; `sym`, symmetric, with a floor below its cap 
 backoff of 1.0; and `bare`, with `row`'s parameters but no `M`. The toy fixes `F_HI`, `D_OUT`, `D_OUT_FAST` and
 `D_OUT_MAX` at 12, 8, 8 and 12 for its three types (toy/node.py:1237, :1287, :1332); the records take smaller values,
 which §1.1's class allows, so that their lists stay short, and the twin reads each from the context the same way at
-any value. Two symmetric types are outside the mesh's `F_LO ≤ D_OUT < F_HI` (§9's table), which the toy's `payload`,
+any value. Two symmetric types are outside the mesh's `F_LO ≤ D_OUT < F_HI` (§6's table), which the toy's `payload`,
 the only type the toy makes symmetric, meets at 6 ≤ 8 < 12: `column`, whose `D_OUT` is below its floor, and `sym`,
 whose `D_OUT` is above its cap, so that the draw at the cap can be asked with 0, and with a negative count in the one
 that must fail.

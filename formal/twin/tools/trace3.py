@@ -589,8 +589,8 @@ LAYERS = {("node.py", "Node.__init__.<locals>.over_ihave_limits", 207): ("over_i
           ("node.py", "Node._no_source_offers.<locals>.publish", 997): ("publish", CHANGING),
           ("node.py", "Node._late_source_offers.<locals>.publish", 1016): ("publish", CHANGING),
           # an adapter: the gossipsub binding's reading of a frame as SEACAST's messages, around the one call of the
-          # document's on_frame that is the record. seacast-bindings.md §4 (the gossipsub binding, :369) gives that
-          # reading to the binding, and :393-395 keep an IDONTWANT's stock ids in unwanted[p] with stock gossipsub's
+          # document's on_frame that is the record. seacast-bindings.md §4 (the gossipsub binding) gives that
+          # reading to the binding, and its IDONTWANT bullet keeps the stock ids in unwanted[p] with stock gossipsub's
           # admission, after the frame's asks: the work the adapter does after its call
           ("node.py", "Node._seacast.<locals>.on_frame", 1695): ("on_frame", ADAPTER),
           # bound during a call: publish's announce under --source-offers off and late
@@ -3007,7 +3007,7 @@ def orders_self_test():
     # R10, §4.2's gate. drop_outside's three entries where its own frame iterates (OrderPopView with its
     # keys writer, DropPeers, WantKeysView), each level the document's way, empty ones included; nothing where another
     # frame iterates the same levels (drop_wants_beyond), nor inside a question; `discard` goes to the set itself
-    def drop_outside(standing, want_p, g):          # seacast.md :1575-1581's iterations, `outside` a test of q
+    def drop_outside(standing, want_p, g):          # seacast.md's drop_outside's iterations, `outside` a test of q
         for i in list(standing[g]):
             for q in [q for q in standing[g][i] if q != 5]:
                 standing[g][i].discard(q)
@@ -5687,8 +5687,8 @@ def caller_name():
 
 
 class Gate:
-    """§4.2's gate under SEACAST: the order of `on_header_validated`'s `for g in groups` (:1221), where groups is
-    `dict.fromkeys(cell_groups(root))` (:1198): cell_groups' answer in that frame without its repeats, in the answer's
+    """§4.2's gate under SEACAST: the order of `on_header_validated`'s `for g in groups`, where groups is
+    `dict.fromkeys(cell_groups(root))`: cell_groups' answer in that frame without its repeats, in the answer's
     own order, so the order is `list(dict.fromkeys(answer))`, the same in every process (a set's order would follow
     the hash seed). It is written as ["order", "on_header_validated", [g...]] just before the first drop_outside the
     frame calls, or at the frame's return where it calls none; each drop_outside the frame calls is checked against

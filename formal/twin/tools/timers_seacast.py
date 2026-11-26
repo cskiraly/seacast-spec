@@ -36,8 +36,8 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       retry_offer has a second caller with no timer: seacast.md's on_heartbeat retries every offer §4.3's limits held
       back (`for a in held_back.values(): retry_offer(a)`), then clears held_back. Since the roots are traced
       (917d02f), on_heartbeat is a record, and those retries and its drop_stale_waits run inside it and are no
-      records of their own. Its other callers run inside records too: on_header_validated (:1223), and
-      seacast-lite.md's on_block_installed (:572) and drop_tie (:578), which runs inside on_block_installed or,
+      records of their own. Its other callers run inside records too: seacast.md's on_header_validated, and
+      seacast-lite.md's on_block_installed and drop_tie, which runs inside on_block_installed or,
       through drop_stale_waits, on_heartbeat. So every retry_offer record is a timer's, no marker is met, and K4
       excuses no record. In a trace made before, on_heartbeat was no record, so those calls were records of their
       own, and the rest of this paragraph is about such a trace. Under seacast.md on_heartbeat alone calls
@@ -52,8 +52,8 @@ log's `timers`: ["after", DELAY, "retry_offer", [ASK]]. A record's own `after` i
       once, K4 fails any chunk with two or more records beyond its timers at one (node, t) of a heartbeat, in either
       branch and across epochs (two markers at one t). The limit: a timer lost whose fire falls on a heartbeat, for
       an ask held back in the epoch that heartbeat closes and not yet retried, is taken for the heartbeat's retry.
-      on_offer is the one writer of held_back's entries (seacast.md's :1321); on_heartbeat's `held_back.clear()`
-      (:2826) writes it too, inside on_heartbeat's record. on_offer's one caller is on_frame (:624). Since 917d02f
+      on_offer is the one writer of held_back's entries in seacast.md; on_heartbeat's `held_back.clear()` writes
+      it too, inside on_heartbeat's record. on_offer's one caller is on_frame. Since 917d02f
       on_frame is traced, so each call of on_offer runs inside an on_frame record, and its writes are among that
       record's, where the checker reads them (it reads held_back's writes on every record). In a trace made before,
       on_frame was not traced, and each call of on_offer was a record of its own. A trace whose header's traced names
