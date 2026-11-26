@@ -1647,7 +1647,7 @@ act.
 
 *The reasons and history behind this section: [`seacast-lite-rationale.md`](seacast-lite-rationale.md), its §7.3.*
 
-- **A writer SHOULD hand a chunk to the transport only while the connection has less than one chunk
+- **A writer should hand a chunk to the transport only while the connection has less than one chunk
   unsent.** The write of §7.2 then completes when the transport has taken all but about one chunk,
   and the queue holds the rest: cancel, projection and rarest-first act on what has not left (§7.2),
   the window counts what no peer is yet known to hold (§7.1), and the queue's order is the link's.

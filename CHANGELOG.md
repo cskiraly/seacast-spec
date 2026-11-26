@@ -30,9 +30,9 @@ The rules and their reasons are now in separate files. No rule changed, and ever
   before the claim it would contradict, and in `seacast.md` §4.5, that a WANT ignored at either of
   its two bounds is not penalised. `seacast-lite.md` §7.1 now says that whether the normal lane's
   control should bypass the window is open, which only §9 said before.
-- **Obligation words are BCP 14 key words** (RFC 2119, RFC 8174) where they bind, such as MUST,
-  SHOULD and MAY, in capitals. §0 of each document, the bindings' included, says how a rule stated
-  without one binds.
+- **Obligation words are BCP 14 key words** (RFC 2119, RFC 8174) where they bind, such as MUST and
+  MAY, in capitals. §0 of each document, the bindings' included, says how a rule stated without one
+  binds.
 - Three passages no longer say that gossipsub or its Partial Messages Extension is the deployed path:
   `seacast.md` §0, `seacast-bindings.md` §5, and the reason behind `seacast.md` §7, now in
   `seacast-rationale.md` §7.

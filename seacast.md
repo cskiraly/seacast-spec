@@ -301,7 +301,7 @@ its own that serves the index: it does so if its own duty is `FORWARD`, within i
 for the asker, to such a link other than the asker that it has not parked for the group (§4.5,
 `route_want`). That is the trivial structure, which needs no routing neighbours; its one forwarding
 step is the request's default. With steps left (the request's `hops` above 1 when it arrives:
-`ROUTE_HOPS` above 1 at the sampler), a forwarder that has no such link MAY pass the request on
+`ROUTE_HOPS` above 1 at the sampler), a forwarder that has no such link may pass the request on
 toward the family in turn, to another forwarding link, under the same duty and limit (§4.5).
 
 ### 1.4 Colours and the floor
@@ -546,7 +546,7 @@ every index under `ALL`, its derived interest under `DERIVED` (every index of a 
 custodies, or of its own subnet's row, and none of another), the cells it drew to sample under
 `DECLARED`, whether or not it has asked a peer for them yet (§4.10), and, for a supernode, every
 row besides (§4.6, the second phase). A
-node MAY hold state for a group it has no interest in, when it holds chunks of it or a peer's
+node may hold state for a group it has no interest in, when it holds chunks of it or a peer's
 interest names it (a reconstructor's non-custodied columns, R4); the number of such groups per slot
 is bounded (§6.3).
 
@@ -1980,7 +1980,7 @@ def push_rebuilt_as_source(g2, items):                 # [D4] REPAIR_BUDGET: a r
   column subnets can observe rows completing elsewhere and cancel the redundant work": a row rebuilt
   elsewhere reaches a supernode as column cells. A node with 64 to 127 columns never holds the cells
   of the columns it lacks, so it cannot tell a row rebuilt elsewhere from one still short, and it
-  keeps no second-phase duty here (the EIP's MAY, left out). Under custody alone, without row
+  keeps no second-phase duty here (the EIP's "MAY", left out). Under custody alone, without row
   subnets, the same rule is PeerDAS's reconstruction ("If the node obtains 50%+ of all the columns,
   it SHOULD reconstruct the full data matrix … Nodes MAY delay this reconstruction"), with the delay
   made the rule's: a supernode keeps the rows, no other node does, and it rebuilds only the rows its
@@ -2307,7 +2307,7 @@ claimant takes the probe's promise too (§4.6), which the option, having no code
 more than one of the node's samples; §8 gives the reasons, selective disclosure first.
 
 **The WANT is standing:** the peer answers from what it holds and, for the rest, when the chunks
-arrive (§4.5), so the WANT MAY go out at block arrival, before any cell has reached the custodian;
+arrive (§4.5), so the WANT may go out at block arrival, before any cell has reached the custodian;
 in the toy it does. The duplicate that a peer may still deliver after the sampler moved on is
 acknowledged like any duplicate.
 
@@ -2485,7 +2485,7 @@ the writer, for example an urgent entry for its peer, another writer leaving the
 a holding or a window timeout frees. Waking the front writer when a discard changes its entry is a
 rule change, for a later release.
 
-**Below the writer** (v0.9 §7.3, as written). A writer SHOULD hand a chunk to the transport only
+**Below the writer** (v0.9 §7.3, as written). A writer should hand a chunk to the transport only
 while the connection has less than one chunk unsent. The backlog then waits in the queue, where
 cancel, projection and §4.12's order act on it.
 - **v0.9 §7.3 says the rest:** what the rule bounds and what it does not, what follows when it is
@@ -2721,7 +2721,7 @@ cross-fill ones under the row setting, the last by `check.py --doc seacast`.
 | `IWANT_WINDOW` | node | `seacast-lite.md` §8.3's 200 ms, scaled by `ask_scale()` (§4.13) | – |
 | `MERGE_HOLDINGS` | node | a holding of a group the node publishes that is still in its queue takes the newer chunks instead of a second holding (§4.2; v0.4 §5.1 allows it) | permitted: a source MAY merge (local policy, as v0.4 words it); the toy keeps it off so that its recorded cells stay comparable |
 | `HAVE_TTL`, `PUSH_TTL`, `GROUP_TTL`, `PARK_TTL`, offers, `GUARD_GRACE`, `RTT_REF`, `TARGET`, `WINDOW_TIMEOUT`, pace tick, `GOSSIP_RETRANSMISSION` | – | `seacast-lite.md` §8.3 unchanged | – |
-| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *RECOMMENDED* on the libp2p stream binding: not gossipsub's 10 (`seacast-rationale.md` §6.3) |
+| `MAX_IHAVE_MESSAGES`, `MAX_IHAVE_LENGTH` | node, per peer and heartbeat | gossipsub's two IHAVE limits on offers: offer-bearing frames, and asks in reply to them. Over either, asks wait for the next heartbeat (§4.3). The values are the client's (`seacast-lite.md` §8.2); on the gossipsub binding a stock gossipsub client sets 10 and 5000 (`seacast-bindings.md` §4) | `seacast-lite.md` §8.3's reference values are 4096 frames and 5000 ids per peer and heartbeat; this draft chooses no values of its own for its bindings. *Recommended* on the libp2p stream binding: not gossipsub's 10 (`seacast-rationale.md` §6.3) |
 
 **Open, for later study:**
 - *`M`:* the values 1 < M < N are open.

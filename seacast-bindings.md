@@ -60,8 +60,8 @@ interpreted as described in BCP 14 ([RFC 2119](https://www.rfc-editor.org/rfc/rf
 [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174)) when, and only when, they appear in all
 capitals, as shown here. Most rules are stated without them, in the indicative. In the sections the
 list above calls normative, such a rule binds every node that speaks the binding as a MUST does,
-except for how a node schedules its writes, which is its own, as `seacast.md` §0 says. In §7, the
-draft, the key words say what that binding would require.
+except for how a node schedules its writes, which is its own while the meanings of the messages
+hold, as `seacast.md` §0 says. In §7, the draft, the key words say what that binding would require.
 
 **At a glance**, the table below shows the bindings message by message (`M`: `seacast.md` §1.4).
 The native QUIC binding is not in it: §7.2 shows that binding message by message.
@@ -679,9 +679,9 @@ This version sends no datagrams (RFC 9221). Two uses are considered:
   so a later holding supersedes a lost one. The last holding of a group has no successor and would
   also go on the control stream.
 - **Payload chunks as datagrams,** where an encoded chunk fits in one. A datagram is never
-  fragmented. The encoded chunk, with the DATAGRAM frame's own bytes, MUST fit the largest datagram
+  fragmented. The encoded chunk, with the DATAGRAM frame's own bytes, must fit the largest datagram
   frame the peer accepts (`max_datagram_frame_size`, RFC 9221 §3). The UDP payload that carries it,
-  with QUIC's overhead, MUST fit both the path's packet size and the largest UDP payload the peer
+  with QUIC's overhead, must fit both the path's packet size and the largest UDP payload the peer
   accepts (`max_udp_payload_size`, RFC 9000 §18.2). At the packet sizes the study assumed, this
   leaves the encoded chunk about 1 160 to 1 415 bytes. A cell's encoded message is 2 140 bytes
   before compression, with its kind byte and without a header (§1.5), and does not fit unless it
@@ -733,7 +733,7 @@ The binding also adds three rows to that table. Its own answers are these:
 - **An implementation feature the standard recommends:** priorities between streams (§7.4). quic-go
   has them from v0.62.0. Without them the binding still works, and the implementation shares the
   connection between streams in its own way.
-- **An OPTIONAL standard extension:** datagrams (RFC 9221), for §7.5.
+- **An optional standard extension:** datagrams (RFC 9221), for §7.5.
 - **No TCP form.** The libp2p stream binding over TCP stays the fallback.
 
 ### 7.9 What is open
